@@ -24,6 +24,8 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/client.js` — `StremioClient` (API calls, LRU caching, AbortController support)
 - `assets/src/js/lib/discover/lang.js` — `LANG_MAP`, `extractLanguages()` (language detection for stream titles)
 - `assets/src/js/lib/discover/stream.js` — `parseStreamName()`, `extractInfoHash()` (stream name parsing)
+- `assets/src/js/lib/discover/release-video.js` — what a release's name says about its video (codec, HDR, Dolby Vision profile 5); see "Video switches"
+- `assets/src/js/lib/discover/playback.js` — the video switches' rules: defaults, the 4K gate, what each switch hides, the empty-state text
 - `assets/src/js/lib/discover/components/discoverReducer.js` — state reducer, initial state, helper functions
 - `assets/src/js/lib/discover/components/DiscoverApp.jsx` — root Preact component orchestrating all sub-components
 - `assets/src/js/lib/discover/components/StreamModal.jsx` — stream modal, episode picker, stream filters
@@ -180,8 +182,8 @@ The stream modal shows TMDB community reviews for the open title, when they exis
 Whether content-transcoder hands HEVC to the player as it is (HEVC
 passthrough) decides what Discover may promise about 4K HEVC. The page gets
 the transcoder's own answer as `window._passthrough = {"hevc": "on"|"off"|"unknown"}`
-(`handlers/discover` `indexData.Passthrough`). Nothing on the page reads it
-yet; the Discover UI of the passthrough work will.
+(`handlers/discover` `indexData.Passthrough`). The stream modal's 4K switch
+reads it ("Video switches" below).
 
 - **Where it comes from.** `services/transcodercaps` asks
   `GET http://$CONTENT_TRANSCODER_SERVICE_HOST:$CONTENT_TRANSCODER_SERVICE_PORT/capabilities`
@@ -213,6 +215,97 @@ yet; the Discover UI of the passthrough work will.
 - **The player does not read it.** A stream's route is decided per session
   by the transcoder from what the browser declares; a failure to read the
   capability cannot touch playback.
+
+## Video switches
+
+Above a title's releases the stream modal has up to three switches — HEVC,
+HDR, 4K — each shown only when the list has releases it is about, with the
+number of those releases in its label. A switch that is off hides those
+releases from the list. The rules are `lib/discover/playback.js`; the
+names are read by `lib/discover/release-video.js`.
+
+- **What a release is, by name.** HEVC: the words `x265`, `H.265`/`h265`,
+  `HEVC`; H.264: `x264`, `H.264`, `AVC`; `AV1`. HDR: `HDR`, `HDR10`,
+  `HDR10+`, `HDR10P`/`HDR10Plus` (not `HDRip`, not `HDTV`), and Dolby
+  Vision (`DV`, `DoVi`, `Dolby Vision`) without an HDR word; `HLG` is its
+  own. A word counts only as a whole token, so `HEVCKiNGS`, `Relax265`
+  and `DVDRip` say nothing. The text read is the addon's name line
+  (Torrentio writes `4k DV | HDR10+` there), the title, and a hinted file
+  name. A release that names no codec — or two different ones, like a
+  pack folder saying x265 over a file saying x264 — is `unknown` and is
+  never hidden as HEVC. 4K is the existing `4K` chip (`2160p`/`4k` in the
+  name line).
+- **How often the names are wrong.** Measured on the file paths of the
+  films opened on Webtor over two weeks (24 062; the true codec from the
+  media probe): HEVC by name is right 99.6% of the time and finds 78% of
+  HEVC files; the HDR switch's rule is right 97.9% and finds 79%. **On
+  Discover's own lists the error is not measured**: those names come from
+  addons, not from file paths, and the old 4K switch kept 4K releases out
+  of the sample.
+- **HEVC.** On by default where the browser decodes HEVC, off where it
+  answered that it does not: there HEVC is converted on our side — slower
+  to start, may pause, and 4K HEVC does not play at all. Turning it on
+  there shows that warning first. The browser's answer is the same probe
+  and tokens the page declares to the transcoder
+  (`lib/player/decode-declaration.js` `decodedTokens`, any of
+  `hevc8`/`hevc10`/`hevc8-2160`/`hevc10-2160`), asked of every browser on
+  Discover whether or not it takes part in the declaration.
+- **HDR.** The same, by `hdr-pq`: on where the browser decodes PQ, off
+  with a warning where it answered that it does not (HDR up to 1080p may
+  look washed out; 4K HDR does not play). It hides PQ releases and Dolby
+  Vision without an HDR word (profiles 8 and 7 carry an HDR10 layer).
+  Not HLG, and not profile 5 (next item).
+- **Dolby Vision profile 5.** A release whose name reads as DV5 — the
+  profile said outright (`DV.P5`), or Dolby Vision with no HDR word from a
+  WEB source that is not a `HYBRID` — gets a yellow "DV: wrong colours"
+  badge for every browser: it has no HDR10 or SDR layer, the transcoder
+  never passes it through, and a re-encode keeps its colours wrong. It is
+  not hidden by the HDR switch; the row stays, "Download" is one click on.
+  The rule is small-sample: on the same two weeks of paths it marked 5
+  files, 4 of them DV5, and found 4 of the 6 DV5 files. Plain "DV without
+  HDR" was DV5 only 4 times in 19, which is why the rule asks for WEB.
+- **4K — the one switch that reads the transcoder.** 4K HEVC plays only
+  where the transcoder passes HEVC through (`window._passthrough.hevc ===
+  "on"`) **and** this page declares 4K Main10 (`hevc10-2160`, the
+  transcoder's own rule; 9 in 10 HEVC sources over 1080p are Main10). There
+  the 4K switch is gone and 4K is shown. Everywhere else it stays, off by
+  default, and turning it on warns — with a text that says why:
+  - transcoder answer `unknown`, or this page takes part and the browser
+    has not answered: "we couldn't check" (`discover.warning4kBodyUnchecked`)
+    — a check that did not happen is not "4K is off";
+  - the transcoder passes HEVC through and this browser declared without
+    4K Main10: "this browser doesn't decode 10-bit HEVC"
+    (`discover.warning4kBodyNoHevc`) — a browser with 1080p HEVC or 4K
+    Main only is not offered 4K HEVC as playable;
+  - otherwise (the transcoder converts, or this page does not declare, so
+    its sessions take the old route): the warning Discover always had
+    (`discover.warning4kBody`), which is true there.
+  4K HEVC tier High (UHD Blu-ray remuxes) also needs `hevc-high`; a
+  browser that declares 4K Main10 without it is not told (not handled).
+- **A check that has not answered is not a "no".** Until the browser's
+  probe answers (the first moments of a first visit; a cached answer of
+  the same browser counts at once), HEVC and HDR stay shown and turning
+  them on does not warn. The probe is the declaration's: its module is a
+  lazy chunk (`decode-probe`) that Discover loads for every visitor.
+- **The viewer's choice.** `discover-prefs` in localStorage: `showHevc`,
+  `showHdr`, `show4k` are written only when the viewer flips a switch, and
+  a written choice wins over any default. `show4k` keeps its old meaning,
+  "show 4K that will not play here": where 4K plays it is not read (no
+  switch, 4K shown) and not deleted, so if the transcoder stops passing
+  HEVC through the switch comes back with the viewer's old choice. There
+  is no migration step: an existing `show4k: true` keeps 4K shown where
+  the switch stands.
+- **Everything hidden.** When the switches hide every release, the list
+  says so instead of going empty: the one switch that hides them all is
+  named (`discover.allHevcStreams`, `discover.allHdrStreams`, the old
+  `discover.all4kStreams`), several are named together
+  (`discover.allHiddenStreams`).
+- **Before passthrough is on** (the transcoder answers `off`), HEVC and
+  HDR are converted for every browser, so today the two defaults tell
+  apart browsers the transcoder still treats alike: a browser that decodes
+  HEVC keeps HEVC shown (as before), one that does not gets it hidden
+  (owner's decision, 2026-09-28). The defaults become exact when the
+  browser's sessions pass through.
 
 ## Addon Wizard
 
@@ -321,6 +414,9 @@ Events tracked:
 - `ai-watchlist-toggled` — heart icon clicked on an AI recommendation card (`id`, `on`)
 - `stream-from-watchlist` — a card was clicked while the Watchlist view was active (no params; bare counter so the conversion ratio is `count(stream-from-watchlist) / count(watchlist-added)`)
 - `discover-reviews-expand` — TMDB reviews section expanded in the stream modal (`id`); the gate metric for investing further in reviews (translation, more sources)
+- `discover-4k-toggle-attempt` / `-enabled` / `-disabled` / `-cancelled` — the 4K switch (no fields; names unchanged)
+- `discover-hevc-toggle-attempt` / `-enabled` / `-disabled` / `-cancelled`, and the same `discover-hdr-*` — the HEVC and HDR switches (`browser`: `yes` / `no` / `unknown`, whether it decodes them); `toggle-attempt` is the warning shown
+- `discover-streams-classified` — once per stream list: `n`, how many the names read as `hevc` / `hdr` / `uhd` / `dv5` / `unknown_codec`, how many the switches `hidden` and whether that left the list `empty`, the browser's `dec_hevc` / `dec_pq` (`yes` / `no` / `unknown`), the transcoder's `caps`, `uhd_plays`. How often the defaults hide releases and empty lists
 
 ## Addon Health
 

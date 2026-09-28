@@ -27,6 +27,8 @@ import { AddonHealthChip } from './AddonHealthChip';
 import { AISection } from './ai/AISection';
 import { t, langPath } from '../i18n';
 import { fetchTorznabStreams, hasIndexers, indexerLabel } from '../torznabClient';
+import { startProbe, decodedTokens, declaredTokens, takesPart } from '../../player/decode-declaration';
+import { playbackContext } from '../playback';
 
 // episodesModalFromBack rebuilds the episodes-view modal from the
 // backToEpisodes snapshot carried by an episode-streams modal. Shared by
@@ -91,6 +93,29 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     const pendingStreamRef = useRef(null); // stream to reload after wizard
 
     const url = useDiscoverUrl('/discover');
+
+    // What the stream modal's video switches go by (lib/discover/playback.js):
+    // the transcoder's answer on the page, and the browser's own, from the
+    // same probe the page declares with -- asked here of every browser, not
+    // only of those taking part, since the HEVC and HDR switches follow
+    // what the browser decodes. The probe runs in the background (its module
+    // is a lazy chunk); until it answers, and where it never does, the
+    // switches read "not answered", never "does not decode". A cached
+    // answer of this browser counts at once.
+    const [probeAnswers, setProbeAnswers] = useState(0);
+    useEffect(() => {
+        let live = true;
+        try {
+            Promise.resolve(startProbe(window)).then(() => { if (live) setProbeAnswers(n => n + 1); }, () => {});
+        } catch (e) {
+            // No probe: the switches stay as for an unanswered one.
+        }
+        return () => { live = false; };
+    }, []);
+    const playback = useMemo(
+        () => playbackContext(window, { decodedTokens, declaredTokens, takesPart }),
+        [probeAnswers],
+    );
 
     // Create client once
     if (!clientRef.current) {
@@ -1777,6 +1802,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     subscriptionKeys={state.subscriptionKeys}
                     onToggleSubscription={handleToggleSubscription}
                     hasSources={hasCustomAddons || addonsInstalled || hasIndexers()}
+                    playback={playback}
                 />
             )}
 

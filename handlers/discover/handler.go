@@ -66,9 +66,9 @@ type indexData struct {
 	Prefs streamPrefsView
 	// Passthrough is what the transcoder last said about handing HEVC to
 	// the player as it is (window._passthrough). "unknown" is not "off":
-	// it is the time before this process heard an answer. Nothing on the
-	// page reads it yet; the Discover UI will, to promise 4K HEVC only
-	// where it can play.
+	// it is the time before this process heard an answer. The stream
+	// modal's 4K switch reads it (lib/discover/playback.js), to promise 4K
+	// HEVC only where it can play.
 	Passthrough passthroughView
 }
 

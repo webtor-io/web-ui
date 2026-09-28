@@ -10,10 +10,12 @@ import { ReviewsList, useReviews } from './Reviews';
 import { SubscribeButton, OnAirDot } from './SubscribeButton';
 import { isSeasonUnfinished } from '../seasonStatus';
 import { getStreamPrefs, noneMatchPrefs } from '../streamPrefs';
+import { releaseText, releaseVideo } from '../release-video';
+import { switchStates, switchCounts, hiddenBy, emptyStateKey, browserDecodesHevc, browserDecodesPq } from '../playback';
 import { StarIcon } from './StarIcon';
 import { t, tf } from '../i18n';
 
-export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
+export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources, playback }) {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -61,7 +63,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                     </button>
                 </div>
                 <div class="overflow-y-auto px-3 sm:px-6 pb-4 sm:pb-6">
-                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} />
+                    <ModalBody modal={modal} onClose={handleClose} onEpisodeSelect={onEpisodeSelect} onStreamClick={onStreamClick} onSeasonChange={onSeasonChange} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} userStatuses={userStatuses} watchlistIds={watchlistIds} onToggleWatched={onToggleWatched} onRate={onRate} onToggleWatchlist={onToggleWatchlist} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} playback={playback} />
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
@@ -71,7 +73,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
     );
 }
 
-function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
+function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources, playback }) {
     const videoId = modal.metaId || modal.itemId;
     const videoType = modal.itemType;
     const isImdb = videoId && videoId.startsWith('tt') && !videoId.includes(':');
@@ -109,8 +111,8 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     }
 
     // Both settled views carry the same tab row — Episodes (N) / Reviews (M)
-    // in the episodes view, Streams (N) / Reviews (M) + the 4K toggle in the
-    // streams view. Transient views (loading / fetching / progress) stay
+    // in the episodes view, Streams (N) / Reviews (M) + the video switches
+    // in the streams view. Transient views (loading / fetching / progress) stay
     // reviews-free.
     const reviewsVideoId = isImdb && videoType ? videoId : null;
 
@@ -119,7 +121,7 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
     }
 
     if (modal.view === 'streams') {
-        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} />;
+        return <StreamContent modal={modal} onStreamClick={onStreamClick} hasCustomAddons={hasCustomAddons} onSetupAddons={onSetupAddons} onRetryStreams={onRetryStreams} statusButtons={statusButtons} headerMeta={headerMeta} videoId={reviewsVideoId} videoType={videoType} onTabChange={onTabChange} subscriptionKeys={subscriptionKeys} onToggleSubscription={onToggleSubscription} hasSources={hasSources} playback={playback} />;
     }
 
     return null;
@@ -333,7 +335,7 @@ function FetchingView({ modal, statusButtons, headerMeta }) {
 // --- Modal tabs (shared by episodes & streams views) ---
 
 // ModalTabs — the Primary (N) / Reviews (M) chip row. `extra` lands
-// right-aligned (the 4K toggle in the streams view). The reviews chip is
+// right-aligned (the video switches in the streams view). The reviews chip is
 // disabled until reviews arrive and stays disabled at zero.
 function ModalTabs({ tab, onSwitch, primaryLabel, reviews, showReviews, extra }) {
     return (
@@ -369,7 +371,24 @@ function is4kStream(parsedInfo) {
     return parsedInfo.labels.some(l => l === '4K');
 }
 
-function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta, videoId, videoType, onTabChange, subscriptionKeys, onToggleSubscription, hasSources }) {
+// What Discover knows about playback here before anyone asked: nothing
+// (lib/discover/playback.js). A modal rendered without DiscoverApp's
+// context behaves as one whose checks have not answered -- the list as it
+// has always been, no promises either way.
+const UNANSWERED = { caps: 'unknown', decodes: null, part: false, declared: null };
+
+// The three switches: what the viewer's choice is stored under, and the
+// name of its Umami events. The 4K ones keep the names they have always
+// had, and no fields, so their series goes on.
+const SWITCHES = {
+    hevc: { pref: 'showHevc', event: 'discover-hevc' },
+    hdr: { pref: 'showHdr', event: 'discover-hdr' },
+    uhd: { pref: 'show4k', event: 'discover-4k' },
+};
+
+const answerOf = (v) => (v === true ? 'yes' : v === false ? 'no' : 'unknown');
+
+function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, onRetryStreams, statusButtons, headerMeta, videoId, videoType, onTabChange, subscriptionKeys, onToggleSubscription, hasSources, playback }) {
     const { title, poster, streams, error, failedAddons } = modal;
     const failed = failedAddons || [];
     // Tab state lives in the modal (synced to the ?tab= URL param by
@@ -387,11 +406,15 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         try { await onRetryStreams(); } finally { setRetrying(false); }
     }, [onRetryStreams, retrying]);
 
-    const [show4k, setShow4k] = useState(() => {
+    // The viewer's own choices, as stored: a boolean only where they flipped
+    // the switch. Everything else is a default (lib/discover/playback.js).
+    const [choices, setChoices] = useState(() => {
         const prefs = loadPrefs();
-        return prefs.show4k === true;
+        return { showHevc: prefs.showHevc, showHdr: prefs.showHdr, show4k: prefs.show4k };
     });
-    const [show4kWarning, setShow4kWarning] = useState(false);
+    const [warningFor, setWarningFor] = useState(null);
+    const ctx = playback || UNANSWERED;
+    const states = useMemo(() => switchStates({ ...ctx, prefs: choices }), [ctx, choices]);
 
     const parsed = useMemo(() => streams.map(s => parseStreamName(s.name)), [streams]);
 
@@ -400,24 +423,58 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         [streams]
     );
 
-    // Count how many 4K streams exist (before any filtering)
-    const total4kCount = useMemo(() => parsed.filter(p => is4kStream(p)).length, [parsed]);
+    // What each release's name says about its video, and whether it is 4K
+    // (the 4K chip, as before).
+    const rows = useMemo(() => streams.map((s, i) => ({
+        video: releaseVideo(releaseText(s)),
+        uhd: is4kStream(parsed[i]),
+    })), [streams, parsed]);
 
-    // Base streams: exclude 4K when toggle is off
-    const { baseStreams, baseParsed, baseLangs } = useMemo(() => {
-        if (show4k) {
-            return { baseStreams: streams, baseParsed: parsed, baseLangs: streamLangs };
-        }
+    // How many releases each switch is about, before any filtering.
+    const counts = useMemo(() => switchCounts(rows), [rows]);
+
+    // Base streams: the ones no switch hides.
+    const { baseStreams, baseParsed, baseLangs, baseRows } = useMemo(() => {
         const indices = [];
-        for (let i = 0; i < parsed.length; i++) {
-            if (!is4kStream(parsed[i])) indices.push(i);
+        for (let i = 0; i < rows.length; i++) {
+            if (hiddenBy(rows[i], states).length === 0) indices.push(i);
         }
         return {
             baseStreams: indices.map(i => streams[i]),
             baseParsed: indices.map(i => parsed[i]),
             baseLangs: indices.map(i => streamLangs[i]),
+            baseRows: indices.map(i => rows[i]),
         };
-    }, [streams, parsed, streamLangs, show4k]);
+    }, [streams, parsed, streamLangs, rows, states]);
+
+    // Every release is hidden by a switch: say which, rather than show an
+    // empty list.
+    const emptyKey = useMemo(() => emptyStateKey(rows, states), [rows, states]);
+
+    // Once per list (a new list is a new `streams`; flipping a switch is
+    // not): how the names read and how much the switches hide as they
+    // stand -- the measure of the defaults (docs/discover.md).
+    useEffect(() => {
+        if (!streams.length) return;
+        try {
+            window.umami?.track('discover-streams-classified', {
+                n: rows.length,
+                hevc: counts.hevc,
+                hdr: counts.hdr,
+                uhd: counts.uhd,
+                dv5: rows.filter(r => r.video.dv5).length,
+                unknown_codec: rows.filter(r => r.video.codec === 'unknown').length,
+                hidden: rows.length - baseStreams.length,
+                empty: baseStreams.length === 0,
+                dec_hevc: answerOf(browserDecodesHevc(ctx.decodes)),
+                dec_pq: answerOf(browserDecodesPq(ctx.decodes)),
+                caps: ctx.caps,
+                uhd_plays: !states.uhd.switchable,
+            });
+        } catch (e) {
+            // A count that cannot be sent is not a reason to break the list.
+        }
+    }, [streams]);
 
     const { allSources, allLabels, allLangs } = useMemo(() => {
         const sources = [];
@@ -485,7 +542,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         const activeSrcKeys = Object.keys(activeSources);
         const activeLblKeys = Object.keys(activeLabels);
         if (!activeSrcKeys.length && !activeLblKeys.length && !activeLang) {
-            return baseStreams.map((s, i) => ({ stream: s, parsed: baseParsed[i], langs: baseLangs[i], visible: true }));
+            return baseStreams.map((s, i) => ({ stream: s, parsed: baseParsed[i], video: baseRows[i].video, langs: baseLangs[i], visible: true }));
         }
         return baseStreams.map((s, i) => {
             let show = true;
@@ -495,35 +552,61 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                 if (!activeLblKeys.every(k => lblLower.includes(k.toLowerCase()))) show = false;
             }
             if (show && activeLang && !baseLangs[i].includes(activeLang)) show = false;
-            return { stream: s, parsed: baseParsed[i], langs: baseLangs[i], visible: show };
+            return { stream: s, parsed: baseParsed[i], video: baseRows[i].video, langs: baseLangs[i], visible: show };
         });
-    }, [baseStreams, baseParsed, baseLangs, activeSources, activeLabels, activeLang]);
+    }, [baseStreams, baseParsed, baseLangs, baseRows, activeSources, activeLabels, activeLang]);
 
     const visibleCount = filteredStreams.filter(s => s.visible).length;
     const hasActiveFilters = Object.keys(activeSources).length > 0 || Object.keys(activeLabels).length > 0 || activeLang;
 
-    const toggle4k = useCallback(() => {
-        if (!show4k) {
-            setShow4kWarning(true);
-            window.umami?.track('discover-4k-toggle-attempt');
-        } else {
-            setShow4k(false);
-            savePrefs({ show4k: false });
-            window.umami?.track('discover-4k-disabled');
+    // trackSwitch: the switch's Umami event. HEVC and HDR say what the
+    // browser answered; the 4K events stay as they were.
+    const trackSwitch = useCallback((kind, what) => {
+        const name = `${SWITCHES[kind].event}-${what}`;
+        if (kind === 'uhd') window.umami?.track(name);
+        else {
+            const decoded = kind === 'hevc' ? browserDecodesHevc(ctx.decodes) : browserDecodesPq(ctx.decodes);
+            window.umami?.track(name, { browser: answerOf(decoded) });
         }
-    }, [show4k]);
+    }, [ctx]);
 
-    const confirm4k = useCallback(() => {
-        setShow4k(true);
-        setShow4kWarning(false);
-        savePrefs({ show4k: true });
-        window.umami?.track('discover-4k-enabled');
+    const choose = useCallback((kind, on) => {
+        const pref = SWITCHES[kind].pref;
+        setChoices(prev => ({ ...prev, [pref]: on }));
+        savePrefs({ [pref]: on });
     }, []);
 
-    const cancel4k = useCallback(() => {
-        setShow4kWarning(false);
-        window.umami?.track('discover-4k-cancelled');
-    }, []);
+    // Turning a switch off is always quiet. Turning one on warns where the
+    // releases it shows will not play well here: 4K always (its switch only
+    // stands where 4K does not play), HEVC and HDR only where the browser
+    // answered that it does not decode them.
+    const toggleSwitch = useCallback((kind) => {
+        if (states[kind].shown) {
+            choose(kind, false);
+            trackSwitch(kind, 'disabled');
+            return;
+        }
+        if (kind === 'uhd' || states[kind].warns) {
+            setWarningFor(kind);
+            trackSwitch(kind, 'toggle-attempt');
+            return;
+        }
+        choose(kind, true);
+        trackSwitch(kind, 'enabled');
+    }, [states, choose, trackSwitch]);
+
+    const confirmSwitch = useCallback(() => {
+        if (!warningFor) return;
+        choose(warningFor, true);
+        trackSwitch(warningFor, 'enabled');
+        setWarningFor(null);
+    }, [warningFor, choose, trackSwitch]);
+
+    const cancelSwitch = useCallback(() => {
+        if (!warningFor) return;
+        trackSwitch(warningFor, 'cancelled');
+        setWarningFor(null);
+    }, [warningFor, trackSwitch]);
 
     const toggleSource = useCallback((src) => {
         setActiveSources(prev => {
@@ -691,15 +774,15 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                 />
             )}
 
-            {baseStreams.length === 0 && !show4k && total4kCount > 0 ? (
+            {emptyKey ? (
                 <p class="text-w-muted text-sm text-center py-6">
-                    {tf('discover.all4kStreams', total4kCount)}
+                    {tf(emptyKey, rows.length)}
                 </p>
             ) : (
                 <>
                     <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
-                        {filteredStreams.map(({ stream, parsed: info, visible }, i) => (
-                            visible && <StreamRow key={i} stream={stream} info={info} onStreamClick={onStreamClick} />
+                        {filteredStreams.map(({ stream, parsed: info, video, visible }, i) => (
+                            visible && <StreamRow key={i} stream={stream} info={info} video={video} onStreamClick={onStreamClick} />
                         ))}
                     </div>
 
@@ -731,9 +814,9 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                 primaryLabel={tf('discover.tabStreams', baseStreams.length)}
                 reviews={reviews}
                 showReviews={!!videoId}
-                extra={tab === 'primary' && total4kCount > 0 ? (
-                    <Toggle4k show4k={show4k} count={total4kCount} onToggle={toggle4k}
-                        showWarning={show4kWarning} onConfirm={confirm4k} onCancel={cancel4k} />
+                extra={tab === 'primary' ? (
+                    <VideoSwitches states={states} counts={counts} warningFor={warningFor}
+                        onToggle={toggleSwitch} onConfirm={confirmSwitch} onCancel={cancelSwitch} />
                 ) : null}
             />
 
@@ -742,27 +825,52 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
     );
 }
 
-function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel }) {
-    return (
-        <div class="relative">
-            <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                <input
-                    type="checkbox"
-                    checked={show4k}
-                    onChange={onToggle}
-                    class="toggle toggle-xs toggle-soft"
-                />
-                <span class="text-xs text-w-sub">
-                    {t('discover.include4k')}
-                    <span class="text-w-muted ml-0.5">({count})</span>
-                </span>
-            </label>
+// The texts of each switch: its label, and the warning shown before it
+// turns on. The 4K warning's body depends on why 4K does not play here
+// (playback.js uhdWarningKey).
+function switchTexts(kind, states) {
+    if (kind === 'hevc') {
+        return { label: t('discover.hevc'), title: t('discover.warningHevcTitle'), body: t('discover.warningHevcBody'), confirm: t('discover.showHevc') };
+    }
+    if (kind === 'hdr') {
+        return { label: t('discover.hdr'), title: t('discover.warningHdrTitle'), body: t('discover.warningHdrBody'), confirm: t('discover.showHdr') };
+    }
+    return { label: t('discover.include4k'), title: t('discover.warning4kTitle'), body: t(states.uhd.warningKey), confirm: t('discover.show4k') };
+}
 
-            {showWarning && (
-                <div class="absolute right-0 top-full mt-1.5 z-dropdown bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64">
-                    <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">{t('discover.warning4kTitle')}</p>
+// VideoSwitches: HEVC, HDR and 4K, each only where the list has releases
+// it is about -- and 4K only where 4K does not play here. The warning
+// hangs under the whole row, so it stays inside the modal whichever
+// switch asked for it and however the row wraps on a phone.
+function VideoSwitches({ states, counts, warningFor, onToggle, onConfirm, onCancel }) {
+    const shown = [];
+    if (counts.hevc > 0) shown.push('hevc');
+    if (counts.hdr > 0) shown.push('hdr');
+    if (counts.uhd > 0 && states.uhd.switchable) shown.push('uhd');
+    if (!shown.length) return null;
+    const warning = warningFor ? switchTexts(warningFor, states) : null;
+    return (
+        <div class="relative flex items-center justify-end gap-x-3 gap-y-1 flex-wrap">
+            {shown.map(kind => (
+                <label key={kind} class="flex items-center gap-1.5 cursor-pointer select-none" data-switch={kind}>
+                    <input
+                        type="checkbox"
+                        checked={states[kind].shown}
+                        onChange={() => onToggle(kind)}
+                        class="toggle toggle-xs toggle-soft"
+                    />
+                    <span class="text-xs text-w-sub">
+                        {switchTexts(kind, states).label}
+                        <span class="text-w-muted ml-0.5">({counts[kind]})</span>
+                    </span>
+                </label>
+            ))}
+
+            {warning && (
+                <div class="absolute right-0 top-full mt-1.5 z-dropdown bg-w-card border border-w-line rounded-xl shadow-lg p-3 w-64" data-switch-warning={warningFor}>
+                    <p class="text-[10px] font-semibold text-w-text uppercase tracking-wide">{warning.title}</p>
                     <p class="text-[11px] text-w-muted mt-0.5 leading-snug">
-                        {t('discover.warning4kBody')}
+                        {warning.body}
                     </p>
                     <div class="flex justify-between gap-1.5 mt-2">
                         <button
@@ -775,7 +883,7 @@ function Toggle4k({ show4k, count, onToggle, showWarning, onConfirm, onCancel })
                             class="btn btn-xs btn-ghost border border-red-400/30 text-red-400/70 hover:bg-red-400/10 hover:text-red-400"
                             onClick={onConfirm}
                         >
-                            {t('discover.show4k')}
+                            {warning.confirm}
                         </button>
                     </div>
                 </div>
@@ -846,7 +954,7 @@ const PLAY_ICON = (
     </svg>
 );
 
-function StreamRow({ stream, info, onStreamClick }) {
+function StreamRow({ stream, info, video, onStreamClick }) {
     const infoHash = extractInfoHash(stream);
     const fileIdx = extractFileIdx(stream);
     const titleLines = (stream.title || '').split('\n').filter(Boolean);
@@ -862,6 +970,14 @@ function StreamRow({ stream, info, onStreamClick }) {
                     {info.labels.map(label => (
                         <span key={label} class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{label}</span>
                     ))}
+                    {/* Dolby Vision profile 5 by name (release-video.js): no
+                        HDR10 or SDR layer, so a browser shows it with wrong
+                        colours on every route -- said for every browser, and
+                        the row stays, since "Download" is one click on. Yellow,
+                        as warnings are here; cyan describes the release. */}
+                    {video && video.dv5 && (
+                        <span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium" title={t('discover.badgeDv5Hint')} data-badge="dv5">{t('discover.badgeDv5')}</span>
+                    )}
                     {/* Sources that returned the same torrent. Deduping to
                         one row keeps the list readable, but which of your
                         sources found a release is exactly what you look at
