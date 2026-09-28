@@ -357,3 +357,21 @@ test('a throwing localStorage: init does not throw, the hook still works on page
     assert.equal(decodeOf(failed), null, 'the file that failed, remembered on the page');
     assert.equal(decodeOf(other), 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq');
 });
+
+// The layout runs this before Turnstile and the async navigation: whatever
+// throws inside must stay inside (read() already catches storage; this is
+// the net under everything else -- a document that refuses a listener here).
+test('initDecodeDeclaration never throws into the layout', () => {
+    const win = page({ url: 'https://webtor.io/?passthrough=on' });
+    const errors = [];
+    const origError = console.error;
+    console.error = (...a) => errors.push(a);
+    try {
+        const doc = { addEventListener() { throw new Error('no listeners here'); } };
+        assert.doesNotThrow(() => initDecodeDeclaration(win, doc));
+    } finally {
+        console.error = origError;
+    }
+    assert.equal(errors.length, 1, 'said once, on the console');
+    assert.equal(takesPart(win), true, 'what ran before the throw stands');
+});
