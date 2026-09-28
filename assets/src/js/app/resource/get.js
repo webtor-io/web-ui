@@ -4,6 +4,7 @@ import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initToolIntent } from '../../lib/toolIntent';
 import '../../lib/share/share';
+import { takesPart, whenDeclared } from '../../lib/player/decode-declaration';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
 // at the longest fitting prefix (shared findTextCut from lib/textClamp)
 // and append a clickable inline "\u2026" that expands the full plot; an
@@ -107,6 +108,12 @@ av( async function() {
         debugInput.setAttribute('value', debug);
         form.appendChild(debugInput);
     }
+    // A deep link starts at once, possibly before the page's decoder probe
+    // has answered; a browser that declares gets up to 300 ms for it, then
+    // goes with its cached answer or `unknown` (decode-declaration.js).
+    try {
+        if (takesPart(window)) await whenDeclared(window, 300);
+    } catch (e) { /* start anyway */ }
     form.requestSubmit();
     if (modal) {
         window.addEventListener('player_ready', function () {

@@ -29,6 +29,7 @@ import {
     decodePath,
     hevcDecodeTokens,
     decodeTokens,
+    declarationSupport,
     dynamicRange,
     QUALITY_EVENT,
     QUALITY_PAGE_FLAG,
@@ -1071,4 +1072,39 @@ test('playback-quality never throws', () => {
     watchPlaybackQuality(v, () => { throw new Error('extra'); }, { ...p.deps, schedule: () => { throw new Error('schedule'); } });
     v.dispatchEvent(new Event('timeupdate'));
     assert.doesNotThrow(() => v.play(61));
+});
+
+// ---- declarationSupport: what the page declares ---------------------------
+
+const settled = (p) => Promise.race([p.then((v) => ({ v })), new Promise((r) => setTimeout(() => r('pending'), 30))]);
+
+test('declarationSupport: the HEVC tokens at once, the same ones decodeTokens finds', async () => {
+    const env = { userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes(...ALL_HEVC)), mediaCapabilities: pqCapabilities(PQ_YES) };
+    const d = declarationSupport(env);
+    assert.equal(d.path, 'mse');
+    assert.deepEqual(d.hevc, (await decodeTokens(env)).filter((t) => t !== 'hdr-pq'));
+    assert.deepEqual(await settled(d.pq), { v: true });
+});
+
+// The event gives decodingInfo 3 s and counts silence as "no"; the
+// declaration must not -- a check that did not answer is not a browser
+// that cannot decode. Silence stays pending; every real answer settles.
+test('declarationSupport: hdr-pq has no deadline -- silence stays pending, answers settle', async () => {
+    const base = { userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes('hevc10-2160')) };
+    assert.equal(await settled(declarationSupport({ ...base, mediaCapabilities: pqCapabilities(() => new Promise(() => {})) }).pq), 'pending');
+    for (const [name, pq, want] of [
+        ['yes', PQ_YES, true],
+        ['no', PQ_NO, false],
+        ['a rejection', () => Promise.reject(new Error('nope')), false],
+        ['a throw', () => { throw new TypeError('bad config'); }, false],
+        ['garbage', () => Promise.resolve('yes'), false],
+    ]) {
+        assert.deepEqual(await settled(declarationSupport({ ...base, mediaCapabilities: pqCapabilities(pq) }).pq), { v: want }, name);
+    }
+    assert.deepEqual(await settled(declarationSupport(base).pq), { v: false }, 'no mediaCapabilities: never declared');
+    const mc = pqCapabilities(PQ_YES);
+    const none = declarationSupport({ userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes()), mediaCapabilities: mc });
+    assert.deepEqual(none.hevc, []);
+    assert.deepEqual(await settled(none.pq), { v: false });
+    assert.equal(mc.calls.length, 0, 'without an HEVC token PQ is not asked');
 });

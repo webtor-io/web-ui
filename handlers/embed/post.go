@@ -19,6 +19,9 @@ import (
 type PostArgs struct {
 	ID            string
 	EmbedSettings *models.EmbedSettings
+	// Decode is the embed page's HEVC passthrough declaration and, on a
+	// restart after a failed passthrough, why (models.DecodeRequest).
+	Decode models.DecodeRequest
 }
 
 type PostData struct {
@@ -40,6 +43,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 	return &PostArgs{
 		ID:            id,
 		EmbedSettings: &settings,
+		Decode:        models.ParseDecodeRequest(c.PostForm("decode"), c.PostForm("decode-fallback"), c.PostForm("decode-class")),
 	}, nil
 
 }
@@ -77,7 +81,7 @@ func (s *Handler) post(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to set embed claims"))
 		return
 	}
-	embedJob, err := s.jobs.Embed(web.NewContext(c), s.cl, args.EmbedSettings, dsd)
+	embedJob, err := s.jobs.Embed(web.NewContext(c), s.cl, args.EmbedSettings, dsd, args.Decode)
 	if err != nil {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))
 		return

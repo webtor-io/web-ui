@@ -13,8 +13,8 @@ import (
 	"github.com/webtor-io/web-ui/services/job"
 )
 
-func (s *Jobs) Embed(c *web.Context, cl *http.Client, settings *models.EmbedSettings, dsd *embed.DomainSettingsData) (j *job.Job, err error) {
-	es, hash, err := scripts.Embed(s.tb, cl, c, s.api, s.i18n, s.enricher, settings, "", dsd, s.warmup)
+func (s *Jobs) Embed(c *web.Context, cl *http.Client, settings *models.EmbedSettings, dsd *embed.DomainSettingsData, decl models.DecodeRequest) (j *job.Job, err error) {
+	es, hash, err := scripts.Embed(s.tb, cl, c, s.api, s.i18n, s.enricher, settings, "", dsd, s.warmup, decl)
 	if err != nil {
 		return
 	}

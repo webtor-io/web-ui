@@ -33,6 +33,11 @@ type VideoStreamUserData struct {
 	Carry           *TrackCarry
 	FallbackLangTag language.Tag
 	Settings        *StreamSettings
+	// DecodeRequest is the browser's HEVC passthrough declaration for this
+	// start (Decode, "" = none) and, on a restart after a failed
+	// passthrough, why it failed. From the request, never the session: an
+	// account has several devices.
+	DecodeRequest
 }
 
 func NewVideoStreamUserData(resourceID string, itemID string, settings *StreamSettings) *VideoStreamUserData {

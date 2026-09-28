@@ -1671,10 +1671,19 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	return err
 }
 
+// actionClock is the clock of the job keys' time bucket (Action, Embed); a
+// test pins it to compare keys with the ones recorded before a change.
+var actionClock = time.Now
+
 func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, cacheIndex CacheIndexer, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + vsud.PreferredLang + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags) + "/" + vsud.Carry.Key()
+	// A render for one declaration must not be served to another: the
+	// transcoder may give the browser that declared HEVC the source as it
+	// is, which a browser without the decoder cannot show. Appended only
+	// when there is one, so a start that declares nothing keeps its id.
+	vsudID += vsud.DecodeRequest.Key()
 	settingsID := fmt.Sprintf("%+v", settings)
-	now := time.Now().UTC()
+	now := actionClock().UTC()
 	// Cache key includes the authenticated user's id so two users on the
 	// same file don't share each other's rendered template through the
 	// job-queue cache; and the concatenated hashes of their uploaded

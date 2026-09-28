@@ -92,6 +92,7 @@ window.progress = {
 
 import {bindAsync} from '../lib/async';
 import initTurnstileAction from '../lib/turnstileAction';
+import { initDecodeDeclaration } from '../lib/player/decode-declaration';
 import initAsyncView from '../lib/asyncView';
 import loadAsyncView from '../lib/loadAsyncView';
 import toast from '../lib/toast';
@@ -109,6 +110,11 @@ document.addEventListener('click', (e) => {
         document.documentElement.lang = lang;
     }
 }, true);
+// The HEVC passthrough declaration (lib/player/decode-declaration.js): the
+// `?passthrough=on|off` switch, the probe for a browser that takes part, and
+// the submit hook that writes `decode` on a stream start. Before Turnstile,
+// and it cannot throw: nothing in it may stop the two lines below.
+initDecodeDeclaration(window, document);
 initTurnstileAction();
 bindAsync({
     async fetch(f, url, fetchParams) {

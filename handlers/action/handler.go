@@ -289,6 +289,10 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 	vsud := models.NewVideoStreamUserData(rID[0], iID[0], &models.StreamSettings{})
 	vsud.FetchSessionData(c)
 	vsud.Carry = carryFromForm(c.PostForm)
+	// The browser's HEVC passthrough declaration and, on a restart after a
+	// passthrough failed, why (models.DecodeRequest). Allowlisted: the
+	// values reach the transcoder's query and a metric label.
+	vsud.DecodeRequest = models.ParseDecodeRequest(c.PostForm("decode"), c.PostForm("decode-fallback"), c.PostForm("decode-class"))
 
 	return &PostArgs{
 		ResourceID:          rID[0],

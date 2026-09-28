@@ -7,6 +7,7 @@
 // (owner, 2026-09-19).
 
 import { silentToken } from '../turnstileAction';
+import { declarationFor, isStreamVideoForm } from './decode-declaration.js';
 
 // backgroundToken is what a job start made off the page needs from
 // Turnstile. A signed-in viewer and a deployment with no widget need
@@ -23,6 +24,26 @@ export async function backgroundToken() {
 }
 
 const FRESH_RENDER_TIMEOUT_MS = 30000;
+
+// declare gives a start made off the page the declaration a visible one
+// would get (decode-declaration.js): the form is a clone or the page's own,
+// and whatever `decode` it carries was right for another file or another
+// moment. The fields of a passthrough fallback never travel on: a restart is
+// the visible one's, once (Player.jsx), and a clone of a form that carried
+// them would repeat it for the next file.
+export function declare(body, form, win = window) {
+    try {
+        const d = isStreamVideoForm(form, win)
+            ? declarationFor(win, { resourceId: body.get('resource-id'), itemId: body.get('item-id') })
+            : null;
+        if (d) body.set('decode', d);
+        else body.delete('decode');
+    } catch (e) {
+        body.delete('decode');
+    }
+    body.delete('decode-fallback');
+    body.delete('decode-class');
+}
 
 // fetchStreamRender asks for a stream action WITHOUT putting it on the page,
 // and resolves with the new render as a parsed Document (or null: any answer
@@ -50,6 +71,7 @@ export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, toke
     let text = '';
     const body = new FormData(form);
     if (token) body.set('cf-turnstile-response', token);
+    declare(body, form);
     try {
         const res = await doFetch(form.action, {
             method: 'POST',

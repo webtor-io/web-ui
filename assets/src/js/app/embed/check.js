@@ -5,6 +5,15 @@ const debug = await makeDebug('webtor:embed:check');
 // Both client and server must agree on the algorithm, so migrating to SHA-256
 // would require a coordinated change and would break all existing embeds.
 import sha1 from 'sha1';
+import { applyUrlSwitch, takesPart, startProbe, whenDeclared, declarationFor } from '../../lib/player/decode-declaration';
+// The HEVC passthrough declaration (lib/player/decode-declaration.js). An
+// embed takes part the way any page does -- its own storage says so -- and
+// only then probes. Wrapped: this module has top-level awaits, and a throw
+// here would take the whole embed down.
+try {
+    applyUrlSwitch(window);
+    if (takesPart(window)) startProbe(window);
+} catch (e) { /* no declaration */ }
 message.send('init');
 const data = await message.receiveOnce('init');
 if (window._umami) {
@@ -16,7 +25,7 @@ const c = await check();
 if (c) {
     await initPlaceholder(data);
     window.addEventListener('click', async () => {
-        initEmbed(data);
+        await initEmbed(data);
     }, { once: true });
     message.send('inited');
 } else {
@@ -53,8 +62,22 @@ async function check() {
     return hash  === _checkHash;
 }
 
-function initEmbed(data) {
+// embedDeclaration is the `decode` field of the embed's start, or null. The
+// file is not known here (the job finds it), so there is no per-file memory
+// to consult; the per-class memory still applies.
+async function embedDeclaration() {
+    try {
+        if (!takesPart(window)) return null;
+        await whenDeclared(window, 300);
+        return declarationFor(window, {});
+    } catch (e) {
+        return null;
+    }
+}
+
+async function initEmbed(data) {
     message.send('play_clicked');
+    const decode = await embedDeclaration();
     const form = document.createElement('form');
     form.setAttribute('method', 'post');
     form.setAttribute('enctype', 'multipart/form-data');
@@ -73,6 +96,13 @@ function initEmbed(data) {
     i.setAttribute('value', JSON.stringify(data));
     i.setAttribute('type', 'hidden');
     form.append(i);
+    if (decode) {
+        const d = document.createElement('input');
+        d.setAttribute('name', 'decode');
+        d.setAttribute('value', decode);
+        d.setAttribute('type', 'hidden');
+        form.append(d);
+    }
     document.body.append(form);
     form.submit();
 }

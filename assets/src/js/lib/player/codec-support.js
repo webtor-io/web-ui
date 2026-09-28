@@ -222,16 +222,52 @@ export function hevcDecodeTokens(env = {}, path = decodePath(env)) {
 // native one (the plan's choice; native HLS is neither, and 'file' is what
 // Safari answers for). The same Firefox-on-Windows rule: the question is
 // asked of an HEVC codec.
+const pqConfig = (path) => {
+    const mse = path === 'mse';
+    return {
+        type: mse ? 'media-source' : 'file',
+        video: { contentType: mse ? mseType(PQ_CODEC) : fileType(PQ_CODEC), ...PQ_VIDEO },
+    };
+};
+
 async function decodesPQ(env, path, opts) {
     if (path === 'none' || hevcAnswerInaccurate(env)) return false;
     const mc = safe(() => env.mediaCapabilities);
     if (safe(() => isFn(mc.decodingInfo)) !== true) return false;
-    const mse = path === 'mse';
-    const info = await decoding(mc, {
-        type: mse ? 'media-source' : 'file',
-        video: { contentType: mse ? mseType(PQ_CODEC) : fileType(PQ_CODEC), ...PQ_VIDEO },
-    }, opts);
+    const info = await decoding(mc, pqConfig(path), opts);
     return info.ok;
+}
+
+// pqAnswer is the `hdr-pq` question without a deadline: it resolves with
+// the browser's answer whenever it comes. A rejection, a throw or a
+// malformed answer is an answer ("no"), and so is a browser without
+// decodingInfo (the token is never declared there); only silence is not --
+// the promise then stays pending. The event above treats 3 s of silence as
+// "no" (it counts viewers, and a count has to close); the declaration must
+// not: a check that did not answer is not a browser that cannot decode
+// (decode-declaration.js).
+function pqAnswer(env, path) {
+    if (path === 'none' || hevcAnswerInaccurate(env)) return Promise.resolve(false);
+    const mc = safe(() => env.mediaCapabilities);
+    if (safe(() => isFn(mc.decodingInfo)) !== true) return Promise.resolve(false);
+    try {
+        return Promise.resolve(mc.decodingInfo(pqConfig(path)))
+            .then((info) => !!info && typeof info === 'object' && info.supported === true, () => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+
+// declarationSupport is what the page declares (decode-declaration.js), in
+// two parts: the HEVC tokens, known at once, and `pq`, a promise of the
+// `hdr-pq` answer that has no deadline (pqAnswer). The same questions, codec
+// strings and path as decodeTokens: the event measures the share that
+// declares. Without an HEVC token there is nothing for `hdr-pq` to qualify,
+// and the question is not asked.
+export function declarationSupport(env = {}) {
+    const path = decodePath(env);
+    const hevc = hevcDecodeTokens(env, path);
+    return { path, hevc, pq: hevc.length ? pqAnswer(env, path) : Promise.resolve(false) };
 }
 
 const timing = ({ timeoutMs = MC_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) => (

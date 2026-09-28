@@ -428,8 +428,8 @@ capability keys do not depend on it.
 
 ### The declaration — `decodeTokens`
 
-What the page will send content-transcoder as `decode=<tokens>` on POST `/session` (stage 3 of the
-plan; nothing sends it yet). The transcoder alone picks the route; the browser only says what it
+What the page sends content-transcoder as `decode=<tokens>` on POST `/session` (sent since stage 3,
+by browsers that take part — see [Sending it](#sending-it--decode-declarationjs) below). The transcoder alone picks the route; the browser only says what it
 decodes. `decodeTokens(env)` → the tokens in this order (unknown ones are ignored by the transcoder,
 so renaming one is a protocol change):
 
@@ -461,9 +461,56 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
   answer in 3 s → not declared. Asked at 4K, where ~89% of PQ sessions are: a browser that decodes
   1080p PQ but not 4K PQ is under-declared, and its 1080p PQ sources stay re-encoded, as today. The
   screen is not consulted (variant A); `dynamic-range` is only reported.
-- `hevcDecodeTokens(env)` is the synchronous part (the five HEVC tokens), for a submit hook that
-  cannot wait. What the declaration adds on top — `unknown` before the probe finishes, the cache
-  for the first submit, the hidden field — is stage 3.
+- `hevcDecodeTokens(env)` is the synchronous part (the five HEVC tokens). `declarationSupport(env)`
+  is what the page declares: those tokens at once, and `pq`, a promise of the `hdr-pq` answer with
+  **no deadline** (`pqAnswer`: a rejection, a throw, garbage or a missing API is an answer, "no";
+  only silence is not). `decodeTokens` — the events — keeps the 3 s deadline: a count has to close.
+  The declaration must not: a check that did not answer is not a browser that cannot decode.
+
+#### Sending it — `decode-declaration.js`
+
+- **Who.** A browser takes part once any page was opened with `?passthrough=on`
+  (localStorage `wt-passthrough`); `?passthrough=off` takes it out. Nobody else, until stage 5 makes
+  it the default (`takesPart`: `=== 'on'` → `!== 'off'`). Why a per-browser opt-in and not a flag:
+  the transcoder is one for production and stage, and web-ui's stage is `main` itself, so "production
+  does not declare yet" cannot be a deployment. A page that does not take part sends no field and
+  runs no probe; the probe module is loaded (`import()`, chunk `decode-probe`) only when it does.
+  The layout carries the rest: +1.3 KB gzip on `layout.js`, +1.4 KB on `embed/check.js` (measured
+  with `npm run build`, 2026-09-28).
+- **What** (`declarationFor(win, {resourceId, itemId})`), all or nothing:
+  1. not taking part → no field;
+  2. this file failed passthrough in this browser (memory below) → no field;
+  3. the probe answered completely → its tokens minus those the memory took away; none left → no
+     field (not an empty one);
+  4. not yet (the `hdr-pq` answer is still out) → the cached answer of this same browser
+     (`wt-decode`: same User-Agent, at most 30 days old); none → `unknown`. HEVC tokens never go out
+     without the `hdr-pq` answer: the transcoder would read the missing token as "no HDR" and refuse
+     a 4K HDR film with a false reason. With `unknown` it plays ≤1080 the old way and answers a 4K
+     start with "we were still checking — press Watch again" (`error.video_route.checking`).
+- **Where.** A capture listener on `submit` (`installSubmitHook`, from `app/layout.js` before
+  Turnstile) rewrites the hidden `decode` of every `/stream-video` form on every pass — idempotent,
+  so Turnstile's two passes and either listener order end with the declaration of the moment. Starts
+  made off the page (`background-render.js`: the next episode's cloned form, a settings restart)
+  get it through `declare(body, form)`, which also drops a fallback's fields. A deep link
+  (`#action=stream`, `app/resource/get.js`) waits up to 300 ms for the probe. The embed adds the
+  field to its POST (`app/embed/check.js`), after the same 300 ms; there the file is not known yet, so
+  only the per-class memory applies.
+- **The memory of failures** (`wt-decode-fallback`, 7 days; `rememberFallback`): the file
+  (`<resource-id>/<item-id>`) of a passthrough that failed — its next start sends nothing — and
+  strikes against the decoder class that failed. Two strikes on **different** files within 7 days take
+  the tokens that cover the class out of the declaration (`hevc8` → all four HEVC tokens, `hevc10` →
+  `hevc10`, `hevc10-2160`, `hevc8-2160` → both `-2160`, `hevc10-2160` → itself); `hevc-high` and
+  `hdr-pq` are never struck. Which failures strike: see the player's fallback.
+- **State and storage.** Everything is on `window.__wtDecode` (the module is in several entries).
+  Every localStorage access is caught: a browser whose storage throws keeps the switch and the memory
+  for the page, and the layout's Turnstile and async navigation are never affected (tested with the
+  real `app/layout.js` and a throwing getter).
+- **Server side.** `handlers/action` and `handlers/embed` read `decode`, `decode-fallback` and
+  `decode-class` through an allowlist (`models.ParseDecodeRequest`: the transcoder's token list and
+  order, duplicates dropped, `unknown` only alone, over 512 bytes → none). The declaration is part of
+  the job key (`DecodeRequest.Key`, appended only when present — a start without one keeps the id it
+  had; `jobs/scripts/job_key_test.go` pins it to the ids recorded at `acf12dea`). It comes from the
+  request, never the session: an account watches on several devices.
 
 Reading the tokens: the share that matters for 4K is `hevc10-2160` (93% of >1080p HEVC sources are
 Main10), and `hevc10-2160` with `hdr-pq` for PQ (52.5% of them); split by `decode_path` and by

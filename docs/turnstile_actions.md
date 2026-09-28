@@ -41,6 +41,13 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
   set (the nav partial sets it; async navigation re-renders the nav). Known
   gap: sign-out is an async view, so a visitor who signs out and starts a job
   without a page load has no widget and gets the card once; a reload fixes it.
+- A second capture listener on `submit` shares these forms: the HEVC
+  passthrough declaration (`lib/player/decode-declaration.js`,
+  `installSubmitHook`, installed by the layout before this one). It rewrites
+  the hidden `decode` field of a `/stream-video` form on every pass, so the
+  order of the two listeners does not matter: the first pass is stopped here,
+  and the pass that reaches `lib/async.js` has been through both. It never
+  stops or delays a submit.
 - Deadlines: the script missing → the form goes out at once without a token
   (fail closed: the server refuses, the card says to disable blockers or
   sign in); script loaded but silent → 15 s; checkbox shown → 120 s.
