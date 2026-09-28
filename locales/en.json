@@ -791,7 +791,7 @@
     "player.playNow": "Play now",
     "player.nextCancel": "Cancel",
     "player.autoplayNext": "Autoplay the next one",
-    "player.compatMode": "Compatible mode",
+    "player.compatMode": "Compatibility mode",
     "player.compatModeHint": "Converts the video on our side. Use it if the picture looks wrong.",
     "player.stillWatching": "Still watching?",
     "player.continueWatching": "Continue",

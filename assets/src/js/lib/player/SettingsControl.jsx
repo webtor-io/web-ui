@@ -8,7 +8,7 @@ import { t } from './i18n';
  * of the film. Autoplay of the next episode / track -- reachable at any time,
  * with its name next to it (owner, 2026-09-20: a bare switch in the audio bar
  * said nothing about what it switched) -- where there is a next file; and
- * "Compatible mode" where the transcoder passes the video through as it is
+ * "Compatibility mode" where the transcoder passes the video through as it is
  * (passthrough.js): the viewer who sees a wrong picture no automatic check
  * catches (Dolby Vision without its metadata, HDR on an SDR screen) restarts
  * the file converted on our side. Each row only where it applies.

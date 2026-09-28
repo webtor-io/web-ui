@@ -5083,7 +5083,7 @@ test('the next file starts without the answer: plain until the status says so', 
     assert.ok(lockButton(p), 'the status says so: the lock');
 });
 
-// ---- HEVC passthrough: the route in stream-start, the fallback, "Compatible mode"
+// ---- HEVC passthrough: the route in stream-start, the fallback, "Compatibility mode"
 
 const { setPendingFallback, pendingFallbackFor, loadMemory: loadDecodeMemory } = await import('./decode-declaration.js');
 
@@ -5143,7 +5143,7 @@ test('stream-start without a transcoder session: empty route fields', async (t) 
     assert.deepEqual([ev.data.route, ev.data.reason, ev.data.decl], ['', '', '']);
 });
 
-test('"Compatible mode" is there only on a passthrough stream', async (t) => {
+test('"Compatibility mode" is there only on a passthrough stream', async (t) => {
     t.after(() => destroyPlayer());
     let p = await mountPlayer((page) => {
         page.video.setAttribute('controls', '');
@@ -5159,7 +5159,7 @@ test('"Compatible mode" is there only on a passthrough stream', async (t) => {
     assert.equal(p.container.querySelector('.wt-player-menu input[role="switch"]'), null, 'no autoplay switch without a next file');
 });
 
-test('"Compatible mode" restarts this file on the old route, with why, once', async (t) => {
+test('"Compatibility mode" restarts this file on the old route, with why, once', async (t) => {
     freshDecodeMemory();
     const rec = recordSubmits();
     t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });

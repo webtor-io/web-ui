@@ -558,7 +558,7 @@ listens to the element, and gives the file up **at most once per player**:
 | native HLS (no hls.js: iOS, or no MSE): the element's `error` — 3 | `decode_error` | yes |
 | — 4 (Safari may say it for a master that failed to load too; not verified) | `src_unsupported` | no |
 | the watchdog, native and hls.js: 10 s after the first `playing`, in a tab that stayed visible, time ran on by more than 2 s and there is no picture — `videoWidth` 0, or 0 decoded frames where this page has seen the counter count (Android Chrome's native player reads 0 while it plays) | `no_frames` | yes |
-| "Compatible mode" (below) | `user` | no |
+| "Compatibility mode" (below) | `user` | no |
 
 Network errors are not a fallback. `fragLoadPolicy` for passthrough: `maxLoadTimeMs` from
 `data-frag-load-ms` (twice the segment's time at the viewer's cap, 2–15 min), a timed-out segment tried
@@ -600,9 +600,9 @@ route"). Not verified in a real browser: which errors hls.js and each browser ra
 fails, the watchdog on iOS, `requestSubmit()` through a visible Turnstile checkbox mid-film — the
 stage 4 matrix.
 
-#### Compatible mode
+#### Compatibility mode
 
-The "More" menu (`SettingsControl.jsx`) shows **Compatible mode** (`player.compatMode`, hint
+The "More" menu (`SettingsControl.jsx`) shows **Compatibility mode** (`player.compatMode`, hint
 `player.compatModeHint`) only on a passthrough stream — the menu itself appears for it even without a
 next file. It is the fallback with reason `user`: the viewer who sees a wrong picture no check catches
 (Dolby Vision without its metadata, HDR on an SDR screen, green frames) restarts the file converted on

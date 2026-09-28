@@ -251,7 +251,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // and fallback"): only where the transcoder passes this stream's video
     // through. A guard that watches hls.js, the element and the picture, and
     // gives the file up to the old route at most once -- the same way the
-    // "Compatible mode" item does. Every other stream gets none of it.
+    // "Compatibility mode" item does. Every other stream gets none of it.
     const passthroughRoute = isVideo && videoEl.dataset.videoRoute === 'passthrough';
     const passthroughGuardRef = useRef(null);
     if (passthroughRoute && !passthroughGuardRef.current) {

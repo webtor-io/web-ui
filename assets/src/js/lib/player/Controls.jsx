@@ -87,7 +87,7 @@ export function Controls({
                     )}
 
                     {/* "More" (three dots): autoplay of the next file, at any time
-                        and with its name on it; "Compatible mode" on a stream
+                        and with its name on it; "Compatibility mode" on a stream
                         the transcoder passes through. Always the LAST thing on
                         the right (owner) -- after fullscreen, where a menu is
                         looked for. Only where it has something to hold. */}
