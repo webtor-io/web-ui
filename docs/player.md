@@ -635,6 +635,18 @@ passes no HEVC through, so this is the baseline: re-encoded H.264 where `tc` is 
 `src: 'hevc'` with `tc: false` — HEVC in MP4, repackaged as it is without a transcoder session — is
 where software HEVC decoding already happens (plan §6: ~35% of HEVC starts).
 
+### `discover-release-check`
+
+Discover hides HEVC and HDR releases by what their names say (docs/discover.md, "Video switches"),
+and how often those names are wrong on its lists is not measured. A click on a release there leaves
+what the name said in sessionStorage (`wt-discover-release`, 30 min); on the first frame of that
+release (`data-resource-id` = the recorded infohash) the player takes the record and sends
+`rel_codec`, `rel_hdr`, `rel_dv5`, `rel_uhd` against `src` (the media probe's codec, as in
+`codec-support`) and the session's `route` / `reason`. Once per record; a record for another release
+is left for its own page. `lib/discover/release-check.js`; every storage access is caught, since the
+read can run inside the codec effect (an element already playing at mount) and Preact drops a
+component's remaining effects after one throws.
+
 ## Next episode / next track — `next-item.js`, `next-item-go.js`
 
 Design, numbers and the owner's decisions: `docs/superpowers/specs/2026-09-20-next-episode-design.md`.

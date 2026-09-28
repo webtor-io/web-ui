@@ -12,6 +12,7 @@ import { isSeasonUnfinished } from '../seasonStatus';
 import { getStreamPrefs, noneMatchPrefs } from '../streamPrefs';
 import { releaseText, releaseVideo } from '../release-video';
 import { switchStates, switchCounts, hiddenBy, emptyStateKey, browserDecodesHevc, browserDecodesPq } from '../playback';
+import { rememberRelease } from '../release-check';
 import { StarIcon } from './StarIcon';
 import { t, tf } from '../i18n';
 
@@ -1007,7 +1008,12 @@ function StreamRow({ stream, info, video, onStreamClick }) {
     if (infoHash) {
         return (
             <div
-                onClick={() => onStreamClick(infoHash, fileIdx)}
+                onClick={() => {
+                    // What the name said, for the player to check against
+                    // the file (release-check.js).
+                    rememberRelease(window, infoHash, video, is4kStream(info));
+                    onStreamClick(infoHash, fileIdx);
+                }}
                 class="cursor-pointer flex items-center gap-3 p-3 rounded-lg border border-w-line hover:border-w-cyan/30 hover:bg-w-surface/50 transition-all"
             >
                 {content}

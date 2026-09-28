@@ -20,6 +20,7 @@ import { track, settled } from './player-telemetry';
 import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
 import { createPassthroughGuard, fallbackToOldRoute } from './passthrough.js';
 import { clearPendingFallback } from './decode-declaration.js';
+import { reportReleaseCheck } from '../discover/release-check.js';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
 import { markAutoResume, takeAutoResume } from './preferred-lang.js';
@@ -830,9 +831,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         });
         const stopCodec = whenPlaying(videoEl, () => reportCodecSupport(stream()));
         const stopQuality = watchPlaybackQuality(videoEl, stream);
+        // A release opened from Discover: what its name said against what
+        // the file is (lib/discover/release-check.js; never throws, so the
+        // effects after this one run whatever the tab's storage does).
+        const stopRelease = whenPlaying(videoEl, () => reportReleaseCheck(window, videoEl, sourceCodec(videoEl.dataset.videoCodecs)));
         return () => {
             stopCodec();
             stopQuality();
+            stopRelease();
         };
     }, []);
 

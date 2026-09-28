@@ -1,7 +1,7 @@
 // The stream modal's video switches, rendered: HEVC, HDR and 4K above the
-// list, what each hides, the warnings, the empty states and the DV5 badge
-// (lib/discover/playback.js has the rules; these check the modal applies
-// them).
+// list, what each hides, the warnings, the empty states, the DV5 badge,
+// and what a click on a release records (lib/discover/playback.js has the
+// rules; these check the modal applies them).
 //
 // The real StreamModal in jsdom, through preact. Not faked: the DOM, the
 // rules, discover-prefs in localStorage. Faked: window.umami (the events
@@ -278,6 +278,15 @@ test('a Dolby Vision profile 5 release is badged for every browser and not hidde
 });
 
 // ---- measurement ---------------------------------------------------------------
+
+test('a click on a release records what its name said, for the player to check', async () => {
+    const s = S.dv5();
+    const { root, clicks } = await mount([s], off(EVERYTHING), { show4k: true });
+    rows(root)[0].click();
+    assert.deepEqual(clicks, [[s.infoHash, null]]);
+    const rec = JSON.parse(window.sessionStorage.getItem('wt-discover-release'));
+    assert.deepEqual({ ...rec, at: 0 }, { h: s.infoHash, codec: 'hevc', hdr: 'dv', dv5: true, uhd: true, at: 0 });
+});
 
 test('discover-streams-classified: once per list, what the names said and what the switches hid', async () => {
     const { root } = await mount([S.hevc1080(), S.avc1080(), S.uhdHevc(), S.dv5(), S.unknown1080()], off([]));

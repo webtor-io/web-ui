@@ -1002,6 +1002,62 @@ test('playback-quality goes out after a minute of playback, with the stream fact
     assert.equal(qualityEvents(p).length, 1, 'once per page');
 });
 
+// discover-release-check: a release opened from Discover, what its name
+// said against the file the player got (lib/discover/release-check.js).
+const releaseEvents = (p) => p.events.filter((e) => e.name === 'discover-release-check');
+
+test('discover-release-check: the release Discover recorded is checked on its first frame, once', async (t) => {
+    t.after(() => { destroyPlayer(); window.sessionStorage.clear(); });
+    window.sessionStorage.setItem('wt-discover-release', JSON.stringify({
+        h: 'res', codec: 'hevc', hdr: 'dv', dv5: true, uhd: true, at: Date.now(),
+    }));
+    const p = await mountPlayer((page) => {
+        page.video.setAttribute('data-video-codecs', 'h264 ');
+        page.video.setAttribute('data-video-route', 'copy');
+        page.video.setAttribute('data-route-reason', 'not_hevc');
+    });
+    assert.equal(releaseEvents(p).length, 0, 'not on mount');
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    assert.deepEqual(releaseEvents(p).map((e) => e.data), [{
+        rel_codec: 'hevc', rel_hdr: 'dv', rel_dv5: true, rel_uhd: true, src: 'h264', route: 'copy', reason: 'not_hevc',
+    }]);
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    assert.equal(releaseEvents(p).length, 1);
+    assert.equal(window.sessionStorage.getItem('wt-discover-release'), null);
+});
+
+// Preact drops a component's remaining effects after one throws. The check
+// runs inside the codec effect when the element is already playing at mount
+// (whenPlaying calls at once), so a sessionStorage that throws there must
+// not take the effects after it -- player_ready among them -- down.
+test('discover-release-check: a throwing sessionStorage with the element already playing leaves the later effects alone', async (t) => {
+    const own = Object.getOwnPropertyDescriptor(window, 'sessionStorage');
+    const proto = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'sessionStorage');
+    t.after(() => {
+        destroyPlayer();
+        delete window.sessionStorage;
+        if (own) Object.defineProperty(window, 'sessionStorage', own);
+    });
+    freshBrowser();
+    Object.defineProperty(window, 'sessionStorage', { configurable: true, get() { throw new dom.window.DOMException('denied', 'SecurityError'); } });
+    let ready = 0;
+    const onReady = () => { ready++; };
+    window.addEventListener('player_ready', onReady);
+    t.after(() => window.removeEventListener('player_ready', onReady));
+    const p = await mountPlayer((page) => {
+        Object.defineProperty(page.video, 'paused', { configurable: true, get: () => false });
+        Object.defineProperty(page.video, 'readyState', { configurable: true, get: () => 4 });
+    });
+    assert.equal(codecEvents(p).length, 1, 'the codec report of the same effect went out');
+    assert.equal(releaseEvents(p).length, 0);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await settle();
+    assert.equal(ready, 1, 'the next effect subscribed to canplay');
+    assert.ok(proto || own, 'the page had a sessionStorage to put back');
+});
+
 test('playback-quality: the audio player does not report', async (t) => {
     t.after(() => destroyPlayer());
     delete window.__wtPlaybackQuality;

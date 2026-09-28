@@ -26,6 +26,7 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/stream.js` — `parseStreamName()`, `extractInfoHash()` (stream name parsing)
 - `assets/src/js/lib/discover/release-video.js` — what a release's name says about its video (codec, HDR, Dolby Vision profile 5); see "Video switches"
 - `assets/src/js/lib/discover/playback.js` — the video switches' rules: defaults, the 4K gate, what each switch hides, the empty-state text
+- `assets/src/js/lib/discover/release-check.js` — the record a click on a release leaves for the player, and the player's `discover-release-check`
 - `assets/src/js/lib/discover/components/discoverReducer.js` — state reducer, initial state, helper functions
 - `assets/src/js/lib/discover/components/DiscoverApp.jsx` — root Preact component orchestrating all sub-components
 - `assets/src/js/lib/discover/components/StreamModal.jsx` — stream modal, episode picker, stream filters
@@ -241,7 +242,8 @@ names are read by `lib/discover/release-video.js`.
   HEVC files; the HDR switch's rule is right 97.9% and finds 79%. **On
   Discover's own lists the error is not measured**: those names come from
   addons, not from file paths, and the old 4K switch kept 4K releases out
-  of the sample.
+  of the sample. `discover-release-check` (below) measures it on the
+  releases people open.
 - **HEVC.** On by default where the browser decodes HEVC, off where it
   answered that it does not: there HEVC is converted on our side — slower
   to start, may pause, and 4K HEVC does not play at all. Turning it on
@@ -417,6 +419,7 @@ Events tracked:
 - `discover-4k-toggle-attempt` / `-enabled` / `-disabled` / `-cancelled` — the 4K switch (no fields; names unchanged)
 - `discover-hevc-toggle-attempt` / `-enabled` / `-disabled` / `-cancelled`, and the same `discover-hdr-*` — the HEVC and HDR switches (`browser`: `yes` / `no` / `unknown`, whether it decodes them); `toggle-attempt` is the warning shown
 - `discover-streams-classified` — once per stream list: `n`, how many the names read as `hevc` / `hdr` / `uhd` / `dv5` / `unknown_codec`, how many the switches `hidden` and whether that left the list `empty`, the browser's `dec_hevc` / `dec_pq` (`yes` / `no` / `unknown`), the transcoder's `caps`, `uhd_plays`. How often the defaults hide releases and empty lists
+- `discover-release-check` — sent by the player on the first frame of a release opened from Discover (sessionStorage `wt-discover-release`, 30 min, taken once): what the name said (`rel_codec`, `rel_hdr`, `rel_dv5`, `rel_uhd`) against the file (`src`: the media probe's codec) and the session's `route` / `reason` (the transcoder's reason says `dv5` and the like only where it probed the source: a declaring browser, passthrough on). The error of the name rules on Discover's lists
 
 ## Addon Health
 

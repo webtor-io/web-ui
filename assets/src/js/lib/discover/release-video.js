@@ -12,7 +12,9 @@
 // HDR (PQ, the switch's rule) 97.9% and 79%. A fifth of HEVC files name no
 // codec at all, so "unknown" is common, and it is never read as HEVC.
 //
-// Pure: no DOM, no storage. Discover's switches read it (playback.js).
+// Pure: no DOM, no storage. Discover's switches read it (playback.js), and
+// a click on a release records what it said, so the player can compare it
+// with the file that actually plays (release-check.js).
 
 // A boundary before a word, and one after it (a lookahead, so two words
 // can share the separator between them).
