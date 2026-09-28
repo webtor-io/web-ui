@@ -738,12 +738,14 @@ func translationCandidates(lis []ListItem, audioLang string, embedded bool) sour
 
 // applyLadder decides what the viewer gets selected when they have a
 // preferred content language: the best human track in that language, or
-// an AI translation when there is none, or nothing at all when the audio
-// is already in that language (then only a forced track, if the file has
-// one, is turned on). The viewer's own saved choice always wins. When the
-// preferred language yields nothing at all, the phase-1 selection
-// (Accept-Language, then the English fallback) still applies: a language
-// the ladder cannot serve must not switch subtitles off.
+// an AI translation offered (never started) when there is none -- with the
+// best English track playing meanwhile (offeredDefault) -- or nothing at
+// all when the audio is already in that language (then only a forced
+// track, if the file has one, is turned on). The viewer's own saved choice
+// always wins. When the preferred language yields nothing at all, the
+// phase-1 selection (Accept-Language, then the English fallback) still
+// applies: a language the ladder cannot serve must not switch subtitles
+// off.
 //
 // lis always starts with the "None" item, which GetSubtitles prepends
 // before anything else, so lis[0] is the safe "no subtitles" default.
@@ -804,12 +806,25 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 					markUpsell(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx, true))
 					if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false); p > 0 && lis[p].Provider == "Translated" {
 						// Same split as below: an offer, never the switch's
-						// answer. What the switch restores is decided by
-						// offSuggestion once the defaults are settled.
+						// answer. The switch restores what the ladder would
+						// have played beside the offer -- the English track
+						// (offeredDefault); with none, nothing is marked here
+						// and offSuggestion decides once the defaults are
+						// settled.
 						markOffered(lis, p)
+						markSuggested(lis, s.offeredDefault(lis, ud))
 					} else {
 						markSuggested(lis, p)
 					}
+				} else if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false); p > 0 && lis[p].Provider == "Translated" && s.offeredDefault(lis, ud) == i {
+					// A saved track normally withdraws the offer: the viewer
+					// has dealt with subtitles. Not when it is the very track
+					// the ladder plays beside the offer -- which is what the
+					// next episode receives: the player carries what is
+					// playing (readCarry), and a carried choice arrives here
+					// as a saved one. Without this the offer showed on the
+					// first episode of a series only.
+					markOffered(lis, p)
 				}
 				for j := range lis {
 					lis[j].Default = false
@@ -826,21 +841,11 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 	// starting one spends tokens, so it takes an explicit click. Where the
 	// ladder chose it, the item is marked Offered -- the picker draws that
 	// as an action ("Translate to Portuguese"), not as a selection -- and
-	// the phase-1 selection decides what actually plays, which is "None"
-	// when it finds nothing.
+	// offeredDefault decides what plays meanwhile: the English track, or
+	// "None" when the file has none.
 	if lis[pick].Provider == "Translated" {
 		markOffered(lis, pick)
-		// Offered means the viewer can have their language in one click, so
-		// nothing else is switched on for them (owner, 2026-09-18). Until
-		// then the phase-1 selection decided here too, and it knows only
-		// the browser's Accept-Language: a viewer who asked for Serbian got
-		// the Russian track their browser implied, which read as the
-		// setting being ignored. The explicit preference outranks the
-		// implicit header. The phase-1 fallback stays for every case where
-		// the preferred language cannot be served at all -- a locked item,
-		// NSFW, a language the service does not know -- and ladderPick
-		// answers those itself (fallbackIndex), never reaching here.
-		lis[0].Default = true
+		lis[s.offeredDefault(lis, ud)].Default = true
 		return lis
 	}
 	lis[pick].Default = true
@@ -896,6 +901,66 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 	return s.fallbackIndex(lis, ud)
 }
 
+// offeredDefault is what plays while the ladder's answer is a translation
+// the viewer has not started (Offered): the best full human track in the
+// fallback language -- English -- by ladderRank, or "None" (index 0) when
+// the file has no such track.
+//
+// Owner, 2026-09-28: "show the main subtitles and offer to translate
+// them". Until then this was always "None" (owner, 2026-09-18): the offer
+// meant the viewer could have their own language in one click, so nothing
+// else was switched on -- and a viewer watching an English film with no
+// subtitles in their language saw nothing on screen until they clicked.
+//
+// What the 2026-09-18 rule was protecting still holds: the browser's
+// Accept-Language is NOT consulted here. That was the actual complaint --
+// a viewer who asked for Serbian got the Russian track their browser
+// implied, which read as the setting being ignored. English is not a guess
+// about the viewer; it is the one fallback language every viewer gets, the
+// same one the phase-1 fallback ends on (fallbackLang).
+//
+// Everything the rule does not touch is decided before this is reached:
+// a human track in the preferred language wins (humanIdx), audio already
+// in that language gets only a forced track or nothing, a saved choice
+// returns before the ladder runs, an embed's own track is a Default
+// ladderPick returns first, and a viewer
+// who cannot run the translation (locked, NSFW, unknown language) never
+// gets an Offered item and keeps the phase-1 fallback. A viewer whose
+// preferred language IS English never gets here with an English track on
+// the list: that track would have been humanIdx.
+//
+// The client re-runs the same rule on an audio switch (pickDefaultSubtitle
+// in subtitle-rules.js, FALLBACK_LANG), reading data-rank, so the track it
+// lands on is this one.
+func (s *Helper) offeredDefault(lis []ListItem, ud *models.VideoStreamUserData) int {
+	if l := fallbackLang(ud); l != "" {
+		if i := bestByLadder(lis, l, false); i >= 0 {
+			return i
+		}
+	}
+	return 0
+}
+
+// fallbackLang is the base language of the phase-1 fallback,
+// ud.FallbackLangTag: English for every stream (NewVideoStreamUserData).
+// offeredDefault falls back to it too, so "the language subtitles fall
+// back to" is one field, not a second constant beside it.
+//
+// "" when the tag is unset. A zero Tag is "und", whose Base is a guess
+// (en, Low), not a setting -- and matchLang, the phase-1 side, gets No
+// confidence from it and falls back to nothing, so reading it as English
+// here would make the two fallbacks disagree.
+func fallbackLang(ud *models.VideoStreamUserData) string {
+	if ud == nil {
+		return ""
+	}
+	b, conf := ud.FallbackLangTag.Base()
+	if conf != language.Exact {
+		return ""
+	}
+	return b.String()
+}
+
 // markOffered marks the translation the viewer may start. Never the item
 // that is already playing: a translation saved in an earlier session comes
 // back as Default, and an invitation to start what is already on screen is
@@ -903,11 +968,12 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 //
 // Locked is the same rule seen from the other side: a free viewer cannot
 // run it, so it is an upsell and not an action. Neither case can reach
-// here today -- applyLadder's saved-choice branch returns before either
-// call site, and ladderPick never answers with a locked item -- which is
-// why this says the rule rather than enforcing a possibility. It is the
-// one place both call sites pass through, so both conditions are written
-// once and read together.
+// here today -- a saved translation is never the item passed in (the
+// saved-choice branch marks only the ladder's pick, and only while
+// something else is saved), and ladderPick never answers with a locked
+// item -- which is why this says the rule rather than enforcing a
+// possibility. It is the one place every call site passes through, so both
+// conditions are written once and read together.
 func markOffered(lis []ListItem, i int) {
 	if i < 0 || i >= len(lis) || lis[i].Default || lis[i].Locked {
 		return
@@ -947,7 +1013,11 @@ func markSuggested(lis []ListItem, i int) {
 //     viewer did not ask for. Reached when the audio is in a third
 //     language: the ladder never turns a forced track on there (that rule
 //     is for audio already in the viewer's language), so it lands on "None"
-//     and this is what the switch has to offer;
+//     and this is what the switch has to offer. Not reached when a
+//     translation is Offered and the file has an English track: the ladder
+//     then plays that track (offeredDefault), and with subtitles saved off
+//     applyLadder marks it Suggested itself -- the switch restores what the
+//     ladder would have played, as everywhere else;
 //  3. the Accept-Language pick (fallbackIndex), which knows nothing about
 //     the preferred language;
 //  4. the best activatable track whatever its language.

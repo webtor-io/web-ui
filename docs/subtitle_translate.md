@@ -97,23 +97,52 @@ feature is on and this is not an embed — see *Gating and flags*):
 4. **Ladder for the preferred language.** Otherwise, the best human track (ranks 0–4) in the
    preferred language wins. Failing that, the `Translated` item is the ladder's answer — but
    **it is never turned on for the viewer** (owner, 2026-09-16: a run spends tokens, so it takes
-   an explicit click). An unlocked item is marked `Offered` and **subtitles stay off**
-   (owner, 2026-09-18): the viewer can have their language in one click, so the explicit
-   preference outranks the browser's `Accept-Language`. Until then the phase-1 selection decided
-   here too, and a viewer who had set Serbian got the Russian track their browser implied. A
+   an explicit click). An unlocked item is marked `Offered`, and **the best full human English
+   track by ladder rank plays beside the offer** (`offeredDefault`; owner, 2026-09-28: "show the
+   main subtitles and offer to translate them"). With no English track, subtitles stay off.
+   History: until 2026-09-18 the phase-1 selection decided here, and a viewer who had set Serbian
+   got the Russian track their browser implied, which read as the setting being ignored; from
+   2026-09-18 an offer left subtitles off, so an English film with no subtitles in the viewer's
+   language played with nothing on screen until they clicked. What the 2026-09-18 rule protected
+   still holds: **`Accept-Language` is not consulted beside an offer** — English is the one
+   fallback language every viewer gets (`fallbackLang`, i.e. `ud.FallbackLangTag`, the language
+   the phase-1 fallback ends on too), not a guess about this viewer. The offer itself is
+   unchanged: the chip, `#subtitle-hint` and the on-screen pill all still offer the translation,
+   since the English track is not in the offer's language (`offerNeedsHint`'s rival rule). A
+   preferred language of English never reaches this: an English track would have won above.
+   **A saved choice that is that very English track keeps the offer.** Any other saved track
+   withdraws it (rule 1: the viewer has dealt with subtitles), but this one is what every next
+   episode receives — the player carries what is *playing* (`readCarry`, `next-item.js`) and a
+   carried choice arrives as a saved one — so without the exception the offer showed on the first
+   episode of a series only (`TestNextEpisodeKeepsTheOffer`). A different English track the viewer
+   picked over the ladder's still withdraws it. The free-viewer analogue — a carried phase-1
+   track dropping `Upsell` from episode 2 on — predates this and is left as it was. A
    locked item is marked `Upsell` (see *The on-screen offer*) and rule 5 applies.
 5. **Phase-1 fallback when the preferred language cannot be served at all.** Not when a
    translation is `Offered` (rule 4). If the preferred language yields nothing activatable
    (NSFW, free viewer facing a locked item, or the language is outside
    `stremio.LanguageByCode`), `applyLadder` falls back to the old phase-1 selection
    (`selectListItem`/`matchLang`: Accept-Language, then English) instead of "None" — the ladder
-   must never take away subtitles phase 1 would have turned on.
+   must never take away subtitles phase 1 would have turned on. Rule 4's English track is
+   deliberately **not** extended to this path (2026-09-28): here the browser's other languages
+   still come before English, as they always did. For most viewers the two agree — a browser
+   that lists English, or none of the file's languages, lands on English either way — and where
+   they differ (a Portuguese viewer whose browser also lists Russian; or CLDR's close matches on
+   the preferred language itself, which `matchLang` accepts with High confidence — kk→ru, be→ru,
+   da→no, gl→es, ms→id, af→nl) switching a free viewer to English is a separate decision
+   (`TestFreeViewerKeepsThePhaseOneFallback`).
 
 Switching audio tracks in the modal re-runs the same rule client-side (`pickDefaultSubtitle` in
-`subtitle-rules.js`), reading `data-rank`/`data-srclang`/`data-forced` instead of recomputing
-anything. Difference from the server: on a miss, the client keeps the current default instead of
-recomputing an Accept-Language match (no such matcher client-side) — the server's phase-1 fallback
-only applies at page render.
+`subtitle-rules.js`), reading `data-rank`/`data-srclang`/`data-forced`/`data-locked` instead of
+recomputing anything. Rule 4's English track is part of it: with no human track in the preferred
+language and an unlocked `Translated` item on the list, the client picks the best English track by
+`data-rank` (`FALLBACK_LANG`, kept equal to the server's by
+`TestFallbackLangIsMirroredInSubtitleRules`). It tests for the item, not for `data-offered`: the
+server does not mark the offer when it rendered for audio already in the viewer's language, and an
+audio switch is exactly how the viewer leaves that state. Difference from the server: on a miss —
+no English track beside an offer, or no offer at all — the client keeps the current default
+instead of answering "None" or recomputing an Accept-Language match (no such matcher client-side);
+the server's phase-1 fallback only applies at page render.
 
 **No preferred language means no re-pick.** `data-preferred-lang` is empty in two live
 configurations — every embed, and any deployment with `SUBTITLE_TRANSLATE_ENABLED` off
@@ -1032,6 +1061,14 @@ an extra list entry; `subtitle-select` gained a `badge` field (rows before the d
 and level `'5'` did not exist before, so any level histogram changes shape rather than moving.
 Compare within a period on one side of the deploy, or re-baseline.
 
+**The English track beside an offer (2026-09-28) moves two lines.** Sessions of paying viewers
+that get an offer (`subtitle-offer-shown kind=start`) now resolve to an English track wherever the
+file has one: their `subtitle-resolved` level moves from `'none'` to `'0'`–`'4'`, badge not `ai`.
+And the offer is now read over subtitles that are already on, so a change in
+`subtitle-offer-click` / `subtitle-translate-start` per `kind=start` offer across that deploy is
+the rule's effect as much as the viewers' — the question worth answering with it, not noise to
+smooth over. `kind=upsell` is untouched (free viewers keep the phase-1 fallback).
+
 Disagreement with spec: the design spec (line ~219) also calls for a "bad translation" variant of
 the existing `report-problem` control with `data-provider=Translated`. **Not implemented** — no
 code path sets that variant. Deferred to a follow-up by controller ruling (the form lives on the
@@ -1261,10 +1298,15 @@ row plus the tracks of the expanded language.
     order: **1.** the best full human track in the preferred language, **2.** a forced (signs-only)
     track in that language — a real subtitle in the right language beats a full one in a language
     the viewer did not ask for, and this is what the switch offers when the audio is in a third
-    language, **3.** an unlocked AI translation (only ever created in the preferred language),
-    **4.** the Accept-Language pick, **5.** the best activatable track whatever its language.
-    Never the `none` item, never a locked one, and never while subtitles are on: with a track
-    playing, `data-default` already answers that question.
+    language, **3.** the Accept-Language pick, **4.** the best activatable track whatever its
+    language. (An AI-translation rung sat between 2 and 3 until 2026-09-16; the switch never
+    starts a translation.) Never the `none` item, never a locked one, and never while subtitles
+    are on: with a track playing, `data-default` already answers that question.
+    One case is answered before `offSuggestion` runs: subtitles saved off while the ladder's
+    answer is an offer. The switch then restores what the ladder plays beside the offer when
+    nothing is saved — the English track of rule 4 (`markSuggested(offeredDefault)` in the
+    saved-off branch; 2026-09-28) — not rung 2's forced track, which covers signs and none of the
+    dialogue. With no English track `offSuggestion` decides as before.
     Deliberately *not* routed through `ladderPick`, close as the orders are — every state that
     reaches `offSuggestion` already has `none` marked `Default`, and `ladderPick` answers with the
     first `Default` it finds (index 0) before it can consider anything else, so the call would be
@@ -1273,8 +1315,8 @@ row plus the tracks of the expanded language.
 - **A translation is offered, never started for the viewer** (owner, 2026-09-16). Running one
   spends tokens, so nothing but an explicit act begins it:
   - the server never makes the AI item `Default`. Where the ladder's answer was the translation,
-    `applyLadder` marks it `Suggested` and the phase-1 selection decides what plays — often
-    nothing, i.e. subtitles off.
+    `applyLadder` marks it `Offered` and `offeredDefault` decides what plays: the best English
+    track by rank, or nothing when the file has none (rule 4 of *Default-track rules*).
   - no rule picks it up either: `pickDefaultSubtitle` (the audio-switch rule) skips
     `provider === "Translated"`, `toggleDecision` accepts one only through `data-last-subtitle`
     (already run this session, therefore cached and free), and `offSuggestion` lost its AI rung.
@@ -1523,8 +1565,16 @@ Server side: `handlers/action/picker.go` (`SubtitleLangGroups`, `OriginCode`, `O
   abuse-store and torrent-store protobufs panics test binaries without
   `-ldflags -X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore`, which the
   Makefile target sets). Relevant packages: `handlers/action` (ladder, `badgeFor`, `applyLadder`
-  negative controls), `models` (`SubtitleOpts`), `services/streamprefs`, `services/api`
-  (`translate_url_test.go`), `jobs/scripts` (`translate_opts_test.go`).
+  negative controls; the English track beside an offer in `english_fallback_test.go`, including
+  the Go check that `FALLBACK_LANG` in `subtitle-rules.js` matches the server), `models`
+  (`SubtitleOpts`), `services/streamprefs`, `services/api` (`translate_url_test.go`),
+  `jobs/scripts` (`translate_opts_test.go`).
+- **Test user data without a fallback language.** A `VideoStreamUserData` literal carries a zero
+  `FallbackLangTag`, which both fallbacks read as "no language" — phase 1's matcher and
+  `offeredDefault` alike — so such a test never sees the English track beside an offer. Production
+  always builds it with `NewVideoStreamUserData` (English). Tests about the offer's default set
+  `FallbackLangTag: language.English` or use the constructor; the picker fixture
+  (`subtitles_dialog_fixture_test.go`) keeps the zero tag on purpose, for its off state.
 - Render guard: `services/template/stream_video_render_test.go` renders
   `templates/views/action/stream_video.html` with a minimal `StreamContent` so an arity mismatch or
   nil-field panic in `getSubtitles`/`getAudioTracks` template bindings goes red under `make test`

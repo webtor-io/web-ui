@@ -73,7 +73,13 @@ const regenCmd = `UPDATE_FIXTURES=1 go test ` +
 //   - the AI item unlocked and Offered, which is the state a click on it
 //     has to turn into a poll;
 //   - subtitles off (the ladder has nothing in Portuguese but the offer),
-//     so the switch's on/off path has something to restore.
+//     so the switch's on/off path has something to restore. Off although
+//     the list has English tracks, which production would turn on beside
+//     the offer (offeredDefault, 2026-09-28): the VideoStreamUserData below
+//     is not built by NewVideoStreamUserData and carries no FallbackLangTag,
+//     so there is no fallback language to turn anything on in. Kept that
+//     way on purpose -- the wiring tests need the off state, and a saved
+//     "off" instead would make every audio switch a manual one.
 func TestSubtitlesDialogFixtureIsCurrent(t *testing.T) {
 	// One upload in the dialog, and the async reload of the uploads partial
 	// that the wiring tests replay: the upload case (the file just added is

@@ -1058,7 +1058,7 @@ func TestOffSuggestsAForcedTrackInThePreferredLanguage(t *testing.T) {
 // TestLadderNeverDefaultsTheTranslation is the owner's rule of 2026-09-16:
 // a translation costs tokens, so it is never turned on for the viewer. The
 // ladder marks it Offered -- the picker draws that as an action, not as a
-// selection -- and the phase-1 selection decides what actually plays.
+// selection -- and offeredDefault decides what actually plays.
 //
 // Negative control for the same guard: TestLadderTranslatedIsOfferedNotDefault
 // below asserts the item is still offered, so "never Default" cannot be
@@ -1078,16 +1078,15 @@ func TestLadderNeverDefaultsTheTranslation(t *testing.T) {
 			t.Fatalf("the AI translation must never be the default: %+v", it)
 		}
 	}
-	// ...and nothing else is switched on in its place (owner, 2026-09-18):
-	// the viewer asked for Portuguese and can have it in one click, so the
-	// English sidecar their Accept-Language implies stays off. Until then
-	// the phase-1 fallback decided here, and a viewer who had set Serbian got
-	// the Russian track their browser implied.
-	//
-	// The other side of the rule is TestUpsellMarksTheLockedTranslation...:
-	// a viewer who CANNOT run the translation keeps the phase-1 pick.
-	if d := defaultID(items); d != "none" {
-		t.Fatalf("default=%s want none: an offer leaves subtitles off", d)
+	// What plays in its place is the best English track by ladder rank
+	// (owner, 2026-09-28: "show the main subtitles and offer to translate
+	// them") -- here the embedded English track, rank 1, ahead of the
+	// sidecar (2) and the hash-matched OpenSubtitles track (3). From
+	// 2026-09-18 to then an offer left subtitles off. The rule has its own
+	// tests in english_fallback_test.go; this one only checks that the
+	// translation is not what came back on.
+	if d := defaultID(items); d != "mp-0" {
+		t.Fatalf("default=%s want mp-0: the best English track plays beside the offer", d)
 	}
 }
 
@@ -1110,7 +1109,11 @@ func TestLadderTranslatedIsOfferedNotDefault(t *testing.T) {
 // half: off, and the offer standing.
 func TestLadderTranslationOfferSurvivesWithNoOtherTrack(t *testing.T) {
 	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/sc-ja.vtt", SrcLang: "ja", Label: "jp.srt", Kind: "subtitles"}}}
-	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("jpn"), tag, nil, &models.ExternalData{}, nil,
+	// Audio only: audioProbe also ships an embedded English subtitle, which
+	// would play beside the offer (offeredDefault) -- "no other track" has
+	// to mean no English one either.
+	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]`)
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audio, tag, nil, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
 	if d := defaultID(items); d != "none" {
 		t.Fatalf("default=%s want none", d)
@@ -1150,14 +1153,17 @@ func TestOffSuggestionNeverOffersTheTranslation(t *testing.T) {
 // different items, and they are drawn differently.
 //
 // Fixture: Japanese audio, Portuguese viewer, one forced Portuguese
-// sidecar (never a full track, so the ladder does not turn it on) and an
-// English sidecar to translate from.
+// sidecar (never a full track, so the ladder does not turn it on) and a
+// Japanese sidecar to translate from. Japanese and not English since
+// 2026-09-28: an English track would play beside the offer
+// (offeredDefault), and subtitles would not be off at all.
 func TestOfferedAndSuggestedAreDifferentSlots(t *testing.T) {
 	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{
-		{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+		{Src: "https://x/sc-ja.vtt", SrcLang: "ja", Label: "Movie.ja.srt", Kind: "subtitles"},
 		{Src: "https://x/sc-pt.vtt", SrcLang: "pt", Label: "Movie.pt.forced.srt", Kind: "subtitles"},
 	}}
-	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{}, audioProbe("jpn"), tag, nil, &models.ExternalData{}, nil,
+	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]`)
+	items := NewHelper().GetSubtitles(&models.VideoStreamUserData{FallbackLangTag: language.English}, audio, tag, nil, &models.ExternalData{}, nil,
 		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true})
 	got := byID(items)
 

@@ -994,6 +994,17 @@ test('toggleDecision: the switch never starts a translation it was only offered'
     );
 });
 
+// Owner, 2026-09-28: beside an offer the English track plays. The switch
+// reaches it through the ladder rule when the server named nothing (a page
+// swapped in without data-suggested, say); the offer itself is not taken.
+test('toggleDecision: beside an offered translation the switch turns the English track on', () => {
+    const tracks = [AI('tr-de'), { id: 'en-1', provider: 'OpenSubtitles', srclang: 'en', rank: 3 }];
+    assert.deepEqual(
+        toggleDecision({ on: true, tracks, audioLang: 'ja', preferredLang: 'de' }),
+        { activateId: 'en-1', persist: true },
+    );
+});
+
 test('toggleDecision: a human track wins over an offered translation', () => {
     const tracks = [AI('tr-de'), { id: 'a', provider: 'OpenSubtitles', srclang: 'de', rank: 3 }];
     assert.deepEqual(

@@ -163,3 +163,57 @@ test('a user upload in the preferred language outranks every other source on an 
     ];
     assert.equal(pickDefaultSubtitle(tracks, 'en', 'pt'), 'us-1');
 });
+
+// ---- the English track beside a translation offer ---------------------
+//
+// Owner, 2026-09-28: when the viewer's language has no human track and the
+// audio is not in it, the best English track plays and the translation
+// stays an offer. offeredDefault on the server; this is the same rule on an
+// audio switch.
+
+const AI = (id, extra = {}) => T(id, 5, id.replace(/^tr-/, ''), { provider: 'Translated', ...extra });
+
+// Negative control: without the offer branch in pickDefaultSubtitle every
+// assertion below that names an English id answers 'none'.
+test('beside a translation offer the best English track by rank comes on', () => {
+    const tracks = [
+        AI('tr-pt'),
+        T('mp-0', 1, 'en'),
+        T('os-ru', 3, 'ru'),
+        T('os-en', 3, 'en'),
+        // Last on the list and still the pick: the rank decides, not the
+        // order the server happened to render.
+        T('us-1', 0, 'en', { provider: 'UserSubtitle' }),
+    ];
+    assert.equal(pickDefaultSubtitle(tracks, 'ja', 'pt'), 'us-1');
+    assert.equal(pickDefaultSubtitle(tracks.slice(0, 4), 'ja', 'pt'), 'mp-0');
+    // Unknown audio counts as foreign, as everywhere else.
+    assert.equal(pickDefaultSubtitle(tracks.slice(0, 4), '', 'pt'), 'mp-0');
+    // A forced English track is signs only, never the full default.
+    assert.equal(pickDefaultSubtitle([AI('tr-pt'), T('mp-0', 1, 'en', { forced: true })], 'ja', 'pt'), 'none');
+});
+
+test('the English track never outranks the rules before it', () => {
+    const en = T('os-en', 3, 'en');
+    // Audio in the viewer's language: nothing, or a forced track -- not English.
+    assert.equal(pickDefaultSubtitle([AI('tr-pt'), en], 'pt', 'pt'), 'none');
+    assert.equal(pickDefaultSubtitle([AI('tr-pt'), en, T('mp-0', 1, 'pt', { forced: true })], 'pt', 'pt'), 'mp-0');
+    // A human track in the viewer's language, however low its rank.
+    assert.equal(pickDefaultSubtitle([AI('tr-pt'), en, T('os-pt', 4, 'pt')], 'ja', 'pt'), 'os-pt');
+    // No English track: what was on stays on (the server answers "None"
+    // there; the client never turns something off it cannot replace).
+    assert.equal(pickDefaultSubtitle([AI('tr-pt'), T('os-ru', 3, 'ru')], 'ja', 'pt'), 'none');
+    assert.equal(pickDefaultSubtitle([AI('tr-pt'), T('mp-0', 1, 'pt', { forced: true, isDefault: true })], 'ja', 'pt'), 'mp-0');
+});
+
+// Negative control for the `locked` test in translationOnOffer: without it
+// a free viewer's audio switch replaces the server's phase-1 pick (here the
+// Russian track Accept-Language chose) with English.
+test('no offer, no English rule: a free viewer keeps what the server chose', () => {
+    const tracks = [AI('tr-pt', { locked: true }), T('os-ru', 3, 'ru', { isDefault: true }), T('os-en', 3, 'en')];
+    assert.equal(pickDefaultSubtitle(tracks, 'ja', 'pt'), 'os-ru');
+    // ...and with nothing on, nothing comes on.
+    assert.equal(pickDefaultSubtitle([AI('tr-pt', { locked: true }), T('os-en', 3, 'en')], 'ja', 'pt'), 'none');
+    // No AI item at all (NSFW, a language the service does not know): the same.
+    assert.equal(pickDefaultSubtitle([T('os-en', 3, 'en')], 'ja', 'pt'), 'none');
+});

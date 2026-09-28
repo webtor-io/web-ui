@@ -18,6 +18,13 @@ export function baseLang(tag) {
     return String(tag || '').toLowerCase().split(/[-_]/)[0];
 }
 
+// FALLBACK_LANG is the language the ladder falls back to beside a
+// translation offer: the server's fallbackLang (handlers/action/helper.go),
+// which is ud.FallbackLangTag -- English on every stream. A constant here
+// because it is the same for every viewer; TestFallbackLangIsMirroredInSubtitleRules
+// (handlers/action/english_fallback_test.go) fails when the two differ.
+export const FALLBACK_LANG = 'en';
+
 // best returns the lowest-ranked (= most trusted) candidate in lang among
 // forced or among full tracks, never mixing the two. Locked items are not
 // candidates: a locked track cannot be turned on, so selecting it would
@@ -29,7 +36,7 @@ export function baseLang(tag) {
 // switch that calls through here. A translation is reached by clicking its
 // chip, or restored through data-last-subtitle when the viewer already ran
 // it in this session and it is cached. The item is still offered in the
-// picker (ListItem.Suggested, drawn as "Translate to <language>"); this is
+// picker (ListItem.Offered, drawn as "Translate to <language>"); this is
 // about what happens without a click.
 function best(tracks, lang, forced) {
     let pick = null;
@@ -47,6 +54,17 @@ function rankOf(t) {
     return Number.isFinite(n) ? n : 9;
 }
 
+// translationOnOffer: the list holds a translation the viewer could start.
+// It is the server's condition for an offer (ladderPick answering with an
+// unlocked Translated item), read without the audio: data-offered cannot
+// stand in for it, because the server does not mark the offer when the
+// audio it rendered for was already in the viewer's language, and an audio
+// switch is exactly how the viewer leaves that state. The item only ever
+// exists in the preferred language, so its language is not tested.
+function translationOnOffer(tracks) {
+    return tracks.some((t) => t.provider === 'Translated' && !t.locked);
+}
+
 // pickDefaultSubtitle answers "which subtitle should be on, given this
 // audio track?" and returns the item id to activate, or 'none'.
 //
@@ -55,7 +73,11 @@ function rankOf(t) {
 // understands is noise. Audio in another language: the best full HUMAN
 // track in the preferred language — an AI translation is never the answer
 // here, because this rule runs without the viewer asking for anything (see
-// best).
+// best). With none, and a translation on offer, the best English track
+// (owner, 2026-09-28: "show the main subtitles and offer to translate
+// them"; offeredDefault on the server). The offer itself is untouched: the
+// picker and the on-screen pill keep offering it, since English is not the
+// viewer's language (offerNeedsHint).
 export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     const list = Array.isArray(tracks) ? tracks : [];
     const pref = baseLang(preferredLang);
@@ -80,7 +102,15 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     }
     const full = best(list, pref, false);
     if (full) return full.id;
-    // The preferred language yielded nothing activatable.
+    if (translationOnOffer(list)) {
+        const en = best(list, FALLBACK_LANG, false);
+        if (en) return en.id;
+    }
+    // The preferred language yielded nothing activatable. Where the server
+    // would answer "None" (an offer, no English track) or the phase-1
+    // Accept-Language match (no offer: a free viewer, NSFW, a language the
+    // service does not know), the client keeps what is on -- it has no
+    // matcher to recompute the latter with.
     return keep();
 }
 

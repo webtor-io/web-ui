@@ -1346,8 +1346,8 @@ func byIDTest(items []action.ListItem) map[string]action.ListItem {
 }
 
 // TestStreamVideoOfferAndRestoreAreTwoChips is the split in markup (owner
-// review, 2026-09-16): Japanese audio, a forced Portuguese sidecar and an
-// English one to translate from. The ladder will not turn a forced track on
+// review, 2026-09-16): Japanese audio, a forced Portuguese sidecar and a
+// Japanese one to translate from. The ladder will not turn a forced track on
 // when the audio is foreign, so subtitles are off — and the two questions
 // land on two different chips: the translation is what the viewer may
 // START, the forced track is what the switch would BRING BACK.
@@ -1408,9 +1408,13 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]}`), &mp); err != nil {
 		t.Fatalf("failed to build MediaProbe fixture: %v", err)
 	}
+	// The source is Japanese, not English: since 2026-09-28 an English track
+	// plays beside an offer (offeredDefault) and subtitles would not be off.
+	// The user data is production's (NewVideoStreamUserData: English
+	// fallback), so that is a real answer, not an unset one.
 	data := &scripts.StreamContent{
 		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
-			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+			{Src: "https://x/sc-ja.vtt", SrcLang: "ja", Label: "Movie.ja.srt", Kind: "subtitles"},
 			{Src: "https://x/sc-pt.vtt", SrcLang: "pt", Label: "Movie.pt.forced.srt", Kind: "subtitles"},
 		}},
 		Resource:            &ra.ResourceResponse{},
@@ -1418,7 +1422,7 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		Title:               "Movie",
 		MediaProbe:          &mp,
 		EIURL:               "http://ei.example.com",
-		VideoStreamUserData: &models.VideoStreamUserData{ResourceID: "res", ItemID: "item"},
+		VideoStreamUserData: models.NewVideoStreamUserData("res", "item", &models.StreamSettings{}),
 		Settings:            &models.StreamSettings{},
 		ExternalData:        &models.ExternalData{},
 		SubtitleOpts:        models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
@@ -1603,5 +1607,128 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 	}
 	if !strings.Contains(html, `data-subtitles-off="false"`) {
 		t.Error("subtitles are on: the saved translation is what is playing")
+	}
+}
+
+// TestStreamVideoRendersEnglishBesideTheOffer is the owner's rule of
+// 2026-09-28 in markup: an English film, nothing human in Portuguese, a
+// paying viewer. The English track plays -- chip active, switch on -- and
+// the translation is still an offer the dialog explains: the hint stands,
+// because English is not Portuguese (the rival rule looks at the offer's
+// own language), and the AI chip keeps its verb shape.
+func TestStreamVideoRendersEnglishBesideTheOffer(t *testing.T) {
+	helper := action.NewHelper()
+
+	echo := func(lang, key string) string { return key }
+	echoVariadic := func(lang, key string, args ...interface{}) string {
+		out := key
+		for i := 1; i < len(args); i += 2 {
+			out += ":" + fmt.Sprint(args[i])
+		}
+		return out
+	}
+	echoHTML := func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) }
+
+	funcs := template.FuncMap{
+		"getSubtitles":       helper.GetSubtitles,
+		"getAudioTracks":     helper.GetAudioTracks,
+		"hasControls":        helper.HasControls,
+		"getDurationSec":     helper.GetDurationSec,
+		"userSubtitleView":   helper.UserSubtitleView,
+		"subtitleLangGroups": helper.SubtitleLangGroups,
+		"stremioLanguages":   func() []stremio.Language { return stremio.Languages },
+		"originCode":         helper.OriginCode,
+		"originCodeForBadge": helper.OriginCodeForBadge,
+		"originKey":          helper.OriginKey,
+		"originHintKey":      helper.OriginHintKey,
+		"propertyTags":       helper.PropertyTags,
+		"audioSuffix":        helper.AudioSuffix,
+		"langDisplay":        stremio.NewHelper().LangDisplay,
+		"langDisplayIn":      stremio.NewHelper().LangDisplayIn,
+
+		"domain":      func() string { return "https://example.com" },
+		"langPath":    func(lang, p string) string { return p },
+		"json":        func(v interface{}) template.JS { return template.JS("{}") },
+		"asset":       func(p string) template.HTML { return template.HTML(p) },
+		"hasAuth":     func(interface{}) bool { return false },
+		"promoOffer":  func() *offer.Offer { return nil },
+		"trialURL":    offer.TrialURL,
+		"tn":          func(lang, key string, n int, args ...any) string { return key },
+		"withContext": func(ctx, data interface{}) interface{} { return map[string]interface{}{"Ctx": ctx, "Data": data} },
+		"t":           echo,
+		"tp":          echoVariadic,
+		"tpHTML":      echoHTML,
+	}
+
+	tpl, err := template.New("stream_video.html").Funcs(funcs).
+		ParseFiles("../../templates/views/action/stream_video.html")
+	if err != nil {
+		t.Fatalf("failed to parse stream_video.html: %v", err)
+	}
+	if _, err := tpl.Parse(`{{ define "user_subtitles_view" }}<!--stub-->{{ end }}`); err != nil {
+		t.Fatalf("failed to define user_subtitles_view stub: %v", err)
+	}
+
+	var mp api.MediaProbe
+	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]}`), &mp); err != nil {
+		t.Fatalf("failed to build MediaProbe fixture: %v", err)
+	}
+	data := &scripts.StreamContent{
+		ExportTag: &ra.ExportTag{Tracks: []ra.ExportTrack{
+			{Src: "https://x/sc-en.vtt", SrcLang: "en", Label: "Movie.en.srt", Kind: "subtitles"},
+		}},
+		Resource:            &ra.ResourceResponse{},
+		Item:                &ra.ListItem{PathStr: "movie.mkv"},
+		Title:               "Movie",
+		MediaProbe:          &mp,
+		EIURL:               "http://ei.example.com",
+		VideoStreamUserData: models.NewVideoStreamUserData("res", "item", &models.StreamSettings{}),
+		Settings:            &models.StreamSettings{},
+		ExternalData:        &models.ExternalData{},
+		SubtitleOpts:        models.SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: true},
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{
+		"Data": data, "Lang": "en", "User": nil,
+	}); err != nil {
+		t.Fatalf("failed to render stream_video.html: %v", err)
+	}
+	html := buf.String()
+
+	chipOf := func(id string) string {
+		at := strings.Index(html, `data-id="`+id+`"`)
+		if at < 0 {
+			t.Fatalf("no chip %s:\n%s", id, html)
+		}
+		c := html[strings.LastIndex(html[:at], "<button"):]
+		return c[:strings.Index(c, "</button>")]
+	}
+
+	en := chipOf("et-1")
+	for _, want := range []string{`data-default="true"`, "track-chip-active", `aria-checked="true"`} {
+		if !strings.Contains(en, want) {
+			t.Errorf("the English chip is missing %q:\n%s", want, en)
+		}
+	}
+	if strings.Contains(en, "data-saved") {
+		t.Errorf("the ladder's pick must not render as the viewer's choice:\n%s", en)
+	}
+	ai := chipOf("tr-pt")
+	for _, want := range []string{`data-offered="true"`, "chip-offered", "action.stream.translate.action:Portuguese"} {
+		if !strings.Contains(ai, want) {
+			t.Errorf("the AI chip is missing %q:\n%s", want, ai)
+		}
+	}
+	if !strings.Contains(html, `data-subtitles-off="false"`) {
+		t.Error("the switch must render on: English is playing")
+	}
+	hintAt := strings.Index(html, `id="subtitle-hint"`)
+	if hintAt < 0 {
+		t.Fatal("no #subtitle-hint element")
+	}
+	hint := html[hintAt : hintAt+strings.Index(html[hintAt:], "</p>")]
+	if strings.Contains(hint[:strings.Index(hint, ">")], "hidden") {
+		t.Errorf("the hint must stand: there is still nothing in Portuguese:\n%s", hint)
 	}
 }
