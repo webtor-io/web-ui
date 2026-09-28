@@ -140,7 +140,8 @@ content-transcoder names why it refused a session in `X-Video-Route-Reason`
 before, byte for byte:
 
 - no reason (a transcoder that predates routes) or `no_declaration` (a start that declared
-  nothing — every start in production until a browser opts in) → the old keys above. A start that
+  nothing — since stage 5 (2026-09-28) a browser that decodes no HEVC, one opted out with
+  `?passthrough=off`, or a page opened before that deploy) → the old keys above. A start that
   declares audio tokens only (`aac51`/`ac3`/`ec3`, multichannel audio) is a declaration: a
   transcoder that knows them gives the video reason of a browser that declares no HEVC
   (`needs_2160`, `not_hevc`, `passthrough_off`, …), so its 4K refusal reads the route's text below —
