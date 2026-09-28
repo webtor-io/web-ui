@@ -237,6 +237,28 @@ export function fallbackURL(href, path, reason, cls) {
     return u.pathname + u.search + u.hash;
 }
 
+// loadDocument goes to `url` by loading the page, which is what starts the
+// deep link: app/resource/get.js reads the hash once, when the page loads.
+// A URL that differs from the address only by its fragment is a fragment
+// navigation -- the document stays, get.js does not run again, and the
+// viewer is left on the failed player. That is the fallback's usual case,
+// not an edge: the quiet move to the next file has already put
+// `?file=<next>` in the address (next-item-go.js pushState), so the
+// deep link for that file differs from it only by the hash. There the
+// address is replaced (no second history entry for the same file) and the
+// page reloaded. `loc` is a Location.
+export function loadDocument(loc, url) {
+    const target = new URL(url, loc.href);
+    const bare = (u) => { const x = new URL(u); x.hash = ''; return x.href; };
+    if (bare(target.href) === bare(loc.href)) {
+        loc.replace(target.href);
+        loc.reload();
+        return 'reload';
+    }
+    loc.assign(target.href);
+    return 'assign';
+}
+
 // restartEmbed starts the embed again the way it was started (app/embed/
 // check.js initEmbed: a POST of its settings), with the fallback's fields and
 // without a declaration -- not a reload: the embed's page is the answer to a
@@ -274,12 +296,14 @@ function restartEmbed(win, doc, reason, cls) {
 //        no declaration) -- the same path as the button, Turnstile included;
 //      - the start form is another file's (the player moved on to the next
 //        episode quietly and the page is not brought up to date yet, e.g. in
-//        fullscreen) or there is none: this page for this file, started by
-//        its deep link with the reason in the hash.
+//        fullscreen): this page for this file, started by its deep link with
+//        the reason in the hash -- loaded, even where the address already
+//        names the file (loadDocument);
+//      - there is no start form: a reload.
 // Returns which restart it took.
 export function fallbackToOldRoute({ video, reason, path = 'mse', win = window, doc = document,
     track = (name, data) => { if (win.umami) win.umami.track(name, data); },
-    navigate = (u) => win.location.assign(u) }) {
+    navigate = (u) => loadDocument(win.location, u) }) {
     const d = video.dataset || {};
     const resourceId = d.resourceId || '';
     const itemId = d.itemId || '';

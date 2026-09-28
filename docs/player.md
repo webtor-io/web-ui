@@ -585,7 +585,10 @@ The fallback (`fallbackToOldRoute`):
    - **the form is another file's** (the player moved on to the next episode quietly and the page is
      not brought up to date yet — in fullscreen until it ends): this page for this file, started by its
      deep link, `#action=stream&decode-fallback=…&decode-class=…` (`app/resource/get.js` sets the note).
-     Restarting the page's form would restart the previous episode;
+     Restarting the page's form would restart the previous episode. The quiet move has already pushed
+     `?file=<that file>` into the address, so the deep link differs from it only by the hash — a
+     fragment navigation, which loads nothing and leaves the viewer on the failed player.
+     `loadDocument` replaces the address and reloads there (`fallback-navigation.test.js`);
    - no form at all: a reload.
 4. The server (`handlers/action`, `handlers/embed`) counts `webui_passthrough_fallback_total{reason,
    class}` and logs `passthrough fallback`. A file ≤1080 plays on the old route; over 1080 the
