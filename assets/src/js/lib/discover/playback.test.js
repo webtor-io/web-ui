@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    transcoderAnswer, browserDecodesHevc, browserDecodesPq, uhdPlaysHere, uhdWarningKey,
+    transcoderAnswer, browserDecodesHevc, browserDecodesPq, uhdPlaysHere, uhdWarningKey, uhdReleasePlays,
     isHdrRelease, switchStates, hiddenBy, switchCounts, emptyStateKey, playbackContext,
 } from './playback.js';
 
@@ -67,20 +67,26 @@ test('uhdWarningKey: unknown says the check did not happen; a declaring browser 
     assert.equal(uhdWarningKey('on', true, null), 'discover.warning4kBodyUnchecked', 'taking part, browser not answered');
     assert.equal(uhdWarningKey('on', true, ['hevc8', 'hevc8-2160']), 'discover.warning4kBodyNoHevc');
     assert.equal(uhdWarningKey('on', true, []), 'discover.warning4kBodyNoHevc');
+    // Where 4K HEVC plays the switch holds only releases that take the old
+    // route (uhdReleasePlays): the old text is true for them.
+    assert.equal(uhdWarningKey('on', true, EVERYTHING), 'discover.warning4kBody');
     assert.equal(uhdWarningKey('on', false, null), 'discover.warning4kBody', 'not declaring: its sessions take the old route');
     assert.equal(uhdWarningKey('off', true, EVERYTHING), 'discover.warning4kBody');
     assert.equal(uhdWarningKey('off', false, null), 'discover.warning4kBody');
 });
 
-test('the 4K switch: gone and 4K shown where 4K plays; kept, hidden by default, elsewhere', () => {
+const uhdRow = (codec = 'hevc', hdr = null, dv5 = false) => ({ video: { codec, hdr, dv5 }, uhd: true });
+
+test('the 4K switch: where 4K plays, 4K that plays is shown and no switch is about it; elsewhere every 4K release is behind it, hidden by default', () => {
+    const playing = [uhdRow('hevc', 'pq'), uhdRow('avc'), uhdRow('unknown')];
     let s = states({ caps: 'on', part: true, declared: EVERYTHING });
-    assert.equal(s.uhd.switchable, false);
-    assert.equal(s.uhd.shown, true);
-    // show4k answered "show 4K that will not play here?": where it plays the
-    // question does not exist, and an old "no" hides nothing without a switch.
+    assert.equal(s.uhd.plays, true);
+    assert.deepEqual(playing.map((r) => hiddenBy(r, s)), [[], [], []]);
+    assert.equal(switchCounts(playing, s).uhd, 0, 'no release for the switch: it does not stand');
+    // show4k answered "show 4K that will not play here?": an old "no" hides
+    // nothing that plays.
     s = states({ caps: 'on', part: true, declared: EVERYTHING, prefs: { show4k: false } });
-    assert.equal(s.uhd.switchable, false);
-    assert.equal(s.uhd.shown, true);
+    assert.deepEqual(playing.map((r) => hiddenBy(r, s)), [[], [], []]);
 
     for (const over of [
         { caps: 'off', part: true, declared: EVERYTHING },
@@ -90,11 +96,46 @@ test('the 4K switch: gone and 4K shown where 4K plays; kept, hidden by default, 
         { caps: 'on', part: true, declared: ['hevc8', 'hevc8-2160', 'hdr-pq'] },
     ]) {
         s = states(over);
-        assert.equal(s.uhd.switchable, true, JSON.stringify(over));
-        assert.equal(s.uhd.shown, false, JSON.stringify(over));
+        assert.equal(s.uhd.plays, false, JSON.stringify(over));
+        assert.deepEqual(playing.map((r) => hiddenBy(r, s)), [['uhd'], ['uhd'], ['uhd']], JSON.stringify(over));
+        assert.equal(switchCounts(playing, s).uhd, 3, JSON.stringify(over));
         s = states({ ...over, prefs: { show4k: true } });
-        assert.equal(s.uhd.shown, true, `${JSON.stringify(over)}: the viewer's "show 4K" is kept`);
+        assert.deepEqual(playing.map((r) => hiddenBy(r, s)), [[], [], []], `${JSON.stringify(over)}: the viewer's "show 4K" is kept`);
     }
+});
+
+// The transcoder's own rules (content-transcoder route.go), read off the
+// name: what it sends to the old route, which converts nothing over 1080p.
+test('uhdReleasePlays: AV1, Dolby Vision 5, HLG, and HDR without hdr-pq do not play as 4K; the rest does', () => {
+    const noPq = HEVC; // 4K Main10, no hdr-pq
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: null, dv5: false }, EVERYTHING), true);
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: 'pq', dv5: false }, EVERYTHING), true);
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: 'dv', dv5: false }, EVERYTHING), true, 'DV with an HDR10 layer, PQ declared');
+    assert.equal(uhdReleasePlays({ codec: 'avc', hdr: null, dv5: false }, EVERYTHING), true, '4K H.264: the old route copies it');
+    assert.equal(uhdReleasePlays({ codec: 'unknown', hdr: null, dv5: false }, EVERYTHING), true, 'no codec named: taken as playing');
+    assert.equal(uhdReleasePlays({ codec: 'av1', hdr: null, dv5: false }, EVERYTHING), false, 'not HEVC (not_hevc)');
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: 'dv', dv5: true }, EVERYTHING), false, 'dv5');
+    assert.equal(uhdReleasePlays({ codec: 'unknown', hdr: 'pq', dv5: true }, EVERYTHING), false, 'P5 said outright next to HDR');
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: 'hlg', dv5: false }, EVERYTHING), false, 'HLG is not passed through yet (hlg_later)');
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: 'pq', dv5: false }, noPq), false, 'PQ without hdr-pq (needs_pq)');
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: 'dv', dv5: false }, noPq), false, 'an HDR10 layer without hdr-pq');
+    assert.equal(uhdReleasePlays({ codec: 'hevc', hdr: null, dv5: false }, noPq), true, 'SDR needs no hdr-pq');
+});
+
+test('where 4K plays, the 4K switch holds only the 4K releases the transcoder turns away', () => {
+    const hevc1080 = { video: { codec: 'hevc', hdr: null, dv5: false }, uhd: false };
+    const list = [uhdRow('hevc', 'pq'), uhdRow('avc'), uhdRow('av1'), uhdRow('hevc', 'dv', true), hevc1080];
+    const plays = states({ caps: 'on', part: true, declared: EVERYTHING, decodes: EVERYTHING });
+    assert.deepEqual(switchCounts(list, plays), { hevc: 3, hdr: 1, uhd: 2 });
+    assert.deepEqual(list.map((r) => hiddenBy(r, plays)), [[], [], ['uhd'], ['uhd'], []]);
+    assert.equal(plays.uhd.warningKey, 'discover.warning4kBody', 'they take the old route, where 4K is converted');
+    const shown = states({ caps: 'on', part: true, declared: EVERYTHING, decodes: EVERYTHING, prefs: { show4k: true } });
+    assert.deepEqual(list.map((r) => hiddenBy(r, shown)), [[], [], [], [], []], 'the viewer\'s "show 4K" shows them');
+    // 4K Main10 without hdr-pq, HDR turned on by the viewer: its 4K HDR is
+    // still 4K that will not play here.
+    const noPq = states({ caps: 'on', part: true, declared: HEVC, decodes: HEVC, prefs: { showHdr: true } });
+    assert.deepEqual(hiddenBy(uhdRow('hevc', 'pq'), noPq), ['uhd']);
+    assert.deepEqual(hiddenBy(uhdRow('hevc'), noPq), []);
 });
 
 // ---- the defaults: what the browser decodes --------------------------------
@@ -157,7 +198,7 @@ test('hiddenBy: HEVC by name, HDR by name, 4K by its label; a release of unknown
 test('switchCounts: the number in each switch, before filtering', () => {
     assert.deepEqual(switchCounts([
         row('hevc', 'pq', { uhd: true }), row('hevc'), row('avc', null, { uhd: true }), row('unknown', 'dv', { dv5: true }), row('hevc', 'dv'),
-    ]), { hevc: 3, hdr: 2, uhd: 2 });
+    ], states()), { hevc: 3, hdr: 2, uhd: 2 });
 });
 
 test('emptyStateKey: the one switch that hides everything is named; several are named together; anything left, no text', () => {

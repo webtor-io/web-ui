@@ -16,8 +16,11 @@
 //       window._passthrough, services/transcodercaps) AND this page sends
 //       it a declaration that covers 4K Main10 -- the transcoder's own rule
 //       for a 4K HEVC source (content-transcoder route.go). Where it does,
-//       the 4K switch is gone and 4K is simply shown; everywhere else the
-//       switch stays with its warning, which is true there.
+//       4K is shown, and the 4K switch stays only for the 4K releases the
+//       transcoder would still turn away by what their names say (AV1,
+//       Dolby Vision 5, HLG, HDR without hdr-pq: uhdReleasePlays);
+//       everywhere else the switch holds every 4K release, with its
+//       warning, which is true there.
 //
 // A check that has not answered is never read as a "no": a browser whose
 // probe has not answered yet keeps HEVC and HDR shown (today's list) and is
@@ -80,15 +83,38 @@ export function uhdPlaysHere(caps, declared) {
 //     answered: the check did not happen -- say so, not "switched off";
 //   - the transcoder passes HEVC through and this browser declared, without
 //     4K Main10: this browser is why;
+//   - 4K HEVC plays here: the switch holds only the releases the transcoder
+//     sends to the old route (uhdReleasePlays), where 4K is converted,
+//     which is off -- the old warning, true for them;
 //   - the transcoder converts: the old warning, as for a page that does not
 //     declare.
 export function uhdWarningKey(caps, part, declared) {
     if (!part) return 'discover.warning4kBody';
     if (caps === 'unknown') return 'discover.warning4kBodyUnchecked';
     if (caps === 'on') {
-        return Array.isArray(declared) ? 'discover.warning4kBodyNoHevc' : 'discover.warning4kBodyUnchecked';
+        if (!Array.isArray(declared)) return 'discover.warning4kBodyUnchecked';
+        return uhdPlaysHere(caps, declared) ? 'discover.warning4kBody' : 'discover.warning4kBodyNoHevc';
     }
     return 'discover.warning4kBody';
+}
+
+// uhdReleasePlays: where 4K HEVC plays on this page (uhdPlaysHere), does
+// this 4K release get past the transcoder's rules for the page's
+// declaration (content-transcoder route.go), by what its name says? Not
+// where the name says something the transcoder sends to the old route,
+// which converts nothing over 1080p:
+//   - AV1: not HEVC (not_hevc). 4K H.264 plays: the old route copies it;
+//   - Dolby Vision profile 5 (dv5);
+//   - HLG (hlg_later: not passed through yet);
+//   - PQ, or Dolby Vision with an HDR10 layer, where the page does not
+//     declare hdr-pq (needs_pq).
+// A name that says none of these, one that names no codec included, is
+// taken as playing, as an unknown codec is everywhere here. What a name
+// cannot tell (Dolby Vision 7, tier High) the transcoder refuses at the
+// start, with its reason (services/web user_error.go).
+export function uhdReleasePlays(video, declared) {
+    if (video.codec === 'av1' || video.dv5 || video.hdr === 'hlg') return false;
+    return !isHdrRelease(video) || (Array.isArray(declared) && declared.includes(PQ_TOKEN));
 }
 
 // isHdrRelease: the releases the HDR switch hides -- PQ by name, and Dolby
@@ -117,15 +143,24 @@ export function switchStates({ caps, decodes, part, declared, prefs }) {
             shown: typeof p.showHdr === 'boolean' ? p.showHdr : pqDecoded !== false,
             warns: pqDecoded === false,
         },
-        // Where 4K plays there is no switch and no choice to keep: show4k was
-        // the answer to "show 4K that will not play here?". It stays in
-        // storage and comes back with the switch if 4K stops playing.
+        // The 4K switch is about the 4K releases that will not play here:
+        // every one where 4K HEVC does not play; where it does, only those
+        // the transcoder would still turn away (uhdReleasePlays), and the
+        // switch stands only if the list has one. show4k keeps its meaning,
+        // "show 4K that will not play here": a stored "no" hides nothing
+        // that plays, and where 4K plays it still answers for the rest.
         uhd: {
-            switchable: !uhdPlays,
-            shown: uhdPlays || p.show4k === true,
+            plays: uhdPlays,
+            declared: uhdPlays ? declared : null,
+            shown: p.show4k === true,
             warningKey: uhdWarningKey(caps, part, declared),
         },
     };
+}
+
+// aboutUhd: is this release one the 4K switch is about.
+function aboutUhd(row, states) {
+    return !!row.uhd && !(states.uhd.plays && uhdReleasePlays(row.video, states.uhd.declared));
 }
 
 // hiddenBy: the switches that hide one release (`row` = {video, uhd}), in
@@ -134,18 +169,19 @@ export function hiddenBy(row, states) {
     const out = [];
     if (row.video.codec === 'hevc' && !states.hevc.shown) out.push('hevc');
     if (isHdrRelease(row.video) && !states.hdr.shown) out.push('hdr');
-    if (row.uhd && !states.uhd.shown) out.push('uhd');
+    if (aboutUhd(row, states) && !states.uhd.shown) out.push('uhd');
     return out;
 }
 
 // switchCounts: how many releases each switch is about, before any
 // filtering -- the number in its label, and whether it is shown at all.
-export function switchCounts(rows) {
+// The 4K switch's depends on whether 4K plays here (aboutUhd).
+export function switchCounts(rows, states) {
     const n = { hevc: 0, hdr: 0, uhd: 0 };
     for (const r of rows) {
         if (r.video.codec === 'hevc') n.hevc++;
         if (isHdrRelease(r.video)) n.hdr++;
-        if (r.uhd) n.uhd++;
+        if (aboutUhd(r, states)) n.uhd++;
     }
     return n;
 }

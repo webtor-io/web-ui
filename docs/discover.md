@@ -270,8 +270,17 @@ names are read by `lib/discover/release-video.js`.
   where the transcoder passes HEVC through (`window._passthrough.hevc ===
   "on"`) **and** this page declares 4K Main10 (`hevc10-2160`, the
   transcoder's own rule; 9 in 10 HEVC sources over 1080p are Main10). There
-  the 4K switch is gone and 4K is shown. Everywhere else it stays, off by
-  default, and turning it on warns — with a text that says why:
+  4K is shown, and the 4K switch stays only for the 4K releases whose names
+  say something the transcoder still sends to the old route, which converts
+  nothing over 1080p (`uhdReleasePlays`): AV1, Dolby Vision 5, HLG (not
+  passed through yet), and HDR — PQ, or Dolby Vision with an HDR10 layer —
+  where the page does not declare `hdr-pq`. No such release in the list,
+  no switch. Its warning there is the old one, true for them. On the paths
+  opened over 14 days, of 2 926 files over 1080p: HEVC 1 128 (PQ 479,
+  HLG 5, DV5 6, DV7 44 — profile 7 cannot be told by name, so it is not
+  held back), AV1 37 (12 of them say so). Everywhere else the switch holds
+  every 4K release, off by default, and turning it on warns — with a text
+  that says why:
   - this page does not declare: its sessions take the old route whatever
     the transcoder answers, so the warning Discover always had
     (`discover.warning4kBody`), which is true there. The transcoder's
@@ -298,11 +307,12 @@ names are read by `lib/discover/release-video.js`.
 - **The viewer's choice.** `discover-prefs` in localStorage: `showHevc`,
   `showHdr`, `show4k` are written only when the viewer flips a switch, and
   a written choice wins over any default. `show4k` keeps its old meaning,
-  "show 4K that will not play here": where 4K plays it is not read (no
-  switch, 4K shown) and not deleted, so if the transcoder stops passing
-  HEVC through the switch comes back with the viewer's old choice. There
-  is no migration step: an existing `show4k: true` keeps 4K shown where
-  the switch stands.
+  "show 4K that will not play here": where 4K plays it hides nothing that
+  plays and still answers for the releases the switch holds there; it is
+  never deleted, so if the transcoder stops passing HEVC through the switch
+  holds every 4K release again with the viewer's old choice. There is no
+  migration step: an existing `show4k: true` keeps 4K shown where the
+  switch stands.
 - **Everything hidden.** When the switches hide every release, the list
   says so instead of going empty: the one switch that hides them all is
   named (`discover.allHevcStreams`, `discover.allHdrStreams`, the old

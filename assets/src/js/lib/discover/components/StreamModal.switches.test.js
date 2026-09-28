@@ -58,6 +58,7 @@ const S = {
     uhdHevc: () => stream('Addon\n4k HDR', 'Movie.2023.2160p.WEB-DL.HDR10.H.265-GRP'),
     uhdAvc: () => stream('Addon\n4k', 'Movie.2023.2160p.WEB-DL.H264-GRP'),
     dv5: () => stream('Addon\n4k DV', 'Movie.2023.2160p.WEB-DL.DDP5.1.DV.H.265-GRP'),
+    uhdAv1: () => stream('Addon\n4k', 'Movie.2023.2160p.WEB-DL.AV1-GRP'),
 };
 
 const settle = () => new Promise((r) => setTimeout(r, 30));
@@ -206,6 +207,27 @@ test('where 4K HEVC plays (transcoder on, 4K Main10 declared) there is no 4K swi
         { caps: 'on', decodes: EVERYTHING, part: true, declared: EVERYTHING }, { show4k: false });
     assert.equal(switchOf(root, 'uhd'), null);
     assert.equal(rows(root).length, 3, 'an old "hide 4K" does not hide what now plays, without a switch to undo it');
+});
+
+// Where 4K HEVC plays, 4K the transcoder still turns away (AV1, Dolby
+// Vision 5) is 4K that will not play here: behind the switch, as before.
+test('where 4K HEVC plays, 4K AV1 and Dolby Vision 5 stay behind the 4K switch, with the old warning', async () => {
+    const plays = { caps: 'on', decodes: EVERYTHING, part: true, declared: EVERYTHING };
+    const { root } = await mount([S.uhdHevc(), S.uhdAv1(), S.dv5(), S.avc1080()], plays, { show4k: false });
+    assert.ok(switchOf(root, 'uhd'), 'the 4K switch stands for them');
+    assert.equal(checked(root, 'uhd'), false);
+    assert.match(switchOf(root, 'uhd').textContent, /\(2\)/, 'it counts only the 4K that will not play');
+    assert.deepEqual(rowTitles(root), ['Movie.2023.2160p.WEB-DL.HDR10.H.265-GRP', 'Movie.2023.1080p.WEB-DL.x264-GRP']);
+    await flip(root, 'uhd');
+    assert.equal(warning(root).querySelectorAll('p')[1].textContent.trim(), 'discover.warning4kBody');
+    warningButtons(root)[1].click();
+    await settle();
+    assert.equal(rows(root).length, 4);
+    assert.equal(prefs().show4k, true);
+    // Classified: `uhd` stays every 4K release the names show.
+    const c = events.find((e) => e.name === 'discover-streams-classified');
+    assert.equal(c.data.uhd, 3);
+    assert.equal(c.data.uhd_plays, true);
 });
 
 const warning4k = async (playback) => {

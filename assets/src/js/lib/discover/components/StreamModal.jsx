@@ -431,8 +431,9 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
         uhd: is4kStream(parsed[i]),
     })), [streams, parsed]);
 
-    // How many releases each switch is about, before any filtering.
-    const counts = useMemo(() => switchCounts(rows), [rows]);
+    // How many releases each switch is about, before any filtering (the 4K
+    // switch's depends on whether 4K plays here).
+    const counts = useMemo(() => switchCounts(rows, states), [rows, states]);
 
     // Base streams: the ones no switch hides.
     const { baseStreams, baseParsed, baseLangs, baseRows } = useMemo(() => {
@@ -462,7 +463,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                 n: rows.length,
                 hevc: counts.hevc,
                 hdr: counts.hdr,
-                uhd: counts.uhd,
+                uhd: rows.filter(r => r.uhd).length,
                 dv5: rows.filter(r => r.video.dv5).length,
                 unknown_codec: rows.filter(r => r.video.codec === 'unknown').length,
                 hidden: rows.length - baseStreams.length,
@@ -470,7 +471,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
                 dec_hevc: answerOf(browserDecodesHevc(ctx.decodes)),
                 dec_pq: answerOf(browserDecodesPq(ctx.decodes)),
                 caps: ctx.caps,
-                uhd_plays: !states.uhd.switchable,
+                uhd_plays: states.uhd.plays,
             });
         } catch (e) {
             // A count that cannot be sent is not a reason to break the list.
@@ -579,7 +580,7 @@ function StreamContent({ modal, onStreamClick, hasCustomAddons, onSetupAddons, o
 
     // Turning a switch off is always quiet. Turning one on warns where the
     // releases it shows will not play well here: 4K always (its switch only
-    // stands where 4K does not play), HEVC and HDR only where the browser
+    // holds 4K that does not play here), HEVC and HDR only where the browser
     // answered that it does not decode them.
     const toggleSwitch = useCallback((kind) => {
         if (states[kind].shown) {
@@ -840,14 +841,14 @@ function switchTexts(kind, states) {
 }
 
 // VideoSwitches: HEVC, HDR and 4K, each only where the list has releases
-// it is about -- and 4K only where 4K does not play here. The warning
+// it is about -- for 4K, releases that will not play here. The warning
 // hangs under the whole row, so it stays inside the modal whichever
 // switch asked for it and however the row wraps on a phone.
 function VideoSwitches({ states, counts, warningFor, onToggle, onConfirm, onCancel }) {
     const shown = [];
     if (counts.hevc > 0) shown.push('hevc');
     if (counts.hdr > 0) shown.push('hdr');
-    if (counts.uhd > 0 && states.uhd.switchable) shown.push('uhd');
+    if (counts.uhd > 0) shown.push('uhd');
     if (!shown.length) return null;
     const warning = warningFor ? switchTexts(warningFor, states) : null;
     return (
