@@ -131,6 +131,39 @@ Every class names an action — a generic apology was the thing being replaced.
 Adding a class: a `case` in `ClassifyError`, a row in
 `TestClassifyError_StreamingChain`, the key in all 11 locale files, a row here.
 
+## Route refusals (HEVC passthrough, 2026-09)
+
+A browser that takes part declares what it decodes (`docs/player.md`, "The declaration"), and
+content-transcoder names why it refused a session in `X-Video-Route-Reason`
+(`api.TranscoderRefusal`). `ClassifyError` reads the refusal **by identity, first**
+(`routeRefusalKey`), and only where the route is the cause; everything else goes on by the text as
+before, byte for byte:
+
+- no reason (a transcoder that predates routes) or `no_declaration` (a start that declared
+  nothing — every start in production until a browser opts in) → the old keys above;
+- a 415 whose body is not the over-1080p refusal → the old keys: a deployment that encodes no video
+  at all (`DISABLE_VIDEO_TRANSCODING`, `video transcoding is disabled`) names a route reason too, and
+  none of these texts — all about 4K — is true for a 1080p file there;
+- a reason this build does not know → the old keys.
+
+| Reason (status) | Key | What the viewer reads |
+|---|---|---|
+| any, on a restart after a passthrough failed in this browser (`decode-fallback`; the restart declares nothing for the file, so the reason is `no_declaration`) — 415 | `error.video_route.fallback_uhd` | this browser could not show this 4K HEVC film; download |
+| `declaration_pending` (415) | `error.video_route.checking` | we were still checking the browser; press Stream again |
+| `probe_failed` (503, `Retry-After: 5`) | `error.video_route.source_check_failed` (HTTP 503) | the file's format could not be checked just now; retry or download |
+| `needs_2160`, `needs_main10`, `needs_main`, `needs_high_tier` (415) | `error.video_route.needs_uhd_hevc` | 4K HEVC this browser does not decode; download, or a browser that plays 4K HEVC |
+| `needs_pq` (415) | `error.video_route.needs_pq` | 4K HDR, this browser does not decode HDR; download |
+| `too_large` (415) | `error.video_route.too_large` | beyond the 4K shown in the browser (larger, or a more demanding level); download |
+| `dv5`, `dv7`, `dv_base`, `dv_unknown`, `pix_fmt`, `profile`, `interlaced`, `no_hvcc`, `hlg_later` (415) | `error.video_route.unsafe_format` | a format we do not show in the browser — it would look wrong or not play; download. One text, no format name (stage 3 spec, D9); the reason is in the log and `route_reason` |
+| `passthrough_off` (415) | `error.video_route.passthrough_off` | showing 4K in the browser is switched off right now; download |
+| `not_hevc` (415) | `error.video_route.uhd_other_codec` | 4K is shown only in HEVC, this file is another format; download |
+
+Nothing here speaks of plans: the cap is explained by the transfer status's own card. The texts are
+the stage 3 spec's defaults (question 1 to the owner there), with two changes: the English "Watch"
+became the button's real label, **Stream** (`resource.stream` in each locale), and `too_large` has its
+own text (an 8K file is not "a format browsers show wrongly"). Tests: `user_error_route_test.go`
+(`jobs/scripts/fallback_refusal_test.go` for the job's Fallback mark).
+
 ## Reviewing the texts
 
 Dev-only, on any resource page: `#action=stream&debug=error:<key>` renders the

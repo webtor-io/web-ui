@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/common"
 )
 
@@ -34,6 +35,17 @@ func NewUserError(key string, err error) *UserError {
 func ClassifyError(err error) string {
 	if ue, ok := err.(*UserError); ok {
 		return ue.Key
+	}
+
+	// A session the transcoder refused because of the video route it took:
+	// by identity, and only where the route is the cause (routeRefusalKey).
+	// Everything else -- a transcoder that names no reason, a start without
+	// a declaration -- reads on by the text below, as it always has.
+	var tr *api.TranscoderRefusal
+	if errors.As(err, &tr) {
+		if key := routeRefusalKey(tr); key != "" {
+			return key
+		}
 	}
 
 	msg := err.Error()
@@ -214,7 +226,8 @@ func StatusForErrKey(key string) int {
 		return http.StatusNotFound
 	case "error.unauthorized":
 		return http.StatusUnauthorized
-	case "error.service_unavailable", "error.upstream_unavailable":
+	case "error.service_unavailable", "error.upstream_unavailable",
+		"error.video_route.source_check_failed":
 		return http.StatusServiceUnavailable
 	case "error.magnet_invalid", "error.turnstile_failed",
 		"error.free_text", "error.webpage_url", "error.torrent_url", "error.v2_hash",
@@ -227,4 +240,63 @@ func StatusForErrKey(key string) int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+// oldRouteRefusal is the body of the transcoder's 415 for a video over
+// 1080p that its old route would have to encode (content-transcoder
+// ErrResolutionNotSupported) -- the refusal every route text below
+// explains. ClassifyError matches the same text for a transcoder that
+// names no reason.
+const oldRouteRefusal = "over 1080p is not supported"
+
+// routeRefusalKey is the text for a POST /session the transcoder refused
+// because of the route it took (HEVC passthrough, docs/user_errors.md
+// "Route refusals"), or "" where the route is not the refusal's to explain
+// and ClassifyError goes on by the message's text, byte for byte as before:
+//   - no reason (a transcoder that predates routes) or no_declaration (a
+//     start that declared nothing -- every start in production today);
+//   - a 415 whose body is not the over-1080p refusal: a deployment that
+//     encodes no video at all (DISABLE_VIDEO_TRANSCODING, "video transcoding
+//     is disabled") names a route reason too, and none of these texts --
+//     all about 4K -- is true for a 1080p file there.
+//
+// A restart after a passthrough that failed in this browser (Fallback) is
+// first: it declares nothing for this file, so the transcoder says
+// no_declaration, and the true text is that this browser could not show it.
+func routeRefusalKey(tr *api.TranscoderRefusal) string {
+	switch tr.Status {
+	case http.StatusServiceUnavailable:
+		if tr.Reason == "probe_failed" {
+			return "error.video_route.source_check_failed"
+		}
+		return ""
+	case http.StatusUnsupportedMediaType:
+	default:
+		return ""
+	}
+	if !strings.Contains(tr.Body, oldRouteRefusal) {
+		return ""
+	}
+	if tr.Fallback {
+		return "error.video_route.fallback_uhd"
+	}
+	switch tr.Reason {
+	case "declaration_pending":
+		return "error.video_route.checking"
+	case "needs_2160", "needs_main10", "needs_main", "needs_high_tier":
+		return "error.video_route.needs_uhd_hevc"
+	case "needs_pq":
+		return "error.video_route.needs_pq"
+	case "too_large":
+		return "error.video_route.too_large"
+	case "dv5", "dv7", "dv_base", "dv_unknown", "pix_fmt", "profile", "interlaced", "no_hvcc", "hlg_later":
+		return "error.video_route.unsafe_format"
+	case "passthrough_off":
+		return "error.video_route.passthrough_off"
+	case "not_hevc":
+		return "error.video_route.uhd_other_codec"
+	}
+	// "", no_declaration, probe_failed on a 415, a reason this build does
+	// not know yet: the old text.
+	return ""
 }
