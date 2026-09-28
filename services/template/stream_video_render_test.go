@@ -252,6 +252,39 @@ func TestStreamVideoRenders(t *testing.T) {
 	if tag := player(data); !strings.Contains(tag, ` data-offer-answered="continue-slow"`) {
 		t.Errorf("force-slow run, not marked answered: %s", tag)
 	}
+
+	// The session's route reaches the player only where it is known: no
+	// session, or a transcoder that predates routes, leaves the tag as it
+	// was; the passthrough-only attributes and the declaration only where
+	// they are set.
+	routeAttrs := []string{"data-video-route", "data-route-reason", "data-video-class", "data-frag-load-ms", "data-decode"}
+	noneOf := func(tag string, names ...string) {
+		t.Helper()
+		for _, n := range names {
+			if strings.Contains(tag, n) {
+				t.Errorf("%s rendered where it is not known: %s", n, tag)
+			}
+		}
+	}
+	noneOf(player(data), routeAttrs...)
+	data.TranscoderSession = &api.TranscoderSession{ID: "s1", Duration: 10}
+	noneOf(player(data), routeAttrs...)
+	data.TranscoderSession = &api.TranscoderSession{ID: "s1", Duration: 10, VideoRoute: "reencode", RouteReason: "no_declaration"}
+	tag := player(data)
+	if !strings.Contains(tag, ` data-video-route="reencode" data-route-reason="no_declaration"`) {
+		t.Errorf("old route not marked: %s", tag)
+	}
+	noneOf(tag, "data-video-class", "data-frag-load-ms", "data-decode")
+	data.TranscoderSession = &api.TranscoderSession{ID: "s1", Duration: 10, VideoRoute: "passthrough", RouteReason: "ok"}
+	data.VideoClass, data.FragLoadMs = "hevc10-2160", 160000
+	data.VideoStreamUserData.Decode = "hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq"
+	tag = player(data)
+	for _, want := range []string{` data-video-route="passthrough"`, ` data-route-reason="ok"`, ` data-video-class="hevc10-2160"`,
+		` data-frag-load-ms="160000"`, ` data-decode="hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq"`} {
+		if !strings.Contains(tag, want) {
+			t.Errorf("passthrough: %s missing: %s", want, tag)
+		}
+	}
 }
 
 // TestStreamVideoRendersTranslateBadgesAndCTA is Task 5's render guard: a

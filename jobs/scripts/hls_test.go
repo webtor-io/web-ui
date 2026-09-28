@@ -228,3 +228,52 @@ func TestPollSessionPlaylist(t *testing.T) {
 		})
 	}
 }
+
+// A passthrough master, as content-transcoder writes it: the variant's
+// attributes are read (CODECS holds commas inside its quotes), and the old
+// route's master reads as it always did.
+func TestParseMasterVideoVariant(t *testing.T) {
+	master := `#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="eng",NAME="English",URI="a0.m3u8?token=xyz"
+#EXT-X-STREAM-INF:BANDWIDTH=41234567,RESOLUTION=3840x1606,CODECS="hvc1.2.4.L153.90,mp4a.40.2",VIDEO-RANGE=PQ,AUDIO="audio"
+v0.m3u8?token=xyz`
+	v, err := parseMasterVideoVariant(master)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := hlsVariant{URL: "v0.m3u8?token=xyz", Codecs: "hvc1.2.4.L153.90,mp4a.40.2", Width: 3840, Height: 1606, Bandwidth: 41234567}
+	if v != want {
+		t.Errorf("got %+v, want %+v", v, want)
+	}
+	old, err := parseMasterVideoVariant(`#EXTM3U
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=5000000,CODECS="avc1.42e00a,mp4a.40.2",AUDIO="audio"
+v0-720.m3u8`)
+	if err != nil || old != (hlsVariant{URL: "v0-720.m3u8", Codecs: "avc1.42e00a,mp4a.40.2", Bandwidth: 5000000}) {
+		t.Errorf("old route master: %+v, %v", old, err)
+	}
+}
+
+// The target duration is read with the segments; a playlist without one
+// reads 0, and the segments it lists are the same as parseMediaPlaylist's.
+func TestParseMediaPlaylistTarget(t *testing.T) {
+	body := "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:11\n#EXT-X-MAP:URI=\"init-0.mp4\"\n#EXTINF:10.427000,\nv0-0.m4s\n#EXTINF:9.009000,\nv0-1.m4s\n"
+	segs, end, target, err := parseMediaPlaylistTarget(body)
+	if err != nil || end || target != 11 || len(segs) != 2 {
+		t.Fatalf("segs %d end %v target %v err %v", len(segs), end, target, err)
+	}
+	old, oldEnd, oldErr := parseMediaPlaylist(body)
+	if oldErr != nil || oldEnd != end || len(old) != len(segs) || old[0] != segs[0] || old[1] != segs[1] {
+		t.Errorf("parseMediaPlaylist disagrees: %+v", old)
+	}
+	if _, _, target, _ := parseMediaPlaylistTarget("#EXTM3U\n#EXTINF:4.0,\nv0-0.ts\n"); target != 0 {
+		t.Errorf("no target: %v", target)
+	}
+	// The longest segment seen: a keyframe-cut passthrough can run over
+	// the announced target, and an EVENT playlist's target can grow.
+	if got := maxSegmentDuration(8, 11, []hlsSegment{{Duration: 10.4}, {Duration: 12.5}}); got != 12.5 {
+		t.Errorf("maxSegmentDuration %v", got)
+	}
+	if got := maxSegmentDuration(14, 11, []hlsSegment{{Duration: 10.4}}); got != 14 {
+		t.Errorf("maxSegmentDuration keeps the previous %v", got)
+	}
+}

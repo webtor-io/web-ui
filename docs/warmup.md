@@ -247,6 +247,14 @@ line with `debug=swarm_demo` (see CLAUDE.md, Debugging).
   cache signal — 404 means `findFile` couldn't resolve the path on this
   pod, not "content is cached". `api.Warmup` therefore treats all non-200
   responses as a single transient error.
+- **A passthrough session's master** (HEVC passthrough, `jobs/scripts/hls.go`
+  `bufferSessionHLS`) exists only once the transcoder has written the
+  session's first init segment; content-transcoder waits for it up to 5 min.
+  web-ui reads it with `http.DefaultClient` (no timeout of its own) inside the
+  buffering deadline, `WARMUP_TIMEOUT_MIN` (3 in production), like every other
+  step of the session: a first GOP slower than that ends the way a buffer
+  timeout always has, as the no-peers card. Not changed; how often it happens
+  on passthrough is not measured.
 
 ## Why the stream warm-up is 10MB
 

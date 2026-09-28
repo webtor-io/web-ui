@@ -125,6 +125,29 @@ type StreamContent struct {
 	// rendered on the <video> as data-cap-card-*. nil without a grace
 	// window, in an embed, or without a cap.
 	CapCard *CapCard
+	// VideoClass is, for a passthrough session, the decoder class its video
+	// needs (passthroughClass: hevc8, hevc10, hevc8-2160, hevc10-2160 --
+	// "unknown" when the master does not say): the class a failure in the
+	// browser is charged to (data-video-class). "" on every other route.
+	VideoClass string
+	// FragLoadMs is, for a passthrough session, how long one segment may
+	// take to load before the player gives up on it (passthroughFragLoadMs,
+	// data-frag-load-ms). 0 on every other route.
+	FragLoadMs int
+}
+
+// VideoRoute is the transcoder session's route ("" without a session or
+// from a transcoder that predates routes).
+func (sc *StreamContent) VideoRoute() string {
+	if sc == nil || sc.TranscoderSession == nil {
+		return ""
+	}
+	return sc.TranscoderSession.VideoRoute
+}
+
+// Passthrough: the session hands the browser the source's video as it is.
+func (sc *StreamContent) Passthrough() bool {
+	return sc.VideoRoute() == videoRoutePassthrough
 }
 
 const (
@@ -824,11 +847,11 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 
 	// Step 4: Session transcoder (after bandwidth check)
 	if seMeta.Transcode && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
-		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second)
+		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second, vsud.DecodeRequest)
 		if serr != nil {
 			return errors.Wrap(serr, "failed to buffer session HLS")
 		}
-		sc.TranscoderSession = result.Session
+		s.applySessionRoute(sc, c, result)
 		sc.ExportTag.Sources = []ra.ExportSource{{
 			Src:  result.HLSURL,
 			Type: "application/vnd.apple.mpegurl",
@@ -1518,7 +1541,14 @@ type ActionScript struct {
 // StatusOverCap), which the player element carries to the page. The rate
 // compared is what the player pulls (playedBitrate), not the file's own.
 func (s *ActionScript) setStatusMarks(sc *StreamContent, c *web.Context, mp *api.MediaProbe, transcoded bool) {
-	bps := playedBitrate(mp, transcoded)
+	s.setRoutedStatusMarks(sc, c, mp, transcoded, false)
+}
+
+// setRoutedStatusMarks is setStatusMarks once the session's route is known:
+// videoCopied for a route that hands the browser the source's video as it
+// is (playedBitrateRouted).
+func (s *ActionScript) setRoutedStatusMarks(sc *StreamContent, c *web.Context, mp *api.MediaProbe, transcoded bool, videoCopied bool) {
+	bps := playedBitrateRouted(mp, transcoded, videoCopied)
 	sc.StatusStallSub = s.statusStallSub(c, bps)
 	sc.StatusFitsCap = statusFitsCap(c, bps)
 	sc.StatusOverCap = statusOverCap(c, bps)

@@ -6,7 +6,13 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 )
 
-// playedBitrate is the bitrate, in bits a second, of what the viewer's player
+// playedBitrate is playedBitrateRouted before the route is known: a
+// transcoded video that is not H.264 counts as re-encoded.
+func playedBitrate(mp *api.MediaProbe, transcoded bool) int64 {
+	return playedBitrateRouted(mp, transcoded, false)
+}
+
+// playedBitrateRouted is the bitrate, in bits a second, of what the viewer's player
 // pulls for the probed file, or 0 when that is not known. The transfer
 // status's marks (StatusFitsCap, StatusOverCap) and its "…and this file
 // needs N Mbps" compare it with the viewer's cap; a file whose number is not
@@ -31,8 +37,12 @@ import (
 //
 // transcoded is the stream export's own word (ExportMeta.Transcode): the
 // file goes through the transcoder, else it is served as it is (nginx-vod's
-// HLS for a video, the file itself for audio).
-func playedBitrate(mp *api.MediaProbe, transcoded bool) int64 {
+// HLS for a video, the file itself for audio). videoCopied is the
+// transcoder session's: its route hands the browser the source's video as
+// it is (passthrough), so even a video that is not H.264 is pulled at its
+// own rate. It is known only once the session exists; before that, false
+// (playedBitrate).
+func playedBitrateRouted(mp *api.MediaProbe, transcoded bool, videoCopied bool) int64 {
 	if mp == nil {
 		return 0
 	}
@@ -78,7 +88,7 @@ func playedBitrate(mp *api.MediaProbe, transcoded bool) int64 {
 		}
 		return audioOut(mp, audio[0], transcoded)
 	}
-	if transcoded && mp.Streams[video].CodecName != "h264" {
+	if transcoded && !videoCopied && mp.Streams[video].CodecName != "h264" {
 		// Re-encoded at a quality target (CRF): the rate is the encoder's
 		// choice, known only once it is made.
 		return 0

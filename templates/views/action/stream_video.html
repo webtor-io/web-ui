@@ -29,6 +29,19 @@
            {{ if .MediaProbe }}data-video-codecs="{{ range .MediaProbe.Streams }}{{ if eq .CodecType "video" }}{{ .CodecName }} {{ end }}{{ end }}"{{ end }}
            {{ if .TranscoderSession }}data-session-id="{{ .TranscoderSession.ID }}"{{ end }}
            {{ if .SessionSeekURL }}data-session-seek-url="{{ .SessionSeekURL }}"{{ end }}
+           {{- /* The transcoder session's route and its reason
+                (content-transcoder POST /session: passthrough, copy,
+                reencode, audio; ok, no_declaration, ...), the declaration
+                the start sent (data-decode) and, for a passthrough, the
+                decoder class its video needs and how long one segment may
+                load (StreamContent.VideoClass, FragLoadMs). Read by the
+                player's passthrough handling and stream-start
+                (docs/player.md). Trimmed and only where known: without
+                them the tag is what it was. */}}
+           {{- with .TranscoderSession }}{{ if .VideoRoute }} data-video-route="{{ .VideoRoute }}"{{ end }}{{ if .RouteReason }} data-route-reason="{{ .RouteReason }}"{{ end }}{{ end }}
+           {{- if .VideoClass }} data-video-class="{{ .VideoClass }}"{{ end }}
+           {{- if .FragLoadMs }} data-frag-load-ms="{{ .FragLoadMs }}"{{ end }}
+           {{- with .VideoStreamUserData }}{{ if .Decode }} data-decode="{{ .Decode }}"{{ end }}{{ end }}
            {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
            {{- /* The resource status's plan-box line while this player buffers
                 under the viewer's cap, with the file's bitrate the status

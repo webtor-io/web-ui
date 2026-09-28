@@ -604,6 +604,54 @@ func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.
 type TranscoderSession struct {
 	ID       string  `json:"id"`
 	Duration float64 `json:"duration"`
+	// VideoRoute is what the transcoder does with the video of this
+	// session: passthrough (the source's HEVC as it is), copy, reencode,
+	// audio. "" from a transcoder that predates routes.
+	VideoRoute string `json:"video_route"`
+	// RouteReason is why (content-transcoder services/route.go): ok for
+	// passthrough; no_declaration, passthrough_off, not_hevc, needs_2160
+	// and the like for the old route.
+	RouteReason string `json:"route_reason"`
+}
+
+// TranscoderRefusal is a POST /session the transcoder answered with 415 or
+// 503: the body, and the route reason it names (X-Video-Route-Reason; ""
+// from a transcoder that names none, or for a refusal the route did not
+// cause). Error() is the text this error had before it was typed, byte for
+// byte: web.ClassifyError and the logs match on it.
+type TranscoderRefusal struct {
+	Status     int
+	Body       string
+	Reason     string
+	RetryAfter string
+	// Fallback: the start that was refused is a restart after a
+	// passthrough failed in the browser -- the refusal of a file this
+	// browser was just shown and could not play (set by the caller that
+	// knows it, jobs/scripts bufferSessionHLS).
+	Fallback bool
+}
+
+func (e *TranscoderRefusal) Error() string {
+	return fmt.Sprintf("transcoder session creation failed status=%d body=%s", e.Status, e.Body)
+}
+
+// withDecode adds the browser's declaration to a POST /session URL as the
+// last query parameter. The query that is there already (thp's token and
+// api-key) is left as it is: re-encoding it through url.Values would sort
+// it. "" leaves the URL untouched.
+func withDecode(sessionURL, decode string) (string, error) {
+	if decode == "" {
+		return sessionURL, nil
+	}
+	u, err := url.Parse(sessionURL)
+	if err != nil {
+		return "", err
+	}
+	if u.RawQuery != "" {
+		u.RawQuery += "&"
+	}
+	u.RawQuery += "decode=" + url.QueryEscape(decode)
+	return u.String(), nil
 }
 
 func appendPath(base string, suffix string) (string, error) {
@@ -615,8 +663,16 @@ func appendPath(base string, suffix string) (string, error) {
 	return u.String(), nil
 }
 
-func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string) (*TranscoderSession, error) {
+// CreateTranscoderSession opens a transcoding session. decode is the
+// browser's declaration (models.ParseDecodeDeclaration; "" for none, and
+// the request is then byte for byte what it was before declarations). A
+// 415 or 503 comes back as a *TranscoderRefusal.
+func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string, decode string) (*TranscoderSession, error) {
 	sessionURL, err := appendPath(baseURL, "/session")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to construct session URL")
+	}
+	sessionURL, err = withDecode(sessionURL, decode)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to construct session URL")
 	}
@@ -636,6 +692,14 @@ func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string) (*Tra
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read session response")
+	}
+	if res.StatusCode == http.StatusUnsupportedMediaType || res.StatusCode == http.StatusServiceUnavailable {
+		return nil, &TranscoderRefusal{
+			Status:     res.StatusCode,
+			Body:       string(data),
+			Reason:     res.Header.Get("X-Video-Route-Reason"),
+			RetryAfter: res.Header.Get("Retry-After"),
+		}
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("transcoder session creation failed status=%d body=%s", res.StatusCode, string(data))

@@ -518,6 +518,30 @@ browser. Note that hls.js 1.6.14 itself asks `decodingInfo` for every HEVC level
 calls unsupported — but only when the master has more than one level
 (`abr-controller.ts`, `removeLevel` guarded by `levels.length > 1`).
 
+#### The session's route — `data-video-route`
+
+The transcoder answers POST `/session` with the route it chose (`video_route`: `passthrough`, `copy`,
+`reencode`, `audio`; `route_reason`: `ok`, `no_declaration`, `passthrough_off`, … —
+content-transcoder `docs/session-transcoding.md`), and a refusal (415, or 503 for a source check that
+did not answer) with the reason in `X-Video-Route-Reason` (`api.TranscoderRefusal`; its `Error()` is
+the text the untyped error had, so `ClassifyError` and the logs read it as before). The stream job
+(`jobs/scripts/hls.go` `bufferSessionHLS`, `passthrough.go` `applySessionRoute`) puts on the
+`<video>`, each only where it is known — without them the tag is byte for byte what it was:
+
+| attribute | what |
+|---|---|
+| `data-video-route`, `data-route-reason` | the session's route and its reason (a transcoder that predates routes sends neither) |
+| `data-decode` | the declaration this start sent (`vsud.Decode`), for telemetry |
+| `data-video-class` | passthrough only: the decoder class the video needs — `hevc8`, `hevc10`, `hevc8-2160`, `hevc10-2160`, `unknown` — read from the master's `CODECS` (the transcoder writes them from the init it produced, not from the source's record, which FFmpeg rebuilds) and `RESOLUTION`, by the transcoder's own rule: profile 2 is 10-bit; taller than 1080, wider than 1920 or level over 4.1 is 2160. The class a failure in the browser is charged to |
+| `data-frag-load-ms` | passthrough only: how long one segment may load, `max(120 s, 2 × BANDWIDTH × target duration / cap)`, at most 15 min (`passthroughFragLoadMs`; no cap → 120 s; a master without a real BANDWIDTH → the file's rate) |
+
+For a passthrough the transfer status's marks are made again once the route is known
+(`setRoutedStatusMarks`): before the session a transcoded HEVC counts as re-encoded, whose rate is
+unknown; passed through it is pulled at the source's own rate (`playedBitrateRouted(…, videoCopied)`),
+so the cap card and "this file needs N" work as for H.264. Every other caller of `playedBitrate` is
+unchanged, and the cap gate before the session still falls back to the file's rate for HEVC —
+conservative, and right for a passthrough.
+
 ### `playback-quality`
 
 The declaration counts software decoding, so its risk — a slow machine dropping frames of a 4K HEVC
