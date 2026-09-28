@@ -24,6 +24,7 @@ function page({ url = 'https://webtor.io/', ua = UA_A, storageThrows = false } =
 }
 
 const optIn = (win) => win.localStorage.setItem(OPTIN_KEY, 'on');
+const optOut = (win) => win.localStorage.setItem(OPTIN_KEY, 'off');
 
 // A probe module whose answers the test holds: the HEVC tokens at once, the
 // PQ answer when the test settles it (or never).
@@ -57,9 +58,12 @@ test('the token list is the probe\'s', () => {
 
 // ---- who takes part --------------------------------------------------------
 
-test('?passthrough=on opts this browser in, ?passthrough=off out; nothing else touches it', () => {
-    let win = page({ url: 'https://webtor.io/?passthrough=on' });
-    assert.equal(takesPart(win), false, 'not before the switch is read');
+// Stage 5 (2026-09-28): every browser takes part unless it opted out.
+test('every browser takes part by default; ?passthrough=off opts it out, ?passthrough=on back in; nothing else touches it', () => {
+    let win = page();
+    assert.equal(takesPart(win), true, 'no switch ever read: takes part');
+    win = page({ url: 'https://webtor.io/?passthrough=on' });
+    assert.equal(takesPart(win), true, 'before the switch is read too');
     assert.equal(applyUrlSwitch(win), 'on');
     assert.equal(takesPart(win), true);
     assert.equal(win.localStorage.getItem(OPTIN_KEY), 'on');
@@ -74,16 +78,23 @@ test('?passthrough=on opts this browser in, ?passthrough=off out; nothing else t
     assert.equal(applyUrlSwitch(win), 'off');
     assert.equal(takesPart(win), false);
     assert.equal(win.localStorage.getItem(OPTIN_KEY), 'off');
-    win = page({ url: 'https://webtor.io/?passthrough=yes' });
+    // An opted-out browser stays out on its later pages.
+    win = page({ url: 'https://webtor.io/ru/other' });
+    win.localStorage.setItem(OPTIN_KEY, 'off');
     assert.equal(applyUrlSwitch(win), null);
     assert.equal(takesPart(win), false);
+    win = page({ url: 'https://webtor.io/?passthrough=yes' });
+    assert.equal(applyUrlSwitch(win), null);
+    assert.equal(takesPart(win), true, 'a value that is not on/off changes nothing');
 });
 
-test('a throwing localStorage and no switch on the address: not taking part, and no exception', () => {
+// No storage means no opt-out could have been saved: the browser takes
+// part, and nothing throws.
+test('a throwing localStorage and no switch on the address: takes part, and no exception', () => {
     const win = page({ storageThrows: true });
-    assert.equal(takesPart(win), false);
-    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), null);
-    assert.equal(declaredTokens(win), null);
+    assert.equal(takesPart(win), true);
+    assert.doesNotThrow(() => declarationFor(win, { resourceId: 'r', itemId: 'i' }));
+    assert.equal(declaredTokens(win), null, 'no probe answer yet');
 });
 
 test('without storage the switch holds for the page', () => {
@@ -92,8 +103,9 @@ test('without storage the switch holds for the page', () => {
     assert.equal(takesPart(win), true);
 });
 
-test('a page that does not take part declares nothing and runs no probe', async () => {
+test('a page that does not take part (opted out) declares nothing and runs no probe', async () => {
     const win = page();
+    optOut(win);
     initDecodeDeclaration(win, win.document);
     assert.equal(win.__wtDecode.probe, null, 'no probe was started');
     const f = startForm(win);
@@ -155,11 +167,12 @@ test('HEVC known, PQ not answered yet: the cache of this browser, else unknown -
 // opt-in.
 test('decodedTokens: the browser\'s answer whether or not the page takes part; null until there is one', async () => {
     let win = page();
+    optOut(win);
     assert.equal(decodedTokens(win), null, 'no probe, no cache: not answered');
     await startProbe(win, fakeProbe({ pq: true }));
     assert.equal(takesPart(win), false);
     assert.deepEqual(decodedTokens(win), [...ALL, 'hdr-pq'], 'answered, though this page declares nothing');
-    assert.equal(declaredTokens(win), null, 'and the declaration still waits for the opt-in');
+    assert.equal(declaredTokens(win), null, 'and an opted-out page declares nothing');
 
     win = page();
     await startProbe(win, fakeProbe({ hevc: [], pq: false }));

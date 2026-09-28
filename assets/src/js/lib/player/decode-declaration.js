@@ -125,13 +125,13 @@ export function applyUrlSwitch(win) {
     return v;
 }
 
-// takesPart: does this page send a declaration? Before stage 5 only a
-// browser that opted in; stage 5 makes it everyone but those who opted out
-// (`!== 'off'`).
+// takesPart: does this page send a declaration? Every browser but one
+// that opted out with `?passthrough=off` (stage 5, 2026-09-28; before it,
+// only a browser that opted in with `?passthrough=on`).
 export function takesPart(win) {
     const s = state(win);
     const v = s.optin !== undefined ? s.optin : read(win, OPTIN_KEY);
-    return v === 'on';
+    return v !== 'off';
 }
 
 const tokensOf = (fresh) => [...fresh.hevc, ...(fresh.pq === 'yes' ? ['hdr-pq'] : [])];

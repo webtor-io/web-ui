@@ -26,14 +26,16 @@ async function embedPage(url, optin) {
     return w;
 }
 
-test('an embed that does not take part runs no probe', async () => {
-    const w = await embedPage('https://webtor.io/embed?id=e1');
+test('an embed of a browser that opted out runs no probe', async () => {
+    const w = await embedPage('https://webtor.io/embed?id=e1', 'off');
     assert.ok(w.__wtDecode, 'the declaration module ran');
     assert.equal(w.__wtDecode.probe, null, 'no probe');
     assert.equal(w.localStorage.getItem('wt-decode'), null, 'nothing written');
 });
 
-test('an embed of a browser that takes part probes', async () => {
+test('an embed of a browser that takes part probes, by default and opted in', async () => {
+    const d = await embedPage('https://webtor.io/embed?id=e1');
+    assert.ok(d.__wtDecode && d.__wtDecode.probe, 'the probe started without any switch');
     const w = await embedPage('https://webtor.io/embed?id=e1', 'on');
     assert.ok(w.__wtDecode && w.__wtDecode.probe, 'the probe started');
 });

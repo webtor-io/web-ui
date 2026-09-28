@@ -471,11 +471,12 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
 
 #### Sending it — `decode-declaration.js`
 
-- **Who.** A browser takes part once any page was opened with `?passthrough=on`
-  (localStorage `wt-passthrough`); `?passthrough=off` takes it out. Nobody else, until stage 5 makes
-  it the default (`takesPart`: `=== 'on'` → `!== 'off'`). Why a per-browser opt-in and not a flag:
-  the transcoder is one for production and stage, and web-ui's stage is `main` itself, so "production
-  does not declare yet" cannot be a deployment. A page that does not take part sends no field and
+- **Who.** Every browser, since stage 5 (2026-09-28, `takesPart`: `!== 'off'`), except one that
+  opened any page with `?passthrough=off` (localStorage `wt-passthrough`); `?passthrough=on` takes it
+  back. Before stage 5 it was the other way round (`=== 'on'`): only browsers that opted in declared.
+  Why a per-browser switch and not a flag: the transcoder is one for production and stage, and
+  web-ui's stage is `main` itself, so "production does not declare yet" could not be a deployment.
+  A page that does not take part sends no field and
   runs no probe; the probe module is loaded (`import()`, chunk `decode-probe`) only when it does.
   The layout carries the rest: +1.3 KB gzip on `layout.js`, +1.4 KB on `embed/check.js` (measured
   with `npm run build`, 2026-09-28).
