@@ -18,6 +18,20 @@ export function readNext(el) {
 // of the next start (models.TrackCarry). Track ids are per file, so what
 // travels is the intent: a language, an origin, "off". Read from the chips
 // and not from a saved value: the chips are what is playing right now.
+//
+// Subtitles travel only when they are the viewer's CHOICE (data-saved: the
+// server renders it for a choice saved earlier, markTrack moves it on every
+// persisted pick). What the ladder or the audio-switch rule turned on is not
+// a choice, and the next file's own ladder decides again -- which is the
+// point: an episode that lacked a track in the viewer's language plays the
+// English one beside a translation offer, and the next episode may well
+// have one. A carry arrives on the server as a saved choice, and a saved
+// choice outranks the ladder, so carrying the ladder's English pinned it
+// over that episode's own Portuguese track and withdrew the offer from
+// every episode after the first (review 2026-09-28). Same for a free
+// viewer's phase-1 track, which used to drop the upsell from episode 2 on.
+// The spec says as much: "the choice survives the transition"
+// (docs/superpowers/specs/2026-09-20-next-episode-design.md).
 export function readCarry(scope) {
     const out = {};
     if (!scope || typeof scope.querySelector !== 'function') return out;
@@ -28,7 +42,7 @@ export function readCarry(scope) {
         if (label) out['carry-audio-label'] = label;
     }
     const sub = scope.querySelector('.subtitle[data-default="true"]');
-    if (sub) {
+    if (sub && sub.getAttribute('data-saved') === 'true') {
         if ((sub.getAttribute('data-id') || '') === 'none') {
             out['carry-sub'] = 'off';
         } else if (sub.getAttribute('data-srclang')) {

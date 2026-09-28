@@ -115,14 +115,17 @@ feature is on and this is not an embed — see *Gating and flags*):
    unchanged: the chip, `#subtitle-hint` and the on-screen pill all still offer the translation,
    since the English track is not in the offer's language (`offerNeedsHint`'s rival rule). A
    preferred language of English never reaches this: an English track would have won above.
-   **A saved choice that is that very English track keeps the offer.** Any other saved track
-   withdraws it (rule 1: the viewer has dealt with subtitles), but this one is what every next
-   episode receives — the player carries what is *playing* (`readCarry`, `next-item.js`) and a
-   carried choice arrives as a saved one — so without the exception the offer showed on the first
-   episode of a series only (`TestNextEpisodeKeepsTheOffer`). A different English track the viewer
-   picked over the ladder's still withdraws it. The free-viewer analogue — a carried phase-1
-   track dropping `Upsell` from episode 2 on — predates this and is left as it was. A
-   locked item is marked `Upsell` (see *The on-screen offer*) and rule 5 applies.
+   **A saved track withdraws the offer, this English one included** (rule 1: the viewer has dealt
+   with subtitles; `TestSavedEnglishWithdrawsTheOffer`). **The next episode is not a saved choice:**
+   the player carries only what the viewer *chose* (`readCarry` in `next-item.js` reads
+   `data-saved`, which `markTrack` moves on every persisted pick), never what the ladder turned
+   on, so the next file's ladder decides again — its own Portuguese track if it has one, else its
+   English track beside the offer. Until the 2026-09-28 review the player carried what was
+   *playing*, a carry arrives as a saved choice, and a saved choice outranks the ladder: the
+   first version of this rule excepted "the ladder's own English track" from rule 1 so that the
+   offer survived episode 1, and that pinned the carried English over the next episode's
+   Portuguese track. The same carry used to drop a free viewer's `Upsell` from episode 2 on; it no
+   longer does. A locked item is marked `Upsell` (see *The on-screen offer*) and rule 5 applies.
 5. **Phase-1 fallback when the preferred language cannot be served at all.** Not when a
    translation is `Offered` (rule 4). If the preferred language yields nothing activatable
    (NSFW, free viewer facing a locked item, or the language is outside
@@ -494,7 +497,9 @@ trip" / cache-key section).
   this session (`manualSubtitleRef`) — re-picking over an explicit choice would read as the player
   fighting the viewer. `manualSubtitleRef` is also seeded on mount from a `data-saved` default
   (`ListItem.Saved`, set where `ud.SubtitleID` wins): a choice the viewer saved in an earlier
-  session is as explicit as one made in this one. The seed reads `readAllTracks`, not `readTracks`:
+  session is as explicit as one made in this one. (`markTrack` moves `data-saved` onto every
+  persisted pick after that, so the chips keep telling a choice from a rule's pick for `readCarry`;
+  the seed itself only ever reads a freshly rendered dialog.) The seed reads `readAllTracks`, not `readTracks`:
   a saved **"None"** is a choice too, and `readTracks` drops the `none` entry — missing it turned
   subtitles back on over an explicit off. *(Spec says the audio element carries `data-audio-lang`; the shipped code
   instead reuses the existing `data-srclang` attribute on `.audio` items — see ledger.)*

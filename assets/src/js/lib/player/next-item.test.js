@@ -18,7 +18,7 @@ test('readCarry reads what is playing now, as intent', () => {
         <button class="audio" data-id="mp-0" data-srclang="ru" data-label="Dub"></button>
         <button class="audio" data-default="true" data-id="mp-1" data-srclang="en" data-label="Original (5.1)"></button>
         <button class="subtitle" data-id="none"></button>
-        <button class="subtitle" data-default="true" data-id="os-7" data-srclang="ru" data-provider="OpenSubtitles"></button>`);
+        <button class="subtitle" data-default="true" data-saved="true" data-id="os-7" data-srclang="ru" data-provider="OpenSubtitles"></button>`);
     assert.deepEqual(readCarry(d), {
         'carry-audio-lang': 'en', 'carry-audio-label': 'Original (5.1)',
         'carry-sub': 'on', 'carry-sub-lang': 'ru', 'carry-sub-provider': 'OpenSubtitles',
@@ -26,11 +26,35 @@ test('readCarry reads what is playing now, as intent', () => {
 });
 
 test('readCarry: subtitles off is an intent too; a track with no language is not', () => {
-    const off = dom('<button class="subtitle" data-default="true" data-id="none" data-srclang=""></button>');
+    const off = dom('<button class="subtitle" data-default="true" data-saved="true" data-id="none" data-srclang=""></button>');
     assert.deepEqual(readCarry(off), { 'carry-sub': 'off' });
-    const und = dom('<button class="audio" data-default="true" data-id="mp-0" data-srclang=""></button><button class="subtitle" data-default="true" data-id="u1" data-srclang=""></button>');
+    const und = dom('<button class="audio" data-default="true" data-id="mp-0" data-srclang=""></button><button class="subtitle" data-default="true" data-saved="true" data-id="u1" data-srclang=""></button>');
     assert.deepEqual(readCarry(und), {}, 'nothing to match in the next file');
     assert.deepEqual(readCarry(null), {});
+});
+
+// Only a choice travels (review 2026-09-28). The ladder's English track
+// beside a translation offer is not one: carried, it arrived on the next
+// episode as a saved choice, beat that episode's own Portuguese track and
+// withdrew the offer. The next file's ladder decides instead -- and
+// "off" the ladder reached (audio already in the viewer's language) is
+// likewise not the viewer's "off". The audio carry is not affected.
+//
+// Negative control: without the data-saved test in readCarry both halves
+// carry a subtitle intent.
+test('readCarry: what the ladder turned on is not a choice and does not travel', () => {
+    const ladder = dom(`
+        <button class="audio" data-default="true" data-id="mp-1" data-srclang="en" data-label="Original"></button>
+        <button class="subtitle" data-id="none"></button>
+        <button class="subtitle" data-default="true" data-id="os-1" data-srclang="en" data-provider="OpenSubtitles"></button>
+        <button class="subtitle" data-offered="true" data-id="tr-pt" data-srclang="pt" data-provider="Translated"></button>`);
+    assert.deepEqual(readCarry(ladder), { 'carry-audio-lang': 'en', 'carry-audio-label': 'Original' });
+    const ladderOff = dom('<button class="subtitle" data-default="true" data-id="none" data-srclang=""></button>');
+    assert.deepEqual(readCarry(ladderOff), {});
+    // A saved mark on a chip that is no longer playing is some other
+    // state (a deleted upload landing on None): still not carried.
+    const stale = dom('<button class="subtitle" data-default="true" data-id="none"></button><button class="subtitle" data-saved="true" data-id="u1" data-srclang="pt" data-provider="UserSubtitle"></button>');
+    assert.deepEqual(readCarry(stale), {});
 });
 
 test('prewarm at 90%, but not more than five minutes early, and only while playing', () => {

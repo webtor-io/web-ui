@@ -869,7 +869,12 @@ against the new file's lists to an item id, which goes down the saved-choice pat
 knows about locked items and the "None" switch). A carry outranks the file's own saved choice and
 the ladder; same language from another origin beats the ladder; a carry the file cannot honour
 changes nothing. It is part of the job cache key. The subtitle delay does not travel: it belongs to
-one subtitle file.
+one subtitle file. **Subtitles travel only when they are the viewer's choice** — `data-saved` on the
+playing chip, rendered by the server for a saved choice and moved by `markTrack` on every persisted
+pick. What the ladder or the audio-switch rule turned on is decided again by the next file's own
+ladder (review 2026-09-28: carried, the ladder's English track beside a translation offer arrived as a
+saved choice and beat the next episode's own track in the viewer's language). Audio still carries
+what plays.
 
 **Client.**
 - Button right after Play (`NextIcon`: a triangle with a bar on its right), key `n` / `Shift+N`.

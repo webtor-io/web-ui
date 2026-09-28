@@ -594,6 +594,18 @@ export function markTrack(container, el, type, persist = true) {
         setChipActive(ee, false);
         ee.removeAttribute('data-default');
     }
+    if (type === 'subtitle' && persist) {
+        // A persisted pick is the viewer's choice, and the chip says so the
+        // way the server would on the next render (ListItem.Saved): the
+        // mark moves here. readCarry reads it -- only a choice travels to
+        // the next episode, never what a rule turned on. The other readers
+        // (hasSavedDefault, restoreSavedTranslation) read a dialog the
+        // server has just rendered -- the page load, or the swap for
+        // another preferred language -- so they see the server's mark
+        // either way.
+        for (const ee of es) ee.removeAttribute('data-saved');
+        el.setAttribute('data-saved', 'true');
+    }
     if (type === 'subtitle') {
         // The one writer of "are subtitles off": every activation moves the
         // switch with it, including the ones the player performs for the

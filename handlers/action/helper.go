@@ -824,16 +824,13 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 					} else {
 						markSuggested(lis, p)
 					}
-				} else if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false); p > 0 && lis[p].Provider == "Translated" && s.offeredDefault(lis, ud) == i {
-					// A saved track normally withdraws the offer: the viewer
-					// has dealt with subtitles. Not when it is the very track
-					// the ladder plays beside the offer -- which is what the
-					// next episode receives: the player carries what is
-					// playing (readCarry), and a carried choice arrives here
-					// as a saved one. Without this the offer showed on the
-					// first episode of a series only.
-					markOffered(lis, p)
 				}
+				// Any other saved track withdraws the offer: the viewer has
+				// dealt with subtitles -- the English track the ladder plays
+				// beside it included, once the viewer has chosen it. The
+				// next episode keeps the offer because the player carries
+				// only a choice (readCarry reads data-saved), not what the
+				// ladder turned on; its ladder then runs as on any page.
 				for j := range lis {
 					lis[j].Default = false
 				}
@@ -1007,7 +1004,7 @@ func fallbackLang(ud *models.VideoStreamUserData) string {
 // run it, so it is an upsell and not an action. Neither case can reach
 // here today -- a saved translation is never the item passed in (the
 // saved-choice branch marks only the ladder's pick, and only while
-// something else is saved), and ladderPick never answers with a locked
+// subtitles are saved off), and ladderPick never answers with a locked
 // item -- which is why this says the rule rather than enforcing a
 // possibility. It is the one place every call site passes through, so both
 // conditions are written once and read together.

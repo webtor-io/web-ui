@@ -214,49 +214,70 @@ func TestFallbackLangIsMirroredInSubtitleRules(t *testing.T) {
 	}
 }
 
-// TestNextEpisodeKeepsTheOffer: the player carries what is PLAYING to the
-// next file (readCarry in next-item.js reads the chips, not a saved value),
-// and the carried choice arrives as a saved one. Before 2026-09-28 an offer
-// played "None", so the carry was "off" and the next episode offered the
-// translation again (the saved-off branch). With the English track playing
-// beside the offer, the carry is "English" -- and a saved track used to mean
-// "the viewer has dealt with subtitles", withdrawing the offer from every
-// episode after the first.
+// TestSavedEnglishWithdrawsTheOffer: a saved track -- the English one the
+// ladder plays beside the offer included -- means the viewer has dealt with
+// subtitles, and the offer goes, as for any other saved track (rule 1).
 //
-// A saved choice that is the very track the ladder plays beside the offer
-// says nothing of the kind: the offer stands. Another English track -- one
-// the viewer picked over the ladder's -- is a choice, and the offer goes, as
-// it does for any other saved track.
+// 82ebe371 excepted the ladder's own English track, because the player
+// carried what was PLAYING to the next episode and a carry arrives as a
+// saved choice: without the exception the offer showed on the first episode
+// of a series only. That exception pinned the carried English over the next
+// episode's own Portuguese track as well, and kept offering a translation to
+// a viewer who had explicitly gone back to English (review 2026-09-28). The
+// player now carries only a choice (readCarry reads data-saved), so the
+// next episode's ladder runs as on any page -- this is the server half.
 //
-// Negative control: without the saved-track branch in applyLadder the first
-// half loses Offered.
-func TestNextEpisodeKeepsTheOffer(t *testing.T) {
+// Negative control: re-adding the exception (markOffered on the ladder's
+// pick when the saved track is offeredDefault's) reddens the first half.
+func TestSavedEnglishWithdrawsTheOffer(t *testing.T) {
 	mp := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
 		{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English"}}]`)
 	oss := []api.OpenSubtitleTrack{osAbs("1", "en", "hash")}
-
-	carried := func(provider string) []ListItem {
-		ud := enViewer(language.Portuguese)
-		ud.Carry = &models.TrackCarry{Subtitles: "on", SubtitleLang: "en", SubtitleProvider: provider}
+	render := func(ud *models.VideoStreamUserData, oss []api.OpenSubtitleTrack) []ListItem {
 		return NewHelper().GetSubtitles(ud, mp, &ra.ExportTag{}, oss, &models.ExternalData{}, nil, paidPT)
 	}
 
-	// The ladder's own English track (embedded, rank 1) carried over.
-	items := carried("MediaProbe")
-	if d := defaultID(items); d != "mp-0" || !byID(items)["mp-0"].Saved {
-		t.Fatalf("default=%s: the carried track plays, as a saved choice", d)
-	}
-	if tr := byID(items)["tr-pt"]; !tr.Offered || tr.Default {
-		t.Fatalf("the translation is still on offer on the next episode: %+v", tr)
+	// Nothing saved, nothing carried: the ladder's English plays beside the
+	// offer. This is what the next episode gets when the previous one only
+	// played what the ladder chose.
+	items := render(enViewer(language.Portuguese), oss)
+	if d := defaultID(items); d != "mp-0" || byID(items)["mp-0"].Saved || !byID(items)["tr-pt"].Offered {
+		t.Fatalf("default=%s: the ladder's English beside the offer, not saved: %+v", d, items)
 	}
 
-	// Another English track than the ladder's: the viewer chose it.
-	items = carried("OpenSubtitles")
-	if d := defaultID(items); d != "os-1" {
-		t.Fatalf("default=%s want os-1", d)
+	// The viewer chose that same track (saved on this file, or carried from
+	// the previous one as a choice): it plays, and the offer is withdrawn.
+	saved := enViewer(language.Portuguese)
+	saved.SubtitleID = "mp-0"
+	carried := enViewer(language.Portuguese)
+	carried.Carry = &models.TrackCarry{Subtitles: "on", SubtitleLang: "en", SubtitleProvider: "MediaProbe"}
+	for name, ud := range map[string]*models.VideoStreamUserData{"saved": saved, "carried": carried} {
+		items = render(ud, oss)
+		if d := defaultID(items); d != "mp-0" || !byID(items)["mp-0"].Saved {
+			t.Fatalf("%s: default=%s want mp-0 as the viewer's choice", name, d)
+		}
+		if tr := byID(items)["tr-pt"]; tr.Offered || tr.Default {
+			t.Fatalf("%s: a saved track withdraws the offer, the ladder's English included: %+v", name, tr)
+		}
 	}
-	if byID(items)["tr-pt"].Offered {
-		t.Fatal("a track the viewer picked over the ladder's withdraws the offer, like any saved track")
+
+	// A carried English choice on an episode that has a Portuguese track:
+	// the choice outranks the ladder, as every carry does. Nothing is marked
+	// Offered -- there is no translation to offer beside a human track.
+	items = render(carried, []api.OpenSubtitleTrack{osAbs("1", "en", "hash"), osAbs("2", "pt", "hash")})
+	if d := defaultID(items); d != "mp-0" {
+		t.Fatalf("default=%s want mp-0: a carried choice wins", d)
+	}
+	for _, li := range items {
+		if li.Offered {
+			t.Fatalf("%s is marked Offered beside a human Portuguese track: %+v", li.ID, li)
+		}
+	}
+	// Without the carry the same episode plays its Portuguese track -- which
+	// is why the ladder's pick must not travel as a choice.
+	items = render(enViewer(language.Portuguese), []api.OpenSubtitleTrack{osAbs("1", "en", "hash"), osAbs("2", "pt", "hash")})
+	if d := defaultID(items); d != "os-2" {
+		t.Fatalf("default=%s want os-2: the viewer's language wins when nothing was chosen", d)
 	}
 }
 
@@ -311,28 +332,5 @@ func TestOfferEnglishIsAFullTrack(t *testing.T) {
 	}
 	if d := defaultID(items); d != "os-1" {
 		t.Fatalf("default=%s want os-1: the full English track, not the signs", d)
-	}
-}
-
-// TestCarriedEnglishNeverOffersAHumanTrack: the saved-track exception in
-// applyLadder re-marks the ladder's pick Offered only when that pick is a
-// translation. Episode 2 of a series can have what episode 1 lacked -- a
-// Portuguese track -- and then the ladder's pick is that human track: an
-// Offered mark on it would draw a real subtitle as "Translate to
-// Portuguese". Which track PLAYS here is not pinned: the carried English
-// wins over the Portuguese one, a known gap of carrying the ladder's pick
-// as a choice (review 2026-09-28).
-//
-// Negative control: dropping `lis[p].Provider == "Translated"` from that
-// branch marks os-2 Offered.
-func TestCarriedEnglishNeverOffersAHumanTrack(t *testing.T) {
-	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]`)
-	ud := enViewer(language.Portuguese)
-	ud.Carry = &models.TrackCarry{Subtitles: "on", SubtitleLang: "en", SubtitleProvider: "OpenSubtitles"}
-	items := NewHelper().GetSubtitles(ud, audio, &ra.ExportTag{}, []api.OpenSubtitleTrack{osAbs("1", "en", "hash"), osAbs("2", "pt", "hash")}, &models.ExternalData{}, nil, paidPT)
-	for _, li := range items {
-		if li.Offered && li.Provider != "Translated" {
-			t.Fatalf("%s is a human track and was marked Offered: %+v", li.ID, li)
-		}
 	}
 }

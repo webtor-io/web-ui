@@ -120,10 +120,12 @@ const {
     wireTrackHandlers,
     syncUploadMarks,
     markTrack,
+    activateSubtitle,
     findSubtitleItem,
     PUT_RETRY_DELAY_MS,
     swapSubtitlesDialog,
 } = await import('./Player.jsx');
+const { readCarry } = await import('./next-item.js');
 // Imported the same way and for the same reason as Player.jsx: hls-manager
 // reads navigator at module scope, so it cannot be a static import above
 // the globals.
@@ -715,6 +717,45 @@ test('audio and subtitle are sequenced apart', async () => {
     assert.deepEqual(puts.map((c) => c.url), [
         '/stream-video/audio', '/stream-video/subtitle', '/stream-video/audio',
     ]);
+});
+
+// The saved mark follows the viewer's choice and nothing else: a persisted
+// pick moves it (it is what the server renders as ListItem.Saved on the next
+// load), a pick the player made for the viewer does not. readCarry reads it
+// to decide what travels to the next episode (review 2026-09-28: the
+// ladder's English track beside an offer used to travel as a choice).
+//
+// Negative control: without the data-saved move in markTrack the first
+// assertion fails, and the carry of a clicked track is lost.
+test('a persisted pick carries the saved mark; a rule\'s activation does not', async () => {
+    const p = mount();
+    p.wire();
+    const saved = () => Array.from(p.modal.querySelectorAll('.subtitle[data-saved="true"]')).map((el) => el.getAttribute('data-id'));
+
+    await markTrack(p.container, p.chip('os-os-en'), 'subtitle');
+    assert.deepEqual(saved(), ['os-os-en'], 'the viewer\'s pick is the one saved track');
+    assert.equal(readCarry(p.modal)['carry-sub-lang'], 'en', 'and it travels');
+
+    // What the audio-switch rule (or a deleted upload landing on None) does:
+    // an activation with persist:false. Nothing was chosen.
+    activateSubtitle(p.container, p.chip('os-os-ru'), { persist: false });
+    assert.deepEqual(saved(), ['os-os-en'], 'a rule\'s activation leaves the mark where the viewer put it');
+    assert.equal(readCarry(p.modal)['carry-sub'], undefined, 'and what it turned on does not travel');
+
+    // Pressing the chip the rule turned on is not a new choice either:
+    // markTrack returns before the PUT (the server saves nothing), and the
+    // mark agrees with the server.
+    await markTrack(p.container, p.chip('os-os-ru'), 'subtitle');
+    assert.deepEqual(saved(), ['os-os-en']);
+    assert.equal(p.puts().length, 1, 'one PUT: the first pick');
+
+    await markTrack(p.container, p.chip('os-os-de'), 'subtitle');
+    assert.deepEqual(saved(), ['os-os-de'], 'the next choice moves it');
+    assert.equal(readCarry(p.modal)['carry-sub-lang'], 'de');
+
+    await markTrack(p.container, p.chip('none'), 'subtitle');
+    assert.deepEqual(saved(), ['none'], 'an explicit off is a choice too');
+    assert.equal(readCarry(p.modal)['carry-sub'], 'off');
 });
 
 // ---- the translation offer ------------------------------------------
