@@ -1050,7 +1050,7 @@ deploys: they are measuring the deploy, not the traffic.
 
 | Event | Fields | Notes |
 |---|---|---|
-| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `needed`, `translated`, `uiLang`, `audioLang`, `notReady` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang` — profile, then browser, see "Preferred language"; the UI language only when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. `notReady` (`data-subtitles-not-ready`) says the OpenSubtitles lookup never finished on this render — exclude those rows before reading a `'none'` rate as "files with no subtitles". Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
+| `subtitle-resolved` | `level` (`'0'`–`'5'`/`'none'`), `hasUiLang`, `count`, `badge`, `defaultLang`, `needed`, `translated`, `uiLang`, `audioLang`, `notReady` | Fires on the `stream-start` gate (playback ≥ `ENGAGEMENT_SECONDS`). `needed = audioLang base != preferred content language base` (`data-preferred-lang` — profile, then browser, see "Preferred language"; the UI language only when unset; unknown audio ⇒ needed). `translated = badge === 'ai'`. `defaultLang` (from 2026-09-28) is the base language of the track that plays: `''` with subtitles off, `'und'` when the source never declared one (`data-lang-guessed`, or an upload without a language) — `level` is the best level on the list, not what plays, and cannot say which rule chose the track. `notReady` (`data-subtitles-not-ready`) says the OpenSubtitles lookup never finished on this render — exclude those rows before reading a `'none'` rate as "files with no subtitles". Level `'5'` = AI translation; `'6'` reserved for whisper (phase 3), not emitted yet. |
 | `subtitle-select` | `provider`, `srclang`, `source`, `badge` | `badge` is an additive field vs. phase 1's schema. Fires for every activation the viewer asked for — a chip press **and** the subtitles switch turning them back on (`trackSubtitleSelect`, one call site each); never for `none`, and never for the activation the player performs by itself (the audio-switch re-pick). |
 | `subtitle-translate-start` | `lang`, `source` | `source` = the item's `data-source-badge` (`SourceBadge`), i.e. what human track is being translated. **Since 2026-09-16 it cannot fire without an explicit act**: the server never defaults the AI item and the engagement-gate auto-start is gone, so a run begins on a click of the chip, on the switch restoring `data-last-subtitle` (a translation the viewer already ran this session), or on the mount-time restore of one they saved in an earlier session. Rates before and after that date are not comparable — and the two restore paths **do** emit `start`/`done`, as replays of a cached file rather than new work, so the event counts a translation being *shown*, not one being *produced*. |
 | `subtitle-translate-done` | `lang`, `seconds`, `cues` | `seconds` = wall time since start, rounded to 0.1; `cues` = last `total` seen. |
@@ -1075,8 +1075,9 @@ Compare within a period on one side of the deploy, or re-baseline.
 that get an offer (`subtitle-offer-shown kind=start`) now resolve to an English track wherever the
 file has one: their `subtitle-resolved` `badge` moves from `''` to that track's badge (`emb`,
 `sc`, `os`…, never `ai`). `level` does **not** move — it is the best level on the list, not the
-level of what plays — so the rule's reach is read off `badge`, joined per session with
-`subtitle-offer-shown kind=start`.
+level of what plays — so the rule's reach is read off `defaultLang` (added with the rule, absent
+before it): `needed && defaultLang === 'en'`, joined per session with
+`subtitle-offer-shown kind=start`. `badge` alone moves for other reasons too.
 And the offer is now read over subtitles that are already on, so a change in
 `subtitle-offer-click` / `subtitle-translate-start` per `kind=start` offer across that deploy is
 the rule's effect as much as the viewers' — the question worth answering with it, not noise to

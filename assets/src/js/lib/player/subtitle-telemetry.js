@@ -83,22 +83,35 @@ export function selectEventData(el) {
 // (`data-preferred-lang`, what the ladder itself ran on); the UI
 // language stands in only when no preference is configured, so the two
 // halves of the same question are never asked of different languages.
+//
+// `defaultLang` is the base language of the track that plays: '' with
+// subtitles off, 'und' for a track whose language the source never
+// declared (an untagged embedded stream the server labels English --
+// data-lang-guessed -- or an upload with none). `level` cannot answer "which
+// rule chose it": it is the best level on the list, not the level of what
+// plays. With the English track beside a translation offer (2026-09-28) the
+// rule's reach is `needed && defaultLang === 'en'` on sessions with a
+// `subtitle-offer-shown kind=start`.
 export function resolveSubtitleLevel(tracks, uiLang, { audioLang = '', preferredLang = '' } = {}) {
     let best = null;
     let hasUiLang = false;
     let badge = '';
+    let playing = null;
     const ui = baseLang(uiLang);
     for (const t of tracks) {
         const l = levelOf(t);
         if (l !== null && (best === null || LEVELS.indexOf(l) < LEVELS.indexOf(best))) best = l;
         if (ui && baseLang(t.srclang) === ui) hasUiLang = true;
         if (t.isDefault && !badge) badge = t.badge || '';
+        if (t.isDefault && !playing) playing = t;
     }
+    const defaultLang = playing ? ((!playing.langGuessed && baseLang(playing.srclang)) || 'und') : '';
     return {
         level: best === null ? 'none' : best,
         hasUiLang,
         count: tracks.length,
         badge,
+        defaultLang,
         // Unknown audio language ⇒ assume subtitles are needed.
         needed: !audioLang || baseLang(audioLang) !== (baseLang(preferredLang) || ui),
         translated: badge === 'ai',

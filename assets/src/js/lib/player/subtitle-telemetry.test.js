@@ -8,7 +8,7 @@ function makeAttrEl(attrs) {
 
 test('none when no tracks', () => {
     assert.deepEqual(resolveSubtitleLevel([], 'en'), {
-        level: 'none', hasUiLang: false, count: 0, badge: '', needed: true, translated: false,
+        level: 'none', hasUiLang: false, count: 0, badge: '', defaultLang: '', needed: true, translated: false,
     });
 });
 
@@ -19,7 +19,7 @@ test('best level wins and ui language is detected', () => {
         { provider: 'OpenSubtitles', srclang: 'pt-BR', source: 'imdb' },
     ];
     assert.deepEqual(resolveSubtitleLevel(tracks, 'pt'), {
-        level: '2', hasUiLang: true, count: 3, badge: '', needed: true, translated: false,
+        level: '2', hasUiLang: true, count: 3, badge: '', defaultLang: '', needed: true, translated: false,
     });
 });
 
@@ -35,8 +35,25 @@ test('user subtitles are level 0', () => {
 test('translated is level 5 and badge/needed are reported', () => {
     const tracks = [{ provider: 'Translated', srclang: 'pt', source: '', badge: 'ai', isDefault: true }];
     assert.deepEqual(resolveSubtitleLevel(tracks, 'pt', { audioLang: 'en' }), {
-        level: '5', hasUiLang: true, count: 1, badge: 'ai', needed: true, translated: true,
+        level: '5', hasUiLang: true, count: 1, badge: 'ai', defaultLang: 'pt', needed: true, translated: true,
     });
+});
+
+// defaultLang: which language actually plays -- what `level` (the best on
+// the list) cannot say. The English track beside a translation offer is
+// read off it (docs/subtitle_translate.md, Telemetry).
+//
+// Negative controls: without defaultLang in the result the deepEqual tests
+// above fail; without the langGuessed branch the untagged stream reads 'en'.
+test('defaultLang is the language of the track that plays', () => {
+    const en = { provider: 'OpenSubtitles', srclang: 'en', source: 'hash', badge: 'os', isDefault: true };
+    const ai = { provider: 'Translated', srclang: 'pt', source: '', badge: 'ai' };
+    assert.equal(resolveSubtitleLevel([ai, en], 'pt', { audioLang: 'en' }).defaultLang, 'en', 'English beside the offer');
+    assert.equal(resolveSubtitleLevel([ai, { ...en, srclang: 'pt-BR' }], 'pt').defaultLang, 'pt', 'a base language');
+    assert.equal(resolveSubtitleLevel([ai, { ...en, isDefault: false }], 'pt').defaultLang, '', 'subtitles off');
+    const untagged = { provider: 'MediaProbe', srclang: 'en', badge: 'emb', langGuessed: true, isDefault: true };
+    assert.equal(resolveSubtitleLevel([untagged], 'pt').defaultLang, 'und', 'labelled English, never declared');
+    assert.equal(resolveSubtitleLevel([{ provider: 'UserSubtitle', srclang: '', badge: 'user', isDefault: true }], 'pt').defaultLang, 'und');
 });
 
 test('audio already in the UI language: subtitles are not needed', () => {

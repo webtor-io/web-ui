@@ -939,6 +939,8 @@ test('subtitle-resolved reports a finished lookup as such', async (t) => {
     const ev = p.events.find((e) => e.name === 'subtitle-resolved');
     assert.ok(ev, 'the engagement gate must emit subtitle-resolved');
     assert.equal(ev.data.notReady, false);
+    // The fixture plays nothing (subtitles off): defaultLang ships, empty.
+    assert.equal(ev.data.defaultLang, '');
 });
 
 // ---- the codec-support measurement -------------------------------------
