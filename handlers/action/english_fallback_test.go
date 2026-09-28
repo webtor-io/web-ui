@@ -259,3 +259,80 @@ func TestNextEpisodeKeepsTheOffer(t *testing.T) {
 		t.Fatal("a track the viewer picked over the ladder's withdraws the offer, like any saved track")
 	}
 }
+
+// TestOfferEnglishIsADeclaredLanguage: beside an offer only a track that
+// DECLARES English plays. ffprobe reports no language tag for a Matroska
+// track marked "und", and GetSubtitles labels such a stream English for
+// display -- in the 2026-09-14 probe sample 7.8% of files with text
+// subtitles had one, titled "Español", "Chinese", "rus full". Embedded is
+// rank 1, so without this it beat the real English OpenSubtitles track and
+// a Portuguese viewer got Spanish subtitles as "English". An "und" tag
+// itself is the same case: its Base is CLDR's Low-confidence guess of
+// English.
+//
+// Negative controls: without the LangGuessed test in offeredDefault the
+// first half answers mp-0; with baseLang instead of declaredLang the
+// second answers et-1.
+func TestOfferEnglishIsADeclaredLanguage(t *testing.T) {
+	mp := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+		{"codec_type":"subtitle","codec_name":"subrip","tags":{"title":"Español"}}]`)
+	items := NewHelper().GetSubtitles(enViewer(language.Portuguese), mp, &ra.ExportTag{}, []api.OpenSubtitleTrack{osAbs("1", "en", "hash")}, &models.ExternalData{}, nil, paidPT)
+	if !byID(items)["tr-pt"].Offered || !byID(items)["mp-0"].LangGuessed {
+		t.Fatalf("fixture must offer a translation beside an untagged embedded track: %+v", items)
+	}
+	if d := defaultID(items); d != "os-1" {
+		t.Fatalf("default=%s want os-1: the untagged stream is not known to be English", d)
+	}
+
+	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]`)
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/a.vtt", SrcLang: "und", Label: "Movie.srt", Kind: "subtitles"}}}
+	items = NewHelper().GetSubtitles(enViewer(language.Portuguese), audio, tag, []api.OpenSubtitleTrack{osAbs("2", "fr", "hash")}, &models.ExternalData{}, nil, paidPT)
+	if !byID(items)["tr-pt"].Offered {
+		t.Fatalf("fixture must offer a translation: %+v", items)
+	}
+	if d := defaultID(items); d != "none" {
+		t.Fatalf("default=%s want none: an \"und\" track is not English", d)
+	}
+}
+
+// TestOfferEnglishIsAFullTrack: a forced English track is signs only, and
+// beside an offer the viewer needs the dialogue -- the full track plays
+// although the forced sidecar ranks better (2 against OpenSubtitles' 3).
+// The client pins the same (subtitle-rules.test.js, "A forced English
+// track is signs only").
+//
+// Negative control: letting forced tracks into offeredDefault answers et-1.
+func TestOfferEnglishIsAFullTrack(t *testing.T) {
+	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"jpn"}}]`)
+	tag := &ra.ExportTag{Tracks: []ra.ExportTrack{{Src: "https://x/f.vtt", SrcLang: "en", Label: "Movie.en.forced.srt", Kind: "subtitles"}}}
+	items := NewHelper().GetSubtitles(enViewer(language.Portuguese), audio, tag, []api.OpenSubtitleTrack{osAbs("1", "en", "hash")}, &models.ExternalData{}, nil, paidPT)
+	if !byID(items)["et-1"].Forced || !byID(items)["tr-pt"].Offered {
+		t.Fatalf("fixture must hold a forced English sidecar beside an offer: %+v", items)
+	}
+	if d := defaultID(items); d != "os-1" {
+		t.Fatalf("default=%s want os-1: the full English track, not the signs", d)
+	}
+}
+
+// TestCarriedEnglishNeverOffersAHumanTrack: the saved-track exception in
+// applyLadder re-marks the ladder's pick Offered only when that pick is a
+// translation. Episode 2 of a series can have what episode 1 lacked -- a
+// Portuguese track -- and then the ladder's pick is that human track: an
+// Offered mark on it would draw a real subtitle as "Translate to
+// Portuguese". Which track PLAYS here is not pinned: the carried English
+// wins over the Portuguese one, a known gap of carrying the ladder's pick
+// as a choice (review 2026-09-28).
+//
+// Negative control: dropping `lis[p].Provider == "Translated"` from that
+// branch marks os-2 Offered.
+func TestCarriedEnglishNeverOffersAHumanTrack(t *testing.T) {
+	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]`)
+	ud := enViewer(language.Portuguese)
+	ud.Carry = &models.TrackCarry{Subtitles: "on", SubtitleLang: "en", SubtitleProvider: "OpenSubtitles"}
+	items := NewHelper().GetSubtitles(ud, audio, &ra.ExportTag{}, []api.OpenSubtitleTrack{osAbs("1", "en", "hash"), osAbs("2", "pt", "hash")}, &models.ExternalData{}, nil, paidPT)
+	for _, li := range items {
+		if li.Offered && li.Provider != "Translated" {
+			t.Fatalf("%s is a human track and was marked Offered: %+v", li.ID, li)
+		}
+	}
+}

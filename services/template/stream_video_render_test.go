@@ -1670,7 +1670,10 @@ func TestStreamVideoRendersEnglishBesideTheOffer(t *testing.T) {
 	}
 
 	var mp api.MediaProbe
-	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]}`), &mp); err != nil {
+	// Plus an embedded stream with no language tag (a Matroska "und"
+	// track): labelled English, rank 1, and still not what plays -- the
+	// markup carries data-lang-guessed so the client rule skips it too.
+	if err := json.Unmarshal([]byte(`{"streams":[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},{"codec_type":"subtitle","codec_name":"subrip","tags":{"title":"Español"}}]}`), &mp); err != nil {
 		t.Fatalf("failed to build MediaProbe fixture: %v", err)
 	}
 	data := &scripts.StreamContent{
@@ -1713,6 +1716,18 @@ func TestStreamVideoRendersEnglishBesideTheOffer(t *testing.T) {
 	}
 	if strings.Contains(en, "data-saved") {
 		t.Errorf("the ladder's pick must not render as the viewer's choice:\n%s", en)
+	}
+	// chipOf finds the first data-id, and the audio row renders before the
+	// subtitle row with ids of its own ("mp-0" is the audio stream too).
+	subAt := strings.Index(html, `id="subtitle-tracks"`)
+	undAt := strings.Index(html[subAt:], `data-id="mp-0"`)
+	if subAt < 0 || undAt < 0 {
+		t.Fatalf("no subtitle chip mp-0:\n%s", html)
+	}
+	und := html[subAt+strings.LastIndex(html[subAt:subAt+undAt], "<button"):]
+	und = und[:strings.Index(und, "</button>")]
+	if !strings.Contains(und, `data-lang-guessed="true"`) || strings.Contains(und, `data-default="true"`) {
+		t.Errorf("the untagged embedded chip must carry data-lang-guessed and not play:\n%s", und)
 	}
 	ai := chipOf("tr-pt")
 	for _, want := range []string{`data-offered="true"`, "chip-offered", "action.stream.translate.action:Portuguese"} {

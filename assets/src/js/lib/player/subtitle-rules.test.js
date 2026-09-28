@@ -217,3 +217,12 @@ test('no offer, no English rule: a free viewer keeps what the server chose', () 
     // No AI item at all (NSFW, a language the service does not know): the same.
     assert.equal(pickDefaultSubtitle([T('os-en', 3, 'en')], 'ja', 'pt'), 'none');
 });
+
+// Negative control: without the langGuessed filter the untagged embedded
+// track (rank 1) wins over the declared English one. Same rule as
+// TestOfferEnglishIsADeclaredLanguage on the server.
+test('beside an offer an embedded track labelled English for lack of a tag does not come on', () => {
+    const tracks = [AI('tr-pt'), T('mp-0', 1, 'en', { langGuessed: true }), T('os-en', 3, 'en')];
+    assert.equal(pickDefaultSubtitle(tracks, 'ja', 'pt'), 'os-en');
+    assert.equal(pickDefaultSubtitle(tracks.slice(0, 2), 'ja', 'pt'), 'none');
+});

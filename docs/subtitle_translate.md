@@ -100,6 +100,11 @@ feature is on and this is not an embed — see *Gating and flags*):
    an explicit click). An unlocked item is marked `Offered`, and **the best full human English
    track by ladder rank plays beside the offer** (`offeredDefault`; owner, 2026-09-28: "show the
    main subtitles and offer to translate them"). With no English track, subtitles stay off.
+   Only a track that **declares** English counts: an embedded stream without a language tag
+   (what ffprobe reports for a Matroska track marked `und`; `GetSubtitles` labels it English for
+   display, `ListItem.LangGuessed` / `data-lang-guessed`) and an `und` tag do not — 7.8% of the
+   files with text subtitles in the 2026-09-14 probe sample had one, titled "Español", "Chinese",
+   "rus full", and at rank 1 it beat a real English track of rank 3.
    History: until 2026-09-18 the phase-1 selection decided here, and a viewer who had set Serbian
    got the Russian track their browser implied, which read as the setting being ignored; from
    2026-09-18 an offer left subtitles off, so an English film with no subtitles in the viewer's
@@ -1063,7 +1068,10 @@ Compare within a period on one side of the deploy, or re-baseline.
 
 **The English track beside an offer (2026-09-28) moves two lines.** Sessions of paying viewers
 that get an offer (`subtitle-offer-shown kind=start`) now resolve to an English track wherever the
-file has one: their `subtitle-resolved` level moves from `'none'` to `'0'`–`'4'`, badge not `ai`.
+file has one: their `subtitle-resolved` `badge` moves from `''` to that track's badge (`emb`,
+`sc`, `os`…, never `ai`). `level` does **not** move — it is the best level on the list, not the
+level of what plays — so the rule's reach is read off `badge`, joined per session with
+`subtitle-offer-shown kind=start`.
 And the offer is now read over subtitles that are already on, so a change in
 `subtitle-offer-click` / `subtitle-translate-start` per `kind=start` offer across that deploy is
 the rule's effect as much as the viewers' — the question worth answering with it, not noise to
@@ -1113,7 +1121,7 @@ for the same reason.
 |---|---|---|
 | `.audio` | `#audio-tracks` | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-label`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default` |
 | `.subtitle#subtitle-none` | first child of `#subtitle-tracks`, hidden | `data-id="none"`, `data-provider=""`, `data-srclang=""`, `data-kind`, `data-rank`, `data-lang="und"`, `data-default`, `data-saved`. No label and no display strings: nothing renders it |
-| `.subtitle` (track) | `#subtitle-tracks` — embedded, sidecar, OpenSubtitles, embed externals, AI (and uploads, see below) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), `data-upsell` (`ListItem.Upsell` — the locked translation the ladder would have offered) and `data-offer-label` (the localized "Translate to …" sentence, on an Offered or Upsell chip; read by the on-screen offer), plus `aria-disabled="true"` on every chip while the block is muted |
+| `.subtitle` (track) | `#subtitle-tracks` — embedded, sidecar, OpenSubtitles, embed externals, AI (and uploads, see below) | `data-id`, `data-mp-id`, `data-srclang`, `data-provider`, `data-src`, `data-label`, `data-kind`, `data-badge`, `data-source`, `data-rank`, `data-lang`, `data-lang-name`, `data-lang-flag`, `data-source-badge` (Translated only), `data-lang-guessed` (`ListItem.LangGuessed`: an embedded stream with no language tag, labelled English for display; the English rule beside an offer skips it), `data-forced`, `data-locked` (+ `aria-disabled="true"`), `data-default`, `data-saved`, `data-suggested` (the track the switch would turn on while subtitles are off — `ListItem.Suggested`), `data-offered` (the translation the viewer may start — `ListItem.Offered`, Translated, unlocked, and never the track already playing), `data-upsell` (`ListItem.Upsell` — the locked translation the ladder would have offered) and `data-offer-label` (the localized "Translate to …" sentence, on an Offered or Upsell chip; read by the on-screen offer), plus `aria-disabled="true"` on every chip while the block is muted |
 | `.subtitle` (MY) | `#subtitle-tracks`, like every other track. On a page load the dialog's own loop renders them (they are `UserSubtitle` items of the same `GetSubtitles` result); on an async reload `templates/partials/action/user_subtitles.html` renders them into `#my-upload-chips` and the client moves them in | `data-id`, `data-provider="UserSubtitle"`, `data-src`, `data-label`, `data-srclang`, `data-kind="subtitles"`, `data-badge="user"`, `data-rank="0"` (fixed — this view model has no ladder), `data-lang`, `data-lang-name`, `data-lang-flag`, `data-default`, `data-saved`, `data-suggested`, `data-autoselect="true"` when just uploaded, `aria-disabled="true"` while the block is muted |
 | `.lang` | `#subtitle-langs` | `data-lang`, `aria-pressed="true\|false"` |
 

@@ -111,6 +111,14 @@ type ListItem struct {
 	// data-upsell; the player's on-screen offer reads it, the picker does
 	// not (the chip keeps its name-plus-lock shape either way).
 	Upsell bool
+	// LangGuessed: the source declared no language and SrcLang is
+	// GetSubtitles' display default. ffprobe reports no language tag for a
+	// Matroska track marked "und", and such a stream is labelled English --
+	// in the 2026-09-14 probe sample 7.8% of files with text subtitles had
+	// one, titled "Español", "Chinese", "Cyrillic", "rus full" and the
+	// like. Rendered as data-lang-guessed. offeredDefault, which turns a
+	// track on in a language the viewer did not ask for, does not trust it.
+	LangGuessed bool
 }
 
 // SubtitleOpts is defined once in models (see models/subtitle_opts.go);
@@ -932,13 +940,42 @@ func (s *Helper) ladderPick(lis []ListItem, ud *models.VideoStreamUserData, audi
 // The client re-runs the same rule on an audio switch (pickDefaultSubtitle
 // in subtitle-rules.js, FALLBACK_LANG), reading data-rank, so the track it
 // lands on is this one.
+//
+// Only a track whose language was DECLARED: not an embedded stream
+// labelled English for lack of a tag (LangGuessed), and not an "und"
+// tag, whose Base is CLDR's Low-confidence guess of English -- baseLang
+// accepts that, and bestByLadder with it. Either one turned a Spanish or
+// Chinese track on as "English" beside the offer, ahead of a real English
+// track of a worse rank.
 func (s *Helper) offeredDefault(lis []ListItem, ud *models.VideoStreamUserData) int {
-	if l := fallbackLang(ud); l != "" {
-		if i := bestByLadder(lis, l, false); i >= 0 {
-			return i
+	l := fallbackLang(ud)
+	if l == "" {
+		return 0
+	}
+	best, rank := 0, rankUnknown+1
+	for i, li := range lis {
+		if !isHumanFull(li) || li.LangGuessed || declaredLang(li.SrcLang) != l {
+			continue
+		}
+		if r := ladderRank(li); r < rank {
+			best, rank = i, r
 		}
 	}
-	return 0
+	return best
+}
+
+// declaredLang is baseLang for a tag that names its language: "" for "und"
+// and anything else whose base is only inferred.
+func declaredLang(tag string) string {
+	t, err := language.Parse(tag)
+	if err != nil {
+		return ""
+	}
+	b, conf := t.Base()
+	if conf != language.Exact {
+		return ""
+	}
+	return b.String()
 }
 
 // fallbackLang is the base language of the phase-1 fallback,
@@ -1124,6 +1161,8 @@ func (s *Helper) GetSubtitles(ud *models.VideoStreamUserData, mp *api.MediaProbe
 					Src:      src,
 					Forced:   forced,
 					Badge:    badgeFor("MediaProbe", forced),
+					// srcLang above is a guess ("eng") when the tag is absent.
+					LangGuessed: stream.Tags.Language == "",
 				})
 			}
 			i++

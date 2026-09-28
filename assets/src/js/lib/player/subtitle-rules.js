@@ -103,7 +103,9 @@ export function pickDefaultSubtitle(tracks, audioLang, preferredLang) {
     const full = best(list, pref, false);
     if (full) return full.id;
     if (translationOnOffer(list)) {
-        const en = best(list, FALLBACK_LANG, false);
+        // Declared English only, as on the server (offeredDefault): an
+        // embedded stream labelled English for lack of a tag is not.
+        const en = best(list.filter((t) => !t.langGuessed), FALLBACK_LANG, false);
         if (en) return en.id;
     }
     // The preferred language yielded nothing activatable. Where the server

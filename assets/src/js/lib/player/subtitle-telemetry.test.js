@@ -68,13 +68,15 @@ test('readTracks queries .subtitle[data-provider], the trait every chip in the r
         'data-badge': 'ai', 'data-rank': '5', 'data-locked': 'true', 'data-default': 'true',
         'data-saved': 'true', 'data-source-badge': 'os',
     });
+    const guessedEl = makeAttrEl({ 'data-id': 'mp-0', 'data-provider': 'MediaProbe', 'data-srclang': 'en', 'data-source': '', 'data-rank': '1', 'data-lang-guessed': 'true' });
     const noneEl = makeAttrEl({ 'data-id': 'none', 'data-provider': 'MediaProbe', 'data-srclang': '', 'data-source': '' });
     const modal = {
-        querySelectorAll: (selector) => (selector === '.subtitle[data-provider]' ? [userEl, trEl, noneEl] : []),
+        querySelectorAll: (selector) => (selector === '.subtitle[data-provider]' ? [userEl, trEl, guessedEl, noneEl] : []),
     };
     assert.deepEqual(readTracks(modal), [
-        { id: 'u1', provider: 'UserSubtitle', srclang: 'ru', source: '', badge: 'user', rank: 0, forced: false, locked: false, isDefault: false, saved: false, sourceBadge: '' },
-        { id: 'tr-ru', provider: 'Translated', srclang: 'ru', source: '', badge: 'ai', rank: 5, forced: false, locked: true, isDefault: true, saved: true, sourceBadge: 'os' },
+        { id: 'u1', provider: 'UserSubtitle', srclang: 'ru', source: '', badge: 'user', rank: 0, forced: false, langGuessed: false, locked: false, isDefault: false, saved: false, sourceBadge: '' },
+        { id: 'tr-ru', provider: 'Translated', srclang: 'ru', source: '', badge: 'ai', rank: 5, forced: false, langGuessed: false, locked: true, isDefault: true, saved: true, sourceBadge: 'os' },
+        { id: 'mp-0', provider: 'MediaProbe', srclang: 'en', source: '', badge: '', rank: 1, forced: false, langGuessed: true, locked: false, isDefault: false, saved: false, sourceBadge: '' },
     ]);
 });
 

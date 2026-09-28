@@ -55,6 +55,9 @@ function trackData(el) {
         // Unknown rank sorts last, same as the server's rankUnknown.
         rank: Number.isFinite(rank) ? rank : 9,
         forced: el.getAttribute('data-forced') === 'true',
+        // The server labelled it (English) for lack of a language tag
+        // (ListItem.LangGuessed); the English rule beside an offer skips it.
+        langGuessed: el.getAttribute('data-lang-guessed') === 'true',
         locked: el.getAttribute('data-locked') === 'true',
         isDefault: el.getAttribute('data-default') === 'true',
         // The viewer's own earlier choice, as opposed to a ladder pick.
