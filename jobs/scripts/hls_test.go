@@ -253,6 +253,32 @@ v0-720.m3u8`)
 	}
 }
 
+// A master with multichannel audio (content-transcoder, a browser that
+// declared aac51/ac3/ec3): CHANNELS on the renditions, every audio codec in
+// CODECS, and -- where the renditions' codecs differ -- possibly one variant
+// per audio group. The first variant is the one buffered, and its CODECS is
+// read whole.
+func TestParseMasterVideoVariantMultichannel(t *testing.T) {
+	master := `#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a-ec3",LANGUAGE="eng",NAME="English",CHANNELS="16/JOC",URI="a0.m3u8?token=xyz"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="a-aac",LANGUAGE="rus",NAME="Russian",CHANNELS="6",URI="a1.m3u8?token=xyz"
+#EXT-X-STREAM-INF:BANDWIDTH=42002567,RESOLUTION=3840x1606,CODECS="hvc1.2.4.L153.90,ec-3",VIDEO-RANGE=PQ,AUDIO="a-ec3"
+v0.m3u8?token=xyz
+#EXT-X-STREAM-INF:BANDWIDTH=41618567,RESOLUTION=3840x1606,CODECS="hvc1.2.4.L153.90,mp4a.40.2",VIDEO-RANGE=PQ,AUDIO="a-aac"
+v0.m3u8?token=xyz`
+	v, err := parseMasterVideoVariant(master)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := hlsVariant{URL: "v0.m3u8?token=xyz", Codecs: "hvc1.2.4.L153.90,ec-3", Width: 3840, Height: 1606, Bandwidth: 42002567}
+	if v != want {
+		t.Errorf("got %+v, want %+v", v, want)
+	}
+	if cls := passthroughClass(v); cls != "hevc10-2160" {
+		t.Errorf("class %q", cls)
+	}
+}
+
 // The target duration is read with the segments; a playlist without one
 // reads 0, and the segments it lists are the same as parseMediaPlaylist's.
 func TestParseMediaPlaylistTarget(t *testing.T) {

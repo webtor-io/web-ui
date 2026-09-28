@@ -14,9 +14,10 @@
 // page where storage is unavailable).
 //
 // The same module holds what the page will declare to the transcoder as
-// `decode=` (decodeTokens, the HEVC passthrough plan): the event carries
-// those tokens as computed by that one function, so the share it measures is
-// the share that will declare. And a second, later event,
+// `decode=` (decodeTokens: the HEVC passthrough plan's video tokens, and
+// since 2026-09-28 the audio tokens of multichannel audio): the event
+// carries those tokens as computed by that one function, so the share it
+// measures is the share that will declare. And a second, later event,
 // `playback-quality`, reads the element's dropped/total frames after a minute
 // of playback: a browser that decodes HEVC in software says "yes" to every
 // question above and can still drop half the frames of a 4K film without an
@@ -133,7 +134,10 @@ export const DECODE_HEVC = [
     ['hevc10-2160', 'hvc1.2.4.L153.90'], // Main10, up to 3840×2160, level ≤ 5.1
     ['hevc-high', 'hvc1.2.4.H153.90'], // tier High (UHD Blu-ray remuxes)
 ];
-export const DECODE_TOKENS = [...DECODE_HEVC.map(([token]) => token), 'hdr-pq'];
+// The video tokens: they decide the video route. The audio tokens
+// (DECODE_AUDIO_TOKENS, below) come after them; DECODE_TOKENS is the whole
+// declaration, in the transcoder's order.
+export const DECODE_VIDEO_TOKENS = [...DECODE_HEVC.map(([token]) => token), 'hdr-pq'];
 
 // `hdr-pq`: the browser decodes PQ (HDR10). Asked of mediaCapabilities, the
 // only API that takes a transfer function, as Main10 4K — where ~89% of the
@@ -238,36 +242,137 @@ async function decodesPQ(env, path, opts) {
     return info.ok;
 }
 
-// pqAnswer is the `hdr-pq` question without a deadline: it resolves with
-// the browser's answer whenever it comes. A rejection, a throw or a
-// malformed answer is an answer ("no"), and so is a browser without
-// decodingInfo (the token is never declared there); only silence is not --
-// the promise then stays pending. The event above treats 3 s of silence as
-// "no" (it counts viewers, and a count has to close); the declaration must
-// not: a check that did not answer is not a browser that cannot decode
-// (decode-declaration.js).
-function pqAnswer(env, path) {
-    if (path === 'none' || hevcAnswerInaccurate(env)) return Promise.resolve(false);
-    const mc = safe(() => env.mediaCapabilities);
-    if (safe(() => isFn(mc.decodingInfo)) !== true) return Promise.resolve(false);
+// supportedAnswer asks decodingInfo one question without a deadline: it
+// resolves with the browser's answer whenever it comes. A rejection, a
+// throw or a malformed answer is an answer ("no"); only silence is not --
+// the promise then stays pending.
+function supportedAnswer(mc, config) {
     try {
-        return Promise.resolve(mc.decodingInfo(pqConfig(path)))
+        return Promise.resolve(mc.decodingInfo(config))
             .then((info) => !!info && typeof info === 'object' && info.supported === true, () => false);
     } catch (e) {
         return Promise.resolve(false);
     }
 }
 
+// pqAnswer is the `hdr-pq` question without a deadline (supportedAnswer). A
+// browser without decodingInfo has answered too: the token is never
+// declared there. The event above treats 3 s of silence as "no" (it counts
+// viewers, and a count has to close); the declaration must not: a check
+// that did not answer is not a browser that cannot decode
+// (decode-declaration.js).
+function pqAnswer(env, path) {
+    if (path === 'none' || hevcAnswerInaccurate(env)) return Promise.resolve(false);
+    const mc = safe(() => env.mediaCapabilities);
+    if (safe(() => isFn(mc.decodingInfo)) !== true) return Promise.resolve(false);
+    return supportedAnswer(mc, pqConfig(path));
+}
+
+// ---- the audio tokens --------------------------------------------------------
+//
+// Multichannel audio (content-transcoder; owner's go of 2026-09-28): about
+// 40% of sources carry more than two channels -- E-AC-3 24%, AC-3 7%, AAC
+// 7% of 1126 in a day -- and every one is downmixed to stereo today. The
+// transcoder keeps the channels only for a browser that says it decodes
+// them:
+//   aac51  AAC-LC with up to six channels: a 5.1 AAC track is copied, and
+//          every other multichannel track is encoded to AAC 5.1 instead of
+//          stereo (MPEG-TS and fMP4 alike);
+//   ac3    AC-3 copied as it is -- in fMP4 only, i.e. a passthrough session;
+//   ec3    E-AC-3 copied as it is, Atmos (JOC) included -- fMP4 only: the
+//          full hls.js build refuses E-AC-3 in MPEG-TS (tsdemuxer.ts).
+// For audio a missing token is exactly the audio the transcoder has always
+// made (stereo AAC); nothing is refused for want of one.
+//
+// Independent of the HEVC tokens: asked and declared whatever the browser
+// says about HEVC, Firefox on Windows included. hls.js distrusts that
+// browser's HEVC answers and no audio answer of any browser (codecs.ts,
+// mediacapabilities-helper.ts; the test pins it to the installed hls.js).
+export const AAC51_TOKEN = 'aac51';
+export const AAC51_CODEC = 'mp4a.40.2';
+// The AAC 5.1 question for mediaCapabilities: six channels, 48 kHz, at the
+// 5.1 rate of the spec (384 kbit/s). Only `channels` is what is asked; the
+// other two make it a stream a browser would really be handed.
+export const AAC51_AUDIO = { channels: '6', bitrate: 384000, samplerate: 48000 };
+export const DECODE_DOLBY = [
+    ['ac3', 'ac-3'],
+    ['ec3', 'ec-3'],
+];
+export const DECODE_AUDIO_TOKENS = [AAC51_TOKEN, ...DECODE_DOLBY.map(([token]) => token)];
+export const DECODE_TOKENS = [...DECODE_VIDEO_TOKENS, ...DECODE_AUDIO_TOKENS];
+
+// hls.js's spelling of an audio type (mimeTypeForCodec(codec, 'audio')), so
+// the MSE answer is the one hls.js gets; the RFC 6381 one for the element.
+export const audioMseType = (codec) => `audio/mp4;codecs=${codec}`;
+export const audioFileType = (codec) => `audio/mp4; codecs="${codec}"`;
+
+// dolbyDecodeTokens: `ac3` and `ec3`, known at once. On the MSE path the
+// question hls.js asks itself before it keeps a level or an audio rendition
+// (level-controller.ts isAudioSupported: its MediaSource -- the managed one
+// first -- and its spelling); on the native path the element's canPlayType.
+export function dolbyDecodeTokens(env = {}, path = decodePath(env)) {
+    if (path === 'none') return [];
+    let yes;
+    if (path === 'mse') {
+        const ms = hlsMediaSource(env);
+        yes = (codec) => safe(() => ms.isTypeSupported(audioMseType(codec))) === true;
+    } else {
+        yes = (codec) => canPlay(env, audioFileType(codec));
+    }
+    return DECODE_DOLBY.filter(([, codec]) => yes(codec)).map(([token]) => token);
+}
+
+// `aac51`. isTypeSupported has no word for channels -- every MSE browser
+// with AAC says yes to mp4a.40.2 -- so on the MSE path the one API that
+// takes a channel count answers: decodingInfo as 'media-source', the same
+// audio question hls.js asks itself for a level whose audio rendition has
+// more than two CHANNELS (mediacapabilities-helper.ts). `supported` is
+// enough, as for `hdr-pq`; without decodingInfo the token is not declared.
+// On the native path the element's canPlayType for AAC.
+const aac51Config = () => ({ type: 'media-source', audio: { contentType: audioMseType(AAC51_CODEC), ...AAC51_AUDIO } });
+
+// decodesAac51 is the events' question: a deadline, silence is "no".
+async function decodesAac51(env, path, opts) {
+    if (path === 'none') return false;
+    if (path === 'native') return canPlay(env, audioFileType(AAC51_CODEC));
+    const mc = safe(() => env.mediaCapabilities);
+    if (safe(() => isFn(mc.decodingInfo)) !== true) return false;
+    return (await decoding(mc, aac51Config(), opts)).ok;
+}
+
+// aac51Answer is the declaration's: no deadline (supportedAnswer), the rule
+// of pqAnswer.
+function aac51Answer(env, path) {
+    if (path === 'none') return Promise.resolve(false);
+    if (path === 'native') return Promise.resolve(canPlay(env, audioFileType(AAC51_CODEC)));
+    const mc = safe(() => env.mediaCapabilities);
+    if (safe(() => isFn(mc.decodingInfo)) !== true) return Promise.resolve(false);
+    return supportedAnswer(mc, aac51Config());
+}
+
 // declarationSupport is what the page declares (decode-declaration.js), in
-// two parts: the HEVC tokens, known at once, and `pq`, a promise of the
-// `hdr-pq` answer that has no deadline (pqAnswer). The same questions, codec
+// three parts: the HEVC tokens, known at once; `pq`, a promise of the
+// `hdr-pq` answer; `audio`, a promise of the audio tokens in
+// DECODE_AUDIO_TOKENS order, which settles once `aac51` has its answer (the
+// Dolby ones are known at once and wait with it). Neither promise has a
+// deadline, and neither waits for the other. The same questions, codec
 // strings and path as decodeTokens: the event measures the share that
 // declares. Without an HEVC token there is nothing for `hdr-pq` to qualify,
-// and the question is not asked.
-export function declarationSupport(env = {}) {
+// and the question is not asked; the audio is asked all the same -- unless
+// `opts.audio` is false (a page that does not declare audio,
+// decode-declaration.js takesPartAudio): then nothing is asked about it and
+// `audio` is null.
+export function declarationSupport(env = {}, opts = {}) {
     const path = decodePath(env);
     const hevc = hevcDecodeTokens(env, path);
-    return { path, hevc, pq: hevc.length ? pqAnswer(env, path) : Promise.resolve(false) };
+    const askAudio = opts.audio !== false;
+    const dolby = askAudio ? dolbyDecodeTokens(env, path) : [];
+    return {
+        path,
+        hevc,
+        pq: hevc.length ? pqAnswer(env, path) : Promise.resolve(false),
+        audio: askAudio ? aac51Answer(env, path).then((aac) => [...(aac ? [AAC51_TOKEN] : []), ...dolby]) : null,
+    };
 }
 
 const timing = ({ timeoutMs = MC_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) => (
@@ -275,15 +380,21 @@ const timing = ({ timeoutMs = MC_TIMEOUT_MS, setTimer = setTimeout, clearTimer =
 
 async function decodeSupport(env, opts) {
     const path = decodePath(env);
+    const t = timing(opts);
     const tokens = hevcDecodeTokens(env, path);
-    if (await decodesPQ(env, path, timing(opts))) tokens.push('hdr-pq');
+    const dolby = dolbyDecodeTokens(env, path);
+    const [pq, aac] = await Promise.all([decodesPQ(env, path, t), decodesAac51(env, path, t)]);
+    if (pq) tokens.push('hdr-pq');
+    if (aac) tokens.push(AAC51_TOKEN);
+    tokens.push(...dolby);
     return { path, tokens };
 }
 
 // decodeTokens is the declaration: the tokens this browser declares, in
-// DECODE_TOKENS order ([] for none). The HEVC ones are known at once; `hdr-pq`
-// waits for decodingInfo (at most `timeoutMs`, 3 s; a timeout is "no").
-// Never rejects. The declaration (stage 3) and every event here use this one
+// DECODE_TOKENS order ([] for none). The HEVC and Dolby ones are known at
+// once; `hdr-pq` and, on the MSE path, `aac51` wait for decodingInfo (side
+// by side, at most `timeoutMs` each, 3 s; a timeout is "no"). Never
+// rejects. The declaration (stage 3) and every event here use this one
 // function.
 export async function decodeTokens(env = {}, opts = {}) {
     try {
@@ -310,7 +421,8 @@ export function dynamicRange(env = {}) {
 //                                  powerEfficient;
 //   mc_av1, mc_av1_sm, mc_av1_pe   the same for AV1 8-bit 1080p;
 // plus the declaration:
-//   hevc8 … hdr-pq       one boolean per DECODE_TOKENS entry;
+//   hevc8 … hdr-pq, aac51, ac3, ec3
+//                        one boolean per DECODE_TOKENS entry;
 //   decode               the tokens joined with ',' — the `decode=` value
 //                        this browser would send ('' for none);
 //   decode_path          the path they were asked on: mse / native / none;

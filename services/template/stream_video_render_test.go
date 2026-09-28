@@ -257,7 +257,7 @@ func TestStreamVideoRenders(t *testing.T) {
 	// session, or a transcoder that predates routes, leaves the tag as it
 	// was; the passthrough-only attributes and the declaration only where
 	// they are set.
-	routeAttrs := []string{"data-video-route", "data-route-reason", "data-video-class", "data-frag-load-ms", "data-decode", "data-item-id"}
+	routeAttrs := []string{"data-video-route", "data-route-reason", "data-video-class", "data-frag-load-ms", "data-decode", "data-item-id", "data-audio-class"}
 	noneOf := func(tag string, names ...string) {
 		t.Helper()
 		for _, n := range names {
@@ -274,7 +274,29 @@ func TestStreamVideoRenders(t *testing.T) {
 	if !strings.Contains(tag, ` data-video-route="reencode" data-route-reason="no_declaration"`) {
 		t.Errorf("old route not marked: %s", tag)
 	}
-	noneOf(tag, "data-video-class", "data-frag-load-ms", "data-decode", "data-item-id")
+	noneOf(tag, "data-video-class", "data-frag-load-ms", "data-decode", "data-item-id", "data-audio-class")
+	// A start that declared video only on the old route: its declaration,
+	// no restart of the player's own.
+	data.VideoStreamUserData.Decode = "hevc8,hdr-pq"
+	tag = player(data)
+	if !strings.Contains(tag, ` data-decode="hevc8,hdr-pq"`) {
+		t.Errorf("old route, video declared: no declaration: %s", tag)
+	}
+	noneOf(tag, "data-video-class", "data-frag-load-ms", "data-item-id", "data-audio-class")
+	// Multichannel audio declared on the old route: the audio the
+	// transcoder made, and the file, for the player's own restart
+	// (lib/player/passthrough.js createAudioGuard).
+	data.VideoStreamUserData.Decode = "hevc8,hdr-pq,aac51"
+	data.AudioClass = "aac51"
+	tag = player(data)
+	for _, want := range []string{` data-audio-class="aac51"`, ` data-item-id="item"`, ` data-decode="hevc8,hdr-pq,aac51"`} {
+		if !strings.Contains(tag, want) {
+			t.Errorf("old route, audio declared: %s missing: %s", want, tag)
+		}
+	}
+	noneOf(tag, "data-video-class", "data-frag-load-ms")
+	data.AudioClass = ""
+	data.VideoStreamUserData.Decode = ""
 	data.TranscoderSession = &api.TranscoderSession{ID: "s1", Duration: 10, VideoRoute: "passthrough", RouteReason: "ok"}
 	data.VideoClass, data.FragLoadMs = "hevc10-2160", 160000
 	data.VideoStreamUserData.Decode = "hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq"

@@ -20,6 +20,15 @@ import {
     whenPlaying,
     DECODE_HEVC,
     DECODE_TOKENS,
+    DECODE_VIDEO_TOKENS,
+    DECODE_AUDIO_TOKENS,
+    DECODE_DOLBY,
+    AAC51_TOKEN,
+    AAC51_CODEC,
+    AAC51_AUDIO,
+    audioMseType,
+    audioFileType,
+    dolbyDecodeTokens,
     PQ_CODEC,
     HEVC_ANSWER_INACCURATE,
     mseType,
@@ -74,7 +83,7 @@ const ALL_FALSE_MC = {
 // H.264) and have no native HLS, so the declaration's path is 'none'.
 const NO_DECLARATION = {
     hevc8: false, hevc10: false, 'hevc8-2160': false, 'hevc10-2160': false, 'hevc-high': false,
-    'hdr-pq': false,
+    'hdr-pq': false, aac51: false, ac3: false, ec3: false,
     decode: '', decode_path: 'none', 'dynamic-range': 'unknown',
 };
 
@@ -556,15 +565,19 @@ const nativeYes = (...tokens) => Object.fromEntries([
 ]);
 const ALL_HEVC = DECODE_HEVC.map(([t]) => t);
 
-// pqCapabilities answers decodingInfo: `pq` for a PQ question, a plain
+// pqCapabilities answers decodingInfo: `pq` for a PQ question, `aac` for
+// an audio one (the AAC 5.1 question; "no" unless the test says), a plain
 // "yes, in hardware" for anything else, and records every question.
-function pqCapabilities(pq) {
+function pqCapabilities(pq, aac = { supported: false, smooth: false, powerEfficient: false }) {
     return {
         calls: [],
         decodingInfo(config) {
             this.calls.push(config);
             if (config.video && config.video.transferFunction === 'pq') {
                 return typeof pq === 'function' ? pq(config) : Promise.resolve(pq);
+            }
+            if (config.audio) {
+                return typeof aac === 'function' ? aac(config) : Promise.resolve(aac);
             }
             return Promise.resolve({ supported: true, smooth: true, powerEfficient: true });
         },
@@ -573,11 +586,25 @@ function pqCapabilities(pq) {
 const PQ_YES = { supported: true, smooth: true, powerEfficient: true };
 const PQ_SOFTWARE = { supported: true, smooth: false, powerEfficient: false };
 const PQ_NO = { supported: false, smooth: false, powerEfficient: false };
+const AAC_YES = { supported: true, smooth: true, powerEfficient: true };
+// The questions decodingInfo was asked about video, and about audio.
+const videoCalls = (mc) => mc.calls.filter((c) => c.video);
+const audioCalls = (mc) => mc.calls.filter((c) => c.audio);
 
 test('the tokens and their codec strings are the protocol', () => {
     // The transcoder parses these by allowlist (plan §2.2): a rename here
-    // is a silent "declares nothing" there.
-    assert.deepEqual(DECODE_TOKENS, ['hevc8', 'hevc10', 'hevc8-2160', 'hevc10-2160', 'hevc-high', 'hdr-pq']);
+    // is a silent "declares nothing" there. The audio tokens come after the
+    // video ones, in the order web-ui's server allowlist keeps
+    // (models.decodeTokens).
+    assert.deepEqual(DECODE_TOKENS, ['hevc8', 'hevc10', 'hevc8-2160', 'hevc10-2160', 'hevc-high', 'hdr-pq', 'aac51', 'ac3', 'ec3']);
+    assert.deepEqual(DECODE_VIDEO_TOKENS, ['hevc8', 'hevc10', 'hevc8-2160', 'hevc10-2160', 'hevc-high', 'hdr-pq']);
+    assert.deepEqual(DECODE_AUDIO_TOKENS, ['aac51', 'ac3', 'ec3']);
+    assert.equal(AAC51_TOKEN, 'aac51');
+    assert.equal(AAC51_CODEC, 'mp4a.40.2');
+    assert.deepEqual(AAC51_AUDIO, { channels: '6', bitrate: 384000, samplerate: 48000 });
+    assert.deepEqual(DECODE_DOLBY, [['ac3', 'ac-3'], ['ec3', 'ec-3']]);
+    assert.equal(audioMseType('ec-3'), 'audio/mp4;codecs=ec-3');
+    assert.equal(audioFileType('ec-3'), 'audio/mp4; codecs="ec-3"');
     assert.deepEqual(DECODE_HEVC, [
         ['hevc8', 'hvc1.1.6.L123.90'],
         ['hevc10', 'hvc1.2.4.L123.90'],
@@ -601,8 +628,10 @@ test('Chrome on Windows, HEVC to 1080p only: the MSE answers decide, in token or
     assert.equal(decodePath(env), 'mse');
     assert.deepEqual(hevcDecodeTokens(env), ['hevc8', 'hevc10']);
     assert.deepEqual(await decodeTokens(env), ['hevc8', 'hevc10']);
-    // Only the PQ question goes to mediaCapabilities.
-    assert.equal(mc.calls.length, 1);
+    // Of video, only the PQ question goes to mediaCapabilities (the other
+    // one is the AAC 5.1 question, audio).
+    assert.equal(videoCalls(mc).length, 1);
+    assert.equal(mc.calls.length, 2);
 });
 
 test('any support counts: software HEVC declares, and PQ without powerEfficient declares', async () => {
@@ -613,6 +642,7 @@ test('any support counts: software HEVC declares, and PQ without powerEfficient 
         calls: [],
         decodingInfo(config) {
             this.calls.push(config);
+            if (config.audio) return Promise.resolve(PQ_NO);
             if (config.video.transferFunction === 'pq') return Promise.resolve(PQ_SOFTWARE);
             return Promise.resolve(PQ_NO);
         },
@@ -622,8 +652,8 @@ test('any support counts: software HEVC declares, and PQ without powerEfficient 
         MediaSource: mediaSource(mseYes(...ALL_HEVC)),
         mediaCapabilities: mc,
     };
-    assert.deepEqual(await decodeTokens(env), DECODE_TOKENS);
-    assert.equal(mc.calls.length, 1, 'decodingInfo is asked the PQ question and nothing else');
+    assert.deepEqual(await decodeTokens(env), DECODE_VIDEO_TOKENS);
+    assert.equal(videoCalls(mc).length, 1, 'of video, decodingInfo is asked the PQ question and nothing else');
 });
 
 test('hdr-pq is asked as Main10 4K PQ in rec2020, through MSE, without hdrMetadataType', async () => {
@@ -634,8 +664,8 @@ test('hdr-pq is asked as Main10 4K PQ in rec2020, through MSE, without hdrMetada
         mediaCapabilities: mc,
     };
     assert.deepEqual(await decodeTokens(env), ['hevc10-2160', 'hdr-pq']);
-    assert.equal(mc.calls.length, 1);
-    const c = mc.calls[0];
+    assert.equal(videoCalls(mc).length, 1);
+    const c = videoCalls(mc)[0];
     assert.equal(c.type, 'media-source');
     assert.equal(c.video.contentType, 'video/mp4;codecs=hvc1.2.4.L153.90');
     assert.equal(c.video.width, 3840);
@@ -673,10 +703,10 @@ test('Firefox on Windows declares nothing, whatever it answers; Firefox elsewher
     assert.equal(decodePath(ffWin), 'mse', 'it still plays through hls.js');
     assert.deepEqual(hevcDecodeTokens(ffWin), []);
     assert.deepEqual(await decodeTokens(ffWin), []);
-    assert.equal(ffWin.mediaCapabilities.calls.length, 0, 'hdr-pq is an HEVC question too: not asked');
+    assert.equal(videoCalls(ffWin.mediaCapabilities).length, 0, 'hdr-pq is an HEVC question too: not asked');
 
     for (const ua of [UA.firefoxMac, UA.firefoxLinux, UA.firefoxAndroid, UA.chromeWin, UA.edgeWin]) {
-        assert.deepEqual(await decodeTokens(everything(ua)), DECODE_TOKENS, ua);
+        assert.deepEqual(await decodeTokens(everything(ua)), DECODE_VIDEO_TOKENS, ua);
     }
 });
 
@@ -1082,7 +1112,7 @@ test('declarationSupport: the HEVC tokens at once, the same ones decodeTokens fi
     const env = { userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes(...ALL_HEVC)), mediaCapabilities: pqCapabilities(PQ_YES) };
     const d = declarationSupport(env);
     assert.equal(d.path, 'mse');
-    assert.deepEqual(d.hevc, (await decodeTokens(env)).filter((t) => t !== 'hdr-pq'));
+    assert.deepEqual(d.hevc, (await decodeTokens(env)).filter((t) => ALL_HEVC.includes(t)));
     assert.deepEqual(await settled(d.pq), { v: true });
 });
 
@@ -1106,5 +1136,179 @@ test('declarationSupport: hdr-pq has no deadline -- silence stays pending, answe
     const none = declarationSupport({ userAgent: UA.chromeWin, MediaSource: mediaSource(mseYes()), mediaCapabilities: mc });
     assert.deepEqual(none.hevc, []);
     assert.deepEqual(await settled(none.pq), { v: false });
-    assert.equal(mc.calls.length, 0, 'without an HEVC token PQ is not asked');
+    assert.equal(videoCalls(mc).length, 0, 'without an HEVC token PQ is not asked');
+});
+
+// ---- the audio tokens: aac51, ac3, ec3 --------------------------------------
+
+const dolbyYes = (...codecs) => codecs.map((c) => audioMseType(c));
+
+test('audio on the MSE path: AAC 5.1 through decodingInfo with six channels, Dolby through isTypeSupported', async () => {
+    const mc = pqCapabilities(PQ_NO, AAC_YES);
+    const env = {
+        userAgent: UA.chromeWin,
+        MediaSource: mediaSource([...mseYes(), ...dolbyYes('ec-3')]),
+        mediaCapabilities: mc,
+    };
+    assert.deepEqual(dolbyDecodeTokens(env), ['ec3']);
+    assert.deepEqual(await decodeTokens(env), ['aac51', 'ec3'], 'no HEVC here, the audio all the same');
+    // The one audio question, as hls.js asks it for a level whose audio
+    // has more than two CHANNELS: media-source, its spelling, a channel count.
+    const [c] = audioCalls(mc);
+    assert.equal(audioCalls(mc).length, 1);
+    assert.equal(c.type, 'media-source');
+    assert.deepEqual(c.audio, { contentType: 'audio/mp4;codecs=mp4a.40.2', channels: '6', bitrate: 384000, samplerate: 48000 });
+    assert.ok(!('video' in c), 'an audio question only');
+    // isTypeSupported has no word for channels: an MSE that says yes to AAC
+    // declares no aac51 when decodingInfo says no.
+    const no = { ...env, MediaSource: mediaSource([...mseYes(), audioMseType('mp4a.40.2')]), mediaCapabilities: pqCapabilities(PQ_NO) };
+    assert.deepEqual(await decodeTokens(no), []);
+});
+
+test('any support counts for audio too: a software AAC 5.1 decoder declares', async () => {
+    const env = {
+        userAgent: UA.chromeWin,
+        MediaSource: mediaSource(mseYes()),
+        mediaCapabilities: pqCapabilities(PQ_NO, { supported: true, smooth: false, powerEfficient: false }),
+    };
+    assert.deepEqual(await decodeTokens(env), ['aac51']);
+});
+
+// hls.js distrusts Firefox-on-Windows's HEVC answers only (codecs.ts,
+// mediacapabilities-helper.ts): its audio answers are what the player
+// goes by, and they are declared.
+test('audio is independent of HEVC: Firefox on Windows declares its audio decoders', async () => {
+    const env = (ua) => ({
+        userAgent: ua,
+        MediaSource: mediaSource([...mseYes(...ALL_HEVC), ...dolbyYes('ac-3', 'ec-3')]),
+        mediaCapabilities: pqCapabilities(PQ_YES, AAC_YES),
+    });
+    const ffWin = env(UA.firefoxWin);
+    assert.deepEqual(hevcDecodeTokens(ffWin), [], 'no HEVC, as before');
+    assert.deepEqual(dolbyDecodeTokens(ffWin), ['ac3', 'ec3']);
+    assert.deepEqual(await decodeTokens(ffWin), ['aac51', 'ac3', 'ec3']);
+    assert.deepEqual(await settled(declarationSupport(ffWin).audio), { v: ['aac51', 'ac3', 'ec3'] });
+    // And a browser with every HEVC token gets them all, video first.
+    assert.deepEqual(await decodeTokens(env(UA.chromeWin)), DECODE_TOKENS);
+});
+
+test('Safari on a Mac: Dolby is asked of the ManagedMediaSource hls.js prefers', () => {
+    const env = {
+        userAgent: UA.safariMac,
+        platform: 'MacIntel',
+        maxTouchPoints: 0,
+        MediaSource: mediaSource([H264]),
+        ManagedMediaSource: mediaSource([H264, ...dolbyYes('ac-3', 'ec-3')]),
+    };
+    assert.equal(decodePath(env), 'mse');
+    assert.deepEqual(dolbyDecodeTokens(env), ['ac3', 'ec3']);
+    const plain = { ...env, MediaSource: mediaSource([H264, ...dolbyYes('ec-3')]), ManagedMediaSource: mediaSource([H264]) };
+    assert.deepEqual(dolbyDecodeTokens(plain), [], 'the plain MediaSource is not the one hls.js asks');
+});
+
+test('iPhone: the element answers every audio token; decodingInfo is not asked about AAC', async () => {
+    const mc = pqCapabilities(PQ_NO, AAC_YES);
+    const env = {
+        userAgent: UA.iPhone,
+        ManagedMediaSource: mediaSource([...mseYes(), ...dolbyYes('ac-3', 'ec-3')]),
+        canPlayType: canPlay({ [HLS]: 'maybe', [audioFileType('mp4a.40.2')]: 'maybe', [audioFileType('ec-3')]: 'probably' }),
+        mediaCapabilities: mc,
+    };
+    assert.equal(decodePath(env), 'native');
+    assert.deepEqual(await decodeTokens(env), ['aac51', 'ec3'], 'a "maybe" is a yes; the MSE is not asked');
+    assert.equal(audioCalls(mc).length, 0);
+    assert.deepEqual(await settled(declarationSupport(env).audio), { v: ['aac51', 'ec3'] });
+});
+
+test('no HLS here: no audio token, no question', async () => {
+    const mc = pqCapabilities(PQ_YES, AAC_YES);
+    const env = {
+        userAgent: UA.chromeWin,
+        canPlayType: canPlay({ [audioFileType('mp4a.40.2')]: 'probably', [audioFileType('ec-3')]: 'probably' }),
+        mediaCapabilities: mc,
+    };
+    assert.equal(decodePath(env), 'none');
+    assert.deepEqual(await decodeTokens(env), []);
+    assert.deepEqual(await settled(declarationSupport(env).audio), { v: [] });
+    assert.equal(mc.calls.length, 0);
+});
+
+test('aac51 for the event: no decodingInfo, a rejection, a throw, garbage or a timeout is no token -- Dolby and HEVC stay', { timeout: 2000 }, async () => {
+    const base = { userAgent: UA.chromeWin, MediaSource: mediaSource([...mseYes('hevc8'), ...dolbyYes('ec-3')]) };
+    assert.deepEqual(await decodeTokens(base), ['hevc8', 'ec3'], 'no mediaCapabilities');
+    assert.deepEqual(await decodeTokens({ ...base, mediaCapabilities: {} }), ['hevc8', 'ec3']);
+    for (const aac of [
+        () => Promise.reject(new Error('nope')),
+        () => { throw new TypeError('bad config'); },
+        () => Promise.resolve('yes'),
+        () => Promise.resolve({ supported: 'true' }),
+        () => new Promise(() => {}),
+    ]) {
+        assert.deepEqual(await decodeTokens({ ...base, mediaCapabilities: pqCapabilities(PQ_NO, aac) }, { timeoutMs: 5 }), ['hevc8', 'ec3']);
+    }
+});
+
+// The event gives decodingInfo 3 s; the declaration gives it all the time
+// it takes -- the rule of hdr-pq. Silence keeps the audio part pending, and
+// neither part waits for the other.
+test('declarationSupport: the audio part has no deadline, and does not wait for PQ', async () => {
+    const base = { userAgent: UA.chromeWin, MediaSource: mediaSource([...mseYes('hevc10-2160'), ...dolbyYes('ac-3')]) };
+    const silentAac = declarationSupport({ ...base, mediaCapabilities: pqCapabilities(PQ_YES, () => new Promise(() => {})) });
+    assert.equal(await settled(silentAac.audio), 'pending', 'no answer is not "no"');
+    assert.deepEqual(await settled(silentAac.pq), { v: true }, 'PQ answers without the audio');
+    const silentPq = declarationSupport({ ...base, mediaCapabilities: pqCapabilities(() => new Promise(() => {}), AAC_YES) });
+    assert.deepEqual(await settled(silentPq.audio), { v: ['aac51', 'ac3'] }, 'the audio answers without PQ');
+    assert.equal(await settled(silentPq.pq), 'pending');
+    for (const [name, aac, want] of [
+        ['yes', AAC_YES, ['aac51', 'ac3']],
+        ['no', PQ_NO, ['ac3']],
+        ['a rejection', () => Promise.reject(new Error('nope')), ['ac3']],
+        ['a throw', () => { throw new TypeError('bad config'); }, ['ac3']],
+        ['garbage', () => Promise.resolve('yes'), ['ac3']],
+    ]) {
+        assert.deepEqual(await settled(declarationSupport({ ...base, mediaCapabilities: pqCapabilities(PQ_NO, aac) }).audio), { v: want }, name);
+    }
+    assert.deepEqual(await settled(declarationSupport(base).audio), { v: ['ac3'] }, 'no mediaCapabilities: aac51 never declared');
+});
+
+test('the event carries one boolean per audio token and the audio in `decode`', async () => {
+    const env = {
+        userAgent: UA.firefoxWin,
+        MediaSource: mediaSource([...mseYes(...ALL_HEVC), ...dolbyYes('ec-3')]),
+        mediaCapabilities: pqCapabilities(PQ_YES, AAC_YES),
+    };
+    const got = await probeCodecSupport(env);
+    assert.equal(got.aac51, true);
+    assert.equal(got.ac3, false);
+    assert.equal(got.ec3, true);
+    assert.equal(got.hevc8, false, 'the HEVC ones as before');
+    assert.equal(got.decode, 'aac51,ec3');
+    assert.equal(got.decode_path, 'mse');
+});
+
+// ---- pinned to the installed hls.js: what it asks about audio --------------
+
+test('hls.js asks about an audio codec in this spelling, of the MediaSource it prefers', () => {
+    const dist = readFileSync(createRequire(import.meta.url).resolve('hls.js/dist/hls.mjs'), 'utf8');
+    assert.ok(dist.includes('function mimeTypeForCodec(codec, type) {\n  return `${type}/mp4;codecs=${codec}`;\n}'),
+        'hls.js changed how it spells a codec for isTypeSupported; change audioMseType with it');
+    assert.equal(audioMseType('ac-3'), 'audio/mp4;codecs=ac-3');
+    assert.ok(dist.includes("isAudioSupported(codec) {\n    return areCodecsMediaSourceSupported(codec, 'audio', this.hls.config.preferManagedMediaSource);"),
+        'hls.js changed which MediaSource it asks about audio codecs; change dolbyDecodeTokens with it');
+    // Its own AAC 5.1 question (a rendition with CHANNELS over 2): the same
+    // media-source audio configuration, a channel count as a string.
+    assert.ok(dist.includes("contentType: mimeTypeForCodec(audioCodec, 'audio'),"));
+    assert.ok(dist.includes("audioConfiguration.channels = '' + channelsNumber;"));
+});
+
+test('hls.js distrusts the HEVC answers of Firefox on Windows, and no audio answer', () => {
+    const dist = readFileSync(createRequire(import.meta.url).resolve('hls.js/dist/hls.mjs'), 'utf8');
+    const uses = dist.split('userAgentHevcSupportIsInaccurate()').length - 1;
+    assert.equal(uses, 2, 'hls.js distrusts a browser\'s answer in a new place: if it is an audio one, follow it here');
+    assert.ok(dist.includes('const lowerPriority = limitedHevcSupport && isHEVC(fourCC);'));
+    assert.ok(dist.includes("videoCodecs.split(',').some(videoCodec => isHEVC(videoCodec)) && userAgentHevcSupportIsInaccurate()"));
+    // E-AC-3 cannot come in MPEG-TS at all: the transcoder copies it only
+    // into fMP4 (a passthrough session), so ec3 is safe to declare on any
+    // route.
+    assert.ok(dist.includes("new Error('Unsupported EC-3 in M2TS found')"));
 });

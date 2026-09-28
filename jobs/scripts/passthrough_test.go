@@ -31,6 +31,10 @@ func TestPassthroughClass(t *testing.T) {
 		{"tier High", hlsVariant{Codecs: "hvc1.2.4.H153.90", Width: 3840, Height: 2160}, "hevc10-2160"},
 		{"hev1 entry", hlsVariant{Codecs: "hev1.1.6.L93.B0", Width: 1280, Height: 720}, "hevc8"},
 		{"audio first", hlsVariant{Codecs: "mp4a.40.2,hvc1.2.4.L120.90", Width: 1920, Height: 1080}, "hevc10"},
+		// Multichannel audio: CODECS lists every audio codec the session
+		// puts out, Dolby copied as it is among them.
+		{"Dolby and AAC beside the video", hlsVariant{Codecs: "hvc1.2.4.L153.90,mp4a.40.2,ec-3,ac-3", Width: 3840, Height: 2160}, "hevc10-2160"},
+		{"Dolby first", hlsVariant{Codecs: "ec-3,hvc1.1.6.L120.90", Width: 1920, Height: 1080}, "hevc8"},
 		{"no HEVC in CODECS", hlsVariant{Codecs: "avc1.42e00a,mp4a.40.2", Width: 1920, Height: 1080}, "unknown"},
 		{"no CODECS", hlsVariant{Width: 3840, Height: 2160}, "unknown"},
 		{"garbled level", hlsVariant{Codecs: "hvc1.2.4.Lxx.90"}, "unknown"},

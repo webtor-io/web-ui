@@ -53,6 +53,8 @@ func TestEmbedKeyWithoutDeclarationIsUnchanged(t *testing.T) {
 
 // Two browsers of one visitor that declare differently never share a
 // render, and a restart after a failed passthrough is a start of its own.
+// A declaration of audio tokens only is one too: its session's audio may be
+// 5.1 or Dolby, which a browser that declared nothing must not be served.
 func TestJobKeysFollowTheDeclaration(t *testing.T) {
 	pinClock(t)
 	reqs := []models.DecodeRequest{
@@ -62,6 +64,9 @@ func TestJobKeysFollowTheDeclaration(t *testing.T) {
 		{Decode: "unknown"},
 		{FallbackReason: "decode_error", FallbackClass: "hevc10"},
 		{FallbackReason: "user", FallbackClass: "unknown"},
+		{Decode: "aac51"},
+		{Decode: "aac51,ac3,ec3"},
+		{Decode: "hevc8,hevc10,aac51"},
 	}
 	actions, embeds := map[string]int{}, map[string]int{}
 	for i, r := range reqs {

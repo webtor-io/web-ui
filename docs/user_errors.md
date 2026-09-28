@@ -140,7 +140,12 @@ content-transcoder names why it refused a session in `X-Video-Route-Reason`
 before, byte for byte:
 
 - no reason (a transcoder that predates routes) or `no_declaration` (a start that declared
-  nothing — every start in production until a browser opts in) → the old keys above;
+  nothing — every start in production until a browser opts in) → the old keys above. A start that
+  declares audio tokens only (`aac51`/`ac3`/`ec3`, multichannel audio) is a declaration: a
+  transcoder that knows them gives the video reason of a browser that declares no HEVC
+  (`needs_2160`, `not_hevc`, `passthrough_off`, …), so its 4K refusal reads the route's text below —
+  true for a browser that answered it decodes no HEVC. One that does not know them yet says
+  `no_declaration`;
 - a 415 whose body is not the over-1080p refusal → the old keys: a deployment that encodes no video
   at all (`DISABLE_VIDEO_TRANSCODING`, `video transcoding is disabled`) names a route reason too, and
   none of these texts — all about 4K — is true for a 1080p file there;
@@ -148,7 +153,7 @@ before, byte for byte:
 
 | Reason (status) | Key | What the viewer reads |
 |---|---|---|
-| any, on a restart after a passthrough failed in this browser (`decode-fallback`; the restart declares nothing for the file, so the reason is `no_declaration`) — 415 | `error.video_route.fallback_uhd` | this browser could not show this 4K HEVC film; download |
+| any, on a restart after a passthrough failed in this browser (`decode-fallback` with a video class; the restart declares nothing for the file, so the reason is `no_declaration`) — 415 | `error.video_route.fallback_uhd` | this browser could not show this 4K HEVC film; download |
 | `declaration_pending` (415) | `error.video_route.checking` | we were still checking the browser; press Stream again |
 | `probe_failed` (503, `Retry-After: 5`) | `error.video_route.source_check_failed` (HTTP 503) | the file's format could not be checked just now; retry or download |
 | `needs_2160`, `needs_main10`, `needs_main`, `needs_high_tier` (415) | `error.video_route.needs_uhd_hevc` | 4K HEVC this browser does not decode; download, or a browser that plays 4K HEVC |
@@ -157,6 +162,11 @@ before, byte for byte:
 | `dv5`, `dv7`, `dv_base`, `dv_unknown`, `pix_fmt`, `profile`, `interlaced`, `no_hvcc`, `hlg_later` (415) | `error.video_route.unsafe_format` | a format we do not show in the browser — it would look wrong or not play; download. One text, no format name (stage 3 spec, D9); the reason is in the log and `route_reason` |
 | `passthrough_off` (415) | `error.video_route.passthrough_off` | showing 4K in the browser is switched off right now; download |
 | `not_hevc` (415) | `error.video_route.uhd_other_codec` | 4K is shown only in HEVC, this file is another format; download |
+
+A restart after the file's multichannel audio failed (`decode-class` `dolby` / `aac51`, docs/player.md
+"Multichannel audio and the fallback") is not the first row's: it declares its video tokens as the
+first start did, so a refusal is the route's own and reads the row of its reason
+(`DecodeRequest.IsAudioFallback`; `fallback_refusal_test.go`).
 
 Nothing here speaks of plans: the cap is explained by the transfer status's own card. The texts are
 the stage 3 spec's defaults (question 1 to the owner there), with two changes: the English "Watch"

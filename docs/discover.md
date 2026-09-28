@@ -252,7 +252,9 @@ names are read by `lib/discover/release-video.js`.
   and tokens the page declares to the transcoder
   (`lib/player/decode-declaration.js` `decodedTokens`, any of
   `hevc8`/`hevc10`/`hevc8-2160`/`hevc10-2160`), asked of every browser on
-  Discover whether or not it takes part in the declaration.
+  Discover whether or not it takes part in the declaration. Only the video
+  part of that answer: the audio tokens of the same declaration (`aac51`,
+  `ac3`, `ec3`, multichannel audio) are neither in it nor waited for.
 - **HDR.** The same, by `hdr-pq`: on where the browser decodes PQ, off
   with a warning where it answered that it does not (HDR up to 1080p may
   look washed out; 4K HDR does not play). It hides PQ releases and Dolby

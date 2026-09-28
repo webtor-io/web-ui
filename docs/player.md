@@ -355,6 +355,7 @@ presses stop and is flushed on teardown):
 | `donate-player-label-shown` | the same | the lock opened the plan card |
 | `stream-start` | + `rate`, `subtitleDelay`, `route`, `reason`, `decl` | what the stream started with (remembered settings make no change event); the transcoder session's route and reason and the declaration it was started with (`data-video-route`, `data-route-reason`, `data-decode`; `''` where the element has none) — the base the HEVC passthrough is measured against |
 | `hevc-fallback` | `reason`, `cls`, `path: mse\|native` | a passthrough given up to the old route (see "Passthrough: errors and fallback") |
+| `audio-fallback` | `reason`, `cls: dolby\|aac51`, `path: mse\|native`, `route` | a file restarted without the multichannel audio its declaration made, on any route (see "Multichannel audio and the fallback"); never counted in `hevc-fallback` |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
 
@@ -396,7 +397,8 @@ one answers `false`):
 | `mc_hvc`, `mc_hvc_sm`, `mc_hvc_pe` | its answer for HEVC Main 1080p over MSE: supported, smooth, powerEfficient |
 | `mc_av1`, `mc_av1_sm`, `mc_av1_pe` | the same for AV1 8-bit 1080p (3 s timeout → `false`) |
 | `hevc8`, `hevc10`, `hevc8-2160`, `hevc10-2160`, `hevc-high`, `hdr-pq` | this browser declares the token (see "The declaration") |
-| `decode` | string: the declared tokens joined with `,` — the exact `decode=` value; `''` for none |
+| `aac51`, `ac3`, `ec3` | the same for the audio tokens (multichannel audio, since 2026-09-28) |
+| `decode` | string: the tokens this browser answers, joined with `,` — the `decode=` value of a start that takes part in both parts of the declaration and has no failure in memory; `''` for none. **Since the multichannel-audio release (2026-09) it carries the audio tokens too, for every browser** (the event asks every viewer the audio questions, whether or not it opted into declaring audio, `?audio=on`): a browser that reported `hevc8,hevc10` reports `hevc8,hevc10,aac51` — see "Reading `decode`" below. What a start actually sent is `stream-start`'s `decl` |
 | `decode_path` | string: the path they were asked on — `mse` (hls.js), `native` (the element's HLS), `none` |
 | `dynamic-range` | string: `high` / `standard` (`matchMedia('(dynamic-range: …)')`), `unknown` where the feature is missing |
 | `src` | the source's video codec: `h264` / `hevc` / `av1` / `other` / `unknown` (no probe on the page) |
@@ -408,10 +410,20 @@ one answers `false`):
 For example: `{mse: 'mse', hvc: true, hev: true, hvc10: true, hvc4k: true, av1: true,
 av1_10: true, av1_4k: true, n_hls: false, n_hvc: true, n_av1: true, mc: true, mc_hvc: true, mc_hvc_sm: true,
 mc_hvc_pe: true, mc_av1: true, mc_av1_sm: true, mc_av1_pe: false, hevc8: true, hevc10: true,
-'hevc8-2160': true, 'hevc10-2160': true, 'hevc-high': false, 'hdr-pq': true,
-decode: 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq', decode_path: 'mse', 'dynamic-range': 'standard',
-src: 'hevc', tc: true, pl: 'hlsjs', emb: false}` plus the usual `tier`, `is_authed`, `user_id`,
-`lang`, `is_referral` on the site (`docs/analytics.md`) — 36 properties.
+'hevc8-2160': true, 'hevc10-2160': true, 'hevc-high': false, 'hdr-pq': true, aac51: true, ac3: false,
+ec3: false, decode: 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq,aac51', decode_path: 'mse',
+'dynamic-range': 'standard', src: 'hevc', tc: true, route: 'reencode', pl: 'hlsjs', emb: false}` plus
+the usual `tier`, `is_authed`, `user_id`, `lang`, `is_referral` on the site (`docs/analytics.md`) —
+40 properties.
+
+**Reading `decode`.** The string is the whole declaration, video tokens then audio tokens, so an
+exact match on it (`decode = 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq'`) stops matching from
+the release that added the audio tokens for every browser that answers any of them (how many do is
+not measured yet — the booleans below will say), and a series built that way drops on that day
+without anything having changed in the browsers. Measure a token's share by its own boolean key (`hevc10-2160`, `hdr-pq`, `aac51`, `ec3`, …),
+which means the same before and after; read `decode` only as a whole-declaration label, and split
+it at `,` when a query needs its video part. The same holds for `playback-quality`'s `decode`, and
+for `stream-start`'s `decl` of a browser opted into audio (the declaration the start sent).
 
 `src` comes from `data-video-codecs` on the `<video>` (`stream_video.html`): every video stream of
 the job's media probe, cover pictures included (`mjpeg`/`png`… are skipped client-side). ffprobe
@@ -443,6 +455,9 @@ so renaming one is a protocol change):
 | `hevc10-2160` | `hvc1.2.4.L153.90` | Main10 up to 3840×2160, level ≤ 5.1 |
 | `hevc-high` | `hvc1.2.4.H153.90` | tier High (UHD Blu-ray remuxes) |
 | `hdr-pq` | `decodingInfo` Main10 3840×2160, `transferFunction: 'pq'`, `colorGamut: 'rec2020'` | decodes PQ (HDR10) |
+| `aac51` | MSE: `decodingInfo` `media-source`, `audio/mp4;codecs=mp4a.40.2`, `channels: '6'`, 384 kbit/s, 48 kHz; native: `canPlayType('audio/mp4; codecs="mp4a.40.2"')` | decodes AAC-LC with up to six channels (5.1) |
+| `ac3` | `ac-3` | decodes AC-3 (Dolby Digital) |
+| `ec3` | `ec-3` | decodes E-AC-3 (Dolby Digital Plus; Atmos is E-AC-3 with JOC) |
 
 Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
 
@@ -463,11 +478,36 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
   answer in 3 s → not declared. Asked at 4K, where ~89% of PQ sessions are: a browser that decodes
   1080p PQ but not 4K PQ is under-declared, and its 1080p PQ sources stay re-encoded, as today. The
   screen is not consulted (variant A); `dynamic-range` is only reported.
-- `hevcDecodeTokens(env)` is the synchronous part (the five HEVC tokens). `declarationSupport(env)`
-  is what the page declares: those tokens at once, and `pq`, a promise of the `hdr-pq` answer with
-  **no deadline** (`pqAnswer`: a rejection, a throw, garbage or a missing API is an answer, "no";
-  only silence is not). `decodeTokens` — the events — keeps the 3 s deadline: a count has to close.
-  The declaration must not: a check that did not answer is not a browser that cannot decode.
+- **The audio tokens** (multichannel audio, owner's go of 2026-09-28; content-transcoder: AAC 5.1 and
+  Dolby as it is). About 40% of sources are multichannel (E-AC-3 24%, AC-3 7%, AAC 7% of 1126 in a
+  day) and every one is downmixed to stereo today. With `aac51` a 5.1 AAC track is copied and every
+  other multichannel track is encoded to AAC 5.1 instead of stereo, on either route; with `ac3` /
+  `ec3` that Dolby track is copied as it is — Atmos included — but only in fMP4, i.e. a passthrough
+  session (the full hls.js build refuses E-AC-3 in MPEG-TS: `Unsupported EC-3 in M2TS`). For audio a
+  missing token is exactly the audio the transcoder has always made; nothing is refused for want of
+  one.
+  - **Independent of HEVC.** Asked and declared whatever the browser says about HEVC — Firefox on
+    Windows included: hls.js distrusts that browser's HEVC answers and no audio answer of any
+    browser (`codecs.ts`, `mediacapabilities-helper.ts`; a test counts the rule's call sites in the
+    installed hls.js).
+  - **`ac3`, `ec3`**: on the MSE path the question hls.js asks itself before it keeps a level
+    (`level-controller.ts` `isAudioSupported`: its MediaSource — `ManagedMediaSource` first — and its
+    spelling `audio/mp4;codecs=ec-3`); on the native path `canPlayType`. Synchronous.
+  - **`aac51`**: `isTypeSupported` has no word for channels (every MSE browser with AAC says yes to
+    `mp4a.40.2`), so on the MSE path `decodingInfo` answers — the same audio configuration hls.js
+    itself sends `decodingInfo` for a level whose audio rendition has more than two `CHANNELS`
+    (it drops the level on "no" only where the master has more than one). `supported` is enough;
+    without `decodingInfo` the token is not declared. On the native path `canPlayType` for AAC,
+    which says nothing about channels (the spec's choice). The events give it 3 s, like `hdr-pq`.
+- `hevcDecodeTokens(env)` is the synchronous part (the five HEVC tokens), `dolbyDecodeTokens(env)`
+  the Dolby one. `declarationSupport(env)` is what the page declares: the HEVC tokens at once; `pq`,
+  a promise of the `hdr-pq` answer; `audio`, a promise of the audio tokens that settles once `aac51`
+  has its answer. Both promises have **no deadline** (`supportedAnswer`: a rejection, a throw,
+  garbage or a missing API is an answer, "no"; only silence is not), and neither waits for the
+  other. `decodeTokens` — the events — keeps the 3 s deadline: a count has to close. The declaration
+  must not: a check that did not answer is not a browser that cannot decode. (One difference remains
+  from stage 3: the events ask `hdr-pq` even of a browser without an HEVC token, the declaration
+  does not.)
 
 #### Sending it — `decode-declaration.js`
 
@@ -479,17 +519,56 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
   A page that does not take part sends no field and
   runs no probe; the probe module is loaded (`import()`, chunk `decode-probe`) only when it does.
   The layout carries the rest: +1.3 KB gzip on `layout.js`, +1.4 KB on `embed/check.js` (measured
-  with `npm run build`, 2026-09-28).
+  with `npm run build`, 2026-09-28); the audio part added 180 B gzip to each, and 337 B to the
+  `decode-probe` chunk; the audio classes of the memory of failures another 201 B on `layout.js`,
+  218 B on `embed/check.js` (and 161 B on `discover.js`, 1.56 KB on the player chunk with the
+  audio guards); the audio part's own opt-in 128 B on `layout.js`, 123 B on `embed/check.js`. All of
+  it against stage 5 (`ef1e89a2`): `layout.js` +511 B, `embed/check.js` +523 B, `decode-probe`
+  +352 B, `discover.js` +392 B, the player chunk +1.69 KB, `resource/get.js` +103 B.
+- **Who declares audio.** The audio tokens (`aac51`, `ac3`, `ec3`) have an opt-in of their own,
+  independent of the video's: `?audio=on` on any page (localStorage `wt-audio`; where storage throws,
+  the page's own state), `?audio=off` takes the browser out (`applyAudioUrlSwitch`,
+  `takesPartAudio`: `=== 'on'`). They go out only from a page that takes part in the declaration at
+  all **and** opted into audio. Any other page sends the video part alone, its probe asks nothing
+  about audio (`declarationSupport(env, {audio: false})`: no `decodingInfo` and no `isTypeSupported`
+  for audio, no `wt-decode-audio` written) and `whenDeclared` waits for the video part only — the
+  deep link's and the embed's 300 ms are not spent on tokens that are not sent. A cached audio answer
+  from an earlier opt-in is not sent either. Why: the video declaration's stage 5 made it every
+  browser's default after the owner's device matrix for HEVC; the matrix for audio (Dolby and AAC 5.1
+  on real devices) has not run. The audio's own stage 5 is a separate, later one-liner —
+  `takesPartAudio`: `=== 'on'` → `!== 'off'`, with its tests. The codec-support event is measurement,
+  not the declaration: it asks every viewer the audio questions whatever the opt-in. Downstream
+  everything keys on the declaration a start actually sent (`data-decode`, `DecodeRequest.DeclaresAudio`):
+  the job's `data-audio-class`, the player's audio guard and the audio classes of the passthrough guard
+  — a start without an audio token has none of them.
 - **What** (`declarationFor(win, {resourceId, itemId})`), all or nothing:
   1. not taking part → no field;
-  2. this file failed passthrough in this browser (memory below) → no field;
-  3. the probe answered completely → its tokens minus those the memory took away; none left → no
-     field (not an empty one);
+  2. this file failed passthrough in this browser (memory below) → no field — its audio tokens
+     included: the restart is the old route, stereo as it always was;
+  3. the probe's video part answered → its tokens minus those the memory took away, then — only
+     for a browser opted into audio — the audio part's; none at all → no field (not an empty one);
   4. not yet (the `hdr-pq` answer is still out) → the cached answer of this same browser
-     (`wt-decode`: same User-Agent, at most 30 days old); none → `unknown`. HEVC tokens never go out
-     without the `hdr-pq` answer: the transcoder would read the missing token as "no HDR" and refuse
-     a 4K HDR film with a false reason. With `unknown` it plays ≤1080 the old way and answers a 4K
-     start with "we were still checking — press Watch again" (`error.video_route.checking`).
+     (`wt-decode`: same User-Agent, at most 30 days old); none → `unknown`, alone. HEVC tokens never
+     go out without the `hdr-pq` answer: the transcoder would read the missing token as "no HDR" and
+     refuse a 4K HDR film with a false reason. With `unknown` it plays ≤1080 the old way and answers
+     a 4K start with "we were still checking — press Watch again" (`error.video_route.checking`).
+- **The audio part** (`aac51`, `ac3`, `ec3`) is answered, cached and read apart from the video part
+  and appended to it. Its one slow question (`aac51` over `decodingInfo`) has no deadline either;
+  until it answers the part is this browser's cached audio answer (`wt-decode-audio`, same rules as
+  `wt-decode`), else no audio token. That is not `unknown`: a missing audio token is only the stereo
+  the transcoder has always made and cannot turn into a false refusal, while `unknown` is about the
+  video and never goes out with audio tokens — the server would drop it for them
+  (`models.ParseDecodeDeclaration`), and audio tokens alone read at the transcoder as "no HEVC".
+  Neither part waits for the other: `startProbe`'s promise is the video part's (Discover waits on
+  it, `usePlaybackContext`), `window.__wtDecode.audio` the audio part's (null where it was not asked),
+  and `whenDeclared` (the deep link's and the embed's 300 ms) waits for both where the audio part was
+  asked, for the video part alone elsewhere. A browser that decodes no HEVC declares its audio
+  alone (`aac51,ac3,ec3`); that is a declaration — its own job key, and a 4K refusal names the
+  route's reason (docs/user_errors.md). A failed passthrough strikes no audio token; a failure of
+  the audio has classes of its own (below).
+- **Discover reads the video part only.** `decodedTokens` / `declaredTokens` are the video tokens,
+  unchanged by the audio part's answer or its silence; `lib/discover/playback.test.js` pins that audio
+  tokens move no switch even if they reached it.
 - **Where.** A capture listener on `submit` (`installSubmitHook`, from `app/layout.js` before
   Turnstile) rewrites the hidden `decode` of every `/stream-video` form on every pass — idempotent,
   so Turnstile's two passes and either listener order end with the declaration of the moment. Starts
@@ -504,16 +583,30 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
   the tokens that cover the class out of the declaration (`hevc8` → all four HEVC tokens, `hevc10` →
   `hevc10`, `hevc10-2160`, `hevc8-2160` → both `-2160`, `hevc10-2160` → itself); `hevc-high` and
   `hdr-pq` are never struck. Which failures strike: see the player's fallback.
+  The **audio classes** go through the same memory (same key, same 7 days, same two strikes on
+  different files), kept apart: a file whose multichannel audio failed is remembered under `audio`
+  with its class, and its next start declares the rest — `dolby` leaves `ac3`, `ec3` out (the video
+  keeps its route; the audio comes as AAC, 5.1 where `aac51` is declared), `aac51` leaves every audio
+  token out (the stereo the transcoder has always made); two strikes take `ac3`+`ec3` (`dolby`) or
+  `aac51` (`aac51`) out of every declaration (`AUDIO_DROP_BY_CLASS`, `AUDIO_STRUCK_BY_CLASS`). No
+  audio class touches a video token, nor Discover's view (`decodedTokens`). A memory written by this
+  build and read by an older one loses only the audio entries (the older one prunes classes it does
+  not know).
 - **State and storage.** Everything is on `window.__wtDecode` (the module is in several entries).
   Every localStorage access is caught: a browser whose storage throws keeps the switch and the memory
   for the page, and the layout's Turnstile and async navigation are never affected (tested with the
   real `app/layout.js` and a throwing getter).
 - **Server side.** `handlers/action` and `handlers/embed` read `decode`, `decode-fallback` and
   `decode-class` through an allowlist (`models.ParseDecodeRequest`: the transcoder's token list and
-  order, duplicates dropped, `unknown` only alone, over 512 bytes → none). The declaration is part of
-  the job key (`DecodeRequest.Key`, appended only when present — a start without one keeps the id it
-  had; `jobs/scripts/job_key_test.go` pins it to the ids recorded at `acf12dea`). It comes from the
-  request, never the session: an account watches on several devices.
+  order — the six video tokens, then `aac51`, `ac3`, `ec3` — duplicates dropped, over 512 bytes →
+  none). `unknown` goes only alone: a video token drops it (whatever answered is an answer); audio
+  tokens beside it are dropped instead, because audio tokens alone read at the transcoder as a
+  browser that answered "no HEVC" and would turn a 4K HEVC start into a false refusal (the page never
+  sends the two together). The declaration is part of the job key (`DecodeRequest.Key`, appended only
+  when present — a start without one keeps the id it had; `jobs/scripts/job_key_test.go` pins it to
+  the ids recorded at `acf12dea`); a declaration of audio tokens only is one too, since its session's
+  audio may be 5.1 or Dolby. It comes from the request, never the session: an account watches on
+  several devices.
 
 Reading the tokens: the share that matters for 4K is `hevc10-2160` (93% of >1080p HEVC sources are
 Main10), and `hevc10-2160` with `hdr-pq` for PQ (52.5% of them); split by `decode_path` and by
@@ -537,6 +630,8 @@ the text the untyped error had, so `ClassifyError` and the logs read it as befor
 | `data-decode` | the declaration this start sent (`vsud.Decode`), for telemetry |
 | `data-video-class` | passthrough only: the decoder class the video needs — `hevc8`, `hevc10`, `hevc8-2160`, `hevc10-2160`, `unknown` — read from the master's `CODECS` (the transcoder writes them from the init it produced, not from the source's record, which FFmpeg rebuilds) and `RESOLUTION`, by the transcoder's own rule: profile 2 is 10-bit; taller than 1080, wider than 1920 or level over 4.1 is 2160. The class a failure in the browser is charged to |
 | `data-frag-load-ms` | passthrough only: how long one segment may load, `max(120 s, 2 × BANDWIDTH × target duration / cap)`, at most 15 min (`passthroughFragLoadMs`; no cap → 120 s; a master without a real BANDWIDTH → the file's rate) |
+| `data-audio-class` | any route, only for a start that declared an audio token: what that declaration made of the session's audio, read from the master (`sessionAudioClass`) — `dolby` where a variant's `CODECS` names `ac-3`/`ec-3` (or `mp4a.a5`/`mp4a.a6`), else `aac51` where an audio rendition has `CHANNELS` over 2; absent for the stereo AAC the transcoder has always made (whose master says neither). The audio class a failure is charged to where hls.js does not say better |
+| `data-item-id` | where the player may restart the file by itself (`StreamContent.PlayerRestarts`): a passthrough, or a start that declared an audio token |
 
 For a passthrough the transfer status's marks are made again once the route is known
 (`setRoutedStatusMarks`): before the session a transcoded HEVC counts as re-encoded, whose rate is
@@ -549,17 +644,31 @@ conservative, and right for a passthrough.
 
 Only where the session's route is `passthrough` (`data-video-route`); every other stream's error
 handling is what it was (`hls-manager.js`: every fatal media error recovers, network errors restart
-loading). The player makes a guard (`createPassthroughGuard`) that sees hls.js's errors first and
-listens to the element, and gives the file up **at most once per player**:
+loading) — but for a start that declared multichannel audio, whose own guard is below ("Multichannel
+audio and the fallback"). The player makes a guard (`createPassthroughGuard`) that sees hls.js's
+errors first and listens to the element, and gives the file up **at most once per player**; where
+the failure is the audio's the class it is charged to is an audio one and the restart keeps the
+video's declaration (below):
 
 | signal | reason | strikes the class |
 |---|---|---|
 | hls.js `manifestIncompatibleCodecsError`, or a fatal `bufferAddCodecError` (the init's codec; with one level hls.js makes it fatal before any listener) | `codecs_rejected` | no — a build fault of ours; `webui_passthrough_fallback_total{reason="codecs_rejected"}` alerts |
-| a fatal media error (hls.js `MEDIA_ERROR`: `bufferAppendError`, `fragParsingError`, …) or, on the hls.js path, the element's own `error` with MediaError 3 — hls.js does not listen for it and learns of it only at its next append, which with a full buffer can be half a minute or never. The first is recovered (`recoverMediaError`); the next, for the rest of this playback, gives up. Two reports within 1 s are one incident | `decode_error` if the element said MediaError 3, else `media_error` | only `decode_error` |
+| a fatal media error (hls.js `MEDIA_ERROR`: `bufferAppendError`, `fragParsingError`, …) or, on the hls.js path, the element's own `error` with MediaError 3 — hls.js does not listen for it and learns of it only at its next append, which with a full buffer can be half a minute or never. The first is recovered (`recoverMediaError`); the next, for the rest of this playback, gives up. Two reports within 1 s are one incident — except that a report swallowed so after the recovery is looked at again when the second ends: an element holding an error then is playing the attachment that failed (below) | `decode_error` if the element said MediaError 3, else `media_error` | only `decode_error` |
 | native HLS (no hls.js: iOS, or no MSE): the element's `error` — 3 | `decode_error` | yes |
 | — 4 (Safari may say it for a master that failed to load too; not verified) | `src_unsupported` | no |
 | the watchdog, native and hls.js: 10 s after the first `playing`, in a tab that stayed visible, time ran on by more than 2 s and there is no picture — `videoWidth` 0, or 0 decoded frames where this page has seen the counter count (Android Chrome's native player reads 0 while it plays) | `no_frames` | yes |
 | "Compatibility mode" (below) | `user` | no |
+
+**One incident, or the next one at once** (`createIncidents`, since 2026-09-28). Before, a report
+within 1 s of the recovery was always taken for the first incident told twice — but hls.js stops
+loading on a fatal error, so where it was really the recovered attachment failing at once (a
+fragment fetched again from cache fails in a few hundred ms) nothing else came, and the player sat
+on a dead MediaSource without falling back. Now such a report is looked at again at the end of the
+second: the recovery reloads the element (hls.js `detachMedia` calls `load()`), which by the HTML
+load algorithm clears its `error` and drops its queued `error` events, so an element that holds an
+error then is on the attachment that failed — the next incident. A clean element leaves it one
+incident, as before. Tested with an hls.js stand-in whose recovery clears the element; not verified
+in a real browser.
 
 Network errors are not a fallback. `fragLoadPolicy` for passthrough: `maxLoadTimeMs` from
 `data-frag-load-ms` (twice the segment's time at the viewer's cap, 2–15 min), a timed-out segment tried
@@ -601,6 +710,94 @@ route"). Not verified in a real browser: which errors hls.js and each browser ra
 fails, the watchdog on iOS, `requestSubmit()` through a visible Turnstile checkbox mid-film — the
 stage 4 matrix.
 
+#### Multichannel audio and the fallback
+
+A start that declared `aac51` / `ac3` / `ec3` may get audio no browser was handed before: AAC 5.1
+(copied, or encoded to instead of stereo) on either route, and on a passthrough Dolby copied as it
+is. When that audio fails, restarting the file with no declaration at all — the video's fallback — is
+wrong twice over: on a passthrough the restart is the old route, which refuses a 4K HEVC film
+("This browser couldn't show this 4K HEVC video", though it played before multichannel audio, with
+stereo), and the failure strikes the video class, so two such files take HEVC out for 7 days. So a
+failure is charged to an **audio class** where it is the audio's, and the restart leaves only that
+audio out (`fallbackAudio`).
+
+**What the audio is** — the class a failure can be charged to: what hls.js buffers first
+(`BUFFER_CODECS`, `audioOfTrack`: `ec-3`/`ac-3` parsed from the fMP4 init → `dolby`; an MPEG-TS
+AAC whose ADTS says more than two channels → `aac51`, and one that says 0 — the layout is in a PCE,
+hls.js builds its AudioSpecificConfig from that header and the browser cannot place the channels —
+also `aac51`; one or two channels → the stereo of old, no class), else the master's word
+(`data-audio-class`: native HLS, and a failure before any audio was buffered). An fMP4 AAC track
+carries no channel count, so there hls.js says only that the audio in play is not Dolby: it counts as
+AAC 5.1 where the master names changed audio (a master with a Dolby rendition may have an AAC 5.1
+one beside it), else as the stereo of old — never as the master's Dolby, which is another rendition.
+A master that labels nothing and a track that says nothing give no class: the rules before.
+
+**Which side failed** (`fault`): hls.js names the SourceBuffer whose own append failed
+(`bufferAppendingError`, or a fatal `bufferAddCodecError`) — kept for the incident that follows
+within 30 s and forgotten at the recovery; else the element's MediaError message where it names
+only one of `audio` / `video` (browser text, not a standard — not verified which browsers name the
+stream). A decoder that fails after its append names no buffer: hls.js's later `bufferAppendError`
+is named after whichever buffer appended next, so it is not read.
+
+**The rule** (`audioFallbackClass`), for every guarded failure but `no_frames` (no picture is the
+video's) and `user`:
+
+| audio | fault | charged to |
+|---|---|---|
+| `dolby` or `aac51` | `audio` | its class |
+| `dolby` | nobody | `dolby` — Dolby as it is is the part of such a session no browser was handed before, and giving it up keeps the video's route; where the video was at fault the restart fails again without Dolby and that failure goes the video's way (one extra restart, one wrong `dolby` strike) |
+| `aac51` | nobody | the video's, as before: AAC 5.1 is what every browser that declares `aac51` without `ec3` gets for every multichannel source, so blaming it first would put a second restart and a wrong strike in front of most HEVC failures stage 4 is meant to see |
+| any | `video` | the video's |
+| none | any | the video's |
+
+**The restart** (`fallbackAudio`): the memory (the file's audio class; a strike for `decode_error`
+and `media_error` — `AUDIO_STRIKING`, wider than the video's because an append the browser refused
+is what the declared capability failing looks like on the audio side, and a struck audio class costs
+stereo or AAC-instead-of-Dolby for 7 days where a struck video class refuses 4K), Umami
+`audio-fallback {reason, cls, path, route}` (not `hevc-fallback`, whose count stays the video's),
+and the same restart as the video's — embed POST (with the `decode` it keeps), the page's form, the
+deep link, a reload — carrying `decode-fallback` and `decode-class=dolby|aac51`. The declaration of
+that start is the rest: `dolby` → without `ac3`,`ec3` (a 4K HEVC film stays a passthrough and plays),
+`aac51` → without any audio token. The server allows the two classes
+(`models.ParseFallbackClass`), counts them in `webui_passthrough_fallback_total{class}`, and does
+not mark a refusal of such a restart as the video's fallback: it still declares its video, so a 415
+there is the route's own word, not "this browser could not show it" (`DecodeRequest.IsAudioFallback`).
+
+**The old route** (MPEG-TS; `createAudioGuard`): only a start that declared an audio token gets a
+guard (`declaresAudio(data-decode)`), so a browser that has not opted into audio (`?audio=on`)
+runs exactly the old handling. Where the audio is changed and no one pins the failure on the video, a fatal media error
+from hls.js is recovered once and the next gives the file up to a restart without audio tokens,
+charged to `aac51` (on the old route that is the only class that can happen: Dolby is copied only
+into fMP4). Native HLS: the element's MediaError 3 → `decode_error`, 4 → `src_unsupported`, at once.
+The measured case is AAC whose layout is in a PCE, copied for `aac51`: Chrome refuses the audio append
+(MediaError 4, `CHUNK_DEMUXER_ERROR_APPEND_FAILED`, hls.js `bufferAppendError`) and every recovery
+fails the same way — before this the old route called `recoverMediaError` for it without end, and
+every start declared `aac51` again. Everything else on such a stream is the old route's: a failure
+pinned on the video or audio the declaration did not change goes to `hls-manager.js`, which recovers
+every fatal media error as it always has; the element's errors on the hls.js path stay hls.js's to
+learn of at its next append.
+
+**The old route's unbounded recovery stays as it is.** `hls-manager.js` recovers every fatal media
+error of a stream without a guard, with no counter. Bounding it would change what every browser that
+declares no audio token gets — a stream that recovers from the fourth transient media error today would
+stop — and there is no measurement of how often that happens, so it is left exactly as it was
+(`hls-manager.test.js` pins the listeners of a stream without a guard to the ones recorded at
+`1bea6ac8`).
+
+**No Compatibility mode on the old route.** The item's promise — "Converts the video on our side.
+Use it if the picture looks wrong." — is false there: that video is already converted. What it would
+have to offer is "stereo sound", a different item with its own text in 11 languages; the failures a
+guard sees now restart by themselves, and the ones it cannot see (a 5.1 track that plays with a
+wrong layout, a silent centre channel) are the transcoder's to get right for every browser at once —
+the owner's device matrix, not a per-viewer escape. Until the audio's own stage 5 only browsers
+opted in with `?audio=on` declare audio, and `?audio=off` takes one out. Whether an audio item is
+worth its text at that stage is the owner's call. On a passthrough the item stays what it was: the restart with no declaration.
+
+Not verified in a real browser: which errors each browser raises when a Dolby or 5.1 AAC decoder
+fails, whether their MediaError messages name the stream, the `CHANNELS`/`CODECS` the transcoder will
+write (the page reads what the spec says it will, and falls back on hls.js's own parse), the Dolby
+path on iOS (native HLS) — all for the owner's device matrix.
+
 #### Compatibility mode
 
 The "More" menu (`SettingsControl.jsx`) shows **Compatibility mode** (`player.compatMode`, hint
@@ -630,7 +827,7 @@ not marked (`window.__wtPlaybackQuality`).
 | `height` | `videoHeight` (0 unknown) |
 | `rate` | `playbackRate` |
 | `hidden` | some counted step happened in a hidden tab: a background tab may stop rendering, read those apart |
-| `decode` | the declaration at that moment, as in `codec-support` |
+| `decode` | the declaration at that moment, as in `codec-support` — audio tokens included since the multichannel-audio release (see "Reading `decode`") |
 | `src`, `tc`, `route`, `pl`, `emb` | the same stream facts as `codec-support`, read at the mark; `route` is the session's (`data-video-route`, `''` without one) — once HEVC is passed through, `tc` is true for a passthrough and a re-encode alike, and the drops of a software decoder are the passthrough's |
 
 For example: `{dropped: 30, total: 1500, drop_pct: 2, played: 60, height: 2160, rate: 1, hidden: false,

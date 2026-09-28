@@ -359,13 +359,22 @@ func TestPassthroughFallbackIsBounded(t *testing.T) {
 	PassthroughFallback("user", "hevc8")
 	PassthroughFallback("<script>", "../x")
 	PassthroughFallback("", "")
+	// The audio classes (multichannel audio) are series of their own.
+	PassthroughFallback("decode_error", "dolby")
+	PassthroughFallback("media_error", "aac51")
 	if got := testutil.ToFloat64(s.fallback.WithLabelValues("decode_error", "hevc10-2160")); got != 2 {
 		t.Errorf("decode_error/hevc10-2160 = %v, want 2", got)
 	}
 	if got := testutil.ToFloat64(s.fallback.WithLabelValues("other", "unknown")); got != 2 {
 		t.Errorf("other/unknown = %v, want 2", got)
 	}
-	if got := testutil.CollectAndCount(s.fallback); got != 3 {
-		t.Errorf("%d series, want 3", got)
+	if got := testutil.ToFloat64(s.fallback.WithLabelValues("decode_error", "dolby")); got != 1 {
+		t.Errorf("decode_error/dolby = %v, want 1", got)
+	}
+	if got := testutil.ToFloat64(s.fallback.WithLabelValues("media_error", "aac51")); got != 1 {
+		t.Errorf("media_error/aac51 = %v, want 1", got)
+	}
+	if got := testutil.CollectAndCount(s.fallback); got != 5 {
+		t.Errorf("%d series, want 5", got)
 	}
 }

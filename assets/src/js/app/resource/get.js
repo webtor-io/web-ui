@@ -111,7 +111,9 @@ av( async function() {
     // A restart after a passthrough failed, sent here because the page's
     // start form was another file's (lib/player/passthrough.js
     // fallbackToOldRoute): this start carries why and declares nothing for
-    // the file (decode-declaration.js setPendingFallback).
+    // the file -- or, after its multichannel audio failed (an audio class,
+    // fallbackAudio), declares it without that audio
+    // (decode-declaration.js setPendingFallback).
     const fallback = urlParams.get('decode-fallback');
     if (fallback) {
         try {

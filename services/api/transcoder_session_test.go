@@ -38,6 +38,9 @@ func TestCreateTranscoderSession_URL(t *testing.T) {
 		{"", "/abc123/Film%20%231.mkv~hls/session?token=zzz&api-key=aaa"},
 		{"hevc8,hevc10,hdr-pq", "/abc123/Film%20%231.mkv~hls/session?token=zzz&api-key=aaa&decode=hevc8%2Chevc10%2Chdr-pq"},
 		{"unknown", "/abc123/Film%20%231.mkv~hls/session?token=zzz&api-key=aaa&decode=unknown"},
+		// Audio tokens alone: a declaration like any other (a transcoder
+		// that does not know them reads no declaration).
+		{"aac51,ec3", "/abc123/Film%20%231.mkv~hls/session?token=zzz&api-key=aaa&decode=aac51%2Cec3"},
 	} {
 		srv, got := sessionServer(t, http.StatusOK, nil, `{"id":"s1","duration":12.5}`)
 		a := &Api{cl: srv.Client()}

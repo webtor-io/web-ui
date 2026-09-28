@@ -88,6 +88,50 @@ func hlsAttributes(list string) map[string]string {
 	return out
 }
 
+// Audio classes (docs/player.md, "Multichannel audio and the fallback"):
+// what a declaration made of a session's audio, and what an audio failure
+// in the browser is charged to (models.DecodeRequest.IsAudioFallback).
+const (
+	audioClassDolby = "dolby" // AC-3 / E-AC-3 copied as it is
+	audioClassAAC51 = "aac51" // AAC with more than two channels
+)
+
+// sessionAudioClass reads from a session's master what the declaration made
+// of its audio -- content-transcoder writes CHANNELS on the audio renditions
+// and every audio codec in CODECS once a declaration changes the audio:
+// "dolby" where a variant's CODECS names AC-3 or E-AC-3 (ac-3, ec-3, or
+// their mp4a.a5 / mp4a.a6 spellings), else "aac51" where a rendition has
+// more than two channels ("6", "16/JOC"), else "": the stereo AAC the
+// transcoder has always made, whose master says neither.
+func sessionAudioClass(master string) string {
+	multichannel := false
+	for _, line := range strings.Split(master, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "#EXT-X-STREAM-INF:"):
+			for _, c := range strings.Split(hlsAttributes(strings.TrimPrefix(line, "#EXT-X-STREAM-INF:"))["CODECS"], ",") {
+				switch strings.ToLower(strings.TrimSpace(c)) {
+				case "ac-3", "ec-3", "mp4a.a5", "mp4a.a6":
+					return audioClassDolby
+				}
+			}
+		case strings.HasPrefix(line, "#EXT-X-MEDIA:"):
+			attrs := hlsAttributes(strings.TrimPrefix(line, "#EXT-X-MEDIA:"))
+			if attrs["TYPE"] != "AUDIO" {
+				continue
+			}
+			n, _, _ := strings.Cut(attrs["CHANNELS"], "/")
+			if c, err := strconv.Atoi(strings.TrimSpace(n)); err == nil && c > 2 {
+				multichannel = true
+			}
+		}
+	}
+	if multichannel {
+		return audioClassAAC51
+	}
+	return ""
+}
+
 func parseMediaPlaylist(body string) (segments []hlsSegment, endList bool, err error) {
 	segments, endList, _, err = parseMediaPlaylistTarget(body)
 	return
@@ -222,6 +266,10 @@ type SessionBufferResult struct {
 	// CODECS are the output's own (content-transcoder writes them from the
 	// init it produced), which is what passthroughClass reads.
 	Variant hlsVariant
+	// AudioClass is what the start's declaration made of the session's
+	// audio (sessionAudioClass): "" for a start that declared no audio
+	// token, whatever its master says -- it cannot have changed the audio.
+	AudioClass string
 	// TargetDuration is the longest segment the video playlist announced
 	// while buffering: #EXT-X-TARGETDURATION, or the longest EXTINF seen
 	// if that is larger (a passthrough cuts at keyframes, and an EVENT
@@ -233,7 +281,9 @@ type SessionBufferResult struct {
 // browser's declaration (decl.Decode, "" for none) and buffers
 // bufferDuration of it. A refusal (415/503) comes back as the
 // *api.TranscoderRefusal it is, marked Fallback when decl says this start is
-// a restart after a passthrough failed in the browser.
+// a restart after a passthrough failed in the browser -- not after its
+// multichannel audio did: that restart declares its video as before, and a
+// refusal is the route's own (decl.IsAudioFallback).
 //
 // The master of a passthrough session appears only once its first init is
 // written (content-transcoder waits up to 5 min for it); its read is bounded
@@ -253,7 +303,7 @@ func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamU
 	session, err := s.api.CreateTranscoderSession(bufferCtx, baseURL, decl.Decode)
 	if err != nil {
 		var tr *api.TranscoderRefusal
-		if errors.As(err, &tr) && decl.FallbackReason != "" {
+		if errors.As(err, &tr) && decl.FallbackReason != "" && !decl.IsAudioFallback() {
 			tr.Fallback = true
 		}
 		return nil, errors.Wrap(err, "failed to create transcoder session")
@@ -331,14 +381,18 @@ func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamU
 		return nil, errors.Wrap(err, "failed to construct session seek URL")
 	}
 
-	return &SessionBufferResult{
+	result := &SessionBufferResult{
 		Session:        session,
 		BaseURL:        baseURL,
 		HLSURL:         hlsURL,
 		SeekURL:        seekURL,
 		Variant:        variant,
 		TargetDuration: targetDuration,
-	}, nil
+	}
+	if decl.DeclaresAudio() {
+		result.AudioClass = sessionAudioClass(masterBody)
+	}
+	return result, nil
 }
 
 // maxSegmentDuration is the largest of prev, the playlist's target duration

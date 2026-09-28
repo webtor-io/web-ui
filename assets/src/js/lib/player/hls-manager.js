@@ -34,9 +34,11 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 
 // opts.passthrough: the session hands the browser the source's video as it
 // is (data-video-route="passthrough"): its own fragment policy
-// (passthroughHlsConfig, opts.fragLoadMs) and opts.guard, the fallback's
-// watch (passthrough.js), first to see every error. Without it the
-// instance is exactly what every stream has always had.
+// (passthroughHlsConfig, opts.fragLoadMs). opts.guard: the fallback's watch
+// (passthrough.js) -- a passthrough's, or, on any other route, the one of a
+// start that declared multichannel audio (createAudioGuard) -- first to see
+// every error. Without them the instance is exactly what every stream has
+// always had.
 export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     if (!Hls || !Hls.isSupported() || isIOS) {
         // Native HLS (Safari/iOS) — browser handles m3u8 natively
@@ -64,7 +66,7 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     hls.loadSource(sourceUrl);
     hls.attachMedia(videoEl);
 
-    setupHlsEvents(hls, undefined, opts.passthrough ? opts.guard : null);
+    setupHlsEvents(hls, undefined, opts.guard || null);
 
     if (onReady) {
         hls.on(Hls.Events.MANIFEST_PARSED, onReady);
@@ -75,10 +77,12 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
 
 // Exported for the tests (loader-restart.test.js), with the loader restart's
 // options: the error handling every instance goes through. guard is a
-// passthrough stream's (passthrough.js createPassthroughGuard): what it
-// handles -- a codec string the browser refused, a media error -- goes no
-// further; everything else, network errors included, is handled as on every
-// route.
+// passthrough stream's (passthrough.js createPassthroughGuard) or a
+// multichannel-audio start's (createAudioGuard): what it handles -- a codec
+// string the browser refused, a media error -- goes no further; everything
+// else, network errors included, is handled as on every route. It is also
+// told which audio hls.js buffers (BUFFER_CODECS) -- a listener no stream
+// without a guard gets.
 export function setupHlsEvents(hls, restartOpts, guard = null) {
     hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         if (hls.levels.length > 1) {
@@ -86,6 +90,12 @@ export function setupHlsEvents(hls, restartOpts, guard = null) {
         }
         remapTrackIds(hls);
     });
+
+    if (guard && typeof guard.onBufferCodecs === 'function') {
+        hls.on(Hls.Events.BUFFER_CODECS, (event, data) => {
+            try { guard.onBufferCodecs(data); } catch (e) { /* the stream goes on */ }
+        });
+    }
 
     hls.on(Hls.Events.ERROR, (event, data) => {
         if (guard && guard.onHlsError(hls, data)) return;

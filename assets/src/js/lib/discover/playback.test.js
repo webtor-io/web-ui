@@ -213,6 +213,34 @@ test('emptyStateKey: the one switch that hides everything is named; several are 
     assert.equal(emptyStateKey([], none), null);
 });
 
+// ---- the audio tokens are not Discover's business ---------------------------
+
+// decode-declaration.js gives Discover the video part only (decodedTokens,
+// declaredTokens); should audio tokens ever reach these arrays, no switch
+// may move: the questions here are HEVC, PQ and 4K Main10.
+test('audio tokens change no switch, no warning and no count', () => {
+    const AUDIO = ['aac51', 'ac3', 'ec3'];
+    const rows = [row('hevc', 'pq', { uhd: true }), row('hevc'), row('avc', null, { uhd: true }), row('hevc', 'dv'), row('av1', null, { uhd: true })];
+    for (const caps of ['on', 'off', 'unknown']) {
+        for (const part of [true, false]) {
+            for (const [decodes, declared] of [[DECODES_NONE, DECODES_NONE], [HEVC, HEVC], [EVERYTHING, EVERYTHING], [EVERYTHING, null]]) {
+                const plain = states({ caps, part, decodes, declared });
+                const withAudio = states({ caps, part, decodes: [...decodes, ...AUDIO], declared: declared && [...declared, ...AUDIO] });
+                const name = `${caps}/${part}/${decodes.join(',')}`;
+                assert.deepEqual(
+                    { ...withAudio, uhd: { ...withAudio.uhd, declared: null } },
+                    { ...plain, uhd: { ...plain.uhd, declared: null } }, name);
+                assert.deepEqual(switchCounts(rows, withAudio), switchCounts(rows, plain), name);
+                assert.equal(emptyStateKey(rows, withAudio), emptyStateKey(rows, plain), name);
+                for (const r of rows) assert.deepEqual(hiddenBy(r, withAudio), hiddenBy(r, plain), name);
+            }
+        }
+    }
+    assert.equal(browserDecodesHevc(AUDIO), false, 'audio alone: answered, no HEVC');
+    assert.equal(browserDecodesPq(AUDIO), false);
+    assert.equal(uhdPlaysHere('on', AUDIO), false);
+});
+
 // ---- gathering the inputs --------------------------------------------------
 
 test('playbackContext: the page\'s answers; whatever throws is an unanswered check', () => {

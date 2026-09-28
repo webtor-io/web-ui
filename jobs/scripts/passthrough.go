@@ -105,7 +105,8 @@ func capOf(c *web.Context) int64 {
 	return parseRateLimit(c.ApiClaims.Rate)
 }
 
-// applySessionRoute puts the transcoder session on sc, and with it what its
+// applySessionRoute puts the transcoder session on sc, with what the
+// declaration made of its audio on any route (AudioClass), and what its
 // route decides. For a passthrough: the status marks again (the ones made
 // before the session were for a re-encode of HEVC, whose rate is unknown;
 // the source's video as it is has its own, so the cap card and the "this
@@ -114,6 +115,7 @@ func capOf(c *web.Context) int64 {
 // before made it.
 func (s *ActionScript) applySessionRoute(sc *StreamContent, c *web.Context, result *SessionBufferResult) {
 	sc.TranscoderSession = result.Session
+	sc.AudioClass = result.AudioClass
 	if !sc.Passthrough() {
 		return
 	}

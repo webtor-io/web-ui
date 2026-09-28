@@ -41,10 +41,16 @@
            {{- with .TranscoderSession }}{{ if .VideoRoute }} data-video-route="{{ .VideoRoute }}"{{ end }}{{ if .RouteReason }} data-route-reason="{{ .RouteReason }}"{{ end }}{{ end }}
            {{- if .VideoClass }} data-video-class="{{ .VideoClass }}"{{ end }}
            {{- if .FragLoadMs }} data-frag-load-ms="{{ .FragLoadMs }}"{{ end }}
-           {{- /* The file, for a passthrough's fallback: the restart is this
-                file's, even where the page's start form has moved on to
-                another (lib/player/passthrough.js). */}}
-           {{- if .Passthrough }} data-item-id="{{ .VideoStreamUserData.ItemID }}"{{ end }}
+           {{- /* What the declaration made of the session's audio, on any
+                route (StreamContent.AudioClass: dolby, aac51): the class a
+                failure of that audio is charged to. Only for a start that
+                declared an audio token and got such audio. */}}
+           {{- if .AudioClass }} data-audio-class="{{ .AudioClass }}"{{ end }}
+           {{- /* The file, for the player's own restart -- a passthrough's
+                fallback, or a multichannel-audio start's: the restart is
+                this file's, even where the page's start form has moved on
+                to another (lib/player/passthrough.js). */}}
+           {{- if .PlayerRestarts }} data-item-id="{{ .VideoStreamUserData.ItemID }}"{{ end }}
            {{- with .VideoStreamUserData }}{{ if .Decode }} data-decode="{{ .Decode }}"{{ end }}{{ end }}
            {{ if .GraceDurationSec }}data-grace-duration-sec="{{ .GraceDurationSec }}"{{ end }}
            {{- /* The resource status's plan-box line while this player buffers

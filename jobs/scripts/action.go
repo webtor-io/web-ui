@@ -134,6 +134,12 @@ type StreamContent struct {
 	// take to load before the player gives up on it (passthroughFragLoadMs,
 	// data-frag-load-ms). 0 on every other route.
 	FragLoadMs int
+	// AudioClass is what the start's declaration made of the session's
+	// audio, on any route (sessionAudioClass: "dolby", "aac51"): the class a
+	// failure of that audio in the browser is charged to
+	// (data-audio-class). "" for a start that declared no audio token, and
+	// for audio the transcoder did not change.
+	AudioClass string
 }
 
 // VideoRoute is the transcoder session's route ("" without a session or
@@ -148,6 +154,14 @@ func (sc *StreamContent) VideoRoute() string {
 // Passthrough: the session hands the browser the source's video as it is.
 func (sc *StreamContent) Passthrough() bool {
 	return sc.VideoRoute() == videoRoutePassthrough
+}
+
+// PlayerRestarts: the player may give this file up to a restart of its own
+// -- a passthrough, or a start that declared multichannel audio on any
+// route (lib/player/passthrough.js) -- and needs the file's item id for it
+// (data-item-id). A start that declared nothing never restarts itself.
+func (sc *StreamContent) PlayerRestarts() bool {
+	return sc.Passthrough() || (sc.VideoStreamUserData != nil && sc.VideoStreamUserData.DeclaresAudio())
 }
 
 const (

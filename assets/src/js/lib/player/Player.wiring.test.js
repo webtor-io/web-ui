@@ -5224,3 +5224,166 @@ test('a player coming up ends a pending restart: its fields ride on no later sta
     await mountPlayer();
     assert.equal(pendingFallbackFor(window, { resourceId: 'res', itemId: 'item1' }), null);
 });
+
+// ---- multichannel audio: the fallback of the audio a declaration made -------
+
+// A browser that opted in -- to the declaration and to its audio part
+// (?audio=on) -- with its cached answers: every video token and every audio
+// token (decode-declaration.js reads them for the restart's declaration).
+// Taken out again after each test.
+const DECL_VIDEO = 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq';
+function declaringBrowser({ audio = true } = {}) {
+    const ua = window.navigator.userAgent;
+    window.localStorage.setItem('wt-passthrough', 'on');
+    if (audio) window.localStorage.setItem('wt-audio', 'on');
+    window.localStorage.setItem('wt-decode', JSON.stringify({ ua, tokens: DECL_VIDEO.split(','), at: Date.now() }));
+    window.localStorage.setItem('wt-decode-audio', JSON.stringify({ ua, tokens: ['aac51', 'ac3', 'ec3'], at: Date.now() }));
+    return () => {
+        for (const k of ['wt-passthrough', 'wt-audio', 'wt-decode', 'wt-decode-audio']) window.localStorage.removeItem(k);
+        freshDecodeMemory();
+    };
+}
+const oldRouteAudio = (page, { decode = `${DECL_VIDEO},aac51,ac3,ec3`, audioClass = 'aac51' } = {}) => {
+    page.video.setAttribute('controls', '');
+    page.video.setAttribute('data-video-route', 'reencode');
+    page.video.setAttribute('data-route-reason', 'no_hevc_declared');
+    if (decode) page.video.setAttribute('data-decode', decode);
+    if (audioClass) page.video.setAttribute('data-audio-class', audioClass);
+    page.video.setAttribute('data-item-id', 'item1');
+};
+const failElement = async (p, code) => {
+    Object.defineProperty(p.video, 'error', { value: { code, message: '' }, configurable: true });
+    p.video.dispatchEvent(new dom.window.Event('error'));
+    await settle();
+};
+
+test('old route, AAC 5.1 declared and made: a failure restarts the file without audio tokens, the video declared as before', async (t) => {
+    const undo = declaringBrowser();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); undo(); });
+    const p = await mountPlayer((page) => {
+        oldRouteAudio(page);
+        pageStartForm(page);
+    });
+    await failElement(p, 3);
+    assert.equal(rec.got.length, 1, 'the start form, submitted');
+    assert.equal(rec.got[0].decode, DECL_VIDEO, 'no audio token; the video tokens stay');
+    assert.equal(rec.got[0]['decode-fallback'], 'decode_error');
+    assert.equal(rec.got[0]['decode-class'], 'aac51');
+    const ev = p.events.find((e) => e.name === 'audio-fallback');
+    assert.deepEqual(ev && ev.data, { reason: 'decode_error', cls: 'aac51', path: 'native', route: 'reencode' });
+    assert.equal(p.events.find((e) => e.name === 'hevc-fallback'), undefined, 'the HEVC fallback count stays the video\'s');
+    assert.deepEqual(loadDecodeMemory(window).strikes.aac51.map((s) => s.src), ['res/item1']);
+    assert.equal(compatItem(p), null, 'no Compatibility mode on the old route');
+});
+
+// The invariant: a start that declared no audio token gets no guard --
+// every browser that has not opted in, and one that declared video only.
+for (const [name, decode] of [['no declaration', ''], ['video only', DECL_VIDEO]]) {
+    test(`old route, ${name}: an element error restarts nothing, whatever the tag says of the audio`, async (t) => {
+        const undo = declaringBrowser();
+        const rec = recordSubmits();
+        t.after(() => { rec.stop(); destroyPlayer(); undo(); });
+        const p = await mountPlayer((page) => {
+            oldRouteAudio(page, { decode, audioClass: 'aac51' });
+            pageStartForm(page);
+        });
+        await failElement(p, 3);
+        await failElement(p, 4);
+        assert.equal(rec.got.length, 0);
+        assert.equal(p.events.find((e) => e.name === 'audio-fallback'), undefined);
+    });
+}
+
+test('old route, audio declared but not made (no class): nothing restarts', async (t) => {
+    const undo = declaringBrowser();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); undo(); });
+    const p = await mountPlayer((page) => {
+        oldRouteAudio(page, { audioClass: '' });
+        pageStartForm(page);
+    });
+    await failElement(p, 3);
+    assert.equal(rec.got.length, 0);
+});
+
+test('a passthrough with Dolby whose decoder fails restarts it without Dolby: the video keeps passthrough, the class is not struck', async (t) => {
+    const undo = declaringBrowser();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); undo(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        page.video.setAttribute('data-decode', `${DECL_VIDEO},aac51,ac3,ec3`);
+        page.video.setAttribute('data-audio-class', 'dolby');
+        pageStartForm(page);
+    });
+    await failElement(p, 3);
+    assert.equal(rec.got.length, 1);
+    assert.equal(rec.got[0].decode, `${DECL_VIDEO},aac51`, 'HEVC declared again: a 4K film plays');
+    assert.equal(rec.got[0]['decode-class'], 'dolby');
+    const m = loadDecodeMemory(window);
+    assert.equal(m.strikes['hevc10-2160'], undefined, 'the video class is not struck');
+    assert.deepEqual(m.strikes.dolby.map((s) => s.src), ['res/item1']);
+    assert.deepEqual(m.sources, {});
+    const ev = p.events.find((e) => e.name === 'audio-fallback');
+    assert.deepEqual(ev && ev.data, { reason: 'decode_error', cls: 'dolby', path: 'native', route: 'passthrough' });
+});
+
+test('a passthrough with AAC 5.1 whose decoder fails, nobody blaming the audio: the video\'s fallback, as before', async (t) => {
+    const undo = declaringBrowser();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); undo(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        page.video.setAttribute('data-audio-class', 'aac51');
+        pageStartForm(page);
+    });
+    await failElement(p, 3);
+    assert.equal(rec.got[0].decode, undefined);
+    assert.equal(rec.got[0]['decode-class'], 'hevc10-2160');
+    assert.deepEqual(loadDecodeMemory(window).strikes['hevc10-2160'].map((s) => s.src), ['res/item1']);
+});
+
+// A browser that declares its video but has not opted into audio: its
+// start carries no audio token, so the server renders a video-only
+// data-decode -- even a tag that named Dolby (it cannot, without an audio
+// token) charges nothing to the audio: the video's fallback, as before
+// multichannel audio. (Its declaration: decode-declaration.test.js.)
+test('a passthrough of a browser not opted into audio: a failure is the video\'s', async (t) => {
+    const undo = declaringBrowser({ audio: false });
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); undo(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        page.video.setAttribute('data-audio-class', 'dolby');
+        pageStartForm(page);
+    });
+    await failElement(p, 3);
+    assert.equal(rec.got.length, 1);
+    assert.equal(rec.got[0].decode, undefined, 'the old route for this file');
+    assert.equal(rec.got[0]['decode-class'], 'hevc10-2160');
+    assert.equal(p.events.find((e) => e.name === 'audio-fallback'), undefined);
+    assert.deepEqual(loadDecodeMemory(window).strikes['hevc10-2160'].map((s) => s.src), ['res/item1']);
+});
+
+// The audio guard is made only for a start that declared an audio token:
+// every other stream -- a browser not opted into audio, or no declaration at
+// all -- gets exactly the listeners it always had. Counted on the element:
+// the guard's one `error` listener is the only thing it adds there.
+test('no audio token declared, no audio guard: the element gets the listeners it always had', async (t) => {
+    const errorListeners = async (prep) => {
+        let n = 0;
+        const p = await mountPlayer((page) => {
+            const add = page.video.addEventListener.bind(page.video);
+            page.video.addEventListener = (type, fn, o) => { if (type === 'error') n++; return add(type, fn, o); };
+            if (prep) prep(page);
+        });
+        destroyPlayer();
+        return n;
+    };
+    t.after(() => destroyPlayer());
+    const plain = await errorListeners(null);
+    assert.equal(await errorListeners((page) => oldRouteAudio(page, { decode: '', audioClass: 'aac51' })), plain, 'no declaration');
+    assert.equal(await errorListeners((page) => oldRouteAudio(page, { decode: DECL_VIDEO, audioClass: 'aac51' })), plain, 'the video only');
+    assert.equal(await errorListeners((page) => oldRouteAudio(page)), plain + 1, 'an audio token: its guard');
+});

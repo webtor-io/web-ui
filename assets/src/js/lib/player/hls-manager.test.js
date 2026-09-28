@@ -147,3 +147,72 @@ test('passthrough: the guard is first, and the rest is the old handling', () => 
     assert.equal(hls.startLoads, 1, 'a network error restarts loading as on every route');
     assert.deepEqual(seen, [Hls.ErrorDetails.BUFFER_APPEND_ERROR, Hls.ErrorDetails.FRAG_LOAD_TIMEOUT]);
 });
+
+// ---- a start that declared multichannel audio, on the old route ------------
+
+import { createAudioGuard, SAME_INCIDENT_MS } from './passthrough.js';
+
+// Every stream without a guard -- every browser that has not opted in --
+// registers exactly what it registered before multichannel audio (recorded
+// off the code at 1bea6ac8): no BUFFER_CODECS listener, nothing else new.
+test('no guard: the listeners are exactly today\'s', () => {
+    const names = [];
+    const hls = { ...busHls(), on(ev) { names.push(ev); } };
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} });
+    assert.deepEqual(names, ['hlsManifestParsed', 'hlsError', 'hlsError', 'hlsStallResolved', 'hlsManifestLoading', 'hlsMediaDetaching', 'hlsDestroying']);
+    const withGuard = [];
+    setupHlsEvents({ ...busHls(), on(ev) { withGuard.push(ev); } }, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, { onHlsError: () => false, onBufferCodecs() {} });
+    assert.deepEqual(withGuard.filter((n) => !names.includes(n)), [Hls.Events.BUFFER_CODECS], 'a guard is told what audio hls.js buffers');
+});
+
+function audioVideo(dataset) {
+    let err = null;
+    const listeners = {};
+    return {
+        dataset,
+        get error() { return err; },
+        setError(code) { err = code ? { code, message: '' } : null; },
+        addEventListener(ev, fn) { listeners[ev] = fn; },
+        removeEventListener() {},
+    };
+}
+
+test('old route, multichannel audio declared: the guard recovers once and gives the file up; hls-manager does not recover it again', () => {
+    const hls = busHls();
+    const video = audioVideo({ decode: 'aac51', videoRoute: 'reencode' });
+    let t = 0;
+    const fired = [];
+    const guard = createAudioGuard({ video, fallback: (...a) => fired.push(a), now: () => t, setTimer: () => 0, clearTimer: () => {} });
+    guard.setHls(hls);
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard);
+    hls.trigger(Hls.Events.BUFFER_CODECS, { audio: { codec: 'mp4a.40.2', metadata: { channelCount: 6 } } });
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.equal(hls.recovered, 1, 'the guard\'s one recovery');
+    t += SAME_INCIDENT_MS + 1;
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.equal(hls.recovered, 1, 'no second recovery');
+    assert.deepEqual(fired, [['media_error', 'mse', 'aac51']]);
+    // A network error still restarts loading, as on every route -- the page
+    // is restarting, so the guard keeps it.
+    hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });
+    assert.equal(hls.startLoads, 0);
+});
+
+test('old route, multichannel audio declared but stereo in play: every fatal media error recovers, as ever', () => {
+    const hls = busHls();
+    const video = audioVideo({ decode: 'aac51', videoRoute: 'reencode' });
+    let t = 0;
+    const fired = [];
+    const guard = createAudioGuard({ video, fallback: (...a) => fired.push(a), now: () => t, setTimer: () => 0, clearTimer: () => {} });
+    guard.setHls(hls);
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard);
+    hls.trigger(Hls.Events.BUFFER_CODECS, { audio: { codec: 'mp4a.40.2', metadata: { channelCount: 2 } } });
+    for (let i = 0; i < 3; i++) {
+        t += SAME_INCIDENT_MS + 1;
+        hls.trigger(Hls.Events.ERROR, fatalMedia);
+    }
+    assert.equal(hls.recovered, 3);
+    assert.deepEqual(fired, []);
+    hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });
+    assert.equal(hls.startLoads, 1);
+});

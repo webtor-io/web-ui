@@ -18,8 +18,8 @@ import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
 import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
-import { createPassthroughGuard, fallbackToOldRoute } from './passthrough.js';
-import { clearPendingFallback } from './decode-declaration.js';
+import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio } from './passthrough.js';
+import { clearPendingFallback, declaresAudio } from './decode-declaration.js';
 import { reportReleaseCheck } from '../discover/release-check.js';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
 import { readTracks, resolveSubtitleLevel } from './subtitle-telemetry.js';
@@ -257,10 +257,29 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     if (passthroughRoute && !passthroughGuardRef.current) {
         passthroughGuardRef.current = createPassthroughGuard({
             video: videoEl,
-            fallback: (reason, path) => fallbackToOldRoute({ video: videoEl, reason, path }),
+            // audio: the failure is charged to the audio the declaration
+            // made (multichannel audio) -- the restart keeps the video's
+            // route and leaves that audio out.
+            fallback: (reason, path, audio) => (audio
+                ? fallbackAudio({ video: videoEl, reason, path, cls: audio })
+                : fallbackToOldRoute({ video: videoEl, reason, path })),
         });
     }
-    useEffect(() => () => { if (passthroughGuardRef.current) passthroughGuardRef.current.dispose(); }, []);
+    // Multichannel audio on every other route (passthrough.js
+    // createAudioGuard): only where this start declared an audio token. A
+    // start that declared none -- every browser that has not opted in --
+    // gets no guard, and its errors are handled as they always were.
+    const audioGuardRef = useRef(null);
+    if (isVideo && !passthroughRoute && declaresAudio(videoEl.dataset.decode) && !audioGuardRef.current) {
+        audioGuardRef.current = createAudioGuard({
+            video: videoEl,
+            fallback: (reason, path, audio) => fallbackAudio({ video: videoEl, reason, path, cls: audio }),
+        });
+    }
+    useEffect(() => () => {
+        if (passthroughGuardRef.current) passthroughGuardRef.current.dispose();
+        if (audioGuardRef.current) audioGuardRef.current.dispose();
+    }, []);
     // A player is up: a restart after a failed passthrough, if one was
     // pending, has happened -- its fields must not ride on the next start
     // (decode-declaration.js setPendingFallback).
@@ -271,6 +290,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         passthrough: passthroughRoute
             ? { fragLoadMs: parseInt(videoEl.dataset.fragLoadMs || '0', 10) || 0, guard: passthroughGuardRef.current }
             : null,
+        audioGuard: audioGuardRef.current,
     });
 
     // Re-assert the picker's answer on hls.js's own transitions.
