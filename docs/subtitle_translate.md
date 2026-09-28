@@ -131,19 +131,17 @@ feature is on and this is not an embed — see *Gating and flags*):
    (NSFW, free viewer facing a locked item, or the language is outside
    `stremio.LanguageByCode`), `applyLadder` falls back to the old phase-1 selection
    (`selectListItem`/`matchLang`: Accept-Language, then English) instead of "None" — the ladder
-   must never take away subtitles phase 1 would have turned on. Rule 4's English track is
-   deliberately **not** extended to this path (2026-09-28): here the browser's other languages
-   still come before English, as they always did. For most viewers the two agree — a browser
-   that lists English, or none of the file's languages, lands on English either way — and where
-   they differ (a Portuguese viewer whose browser also lists Russian; or CLDR's close matches on
-   the preferred language itself, which `matchLang` accepts with High confidence — kk→ru, be→ru,
-   da→no, gl→es, ms→id, af→nl) switching a free viewer to English is a separate decision
-   (`TestFreeViewerKeepsThePhaseOneFallback`).
+   must never take away subtitles phase 1 would have turned on. Exception (owner, 2026-09-28):
+   a free viewer facing a locked item — an **upsell** — gets rule 4's English track too, beside
+   the upsell, exactly as a paying viewer does beside the offer (`TestFreeViewerGetsEnglishBesideTheUpsell`);
+   phase 1 decides only when the file has no English track. NSFW and a language outside
+   `stremio.LanguageByCode` have no translation item at all and keep phase 1 (Accept-Language,
+   then English).
 
 Switching audio tracks in the modal re-runs the same rule client-side (`pickDefaultSubtitle` in
 `subtitle-rules.js`), reading `data-rank`/`data-srclang`/`data-forced`/`data-locked` instead of
 recomputing anything. Rule 4's English track is part of it: with no human track in the preferred
-language and an unlocked `Translated` item on the list, the client picks the best English track by
+language and a `Translated` item on the list (unlocked, or locked as an upsell), the client picks the best English track by
 `data-rank` (`FALLBACK_LANG`, kept equal to the server's by
 `TestFallbackLangIsMirroredInSubtitleRules`). It tests for the item, not for `data-offered`: the
 server does not mark the offer when it rendered for audio already in the viewer's language, and an

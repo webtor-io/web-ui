@@ -811,7 +811,8 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 				// embed's own track is read the same way the ladder reads
 				// it below.
 				if lis[i].ID == "none" {
-					markUpsell(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx, true))
+					up := s.ladderPick(lis, ud, audioLang, opts, humanIdx, true)
+					markUpsell(lis, up)
 					if p := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false); p > 0 && lis[p].Provider == "Translated" {
 						// Same split as below: an offer, never the switch's
 						// answer. The switch restores what the ladder would
@@ -821,6 +822,11 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 						// settled.
 						markOffered(lis, p)
 						markSuggested(lis, s.offeredDefault(lis, ud))
+					} else if e := s.offeredDefault(lis, ud); e > 0 && lis[up].Provider == "Translated" {
+						// Beside an upsell (a viewer who cannot run the
+						// translation) the switch restores the same English
+						// track the ladder plays below.
+						markSuggested(lis, e)
 					} else {
 						markSuggested(lis, p)
 					}
@@ -840,7 +846,8 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 			}
 		}
 	}
-	markUpsell(lis, s.ladderPick(lis, ud, audioLang, opts, humanIdx, true))
+	up := s.ladderPick(lis, ud, audioLang, opts, humanIdx, true)
+	markUpsell(lis, up)
 	pick := s.ladderPick(lis, ud, audioLang, opts, humanIdx, false)
 	// A translation is never turned on for the viewer (owner, 2026-09-16):
 	// starting one spends tokens, so it takes an explicit click. Where the
@@ -852,6 +859,16 @@ func (s *Helper) applyLadder(lis []ListItem, ud *models.VideoStreamUserData, aud
 		markOffered(lis, pick)
 		lis[s.offeredDefault(lis, ud)].Default = true
 		return lis
+	}
+	// The same rule for a viewer who cannot run the translation (owner,
+	// 2026-09-28: a free viewer, whose translation chip is an upsell): the
+	// English track plays beside the upsell. Without one, the phase-1
+	// selection below still decides, as it did before.
+	if lis[up].Provider == "Translated" {
+		if e := s.offeredDefault(lis, ud); e > 0 {
+			lis[e].Default = true
+			return lis
+		}
 	}
 	lis[pick].Default = true
 	return lis

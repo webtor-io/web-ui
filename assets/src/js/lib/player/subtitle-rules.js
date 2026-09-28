@@ -54,15 +54,17 @@ function rankOf(t) {
     return Number.isFinite(n) ? n : 9;
 }
 
-// translationOnOffer: the list holds a translation the viewer could start.
-// It is the server's condition for an offer (ladderPick answering with an
-// unlocked Translated item), read without the audio: data-offered cannot
-// stand in for it, because the server does not mark the offer when the
-// audio it rendered for was already in the viewer's language, and an audio
-// switch is exactly how the viewer leaves that state. The item only ever
-// exists in the preferred language, so its language is not tested.
+// translationOnOffer: the list holds a translation into the viewer's
+// language -- one they can start, or a locked one offered as an upsell
+// (owner, 2026-09-28: the English track plays beside either). It is the
+// server's condition (ladderPick with admitLocked answering with a
+// Translated item), read without the audio: data-offered cannot stand in
+// for it, because the server does not mark the offer when the audio it
+// rendered for was already in the viewer's language, and an audio switch
+// is exactly how the viewer leaves that state. The item only ever exists
+// in the preferred language, so its language is not tested.
 function translationOnOffer(tracks) {
-    return tracks.some((t) => t.provider === 'Translated' && !t.locked);
+    return tracks.some((t) => t.provider === 'Translated');
 }
 
 // pickDefaultSubtitle answers "which subtitle should be on, given this

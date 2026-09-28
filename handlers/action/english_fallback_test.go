@@ -116,12 +116,13 @@ func TestOfferEnglishNotWhenAudioIsInThePreferredLanguage(t *testing.T) {
 	}
 }
 
-// TestFreeViewerKeepsThePhaseOneFallback: the rule is about an Offered
-// translation, and a free viewer's is locked (Upsell), never Offered. Their
-// default is still the phase-1 selection -- Accept-Language, then English --
-// exactly as rule 5 of docs/subtitle_translate.md describes. Pinned so that
-// widening the rule to them is a decision, not a side effect.
-func TestFreeViewerKeepsThePhaseOneFallback(t *testing.T) {
+// TestFreeViewerGetsEnglishBesideTheUpsell: owner, 2026-09-28 -- the rule
+// covers a free viewer too, whose translation is locked and drawn as an
+// upsell: the English track plays beside it, not the phase-1
+// Accept-Language pick (Russian here). With no English track the phase-1
+// selection still decides. Negative control: without the upsell branch in
+// applyLadder the default is os-1 again.
+func TestFreeViewerGetsEnglishBesideTheUpsell(t *testing.T) {
 	audio := probeWith(`[{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]`)
 	ud := enViewer(language.Portuguese, language.Russian, language.English)
 	items := NewHelper().GetSubtitles(ud, audio, &ra.ExportTag{}, []api.OpenSubtitleTrack{osAbs("1", "ru", "hash"), osAbs("2", "en", "imdb")}, &models.ExternalData{}, nil,
@@ -130,8 +131,16 @@ func TestFreeViewerKeepsThePhaseOneFallback(t *testing.T) {
 	if !tr.Locked || !tr.Upsell || tr.Offered {
 		t.Fatalf("fixture must produce a locked upsell: %+v", tr)
 	}
-	if d := defaultID(items); d != "os-1" {
-		t.Fatalf("default=%s want os-1: the phase-1 Accept-Language pick", d)
+	if d := defaultID(items); d != "os-2" {
+		t.Fatalf("default=%s want os-2: the English track beside the upsell", d)
+	}
+	if !byID(items)["tr-pt"].Upsell {
+		t.Fatalf("the upsell must stay: %+v", byID(items)["tr-pt"])
+	}
+	noEnglish := NewHelper().GetSubtitles(ud, audio, &ra.ExportTag{}, []api.OpenSubtitleTrack{osAbs("1", "ru", "hash")}, &models.ExternalData{}, nil,
+		SubtitleOpts{PreferredLang: "pt", Translate: true, Paid: false})
+	if d := defaultID(noEnglish); d != "os-1" {
+		t.Fatalf("no English track: default=%s want os-1, the phase-1 Accept-Language pick", d)
 	}
 }
 

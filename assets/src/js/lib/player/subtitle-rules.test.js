@@ -206,15 +206,18 @@ test('the English track never outranks the rules before it', () => {
     assert.equal(pickDefaultSubtitle([AI('tr-pt'), T('mp-0', 1, 'pt', { forced: true, isDefault: true })], 'ja', 'pt'), 'mp-0');
 });
 
-// Negative control for the `locked` test in translationOnOffer: without it
-// a free viewer's audio switch replaces the server's phase-1 pick (here the
-// Russian track Accept-Language chose) with English.
-test('no offer, no English rule: a free viewer keeps what the server chose', () => {
+// Owner, 2026-09-28: a free viewer (the translation chip locked, an
+// upsell) gets the English track too, as on the server
+// (TestFreeViewerGetsEnglishBesideTheUpsell). Negative control: with
+// translationOnOffer counting only unlocked items again, the audio switch
+// keeps the Russian phase-1 pick.
+test('beside an upsell (a free viewer) the English track comes on too', () => {
     const tracks = [AI('tr-pt', { locked: true }), T('os-ru', 3, 'ru', { isDefault: true }), T('os-en', 3, 'en')];
-    assert.equal(pickDefaultSubtitle(tracks, 'ja', 'pt'), 'os-ru');
-    // ...and with nothing on, nothing comes on.
-    assert.equal(pickDefaultSubtitle([AI('tr-pt', { locked: true }), T('os-en', 3, 'en')], 'ja', 'pt'), 'none');
-    // No AI item at all (NSFW, a language the service does not know): the same.
+    assert.equal(pickDefaultSubtitle(tracks, 'ja', 'pt'), 'os-en');
+    assert.equal(pickDefaultSubtitle([AI('tr-pt', { locked: true }), T('os-en', 3, 'en')], 'ja', 'pt'), 'os-en');
+    // No English track beside the upsell: what the server chose stands.
+    assert.equal(pickDefaultSubtitle([AI('tr-pt', { locked: true }), T('os-ru', 3, 'ru', { isDefault: true })], 'ja', 'pt'), 'os-ru');
+    // No AI item at all (NSFW, a language the service does not know): no English rule.
     assert.equal(pickDefaultSubtitle([T('os-en', 3, 'en')], 'ja', 'pt'), 'none');
 });
 
