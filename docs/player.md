@@ -347,12 +347,19 @@ ManagedMediaSource swaps in its own `blob:` `<source>`, see `stream-url.js`) and
 `stream-start` needs 5 s of playback, the passthrough guard watches a decoder. The watch closes
 that gap with telemetry only — no restart, the viewer sees nothing.
 
-Armed by `play` (the viewer or autoplay), off at the first `playing` or the clock moving past
-where the request found it; a pause disarms (resume prompt, grace hold), a hidden tab restarts
-the quiet, a restart a guard has begun (`guard.done`) or an element taken off the page ends it.
+Armed by `play` (the viewer or autoplay) — and, on a player with `autoplay` in its markup, at
+mount: autoplay fires `play` only once there is data (together with `playing`), so a player that
+never gets any, or whose element errors before any press (`play()` then rejects without a
+`play`), would never be watched. That arming lets go when the element has data and stays paused
+(autoplay refused, the resume prompt's hold); the viewer's Play arms it again. Off at the first
+`playing` on a playing element (the hold leaves a `playing` on a paused one) or the clock moving
+past where the request found it; a pause disarms, a hidden tab restarts the quiet, a restart a
+guard has begun (`guard.done`) or an element taken off the page ends it.
 One `player-dead` per player, when any of three holds 30 s after the request:
 
-- **`why: quiet`** — nothing moved towards playback for 30 s: no playlist request pending
+- **`why: quiet`** — nothing moved towards playback for 30 s. Progress is an answer or bytes, and
+  a request still pending — never the asking itself: on a lost transcoder session (a rollout) every
+  request gets a 404 and hls.js asks again for ever. So: no playlist request pending
   (manifest always; video/audio playlist only before the first fragment is in — after that
   hls.js polls a live playlist whatever the element does), no fragment in flight before its
   headers or receiving bytes (`loader-restart.js` `loadProgress`/`loadWork` — a 4K segment at the

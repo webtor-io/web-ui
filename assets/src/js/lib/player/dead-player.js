@@ -7,14 +7,15 @@
 // guard watches a decoder (the old route died the same way; a fallback would
 // not have helped). The owner found it by hand.
 //
-// So: playback was asked for (`play`: the viewer, or autoplay), the element
-// has not played yet (no `playing`, the clock has not moved), and for
+// So: playback was asked for, the element has not played yet (no `playing`
+// on a playing element, the clock has not moved), and for
 // DEAD_AFTER_MS nothing moved towards playback (why: quiet). Then one
 // `player-dead` event with the state it died in. Moving, or waiting on the
 // server, is:
-//   - a playlist or a fragment request pending: the server is being asked.
-//     Not an hls.js error: a retry is a new request, which counts, and a
-//     media error repeated is no progress at all;
+//   - a playlist or a fragment request pending: the server is being asked;
+//     and an answer, or bytes. Not the asking itself, nor an hls.js error:
+//     on a lost transcoder session (a rollout) every request gets a 404 and
+//     hls.js asks again for ever, which is no progress at all;
 //   - a fragment in flight before its headers or receiving bytes
 //     (loader-restart.js loadProgress/loadWork: a 4K segment at the viewer's
 //     cap may take minutes and raises no event while it arrives);
@@ -38,6 +39,13 @@
 //   - why: recovering -- RECOVERY_STORM re-attachments (`emptied`) since the
 //     request and DEAD_AFTER_MS without a start: on a muxed TS shape hls.js
 //     recovers ~1000 times a second, and the passthrough guard never gives up.
+// Asked for is a `play` (the viewer, or autoplay) -- or, on a player with
+// `autoplay` in its markup, the mount itself: autoplay fires `play` only
+// once the element has data, together with `playing`, so a player that
+// never gets any would never be watched, and a MediaError before any press
+// makes play() reject without a `play`. That arming lets go as soon as the
+// element has data and stays paused (autoplay refused, the resume prompt's
+// hold): the viewer's Play arms it again.
 // Not a fallback: a timer cannot tell a dead player from a slow one well
 // enough to restart anything. Where it was only slow after all -- it plays
 // later -- `player-revived` says so, and their count is this rule's error.
@@ -62,8 +70,10 @@ export const STARTED_ADVANCE_S = 0.5;
 // or a recovery that may work; five without a start is a loop.
 export const RECOVERY_STORM = 5;
 
-// HTMLMediaElement.NETWORK_LOADING, spelled out for plain-object tests.
+// HTMLMediaElement.NETWORK_LOADING and HAVE_FUTURE_DATA, spelled out for
+// plain-object tests.
 const NETWORK_LOADING = 2;
+const HAVE_FUTURE_DATA = 3;
 
 const ELEMENT_ACTIVITY = ['progress'];
 
@@ -94,6 +104,8 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     deadAfterMs = DEAD_AFTER_MS, checkEveryMs = CHECK_EVERY_MS }) {
     const E = (Hls && Hls.Events) || {};
     let armedAt = null;
+    // What armed the watch: 'play', or 'autoplay' (the markup, at mount).
+    let armedBy = null;
     let startAt = 0;
     let quietSince = 0;
     let timer = null;
@@ -118,7 +130,6 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     const ask = (k) => () => {
         if (k === 'manifest') fragIn = false;
         waiting[k] = true;
-        if (counts(k)) touch();
     };
     const answer = (k) => () => {
         waiting[k] = false;
@@ -139,7 +150,7 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         [E.MANIFEST_LOADING, ask('manifest')], [E.MANIFEST_LOADED, answer('manifest')],
         [E.LEVEL_LOADING, ask('level')], [E.LEVEL_LOADED, answer('level')],
         [E.AUDIO_TRACK_LOADING, ask('audio')], [E.AUDIO_TRACK_LOADED, answer('audio')],
-        [E.FRAG_LOADING, touch], [E.FRAG_LOADED, onFrag], [E.FRAG_BUFFERED, onFrag],
+        [E.FRAG_LOADED, onFrag], [E.FRAG_BUFFERED, onFrag],
         [E.ERROR, onError],
     ].filter(([ev]) => ev);
     const bind = (hls) => {
@@ -158,6 +169,7 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     const disarm = () => {
         if (timer !== null) { stopTimer(timer); timer = null; }
         armedAt = null;
+        armedBy = null;
     };
     const dispose = () => {
         if (stopped) return;
@@ -213,6 +225,13 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         const t = now();
         if (advanced()) { started(); return; }
         if (doc.hidden) { quietSince = t; return; }
+        // Autoplay's arming: data in and still paused is autoplay refused or
+        // held, not a dead player. A Play arms it again.
+        if (armedBy === 'autoplay' && safe(() => video.paused, true)
+            && safe(() => video.readyState, 0) >= HAVE_FUTURE_DATA) {
+            disarm();
+            return;
+        }
         if (safe(() => !!video.error, false)) {
             if (errorSince === null) errorSince = t;
         } else {
@@ -245,8 +264,8 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         track(DEAD_EVENT, state(t, why));
     };
 
-    function onPlay() {
-        if (stopped || armedAt !== null || reportedAt !== null) return;
+    const arm = (by) => {
+        armedBy = by;
         armedAt = now();
         startAt = safe(() => video.currentTime, 0) || 0;
         sig = bufferedSig(video);
@@ -255,11 +274,19 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         // hls.js attaching at mount resets the element too: not a recovery.
         recoveries = 0;
         timer = startTimer(check, checkEveryMs);
+    };
+    function onPlay() {
+        if (stopped || armedAt !== null || reportedAt !== null) return;
+        arm('play');
     }
     function onPause() {
         if (reportedAt === null) disarm();
     }
     function onPlaying() {
+        // Autoplay fires `play` and `playing` together; a hold that pauses
+        // on `play` (the resume prompt) leaves a `playing` on a paused
+        // element that has not started anything.
+        if (safe(() => video.paused, false)) return;
         started();
     }
     function onTime() {
@@ -286,8 +313,10 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     video.addEventListener('emptied', onEmptied);
     for (const ev of ELEMENT_ACTIVITY) video.addEventListener(ev, touch);
     doc.addEventListener('visibilitychange', touch);
-    // Autoplay may have asked before the player mounted.
+    // Autoplay may have asked before the player mounted; or it is in the
+    // markup and will ask once there is data.
     if (!safe(() => video.paused, true)) onPlay();
+    else if (safe(() => video.autoplay, false) === true) arm('autoplay');
 
     return { dispose, get reported() { return reportedAt !== null; } };
 }

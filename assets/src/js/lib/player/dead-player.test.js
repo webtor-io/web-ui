@@ -8,6 +8,7 @@ function fakeVideo({ src = 'https://x.test/s/index.m3u8', route = '' } = {}) {
     const handlers = new Map();
     return {
         paused: true,
+        autoplay: false,
         currentTime: 0,
         readyState: 0,
         networkState: 1,
@@ -437,4 +438,81 @@ test('re-attachments before the play request are not a storm', () => {
     s.video.play();
     s.advance(3 * 60000, grow);
     assert.equal(dead(s.events).length, 0);
+});
+
+// The review of 2026-09-29: what arms the watch, and what is not progress.
+
+test('a lost session: the video playlist asked again and again, answered 404, is dead', () => {
+    const video = fakeVideo();
+    const hls = fakeHls(video);
+    const s = setup({ video, hls });
+    s.video.play();
+    s.advance(CHECK_EVERY_MS);
+    s.advance(DEAD_AFTER_MS + 2 * CHECK_EVERY_MS, (t) => {
+        if (t % 4000 === 0) {
+            hls.trigger(Hls.Events.LEVEL_LOADING);
+            hls.trigger(Hls.Events.ERROR, { type: 'networkError', details: 'levelLoadError', fatal: false, response: { code: 404 } });
+        }
+    });
+    assert.equal(dead(s.events).length, 1);
+    assert.equal(dead(s.events)[0].data.why, 'quiet');
+});
+
+test('fragments asked again and again after the first, never answered, is dead', () => {
+    const video = fakeVideo();
+    const hls = fakeHls(video);
+    const s = setup({ video, hls });
+    s.video.play();
+    s.advance(CHECK_EVERY_MS);
+    hls.trigger(Hls.Events.FRAG_LOADED);
+    s.advance(DEAD_AFTER_MS + 2 * CHECK_EVERY_MS, () => {
+        hls.trigger(Hls.Events.FRAG_LOADING);
+        hls.trigger(Hls.Events.ERROR, { type: 'networkError', details: 'fragLoadError', fatal: true, response: { code: 404 } });
+    });
+    assert.equal(dead(s.events).length, 1);
+});
+
+test('autoplay in the markup: a player that never gets data is watched without a play event', () => {
+    const video = fakeVideo();
+    video.autoplay = true;
+    const s = setup({ video });
+    s.advance(DEAD_AFTER_MS - CHECK_EVERY_MS);
+    assert.equal(dead(s.events).length, 0);
+    s.advance(2 * CHECK_EVERY_MS);
+    assert.equal(dead(s.events).length, 1);
+});
+
+test('autoplay in the markup: a MediaError before any press is still reported', () => {
+    const video = fakeVideo();
+    video.autoplay = true;
+    const { hls, grow } = busyHls(video);
+    const s = setup({ video, hls });
+    s.advance(4000, grow);
+    s.video.error = { code: 4 };
+    s.advance(DEAD_AFTER_MS + 2 * CHECK_EVERY_MS, grow);
+    assert.equal(dead(s.events).length, 1);
+    assert.equal(dead(s.events)[0].data.why, 'error');
+});
+
+test('autoplay refused or held: data in and paused is not dead; the viewer\'s Play arms it again', () => {
+    const video = fakeVideo();
+    video.autoplay = true;
+    const s = setup({ video });
+    s.advance(4000);
+    s.video.readyState = 4;
+    s.advance(5 * 60000);
+    assert.equal(s.events.length, 0);
+    s.video.play();
+    s.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
+    assert.equal(dead(s.events).length, 1, 'played, nothing moved: a dead decoder');
+});
+
+test('the resume prompt\'s playing on a held (paused) element is not a start', () => {
+    const s = setup();
+    s.video.play();
+    s.video.pause();
+    s.video.fire('playing');
+    s.video.play();
+    s.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
+    assert.equal(dead(s.events).length, 1, 'the resumed start is still watched');
 });
