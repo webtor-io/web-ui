@@ -69,7 +69,7 @@ type StreamContent struct {
 	// soft signup CTA after the grace window passes.
 	GraceDurationSec int
 	// GraceFreeRateMbps is the user's plan-cap rate (in Mbps) parsed from
-	// ApiClaims.Rate. Shown on the "Continue at X Mbps" secondary CTA. Zero
+	// ApiClaims.Rate (statusview.RateMbps). Shown on the "Continue at X Mbps" secondary CTA. Zero
 	// when the claim is missing/unparseable — template hides the line.
 	GraceFreeRateMbps int
 	// SubtitleOpts carries the viewer-specific inputs of the subtitle
@@ -247,6 +247,10 @@ type WarmupSettings struct {
 	SeederProbeTimeoutSec int
 }
 
+// SlowDownloadData is the slow-download modal's. Its speeds are in the
+// megabit of the transfer status and of thp's limiter (statusview.mbit, 2^20
+// bits): at a "5M" cap the modal says 5, and a stream reads the same number
+// here as in the status's "…and this file needs N".
 type SlowDownloadData struct {
 	MeasuredSpeedMbps float64
 	RequiredSpeedMbps float64
@@ -272,6 +276,20 @@ type SlowDownloadData struct {
 
 type SlowDownloadError struct {
 	Data SlowDownloadData
+}
+
+// MeasuredLabel is the modal's "you have" number, printed the way the
+// transfer status prints a speed (statusview.Quantize, FormatNumber): "5",
+// "9,2" in Russian, "9.2" in English.
+func (d SlowDownloadData) MeasuredLabel(lang string) string {
+	return statusview.FormatNumber(lang, statusview.Quantize(d.MeasuredSpeedMbps))
+}
+
+// RequiredLabel is the modal's "the file needs" number, printed as
+// MeasuredLabel is: for a stream over the cap it is the N of the status's
+// "…and this file needs N" (statusview.StallSub), byte for byte.
+func (d SlowDownloadData) RequiredLabel(lang string) string {
+	return statusview.FormatNumber(lang, statusview.Quantize(d.RequiredSpeedMbps))
 }
 
 func (e *SlowDownloadError) Error() string {
@@ -400,18 +418,6 @@ func getVideoBitrate(mp *api.MediaProbe) int64 {
 	return total
 }
 
-func parseRateLimit(rate string) int64 {
-	rate = strings.TrimSpace(rate)
-	if !strings.HasSuffix(rate, "M") || len(rate) < 2 {
-		return 0
-	}
-	n, err := strconv.ParseInt(rate[:len(rate)-1], 10, 64)
-	if err != nil {
-		return 0
-	}
-	return n * 1_000_000
-}
-
 // buildSlowDownloadData is the slow-download modal's data for a swarm that
 // delivers less than the file needs: measuredBytesPerSec is what the seeder
 // fetched from its peers during the warm-up, not what reaches the viewer, so
@@ -423,11 +429,16 @@ func parseRateLimit(rate string) int64 {
 // in 2026-09 for free viewers, 4 trial clicks from them (owner, 2026-09-26:
 // the modal promised slow video to viewers grace gave full speed). The cap
 // variant is checkCachedRateLimit's alone.
+//
+// Both speeds are in the status's megabit (statusview.BytesToMbps,
+// BitsToMbps). Until 2026-09-29 the modal counted 10^6 bits: the owner's
+// 1080p file "needed 9.1" here and 8,7 in the status, a 1.2 MB/s swarm read
+// 9.6 here and 9,2 there.
 func buildSlowDownloadData(c *web.Context, measuredBytesPerSec float64, bitrate int64) SlowDownloadData {
 	sdd := SlowDownloadData{
-		MeasuredSpeedMbps: measuredBytesPerSec * 8 / 1_000_000,
-		RequiredSpeedMbps: float64(bitrate) / 1_000_000,
-		BitrateMbps:       float64(bitrate) / 1_000_000,
+		MeasuredSpeedMbps: statusview.BytesToMbps(measuredBytesPerSec),
+		RequiredSpeedMbps: statusview.BitsToMbps(float64(bitrate)),
+		BitrateMbps:       statusview.BitsToMbps(float64(bitrate)),
 	}
 	if c.Claims != nil && c.Claims.Context != nil && c.Claims.Context.Tier != nil {
 		sdd.TierName = c.Claims.Context.Tier.Name
@@ -442,20 +453,40 @@ func buildSlowDownloadData(c *web.Context, measuredBytesPerSec float64, bitrate 
 // slow-download warning based purely on the user's subscription-tier rate cap.
 // Cached content comes from CDN/S3 fast enough to saturate the cap, so the cap
 // itself is the effective throughput — no probe download needed.
+//
+// The cap is read the way thp's limiter reads it (statusview.RateMbps: "5M"
+// is 5·2^20 bits a second, 655,360 B/s delivered), and the stream is over it
+// only as the labels say them (statusview.OverCap, the status's own
+// over-the-cap mark): the modal never reads "5 → 5", and a stream the
+// status calls not over the cap gets no cap modal.
+//
+// That leaves a stream in FitsMargin's band -- at the cap as the labels say
+// them, or under it by less than 1.2 -- with no upfront warning, from the
+// modal or from the status, which calls it unknown and shows its stream box
+// only once it really stalls. It is not known to fit: the player pulls more
+// than the estimate. The file FitsMargin records pulled 1.16 times it and,
+// at 0.869 of the cap, stalled four times in 180 s; at that ratio every
+// stream from 0.862 of the cap up pulls over it. It gets no modal because
+// the modal says "the file needs more than you have", and by its own numbers
+// it would read "5 → 4,9". Warning that band upfront is open: it needs
+// wording of its own (docs/warmup.md, Units).
+//
+// Until 2026-09-29 the cap was taken as 5,000,000 b/s, 0.954 of what the
+// limiter delivers: the modal fired for the top of that band (5,000,001 to
+// 5,295,308 b/s at 5M, reading "5.0 → 5.0" to "5.0 → 5.3") by the unit
+// error, not by design, and never for the rest of it (the 0.869 file got
+// none then either).
 func checkCachedRateLimit(c *web.Context, bitrate int64) (SlowDownloadData, bool) {
-	if c.ApiClaims == nil || c.ApiClaims.Rate == "" {
+	if c.ApiClaims == nil {
 		return SlowDownloadData{}, false
 	}
-	rateLimitBps := parseRateLimit(c.ApiClaims.Rate)
-	if rateLimitBps == 0 {
+	capMbps := statusview.RateMbps(c.ApiClaims.Rate)
+	if !statusview.OverCap(capMbps, statusview.BitsToMbps(float64(bitrate))) {
 		return SlowDownloadData{}, false
 	}
-	if float64(rateLimitBps) >= float64(bitrate) {
-		return SlowDownloadData{}, false
-	}
-	sdd := buildSlowDownloadData(c, float64(rateLimitBps)/8, bitrate)
+	sdd := buildSlowDownloadData(c, statusview.RateBytesPerSec(c.ApiClaims.Rate), bitrate)
 	sdd.IsRateLimited = true
-	sdd.RateLimitMbps = float64(rateLimitBps) / 1_000_000
+	sdd.RateLimitMbps = capMbps
 	return sdd, true
 }
 

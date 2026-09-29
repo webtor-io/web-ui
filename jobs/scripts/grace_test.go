@@ -40,6 +40,11 @@ func TestApplyGraceRules_TokenCarriesTheSession(t *testing.T) {
 	if len(c.ApiClaims.Rules) != 1 || c.ApiClaims.Hash != hash || sc.GraceDurationSec != 1200 {
 		t.Fatalf("rules %+v, hash %q, duration %d", c.ApiClaims.Rules, c.ApiClaims.Hash, sc.GraceDurationSec)
 	}
+	// The popup's "Continue at 5 Mbps": the viewer's own cap, the tier's
+	// number as the claim carries it.
+	if sc.GraceFreeRateMbps != 5 {
+		t.Errorf("GraceFreeRateMbps = %d, want 5 for a 5M claim", sc.GraceFreeRateMbps)
+	}
 	p, err := jwt.Parse(c.ApiClaims.Rules[0].Token, func(*jwt.Token) (interface{}, error) { return []byte(secret), nil })
 	if err != nil || !p.Valid {
 		t.Fatalf("grace token: %v", err)

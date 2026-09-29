@@ -39,10 +39,38 @@ test harness). The modal's title says which gate fired: the plan's cap (`IsRateL
 `action.slow.title.rateLimited`, "Not enough speed for smooth playback") or the swarm
 (`action.slow.title.bandwidth`).
 
-Known gap: the modal counts a megabit as 10^6 bits (`buildSlowDownloadData`,
-`parseRateLimit`), the status and thp's limiter as 2^20 (`statusview.mbit`) — the same
-stream reads 9.1 in the modal and 8.7 in the status (the owner's 1080p file of
-`status_stall_test.go`).
+Units: every Mbps in the modal is `statusview.mbit`, 2^20 bits — the megabit thp's
+limiter reads a rate claim in (`"5M"` is 5,242,880 b/s, 655,360 B/s), and the one the
+transfer status prints. `buildSlowDownloadData` converts with `statusview.BytesToMbps` /
+`BitsToMbps`, the cap comes from `statusview.RateMbps`, and the two numbers are printed by
+the status's formatter (`SlowDownloadData.MeasuredLabel`/`RequiredLabel`: `Quantize` +
+`FormatNumber`, the language's separator). The cap modal fires only where the status marks
+the stream over the cap (`statusview.OverCap`, as the labels say them), so it never reads
+"5 → 5". Until 2026-09-29 the modal counted 10^6 bits (`parseRateLimit`): the owner's 1080p
+file read "5.0 → 9.1" in the modal and "5 → 8,7" in the status, and at a 5M cap the modal
+fired from 5,000,001 b/s, 0.954 of what the limiter delivers ("5.0 → 5.0" to "5.0 → 5.3");
+it now starts at 5,295,309 b/s, where the label turns 5,1. The Umami fields
+`measured_mbps`/`required_mbps` of `slow-download-shown` are in the same unit since then:
+4.6% below the old numbers for the same stream. `TestCapModal_SaysWhatTheStatusSays` and
+`TestCheckCachedRateLimit_TheLimitersMegabit` hold this. The speedtest page is the one place
+that stays 10^6: it measures the viewer's line against Ookla, not a cap.
+
+The new start is a behaviour change, not only a unit fix. The streams between those two
+numbers are in `statusview.FitsMargin`'s band — at the cap as the labels say them, or under
+it by less than 1.2 — which the status calls unknown: no upfront stream box, the box once
+the player really stalls. They are not carried in full: the player pulls more than the
+`playedBitrate` estimate the gate reads (1.16 times it on the file `FitsMargin` records —
+MPEG-TS overhead, a heavier-than-average scene, the transcoder's AAC at ~236 kbit/s against
+139.6 — and that file stalled four times in 180 s at 0.869 of the cap). At 1.16 every
+stream from 0.862 of the cap up pulls over it; with the structural overhead alone (TS
+packets ~2.5%, AAC in TS +96 kbit/s) the slice the old modal covered, 0.954–1.01 of the
+cap, pulls about 0.995–1.05 of it. So a stream in the band can stall with no modal. The
+modal stays out because its claim, "the file needs more than you have", would read
+"5 → 4,9" there. The old gate did not cover the band either: it warned its top slice by the
+unit error and nothing below 0.954 (the 0.869 file got no modal then too). An upfront
+warning for the whole band, with wording that does not say the file needs more than the
+cap, is an open choice for the owner; `TestCheckCachedRateLimit_TheLimitersMegabit` pins
+the current one (no modal where the status is not over the cap, swept from cap/1.2 up).
 
 ## Three paths
 

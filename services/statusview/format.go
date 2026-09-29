@@ -87,6 +87,13 @@ func RateBytesPerSec(rate string) float64 {
 	return RateMbps(rate) * mbit / 8
 }
 
+// RateBitsPerSec is the claim in bits a second as thp enforces it ("5M" is
+// 5,242,880), for holding the cap against a bitrate in bits a second
+// (ffprobe's bit_rate, an HLS BANDWIDTH). 0 for no cap.
+func RateBitsPerSec(rate string) float64 {
+	return RateMbps(rate) * mbit
+}
+
 var printers sync.Map // language → *message.Printer
 
 func printer(lang string) *message.Printer {

@@ -20,6 +20,14 @@ func TestRateMbps(t *testing.T) {
 	if got := RateBytesPerSec("5M"); got != 5*1024*1024/8 {
 		t.Errorf("RateBytesPerSec(5M) = %v", got)
 	}
+	// The same cap in bits, to hold against a bitrate: 5,242,880, not the
+	// 5,000,000 the slow-download modal used to take it for.
+	if got := RateBitsPerSec("5M"); got != 5_242_880 {
+		t.Errorf("RateBitsPerSec(5M) = %v, want 5242880", got)
+	}
+	if got := RateBitsPerSec(""); got != 0 {
+		t.Errorf("RateBitsPerSec(no claim) = %v, want 0", got)
+	}
 }
 
 // A viewer held at a "5M" cap must read "5", the number the cap says — the

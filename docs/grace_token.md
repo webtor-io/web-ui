@@ -262,4 +262,4 @@ Kill switch: flip flag OFF. No DB migration, instant rollback.
 | `grace-soft-cta-shown` | client (Player.jsx) | First time `state.currentTime` ≥ `graceDurationSec` — `paused: true` when the popup stopped a playing film (since 2026-09-26; `false` for a film already paused — by the viewer, or by a session seek through hls.js, whose held run shows on the click) |
 | `grace-soft-cta-click` | client | Dismiss X or "Continue at slow speed" — `action: dismiss\|continue`; `via: button\|play` (Play while the popup is up counts as `continue`); `paused` — the popup held playback and this answer resumed it |
 | `donate-grace` | client (popup link) | promo-plan CTA click — `tier: free\|anon`, `target: trial\|checkout\|donate` |
-| `slow-download-shown` | client (existing) | After Sprint 2 only fires for BT-slow — interpret accordingly |
+| `slow-download-shown` | client (existing) | After Sprint 2 only fires for BT-slow — interpret accordingly. `measured_mbps`/`required_mbps` are in 2^20-bit megabits since 2026-09-29 (10^6 before: 4.6% higher for the same stream; `docs/warmup.md`, "Units") |

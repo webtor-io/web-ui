@@ -3,6 +3,7 @@ package scripts
 import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -65,7 +66,10 @@ func (s *ActionScript) applyGraceRules(sc *StreamContent, hash string, c *web.Co
 	// replay path with no THP changes.
 	c.ApiClaims.Hash = hash
 	sc.GraceDurationSec = s.grace.DurationSec
-	if bps := parseRateLimit(c.ApiClaims.Rate); bps > 0 {
-		sc.GraceFreeRateMbps = int(bps / 1_000_000)
+	// The tier's number as the claim carries it ("5M" -> 5): the rate the
+	// viewer continues at, in the limiter's megabit like every speed the
+	// page shows (statusview.RateMbps).
+	if m := statusview.RateMbps(c.ApiClaims.Rate); m > 0 {
+		sc.GraceFreeRateMbps = int(m)
 	}
 }

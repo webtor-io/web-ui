@@ -15,9 +15,13 @@
         </div>
     </div>
 
+    {{- /* The two numbers are printed as the transfer status prints speeds
+         (SlowDownloadData.MeasuredLabel/RequiredLabel): the same megabit,
+         the language's separator, "5" for a cap -- the stream reads here
+         what the status's "…and this file needs N" says of it. */}}
     <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-4 mb-3">
         <div class="text-center p-3 rounded-lg bg-base-300/40 border border-w-line">
-            <div class="text-2xl font-bold text-w-sub leading-none">{{ printf "%.1f" .Data.MeasuredSpeedMbps }}</div>
+            <div class="text-2xl font-bold text-w-sub leading-none">{{ .Data.MeasuredLabel $.Lang }}</div>
             <div class="text-[11px] text-w-muted mt-1.5 uppercase tracking-wide">{{ t $.Lang "action.slow.unit" }}</div>
             <div class="text-xs text-w-muted mt-1">{{ t $.Lang "action.slow.youHave" }}</div>
         </div>
@@ -25,7 +29,7 @@
             <path d="M5 12h14M13 6l6 6-6 6"/>
         </svg>
         <div class="text-center p-3 rounded-lg bg-w-pink/10 border border-w-pink/30">
-            <div class="text-2xl font-bold gradient-text leading-none">{{ printf "%.1f" .Data.RequiredSpeedMbps }}</div>
+            <div class="text-2xl font-bold gradient-text leading-none">{{ .Data.RequiredLabel $.Lang }}</div>
             <div class="text-[11px] text-w-pinkL mt-1.5 uppercase tracking-wide">{{ t $.Lang "action.slow.unit" }}</div>
             <div class="text-xs text-w-pinkL/80 mt-1">{{ t $.Lang "action.slow.fileNeeds" }}</div>
         </div>

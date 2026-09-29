@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -97,12 +98,13 @@ func passthroughFragLoadMs(bandwidth int64, target float64, capBps int64) int {
 	return int(ms)
 }
 
-// capOf is the viewer's cap in bits/s from the claims, 0 for none.
+// capOf is the viewer's cap in bits/s from the claims as thp enforces it
+// ("5M" is 5,242,880, statusview.RateBitsPerSec), 0 for none.
 func capOf(c *web.Context) int64 {
 	if c == nil || c.ApiClaims == nil {
 		return 0
 	}
-	return parseRateLimit(c.ApiClaims.Rate)
+	return int64(statusview.RateBitsPerSec(c.ApiClaims.Rate))
 }
 
 // applySessionRoute puts the transcoder session on sc, with what the

@@ -109,7 +109,8 @@ func TestApplySessionRoute(t *testing.T) {
 	if sc.VideoClass != "hevc10" {
 		t.Errorf("passthrough class %q", sc.VideoClass)
 	}
-	if want := passthroughFragLoadMs(9_000_000, 10, 5_000_000); sc.FragLoadMs != want {
+	// The cap as thp enforces "5M": 5·2^20 bits a second (capOf).
+	if want := passthroughFragLoadMs(9_000_000, 10, 5<<20); sc.FragLoadMs != want {
 		t.Errorf("frag %d, want %d", sc.FragLoadMs, want)
 	}
 
@@ -117,7 +118,7 @@ func TestApplySessionRoute(t *testing.T) {
 	// rate): the file's own rate stands in.
 	sc = &StreamContent{MediaProbe: probeJSON(t, hevc)}
 	s.applySessionRoute(sc, c, &SessionBufferResult{Session: &api.TranscoderSession{VideoRoute: "passthrough"}, Variant: hlsVariant{Codecs: "hvc1.1.6.L150.90", Bandwidth: 1}, TargetDuration: 60})
-	if want := passthroughFragLoadMs(8_400_000, 60, 5_000_000); sc.FragLoadMs != want || want == fragLoadFloorMs {
+	if want := passthroughFragLoadMs(8_400_000, 60, 5<<20); sc.FragLoadMs != want || want == fragLoadFloorMs {
 		t.Errorf("no bandwidth: frag %d, want %d (over the floor)", sc.FragLoadMs, want)
 	}
 }

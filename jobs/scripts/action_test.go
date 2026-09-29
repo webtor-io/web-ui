@@ -11,6 +11,7 @@ import (
 	claimsproto "github.com/webtor-io/claims-provider/proto"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -27,22 +28,6 @@ func ctxWith(rate, tier string) *web.Context {
 
 func almostEqual(a, b float64) bool { return math.Abs(a-b) < 1e-6 }
 
-func TestParseRateLimit(t *testing.T) {
-	cases := map[string]int64{
-		"":    0,
-		"10M": 10_000_000,
-		"1M":  1_000_000,
-		"10":  0,
-		"10K": 0,
-		"xM":  0,
-	}
-	for in, want := range cases {
-		if got := parseRateLimit(in); got != want {
-			t.Errorf("parseRateLimit(%q) = %d, want %d", in, got, want)
-		}
-	}
-}
-
 // The warm-up measures the swarm (what the seeder fetched from its peers), not
 // the viewer's link: a swarm at the plan's cap that still falls short of the
 // file is the swarm's shortfall, and a faster plan would not fix it -- the
@@ -50,8 +35,8 @@ func TestParseRateLimit(t *testing.T) {
 // 90% of the cap read as "rate-limited" and got the trial button.
 func TestBuildSlowDownloadData_SwarmAtTheCapIsNotTheCap(t *testing.T) {
 	c := ctxWith("10M", "free")
-	// The swarm gave 1.2 MB/s ≈ 9.6 Mbit/s: 96% of the 10 Mbit/s cap, and
-	// short of a 12 Mbit/s file.
+	// The swarm gave 1.2 MB/s = 9.2 Mbps in the cap's megabit (2^20 bits):
+	// 92% of the 10 Mbps cap, and short of a 12,000,000 b/s file (11.4).
 	sdd := buildSlowDownloadData(c, 1_200_000, 12_000_000)
 	if sdd.IsRateLimited {
 		t.Fatal("a swarm at the cap is still the swarm: IsRateLimited must be false")
@@ -59,11 +44,18 @@ func TestBuildSlowDownloadData_SwarmAtTheCapIsNotTheCap(t *testing.T) {
 	if sdd.RateLimitMbps != 0 {
 		t.Errorf("RateLimitMbps = %v, want 0 (the cap is not what this modal speaks of)", sdd.RateLimitMbps)
 	}
-	if !almostEqual(sdd.MeasuredSpeedMbps, 9.6) {
-		t.Errorf("MeasuredSpeedMbps = %v, want 9.6", sdd.MeasuredSpeedMbps)
+	if !almostEqual(sdd.MeasuredSpeedMbps, 9.1552734375) {
+		t.Errorf("MeasuredSpeedMbps = %v, want 9.155 (9,600,000 bits / 2^20)", sdd.MeasuredSpeedMbps)
 	}
-	if !almostEqual(sdd.RequiredSpeedMbps, 12) {
-		t.Errorf("RequiredSpeedMbps = %v, want 12 (= bitrate)", sdd.RequiredSpeedMbps)
+	if !almostEqual(sdd.RequiredSpeedMbps, 11.444091796875) {
+		t.Errorf("RequiredSpeedMbps = %v, want 11.444 (12,000,000 bits / 2^20)", sdd.RequiredSpeedMbps)
+	}
+	// Printed as the status prints the same swarm: "9,2", not "9.6".
+	if m, r := sdd.MeasuredLabel("ru"), sdd.RequiredLabel("ru"); m != "9,2" || r != "11" {
+		t.Errorf("ru labels %q -> %q, want 9,2 -> 11", m, r)
+	}
+	if m, r := sdd.MeasuredLabel("en"), sdd.RequiredLabel("en"); m != "9.2" || r != "11" {
+		t.Errorf("en labels %q -> %q, want 9.2 -> 11", m, r)
 	}
 	if sdd.TierName != "free" {
 		t.Errorf("TierName = %q, want free", sdd.TierName)
@@ -114,7 +106,7 @@ func TestCheckCachedRateLimit_CapSufficient(t *testing.T) {
 }
 
 func TestCheckCachedRateLimit_CapInsufficient(t *testing.T) {
-	// Cap=5M, bitrate=8M. Cap < bitrate => warn.
+	// Cap=5M, bitrate 8,000,000 b/s (7.6 in the cap's megabit). Cap < bitrate => warn.
 	c := ctxWith("5M", "free")
 	sdd, limited := checkCachedRateLimit(c, 8_000_000)
 	if !limited {
@@ -130,8 +122,11 @@ func TestCheckCachedRateLimit_CapInsufficient(t *testing.T) {
 	if !almostEqual(sdd.MeasuredSpeedMbps, 5) {
 		t.Errorf("MeasuredSpeedMbps = %v, want 5 (== cap)", sdd.MeasuredSpeedMbps)
 	}
-	if !almostEqual(sdd.RequiredSpeedMbps, 8) {
-		t.Errorf("RequiredSpeedMbps = %v, want 8 (= bitrate)", sdd.RequiredSpeedMbps)
+	if !almostEqual(sdd.RequiredSpeedMbps, 7.62939453125) {
+		t.Errorf("RequiredSpeedMbps = %v, want 7.629 (8,000,000 bits / 2^20)", sdd.RequiredSpeedMbps)
+	}
+	if m, r := sdd.MeasuredLabel("ru"), sdd.RequiredLabel("ru"); m != "5" || r != "7,6" {
+		t.Errorf("labels %q -> %q, want 5 -> 7,6", m, r)
 	}
 	if sdd.TierName != "free" {
 		t.Errorf("TierName = %q, want free", sdd.TierName)
@@ -139,9 +134,10 @@ func TestCheckCachedRateLimit_CapInsufficient(t *testing.T) {
 }
 
 func TestCheckCachedRateLimit_CapEqualsRequirement(t *testing.T) {
-	// Boundary: cap exactly at bitrate — treat as sufficient.
+	// Boundary: cap exactly at bitrate — treat as sufficient. "8M" is
+	// 8·2^20 bits a second, as thp delivers it.
 	c := ctxWith("8M", "basic")
-	if _, limited := checkCachedRateLimit(c, 8_000_000); limited {
+	if _, limited := checkCachedRateLimit(c, 8<<20); limited {
 		t.Error("cap == bitrate should not raise warning")
 	}
 }
@@ -186,7 +182,7 @@ func TestCapGateBitrate(t *testing.T) {
 	if _, limited := checkCachedRateLimit(capped, capGateBitrate(dts, true)); limited {
 		t.Error("a 3.6 Mbps stream at a 5 Mbps cap got the cap modal")
 	}
-	if sdd, limited := checkCachedRateLimit(capped, capGateBitrate(probeJSON(t, probeOwner), true)); !limited || !almostEqual(sdd.RequiredSpeedMbps, float64(8934213+aac48)/1_000_000) {
+	if sdd, limited := checkCachedRateLimit(capped, capGateBitrate(probeJSON(t, probeOwner), true)); !limited || !almostEqual(sdd.RequiredSpeedMbps, float64(8934213+aac48)/(1<<20)) {
 		t.Errorf("the owner's file over a 5 Mbps cap: limited %v, file needs %v", limited, sdd.RequiredSpeedMbps)
 	}
 }
@@ -210,15 +206,15 @@ func TestSwarmGate_HoldsTheFileRate(t *testing.T) {
 		probe      string
 		lowerBound float64 // bytes a second: the quick warm-up's
 		measured   float64 // bytes a second: the full measure's
-		fileNeeds  float64 // Mbps, the modal's
+		fileNeeds  string  // the modal's "the file needs", in English
 	}{
-		// 4.8 Mbps lower bound, 5 Mbps measured: over 3.64 played, under
-		// 6.6 of file.
-		{"two DTS dubs", probeTwoDTSDubs, 600_000, 625_000, 6.6},
-		// FLAC at ~900 kbps transcodes to 139.6 kbps of AAC; a 0.5 Mbps
+		// 4.8 Mbit/s lower bound, 5 measured: over 3.64 played, under
+		// 6.6 of file (6.3 in the cap's megabit, 2^20 bits).
+		{"two DTS dubs", probeTwoDTSDubs, 600_000, 625_000, "6.3"},
+		// FLAC at ~900 kbps transcodes to 139.6 kbps of AAC; a 0.5 Mbit/s
 		// swarm cannot fetch the FLAC.
 		{"transcoded FLAC", `{"format":{"bit_rate":"900000"},"streams":[
-			{"codec_type":"audio","codec_name":"flac","channels":2,"sample_rate":"48000"}]}`, 62_500, 62_500, 0.9},
+			{"codec_type":"audio","codec_name":"flac","channels":2,"sample_rate":"48000"}]}`, 62_500, 62_500, "0.9"},
 	}
 	for _, tc := range cases {
 		mp := probeJSON(t, tc.probe)
@@ -227,14 +223,14 @@ func TestSwarmGate_HoldsTheFileRate(t *testing.T) {
 			t.Fatalf("%s: the case needs a swarm between the played rate %d and the file's %d", tc.name, streamRate, fileRate)
 		}
 		if !needsFullMeasure(tc.lowerBound, fileRate, streamWarmupSize, bandwidthTestSize) {
-			t.Errorf("%s: a %.1f Mbps lower bound passed a %.1f Mbps file unmeasured", tc.name, tc.lowerBound*8/1e6, float64(fileRate)/1e6)
+			t.Errorf("%s: a %.1f Mbps lower bound passed a %.1f Mbps file unmeasured", tc.name, statusview.BytesToMbps(tc.lowerBound), statusview.BitsToMbps(float64(fileRate)))
 		}
 		if !swarmTooSlow(tc.measured, fileRate) {
-			t.Errorf("%s: a %.1f Mbps swarm passed a %.1f Mbps file", tc.name, tc.measured*8/1e6, float64(fileRate)/1e6)
+			t.Errorf("%s: a %.1f Mbps swarm passed a %.1f Mbps file", tc.name, statusview.BytesToMbps(tc.measured), statusview.BitsToMbps(float64(fileRate)))
 		}
 		sdd := buildSlowDownloadData(c, tc.measured, fileRate)
-		if sdd.IsRateLimited || !almostEqual(sdd.RequiredSpeedMbps, tc.fileNeeds) {
-			t.Errorf("%s: modal rate-limited %v, file needs %v, want the swarm's modal at %v", tc.name, sdd.IsRateLimited, sdd.RequiredSpeedMbps, tc.fileNeeds)
+		if sdd.IsRateLimited || sdd.RequiredLabel("en") != tc.fileNeeds {
+			t.Errorf("%s: modal rate-limited %v, file needs %q, want the swarm's modal at %s", tc.name, sdd.IsRateLimited, sdd.RequiredLabel("en"), tc.fileNeeds)
 		}
 	}
 	if swarmTooSlow(0, 6_600_000) {
