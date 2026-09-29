@@ -960,3 +960,27 @@ test('initDecodeDeclaration reads ?mms= too', () => {
     initDecodeDeclaration(win, win.document);
     assert.equal(iosPlaysHlsJs(win), true);
 });
+
+test('the ?mms= switch is read once per page: another tab switching does not split this page', () => {
+    const win = page({ url: 'https://webtor.io/ru/other' });
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
+    assert.equal(iosPlaysHlsJs(win), true);
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'off');
+    assert.equal(iosPlaysHlsJs(win), true, 'the probe asked hls.js\'s path on this page; createHls must take it');
+});
+
+test('a cached answer from the other HLS path is not sent', () => {
+    let win = page({ url: 'https://webtor.io/ru/other' });
+    optIn(win);
+    win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, mms: true, tokens: ['hevc10', 'hdr-pq'], at: Date.now() - 1000 }));
+    assert.equal(declarationFor(win, {}), 'unknown', '?mms=off since: that answer was the MSE path\'s -- no answer yet');
+    win = page({ url: 'https://webtor.io/ru/other' });
+    optIn(win);
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
+    win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, mms: true, tokens: ['hevc10', 'hdr-pq'], at: Date.now() - 1000 }));
+    assert.equal(declarationFor(win, {}), 'hevc10,hdr-pq', 'the same path: kept');
+    win = page({ url: 'https://webtor.io/ru/other' });
+    optIn(win);
+    win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, tokens: ['hevc10'], at: Date.now() - 1000 }));
+    assert.equal(declarationFor(win, {}), 'hevc10', 'an entry from before `mms` is the native path\'s');
+});

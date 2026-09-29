@@ -226,8 +226,11 @@ export function applyMmsUrlSwitch(win) {
 // decodePath); on any other device it changes nothing.
 export function iosPlaysHlsJs(win) {
     const s = state(win);
-    const v = s.mmsOptin !== undefined ? s.mmsOptin : read(win, MMS_OPTIN_KEY);
-    return v === 'on';
+    // Read once per page: the probe (which path it asks) and every
+    // createHls on this page see the same answer, whatever another tab
+    // switches meanwhile.
+    if (s.mmsOptin === undefined) s.mmsOptin = read(win, MMS_OPTIN_KEY);
+    return s.mmsOptin === 'on';
 }
 
 // takesPart: does this page send a declaration? Every browser but one
@@ -271,12 +274,16 @@ function freshAudio(win) {
 
 // cachedTokens: this browser's answer for one part as a page remembered it
 // (`key`: CACHE_KEY for the video part, AUDIO_CACHE_KEY for the audio one),
-// only the part's own tokens; null for none, another browser's, or one
-// older than CACHE_TTL_MS.
+// only the part's own tokens; null for none, another browser's, one asked
+// of the other HLS path (`mms`: an iPhone on hls.js, iosPlaysHlsJs -- the
+// native path would be sent hdr-pq, which it refuses without a word), or
+// one older than CACHE_TTL_MS. An entry from before `mms` is the native
+// path's, as every iPhone's was.
 function cachedTokens(win, key, allowed, now) {
     try {
         const c = JSON.parse(read(win, key) || 'null');
         if (!c || c.ua !== userAgent(win) || !Array.isArray(c.tokens)) return null;
+        if ((c.mms === true) !== iosPlaysHlsJs(win)) return null;
         if (typeof c.at !== 'number' || c.at > now || now - c.at > CACHE_TTL_MS) return null;
         return allowed.filter((t) => c.tokens.includes(t));
     } catch (e) {
@@ -316,7 +323,7 @@ export function startProbe(win, { load = () => import(/* webpackChunkName: "deco
     s.probe = support.then(async (sup) => {
         const f = s.fresh;
         if (f.pq === 'pending') f.pq = (await sup.pq) ? 'yes' : 'no';
-        write(win, CACHE_KEY, JSON.stringify({ ua: userAgent(win), tokens: videoOf(f), at: Date.now() }));
+        write(win, CACHE_KEY, JSON.stringify({ ua: userAgent(win), mms: iosPlaysHlsJs(win), tokens: videoOf(f), at: Date.now() }));
         answered();
     }).catch(() => {
         // A probe that failed to load answers nothing: the cache, or
@@ -328,7 +335,7 @@ export function startProbe(win, { load = () => import(/* webpackChunkName: "deco
         // answer too; only silence leaves it pending.
         const a = await Promise.resolve(sup.audio).then((v) => v, () => []);
         s.fresh.audio = AUDIO_TOKENS.filter((t) => Array.isArray(a) && a.includes(t));
-        write(win, AUDIO_CACHE_KEY, JSON.stringify({ ua: userAgent(win), tokens: s.fresh.audio, at: Date.now() }));
+        write(win, AUDIO_CACHE_KEY, JSON.stringify({ ua: userAgent(win), mms: iosPlaysHlsJs(win), tokens: s.fresh.audio, at: Date.now() }));
         answered();
     }).catch(() => {
         // Nothing loaded: the audio cache, or no audio tokens.
