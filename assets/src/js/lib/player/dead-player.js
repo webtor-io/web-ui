@@ -287,7 +287,11 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         arm('play');
     }
     function onPause() {
-        if (reportedAt === null) disarm();
+        // Not a pause the element takes with an error: Chrome, an append
+        // failure before metadata, sets the error and pauses in the same
+        // moment (the AAC 5.1 session's benches, 4 of 4) -- nobody chose it,
+        // and the player is dead.
+        if (reportedAt === null && !safe(() => !!video.error, false)) disarm();
     }
     function onPlaying() {
         // Autoplay fires `play` and `playing` together; a hold that pauses

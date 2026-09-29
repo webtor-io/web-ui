@@ -540,3 +540,16 @@ test('the resume prompt\'s playing on a held (paused) element is not a start', (
     s.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
     assert.equal(dead(s.events).length, 1, 'the resumed start is still watched');
 });
+
+test('an error and a pause in the same moment (Chrome, an append failure before metadata) keep the watch', () => {
+    const video = fakeVideo();
+    const hls = fakeHls(video);
+    const s = setup({ video, hls });
+    s.video.play();
+    s.advance(4000);
+    s.video.error = { code: 4 };
+    s.video.pause();
+    s.advance(DEAD_AFTER_MS + 2 * CHECK_EVERY_MS);
+    assert.equal(dead(s.events).length, 1);
+    assert.equal(dead(s.events)[0].data.err, 4);
+});

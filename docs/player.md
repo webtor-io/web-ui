@@ -353,7 +353,9 @@ never gets any, or whose element errors before any press (`play()` then rejects 
 `play`), would never be watched. That arming lets go when the element has data and stays paused
 (autoplay refused, the resume prompt's hold); the viewer's Play arms it again. Off at the first
 `playing` on a playing element (the hold leaves a `playing` on a paused one) or the clock moving
-past where the request found it; a pause disarms, a hidden tab restarts the quiet, a restart a
+past where the request found it; a pause disarms (not one the element takes with an error: Chrome
+sets the error and pauses in the same moment on an append failure before metadata), a hidden tab
+restarts the quiet, a restart a
 guard has begun (`guard.done`) or an element taken off the page ends it.
 One `player-dead` per player, when any of three holds 30 s after the request:
 
