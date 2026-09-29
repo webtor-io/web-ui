@@ -54,11 +54,6 @@ module.exports = async (env, options) => {
         new MiniCssExtractPlugin({
             filename: '[name].css',
         }),
-        new CopyPlugin({
-            patterns: [
-                { from: 'node_modules/hls.js/dist/hls.min.js', to: 'lib/hls.min.js'},
-            ],
-        }),
     ];
     for (const t of themes) {
         plugins.push(new FaviconsWebpackPlugin({
