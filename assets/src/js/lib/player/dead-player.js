@@ -58,6 +58,7 @@
 // timer outlives the report: the revival is heard from the element.
 
 import { bufferedSig, loadProgress, loadWork } from './loader-restart.js';
+import { startAudioClass } from './passthrough.js';
 
 export const DEAD_EVENT = 'player-dead';
 export const REVIVED_EVENT = 'player-revived';
@@ -195,6 +196,12 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
             path: sourceKind(video, on),
             hls: on ? 'on' : hls ? 'off' : 'none',
             route: safe(() => (video.dataset && video.dataset.videoRoute) || '', ''),
+            // The start's audio class (passthrough.js startAudioClass: none,
+            // aac51, dolby), as on stream-start and both fallbacks. A
+            // multichannel start that dies with no error and no fallback --
+            // native HLS on iOS refused a PQ variant that way -- has no
+            // other event to be counted per class by.
+            audio: safe(() => startAudioClass(video), 'none'),
             err,
             rs: safe(() => video.readyState, -1),
             ns: safe(() => video.networkState, -1),
@@ -210,7 +217,7 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         if (reportedAt !== null) {
             const t = now();
             const s = state(t);
-            track(REVIVED_EVENT, { path: s.path, route: s.route, waited_s: s.waited_s, recoveries });
+            track(REVIVED_EVENT, { path: s.path, route: s.route, audio: s.audio, waited_s: s.waited_s, recoveries });
         }
         dispose();
     };

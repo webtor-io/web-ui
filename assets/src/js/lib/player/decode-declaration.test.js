@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom';
 import {
     OPTIN_KEY, AUDIO_OPTIN_KEY, MMS_OPTIN_KEY, CACHE_KEY, AUDIO_CACHE_KEY, MEMORY_KEY, MEMORY_TTL_MS, CACHE_TTL_MS, TOKENS, VIDEO_TOKENS, AUDIO_TOKENS,
     AUDIO_STRUCK_BY_CLASS, AUDIO_DROP_BY_CLASS, STRUCK_BY_CLASS,
-    applyUrlSwitch, applyAudioUrlSwitch, applyMmsUrlSwitch, iosPlaysHlsJs, takesPart, takesPartAudio, startProbe, whenDeclared, declaredTokens, declarationFor, decodedTokens,
+    applyUrlSwitch, applyAudioUrlSwitch, applyMmsUrlSwitch, iosPlaysHlsJs, takesPart, mayDeclareAac51, mayDeclareDolby, allowedAudioTokens, startProbe, whenDeclared, declaredTokens, declarationFor, decodedTokens,
     rememberFallback, loadMemory, installSubmitHook, applyDeclaration, initDecodeDeclaration,
     setPendingFallback, clearPendingFallback, declaresAudio, isAudioClass,
 } from './decode-declaration.js';
@@ -27,10 +27,12 @@ function page({ url = 'https://webtor.io/', ua = UA_A, storageThrows = false } =
 
 const optIn = (win) => win.localStorage.setItem(OPTIN_KEY, 'on');
 const optOut = (win) => win.localStorage.setItem(OPTIN_KEY, 'off');
-// The audio part has an opt-in of its own (`?audio=on`): a test about the
-// audio tokens opts into both.
+// The audio part has a switch of its own: every audio token is every
+// browser's unless it opened `?audio=off` (`?audio=on` takes that back) --
+// a test about every audio token opts into both all the same.
 const optInAudio = (win) => win.localStorage.setItem(AUDIO_OPTIN_KEY, 'on');
 const optInBoth = (win) => { optIn(win); optInAudio(win); };
+const optOutAudio = (win) => win.localStorage.setItem(AUDIO_OPTIN_KEY, 'off');
 
 // A probe module whose answers the test holds: the HEVC tokens at once, the
 // PQ answer and the audio part when the test settles them (or never). The
@@ -562,6 +564,54 @@ test('whenDeclared waits for both parts, within the limit', async () => {
     assert.equal(declarationFor(win2, {}), VIDEO_ALL);
 });
 
+// The deep link's and the embed's wait (whenDeclared, 300 ms) is for
+// what the start sends. Where this browser has a cached audio answer, that
+// is what the declaration carries until the fresh one comes: nothing to
+// wait for. Without one -- another User-Agent, older than 30 days -- the
+// audio answer is waited for, within the limit.
+test('whenDeclared: a cached audio answer is not waited for; without one the answer is, within the limit', async () => {
+    const cached = (win, c) => win.localStorage.setItem(AUDIO_CACHE_KEY, JSON.stringify(c));
+    let win = page();
+    optInBoth(win);
+    cached(win, { ua: UA_A, tokens: ['aac51'], at: Date.now() - 1000 });
+    startProbe(win, fakeProbe({ audio: 'never' }));
+    let t0 = Date.now();
+    await whenDeclared(win, 300);
+    assert.ok(Date.now() - t0 < 100, `waited ${Date.now() - t0} ms for an audio answer this browser has`);
+    assert.equal(declarationFor(win, {}), `${VIDEO_ALL},aac51`);
+    // A browser that answered "none" before has an answer too.
+    win = page();
+    optInBoth(win);
+    cached(win, { ua: UA_A, tokens: [], at: Date.now() - 1000 });
+    startProbe(win, fakeProbe({ audio: 'never' }));
+    t0 = Date.now();
+    await whenDeclared(win, 300);
+    assert.ok(Date.now() - t0 < 100);
+    assert.equal(declarationFor(win, {}), VIDEO_ALL);
+    // The video part is still waited for, cache or not.
+    win = page();
+    optInBoth(win);
+    cached(win, { ua: UA_A, tokens: ['aac51'], at: Date.now() - 1000 });
+    const p = fakeProbe({ pq: 'later', audio: 'never' });
+    startProbe(win, p);
+    setTimeout(() => p.answerPQ(true), 80);
+    t0 = Date.now();
+    await whenDeclared(win, 300);
+    const waited = Date.now() - t0;
+    assert.ok(waited >= 60 && waited < 250, `waited ${waited} ms`);
+    // No usable cache: the audio answer is waited for, up to the limit.
+    for (const c of [{ ua: UA_B, tokens: ['aac51'], at: Date.now() - 1000 }, { ua: UA_A, tokens: ['aac51'], at: Date.now() - CACHE_TTL_MS - 1000 }]) {
+        win = page();
+        optInBoth(win);
+        cached(win, c);
+        startProbe(win, fakeProbe({ audio: 'never' }));
+        t0 = Date.now();
+        await whenDeclared(win, 120);
+        assert.ok(Date.now() - t0 >= 110, `${c.ua === UA_A ? 'an old cache' : 'another browser\'s cache'}: waited ${Date.now() - t0} ms`);
+        assert.equal(declarationFor(win, {}), VIDEO_ALL, 'no answer by then: no audio token');
+    }
+});
+
 test('an audio part that rejects, or a probe without one, answers none', async () => {
     let win = page();
     optInBoth(win);
@@ -770,95 +820,160 @@ test('not taking part: no declaration, whatever the audio memory says', async ()
     assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'j' }), null);
 });
 
-// ---- the audio opt-in (`?audio=on|off`, wt-audio) ----------------------------
+// ---- the audio switch (`?audio=on|off`, wt-audio) ----------------------------
 
-test('?audio=on opts this browser into the audio tokens, ?audio=off out; independent of ?passthrough=', () => {
-    let win = page({ url: 'https://webtor.io/?audio=on' });
-    assert.equal(takesPartAudio(win), false, 'not before the switch is read');
-    assert.equal(applyAudioUrlSwitch(win), 'on');
-    assert.equal(takesPartAudio(win), true);
+// Since the audio's stage 5 for AAC 5.1 (2026-09-29): `aac51` by default,
+// Dolby with `?audio=on`, `?audio=off` takes every one out. The two
+// predicates are the two questions; one switch answers both.
+test('the audio switch: aac51 by default, Dolby with ?audio=on, nothing with ?audio=off; independent of ?passthrough=', () => {
+    const answers = (win) => [mayDeclareAac51(win), mayDeclareDolby(win), allowedAudioTokens(win).join(',')];
+    const DEFAULT_AUDIO = [true, false, 'aac51'];
+    const ALL_AUDIO = [true, true, 'aac51,ac3,ec3'];
+    let win = page();
+    assert.deepEqual(answers(win), DEFAULT_AUDIO, 'a browser that never opened the switch');
+    win = page({ url: 'https://webtor.io/?audio=on' });
+    assert.equal(applyAudioUrlSwitch(win), 'on', '?audio=on is read');
+    assert.deepEqual(answers(win), ALL_AUDIO, 'and adds Dolby');
     assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), 'on');
     assert.equal(win.localStorage.getItem(OPTIN_KEY), null, 'the video switch untouched');
     assert.equal(applyUrlSwitch(win), null, 'and ?audio= is not the video switch');
-    // A later page of the same browser.
+    win = page({ url: 'https://webtor.io/?audio=off' });
+    win.localStorage.setItem(AUDIO_OPTIN_KEY, 'on');
+    assert.equal(applyAudioUrlSwitch(win), 'off');
+    assert.deepEqual(answers(win), [false, false, '']);
+    assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), 'off');
+    // A later page of the same browser keeps it...
     const store = win.localStorage.getItem(AUDIO_OPTIN_KEY);
     win = page({ url: 'https://webtor.io/ru/other' });
     win.localStorage.setItem(AUDIO_OPTIN_KEY, store);
     assert.equal(applyAudioUrlSwitch(win), null);
-    assert.equal(takesPartAudio(win), true);
-    win = page({ url: 'https://webtor.io/?audio=off' });
-    win.localStorage.setItem(AUDIO_OPTIN_KEY, 'on');
-    assert.equal(applyAudioUrlSwitch(win), 'off');
-    assert.equal(takesPartAudio(win), false);
-    assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), 'off');
-    // Absent, or a value that is not on/off: not opted in.
+    assert.deepEqual(answers(win), [false, false, '']);
+    // ...until ?audio=on takes it back.
+    win = page({ url: 'https://webtor.io/?audio=on' });
+    win.localStorage.setItem(AUDIO_OPTIN_KEY, 'off');
+    assert.deepEqual(answers(win), [false, false, ''], 'not before the switch is read');
+    applyAudioUrlSwitch(win);
+    assert.deepEqual(answers(win), ALL_AUDIO);
+    // Absent, or a value that is not on/off: the default.
     for (const url of ['https://webtor.io/', 'https://webtor.io/?audio=yes', 'https://webtor.io/?audio=']) {
         win = page({ url });
         assert.equal(applyAudioUrlSwitch(win), null, url);
-        assert.equal(takesPartAudio(win), false, url);
+        assert.deepEqual(answers(win), DEFAULT_AUDIO, url);
     }
-    // ?passthrough=on leaves the audio out; both switches on one address set both.
+    // A stored value that is neither: the default too.
+    win = page();
+    win.localStorage.setItem(AUDIO_OPTIN_KEY, 'garbage');
+    assert.deepEqual(answers(win), DEFAULT_AUDIO);
+    // No audio token where the page takes no part in the declaration.
+    win = page({ url: 'https://webtor.io/?passthrough=off&audio=on' });
+    applyUrlSwitch(win);
+    applyAudioUrlSwitch(win);
+    assert.deepEqual([takesPart(win), allowedAudioTokens(win)], [false, []]);
+    // ?passthrough=on leaves the audio switch alone.
     win = page({ url: 'https://webtor.io/?passthrough=on' });
     applyUrlSwitch(win);
     applyAudioUrlSwitch(win);
-    assert.deepEqual([takesPart(win), takesPartAudio(win)], [true, false]);
     assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), null);
-    win = page({ url: 'https://webtor.io/?passthrough=on&audio=on' });
-    applyUrlSwitch(win);
-    applyAudioUrlSwitch(win);
-    assert.deepEqual([takesPart(win), takesPartAudio(win)], [true, true]);
+    assert.deepEqual(allowedAudioTokens(win), ['aac51']);
 });
 
-test('the audio opt-in with a throwing localStorage: the page\'s own, and no exception', () => {
+test('the audio switch with a throwing localStorage: the page\'s own, and no exception', () => {
     let win = page({ storageThrows: true });
-    assert.equal(takesPartAudio(win), false);
-    win = page({ storageThrows: true, url: 'https://webtor.io/?audio=on' });
+    assert.deepEqual([mayDeclareAac51(win), mayDeclareDolby(win)], [true, false]);
+    win = page({ storageThrows: true, url: 'https://webtor.io/?audio=off' });
     assert.doesNotThrow(() => applyAudioUrlSwitch(win));
-    assert.equal(takesPartAudio(win), true, 'held for the page');
+    assert.deepEqual(allowedAudioTokens(win), [], 'held for the page');
     assert.doesNotThrow(() => initDecodeDeclaration(win, win.document));
+    win = page({ storageThrows: true, url: 'https://webtor.io/?audio=on' });
+    applyAudioUrlSwitch(win);
+    assert.deepEqual(allowedAudioTokens(win), ['aac51', 'ac3', 'ec3']);
 });
 
 test('initDecodeDeclaration reads ?audio= too', () => {
-    const win = page({ url: 'https://webtor.io/ru/some?audio=on' });
+    let win = page({ url: 'https://webtor.io/ru/some?audio=off' });
     initDecodeDeclaration(win, win.document);
-    assert.equal(takesPartAudio(win), true);
+    assert.equal(mayDeclareDolby(win), false);
+    assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), 'off');
+    win = page({ url: 'https://webtor.io/ru/some?audio=on' });
+    initDecodeDeclaration(win, win.document);
     assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), 'on');
 });
 
-// The re-review's condition for merging with stage 5: a browser that
-// declares its video (by the opt-in now, by default after stage 5) sends no
-// audio token, is asked nothing about audio and waits for none, unless it
-// opted into audio itself.
-test('without the audio opt-in a declaring browser sends no audio token, and is asked nothing about audio', async () => {
-    const win = page();
-    optIn(win);
+// A probe whose declarationSupport records what it was asked.
+function askingProbe(audio = ['aac51', 'ac3', 'ec3']) {
     const asked = [];
-    const probe = {
+    return {
+        asked,
         load: async () => ({
             declarationSupport: (env, opts) => {
                 asked.push(opts);
-                return { path: 'mse', hevc: ALL, pq: Promise.resolve(true), audio: Promise.resolve(['aac51', 'ec3']) };
+                return { path: 'mse', hevc: ALL, pq: Promise.resolve(true), audio: Promise.resolve(audio) };
             },
             envFromWindow: () => ({}),
         }),
     };
+}
+
+// The audio's stage 5 for AAC 5.1: a browser that never touched either
+// switch declares its video and aac51 where it answers it -- not Safari's
+// Dolby, which only ?audio=on declares; the whole answer is remembered, so
+// Dolby's own stage 5 needs no new question.
+test('stage 5 for the audio: a browser that never opened either switch declares its video and aac51, Dolby with ?audio=on', async () => {
+    const win = page();
+    assert.deepEqual([takesPart(win), allowedAudioTokens(win)], [true, ['aac51']]);
+    const probe = askingProbe();
     await startProbe(win, probe);
     await win.__wtDecode.audio;
-    assert.deepEqual(asked, [{ audio: false }], 'the probe was told not to ask');
-    assert.equal(win.__wtDecode.audio, null, 'no audio part on this page');
-    assert.equal(win.__wtDecode.fresh.audio, null);
-    assert.equal(win.localStorage.getItem(AUDIO_CACHE_KEY), null, 'nothing remembered for audio');
-    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), VIDEO_ALL);
-    // An audio answer this browser gave while it was opted in stays unsent.
-    win.localStorage.setItem(AUDIO_CACHE_KEY, JSON.stringify({ ua: UA_A, tokens: ['aac51', 'ac3', 'ec3'], at: Date.now() }));
-    assert.equal(declarationFor(win, {}), VIDEO_ALL);
+    assert.deepEqual(probe.asked, [{ audio: true }], 'the whole audio part is asked');
+    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), `${VIDEO_ALL},aac51`);
+    assert.deepEqual(JSON.parse(win.localStorage.getItem(AUDIO_CACHE_KEY)).tokens, ['aac51', 'ac3', 'ec3'], 'the answer, whole');
     // The start form says the same.
     installSubmitHook(win.document, win);
     const f = startForm(win);
     f.addEventListener('submit', (e) => e.preventDefault());
     f.requestSubmit();
+    assert.equal(decodeOf(f), `${VIDEO_ALL},aac51`);
+    // The same answer with ?audio=on: Dolby too.
+    const on = page();
+    optInAudio(on);
+    await startProbe(on, askingProbe());
+    await on.__wtDecode.audio;
+    assert.equal(declarationFor(on, {}), `${VIDEO_ALL},aac51,ac3,ec3`);
+    // A browser that answers no Dolby (Chrome) declares aac51 alone, either way.
+    const chrome = page();
+    optInAudio(chrome);
+    await startProbe(chrome, fakeProbe({ audio: ['aac51'] }));
+    await chrome.__wtDecode.audio;
+    assert.equal(declarationFor(chrome, {}), `${VIDEO_ALL},aac51`);
+    // A browser that decodes no HEVC declares its audio alone.
+    const bare = page();
+    await startProbe(bare, fakeProbe({ hevc: [], pq: false, audio: ['aac51', 'ac3', 'ec3'] }));
+    await bare.__wtDecode.audio;
+    assert.equal(declarationFor(bare, {}), 'aac51');
+});
+
+// A browser opted out of audio declares no audio token, is asked nothing
+// about audio and waits for none -- what every browser did before.
+test('?audio=off: a declaring browser sends no audio token, and is asked nothing about audio', async () => {
+    const win = page({ url: 'https://webtor.io/?audio=off' });
+    applyAudioUrlSwitch(win);
+    const probe = askingProbe(['aac51', 'ec3']);
+    await startProbe(win, probe);
+    await win.__wtDecode.audio;
+    assert.deepEqual(probe.asked, [{ audio: false }], 'the probe was told not to ask');
+    assert.equal(win.__wtDecode.audio, null, 'no audio part on this page');
+    assert.equal(win.__wtDecode.fresh.audio, null);
+    assert.equal(win.localStorage.getItem(AUDIO_CACHE_KEY), null, 'nothing remembered for audio');
+    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), VIDEO_ALL);
+    // An audio answer this browser gave before it opted out stays unsent.
+    win.localStorage.setItem(AUDIO_CACHE_KEY, JSON.stringify({ ua: UA_A, tokens: ['aac51', 'ac3', 'ec3'], at: Date.now() }));
+    assert.equal(declarationFor(win, {}), VIDEO_ALL);
+    installSubmitHook(win.document, win);
+    const f = startForm(win);
+    f.addEventListener('submit', (e) => e.preventDefault());
+    f.requestSubmit();
     assert.equal(decodeOf(f), VIDEO_ALL);
-    // Opting out of audio after opting in is the same.
+    // Opting out after opting in is the same.
     const out = page({ url: 'https://webtor.io/?audio=off' });
     optInBoth(out);
     applyAudioUrlSwitch(out);
@@ -866,37 +981,22 @@ test('without the audio opt-in a declaring browser sends no audio token, and is 
     assert.equal(declarationFor(out, {}), VIDEO_ALL);
 });
 
-test('the audio opt-in alone declares nothing: the page must take part at all (opted out: nothing)', async () => {
-    const win = page();
-    optOut(win);
-    optInAudio(win);
-    assert.equal(takesPart(win), false);
-    const asked = [];
-    await startProbe(win, { load: async () => ({ declarationSupport: (env, opts) => { asked.push(opts); return { path: 'mse', hevc: ALL, pq: Promise.resolve(true), audio: Promise.resolve(['aac51']) }; }, envFromWindow: () => ({}) }) });
-    assert.deepEqual(asked, [{ audio: false }], 'Discover\'s probe on a page that declares nothing asks no audio');
-    assert.equal(declarationFor(win, {}), null);
+test('the audio switch alone declares nothing: the page must take part at all (opted out: nothing)', async () => {
+    for (const audio of ['on', null]) {
+        const win = page();
+        optOut(win);
+        if (audio) optInAudio(win);
+        assert.equal(takesPart(win), false);
+        const probe = askingProbe(['aac51']);
+        await startProbe(win, probe);
+        assert.deepEqual(probe.asked, [{ audio: false }], 'Discover\'s probe on a page that declares nothing asks no audio');
+        assert.equal(declarationFor(win, {}), null);
+    }
 });
 
-// Stage 5 made the video declaration every browser's default; the audio
-// stays opt-in. A browser that never touched either switch: the video
-// part, no audio token, no audio question, no audio cache.
-test('stage 5: a browser that never opened either switch declares its video and no audio', async () => {
+test('whenDeclared: a page opted out of audio waits for the video part only', async () => {
     const win = page();
-    assert.deepEqual([takesPart(win), takesPartAudio(win)], [true, false]);
-    const asked = [];
-    await startProbe(win, { load: async () => ({ declarationSupport: (env, opts) => { asked.push(opts); return { path: 'mse', hevc: ALL, pq: Promise.resolve(true), audio: Promise.resolve(['aac51', 'ac3', 'ec3']) }; }, envFromWindow: () => ({}) }) });
-    assert.deepEqual(asked, [{ audio: false }]);
-    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), VIDEO_ALL);
-    assert.equal(win.localStorage.getItem(AUDIO_CACHE_KEY), null);
-    // The same browser after ?audio=on.
-    const next = page({ url: 'https://webtor.io/?audio=on' });
-    initDecodeDeclaration(next, next.document);
-    assert.deepEqual([takesPart(next), takesPartAudio(next)], [true, true]);
-});
-
-test('whenDeclared: a page that does not declare audio waits for the video part only', async () => {
-    const win = page();
-    optIn(win);
+    optOutAudio(win);
     const p = fakeProbe({ pq: 'later', audio: 'never' });
     startProbe(win, p);
     setTimeout(() => p.answerPQ(true), 60);
@@ -905,31 +1005,36 @@ test('whenDeclared: a page that does not declare audio waits for the video part 
     const waited = Date.now() - t0;
     assert.ok(waited >= 40 && waited < 200, `waited ${waited} ms, not the 300 ms an unasked audio part would cost`);
     assert.equal(declarationFor(win, {}), VIDEO_ALL);
-    // Complete already: at once.
+    // Settled already: at once.
     const t1 = Date.now();
     await whenDeclared(win, 300);
     assert.ok(Date.now() - t1 < 50);
 });
 
-test('the real probe without the audio opt-in: no audio question at all', async () => {
+test('the real probe: ?audio=off asks no audio question; the default asks them and declares aac51, ?audio=on every token answered', async () => {
     let calls = 0;
     const env = {
         userAgent: UA_A,
-        MediaSource: Object.assign(function () {}, { isTypeSupported: (t) => { if (t.startsWith('audio/')) calls++; return t.startsWith('video/mp4;codecs=hvc1.') || t === 'video/mp4;codecs=avc1.42E01E,mp4a.40.2'; } }),
+        MediaSource: Object.assign(function () {}, { isTypeSupported: (t) => { if (t.startsWith('audio/')) calls++; return t.startsWith('video/mp4;codecs=hvc1.') || t === 'video/mp4;codecs=avc1.42E01E,mp4a.40.2' || t === 'audio/mp4;codecs=ac-3' || t === 'audio/mp4;codecs=ec-3'; } }),
         mediaCapabilities: { decodingInfo: async (c) => { if (c.audio && !c.video) calls++; return { supported: true, smooth: true, powerEfficient: true }; } },
     };
     const win = page();
-    optIn(win);
+    optOutAudio(win);
     await startProbe(win, { env });
     assert.equal(calls, 0, 'no isTypeSupported for audio, no decodingInfo for audio');
     assert.equal(declarationFor(win, {}), DECODE_VIDEO_TOKENS.join(','));
-    // The same browser opted into audio is asked, and declares it.
-    const both = page();
-    optInBoth(both);
-    await startProbe(both, { env });
-    await both.__wtDecode.audio;
+    // The same browser with the switch never opened.
+    const dflt = page();
+    await startProbe(dflt, { env });
+    await dflt.__wtDecode.audio;
     assert.ok(calls > 0);
-    assert.equal(declarationFor(both, {}), [...DECODE_VIDEO_TOKENS, 'aac51'].join(','));
+    assert.equal(declarationFor(dflt, {}), [...DECODE_VIDEO_TOKENS, 'aac51'].join(','));
+    // And with ?audio=on: Dolby too.
+    const on = page();
+    optInAudio(on);
+    await startProbe(on, { env });
+    await on.__wtDecode.audio;
+    assert.equal(declarationFor(on, {}), DECODE_TOKENS.join(','));
 });
 
 // ---- how an iPhone plays HLS (`?mms=on|off`, wt-mms) ------------------------

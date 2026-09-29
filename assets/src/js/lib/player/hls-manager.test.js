@@ -177,6 +177,11 @@ function audioVideo(dataset) {
     };
 }
 
+// The audio SourceBuffer's own append failed (hls.js buffer-controller.ts
+// onSBUpdateError: non-fatal, named after the buffer) -- what pins a
+// failure on the audio.
+const audioAppending = { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.BUFFER_APPENDING_ERROR, sourceBufferName: 'audio', fatal: false };
+
 test('old route, multichannel audio declared: the guard recovers once and gives the file up; hls-manager does not recover it again', () => {
     const hls = busHls();
     const video = audioVideo({ decode: 'aac51', videoRoute: 'reencode' });
@@ -187,11 +192,15 @@ test('old route, multichannel audio declared: the guard recovers once and gives 
     setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard);
     hls.trigger(Hls.Events.BUFFER_CODECS, { audio: { codec: 'mp4a.40.2', metadata: { channelCount: 6 } } });
     hls.trigger(Hls.Events.ERROR, fatalMedia);
-    assert.equal(hls.recovered, 1, 'the guard\'s one recovery');
-    t += SAME_INCIDENT_MS + 1;
+    assert.equal(hls.recovered, 1, 'nobody pinned it on the audio: hls-manager\'s recovery, as ever');
+    hls.trigger(Hls.Events.ERROR, audioAppending);
     hls.trigger(Hls.Events.ERROR, fatalMedia);
-    assert.equal(hls.recovered, 1, 'no second recovery');
-    assert.deepEqual(fired, [['media_error', 'mse', 'aac51']]);
+    assert.equal(hls.recovered, 2, 'the guard\'s one recovery');
+    t += SAME_INCIDENT_MS + 1;
+    hls.trigger(Hls.Events.ERROR, audioAppending);
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.equal(hls.recovered, 2, 'no further recovery');
+    assert.deepEqual(fired, [['media_error', 'mse', 'aac51', 'buffer']], 'with what blamed the audio: its buffer');
     // A network error still restarts loading, as on every route -- the page
     // is restarting, so the guard keeps it.
     hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });

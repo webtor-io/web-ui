@@ -20,8 +20,9 @@
 //                                             its audio included);
 //   3. the probe's video part answered     -> its tokens minus the ones the
 //                                             memory of failures took away,
-//                                             then, for a browser opted into
-//                                             audio, the audio part's -- minus
+//                                             then the audio part's this
+//                                             browser may declare
+//                                             (allowedAudioTokens) -- minus
 //                                             the struck audio classes' and,
 //                                             for a file whose audio failed
 //                                             here, that class's
@@ -37,12 +38,15 @@
 //
 // The audio tokens (aac51, ac3, ec3: multichannel audio) are a part of their
 // own, answered and remembered apart from the video part and appended to it.
-// They have an opt-in of their own, independent of the video's:
-// `?audio=on|off` on any page (localStorage `wt-audio`), and until the
-// owner's device matrix passes for audio only a browser that opened
-// `?audio=on` declares them (takesPartAudio) -- a page that takes part in
-// the video declaration and not in the audio one sends exactly the video
-// part, asks the browser nothing about audio and waits for nothing of it.
+// They have a switch of their own, independent of the video's: `?audio=on|off`
+// on any page (localStorage `wt-audio`). Since the audio's stage 5 for AAC
+// 5.1 (2026-09-29) every browser may declare `aac51` (mayDeclareAac51) but
+// one that opened `?audio=off`; Dolby (`ac3`, `ec3`, mayDeclareDolby) only
+// one that opened `?audio=on`, until it has been played on an iPhone. A
+// browser opted out of audio declares no audio token at
+// all: its page sends exactly the video part, asks the browser nothing about
+// audio and waits for nothing of it. Elsewhere the probe asks the whole audio
+// part (Dolby's questions are synchronous).
 // Their one slow question (`aac51` over decodingInfo) has no deadline either,
 // and until it answers the part is this browser's cached audio answer, else
 // nothing: a missing audio token is only the stereo the transcoder has
@@ -64,7 +68,8 @@
 // part, so the layout entry carries this module and nothing of the probe.
 
 export const OPTIN_KEY = 'wt-passthrough';
-// The audio part's own opt-in (`?audio=on|off`), independent of OPTIN_KEY.
+// The audio part's own switch (`?audio=off`, `?audio=on` takes it back),
+// independent of OPTIN_KEY.
 export const AUDIO_OPTIN_KEY = 'wt-audio';
 // `?mms=on|off`: an iPhone or iPad plays HLS with hls.js (iosPlaysHlsJs).
 export const MMS_OPTIN_KEY = 'wt-mms';
@@ -243,18 +248,43 @@ export function takesPart(win) {
     return v !== 'off';
 }
 
-// takesPartAudio: may this page's declaration carry the audio tokens? Only
-// a browser that opted in with `?audio=on`, until the owner's device matrix
-// passes for audio; its own stage 5 is then `=== 'on'` -> `!== 'off'`,
-// separate from the video's. The tokens go out only where the page takes
-// part in the declaration at all (declaresAudioPart).
-export function takesPartAudio(win) {
+// The audio switch this browser holds: 'on', 'off', or anything else for
+// one it never opened. The one place that reads it.
+function audioSwitch(win) {
     const s = state(win);
-    const v = s.audioOptin !== undefined ? s.audioOptin : read(win, AUDIO_OPTIN_KEY);
-    return v === 'on';
+    return s.audioOptin !== undefined ? s.audioOptin : read(win, AUDIO_OPTIN_KEY);
 }
 
-const declaresAudioPart = (win) => takesPart(win) && takesPartAudio(win);
+// mayDeclareAac51: may this browser's declaration carry `aac51` -- AAC with
+// more than two channels, copied or encoded to instead of stereo? Every
+// browser but one that opened `?audio=off` (the audio's stage 5 for AAC 5.1,
+// 2026-09-29, after the owner's device test: 8 files in Chrome on a Mac, 0
+// stalls, 0 fallbacks). Before it only a browser that opened `?audio=on`.
+export function mayDeclareAac51(win) {
+    return audioSwitch(win) !== 'off';
+}
+
+// mayDeclareDolby: may it carry `ac3` / `ec3` -- AC-3 / E-AC-3 copied as it
+// is into a passthrough's fMP4? Only a browser that opened `?audio=on`.
+// Safari 26.6.2 on a Mac played E-AC-3 copied on three files, Atmos
+// included (2026-09-29), but no iPhone has played Dolby yet -- iOS is a
+// quarter of the video starts and plays through hls.js since 2026-09-30 --
+// nor anything AC-3. Its stage 5 is this line: `!== 'off'`.
+export function mayDeclareDolby(win) {
+    return audioSwitch(win) === 'on';
+}
+
+const DOLBY_TOKENS = ['ac3', 'ec3'];
+
+// allowedAudioTokens: the audio tokens this page's declaration may carry,
+// in their order -- none where the page does not take part in the
+// declaration at all; else `aac51` where mayDeclareAac51, `ac3`, `ec3` where
+// mayDeclareDolby (today `aac51` for every one but `?audio=off`, Dolby
+// with `?audio=on`).
+export function allowedAudioTokens(win) {
+    if (!takesPart(win)) return [];
+    return AUDIO_TOKENS.filter((t) => (DOLBY_TOKENS.includes(t) ? mayDeclareDolby(win) : mayDeclareAac51(win)));
+}
 
 const videoOf = (fresh) => [...fresh.hevc, ...(fresh.pq === 'yes' ? ['hdr-pq'] : [])];
 
@@ -292,28 +322,31 @@ function cachedTokens(win, key, allowed, now) {
     }
 }
 
-// complete: the probe on this page has answered every part it asked --
-// the video part, and the audio part only where it was asked (startProbe).
-const complete = (win) => freshVideo(win) !== null && (!state(win).askAudio || freshAudio(win) !== null);
-
 const videoTokens = (win, now) => freshVideo(win) ?? cachedTokens(win, CACHE_KEY, VIDEO_TOKENS, now);
 const audioTokens = (win, now) => freshAudio(win) ?? cachedTokens(win, AUDIO_CACHE_KEY, AUDIO_TOKENS, now);
+
+// settled: what a start waits for is here (whenDeclared) -- the video part
+// answered on this page, and, where the audio part was asked (startProbe),
+// an audio part to send: the answer, or this browser's cached one, which is
+// what the declaration carries until the answer comes. A cached audio
+// answer is not waited on: it is the same browser's (User-Agent, 30 days).
+const settled = (win, now) => freshVideo(win) !== null && (!state(win).askAudio || audioTokens(win, now) !== null);
 
 // startProbe asks the browser once per page, in the background: the
 // probe module is loaded here, not bundled into the layout. Each part of
 // the answer is kept on the page and, once complete, in its own cache for
 // the next page's first seconds. The audio part is asked only where the
-// page declares it (declaresAudioPart, at this moment): a browser that
-// has not opted into audio is asked nothing about it here (the
+// page may declare some audio token (allowedAudioTokens, at this moment):
+// a browser opted out of audio is asked nothing about it here (the
 // codec-support event measures it apart). Returns the promise of the video
 // part -- what Discover waits for before it reads the answer again
 // (usePlaybackContext): the audio part never holds it up.
 export function startProbe(win, { load = () => import(/* webpackChunkName: "decode-probe" */ './codec-support.js'), env } = {}) {
     const s = state(win);
     if (s.probe) return s.probe;
-    s.askAudio = declaresAudioPart(win);
+    s.askAudio = allowedAudioTokens(win).length > 0;
     const answered = () => {
-        if (complete(win)) s.readyResolve();
+        if (settled(win, Date.now())) s.readyResolve();
     };
     const support = (async () => {
         const cs = await load();
@@ -344,14 +377,19 @@ export function startProbe(win, { load = () => import(/* webpackChunkName: "deco
     return s.probe;
 }
 
-// whenDeclared resolves once the probe has answered completely -- the video
-// part, and the audio part where it was asked (startProbe) -- or after
-// `ms`, whichever is first; at once where no probe runs. A page that does
-// not declare audio never waits for it: a deep link and an embed would
-// otherwise hold their start up to `ms` for tokens they do not send.
+// whenDeclared resolves once what a start sends is settled -- the video
+// part answered, and the audio part where it was asked (startProbe):
+// answered, or cached for this browser -- or after `ms`, whichever is
+// first; at once where no probe runs. The audio part costs a wait only to a
+// browser with no cached audio answer (its first page in 30 days, or its
+// first after an update changed its User-Agent), and then at most `ms`,
+// side by side with the video part's own question (codec-support.js asks
+// both at once); an answer that has not come by then is no audio token --
+// the stereo of old for that start. A page that does not declare audio
+// never waits for it.
 export function whenDeclared(win, ms) {
     const s = state(win);
-    if (!s.probe || complete(win)) return Promise.resolve();
+    if (!s.probe || settled(win, Date.now())) return Promise.resolve();
     return Promise.race([s.ready, new Promise((r) => setTimeout(r, ms))]);
 }
 
@@ -482,7 +520,7 @@ export function declaredTokens(win, now = Date.now()) {
 
 // declarationFor is the `decode` value a start of this file sends, or null
 // for none (the rules at the top): the video part, then the audio part --
-// only where the browser opted into audio (takesPartAudio). A
+// the tokens this browser may declare (allowedAudioTokens). A
 // restart note (below) for a video class is a failed passthrough -- no
 // declaration; for an audio class it takes that class's drop out, as the
 // memory does once the file is remembered.
@@ -498,7 +536,8 @@ export function declarationFor(win, { resourceId, itemId } = {}, now = Date.now(
     for (const cls of [...Object.keys((src && m.audio[src]) || {}), ...(pending ? [pending.cls] : [])]) {
         if (isAudioClass(cls)) for (const t of AUDIO_DROP_BY_CLASS[cls]) leftOut.add(t);
     }
-    const audio = declaresAudioPart(win) ? (audioTokens(win, now) ?? []) : [];
+    const allowed = allowedAudioTokens(win);
+    const audio = allowed.length ? (audioTokens(win, now) ?? []).filter((t) => allowed.includes(t)) : [];
     const kept = [...video, ...audio].filter((t) => !leftOut.has(t));
     return kept.length ? kept.join(',') : null;
 }

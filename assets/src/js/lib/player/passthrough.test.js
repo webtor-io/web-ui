@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import {
-    REASONS, STRIKING, AUDIO_STRIKING, SAME_INCIDENT_MS, NO_FRAMES_AFTER_MS, FAULT_TTL_MS,
+    REASONS, STRIKING, AUDIO_STRIKING, SAME_INCIDENT_MS, NO_FRAMES_AFTER_MS, FAULT_TTL_MS, CLEAN_PLAY_S, RELATED_MS,
     passthroughHlsConfig, createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, fallbackURL, framesCounted,
-    audioOfTrack, audioFallbackClass, messageSide,
+    audioOfTrack, audioFallbackClass, messageSide, startAudioClass,
 } from './passthrough.js';
 import {
     MEMORY_KEY, OPTIN_KEY, AUDIO_OPTIN_KEY, CACHE_KEY, AUDIO_CACHE_KEY, PENDING_TTL_MS, loadMemory, installSubmitHook, clearPendingFallback, pendingFallbackFor,
@@ -330,7 +330,7 @@ test('fallback on the resource page: the start form again, with why, without a d
     assert.equal(submits[0]['decode-fallback'], 'decode_error');
     assert.equal(submits[0]['decode-class'], 'hevc10-2160');
     assert.equal(submits[0].decode, undefined, 'the old route for this file');
-    assert.deepEqual(events, [{ n: 'hevc-fallback', d: { reason: 'decode_error', cls: 'hevc10-2160', path: 'mse' } }]);
+    assert.deepEqual(events, [{ n: 'hevc-fallback', d: { reason: 'decode_error', cls: 'hevc10-2160', path: 'mse', audio: 'none' } }]);
     const m = loadMemory(win);
     assert.ok(m.sources['res1/item1'], 'the file is remembered');
     assert.deepEqual(m.strikes['hevc10-2160'].map((s) => s.src), ['res1/item1'], 'a decoder failure strikes its class');
@@ -463,11 +463,26 @@ test('audioOfTrack: Dolby by codec; AAC by its channel count, a PCE (0) counted 
     }
 });
 
+// The messages are Chromium's, "<PipelineStatus>: <the media log's first
+// error>" (batching_media_log.cc); the decoders' texts from
+// decoder_stream.cc, ffmpeg_audio_decoder.cc, ffmpeg_video_decoder.cc;
+// WebKit's from HTMLMediaElement.cpp (no player gives a detail). The two
+// marked "Chrome 154" are what headless Chrome 154.0.8037.58 on a Mac put in
+// MediaError.message on 2026-09-29 (the PCE stand; an fMP4 whose E-AC-3 init
+// Chrome cannot take) -- with the group before the code.
 test('messageSide: the side a MediaError message names, where it names one', () => {
     for (const [message, want] of [
         ['PIPELINE_ERROR_DECODE: audio decode error!', 'audio'],
+        ['PIPELINE_ERROR_DECODE: Failed to send audio packet for decoding: timestamp=0 duration=21333', 'audio'],
+        ['DECODER_ERROR_NOT_SUPPORTED: audio decoder initialization failed with DecoderStatus::Codes::kUnsupportedCodec', 'audio'],
         ['PIPELINE_ERROR_DECODE: VideoDecoder error', 'video'],
+        ['PIPELINE_ERROR_DECODE: Failed to send video packet for decoding: timestamp=0', 'video'],
         ['CHUNK_DEMUXER_ERROR_APPEND_FAILED: audio and video', null],
+        ['CHUNK_DEMUXER_ERROR_APPEND_FAILED: RunSegmentParserLoop: stream parsing failed. Data size=188 append_window_start=0 append_window_end=inf', null],
+        // Chrome 154.
+        ['PipelineStatus::CHUNK_DEMUXER_ERROR_APPEND_FAILED: RunSegmentParserLoop: stream parsing failed. append_window_start=0 append_window_end=inf', null],
+        ['PipelineStatus::CHUNK_DEMUXER_ERROR_APPEND_FAILED: Unsupported audio format 0x65632d33 in stsd box.', 'audio'],
+        ['Media failed to decode', null],
         ['', null],
         [undefined, null],
     ]) {
@@ -477,12 +492,142 @@ test('messageSide: the side a MediaError message names, where it names one', () 
     assert.equal(messageSide({ get error() { throw new Error('no'); } }), null);
 });
 
-test('audioFallbackClass: the audio\'s when it is blamed, Dolby first when nobody is, never the picture\'s or the viewer\'s', () => {
+// An audio output that goes away under a playing stream (Bluetooth
+// headphones disconnecting): Chromium's AudioRendererImpl::OnRenderError
+// logs "audio render error" and fails the pipeline with AUDIO_RENDERER_ERROR,
+// a MediaError 3. It names the audio -- but its output, not its decoder.
+const OUTPUT_GONE = 'AUDIO_RENDERER_ERROR: audio render error';
+test('messageSide: the audio output failing is no side -- not the audio\'s decoder', () => {
+    assert.equal(messageSide({ error: { code: 3, message: OUTPUT_GONE } }), null);
+    // As Chrome 154 spells the group before the code.
+    assert.equal(messageSide({ error: { code: 3, message: `PipelineStatus::${OUTPUT_GONE}` } }), null);
+    // Whatever the media log saw first: the code decides.
+    assert.equal(messageSide({ error: { code: 3, message: 'AUDIO_RENDERER_ERROR: Output device error, falling back to null sink. device_status=1' } }), null);
+});
+
+// The events' audio class of a start: what its declaration made of the audio
+// (the master's word), only where it declared an audio token.
+test('startAudioClass: the master\'s class where the start declared audio, else none', () => {
+    const win = page();
+    for (const [decode, audioClass, want] of [
+        [DECL_AV, 'dolby', 'dolby'],
+        [DECL_AV, 'aac51', 'aac51'],
+        [DECL_AV, '', 'none'],
+        ['aac51', 'aac51', 'aac51'],
+        ['hevc8,hevc10', 'dolby', 'none'],
+        ['', 'aac51', 'none'],
+        [DECL_AV, 'hevc10', 'none'],
+        [DECL_AV, 'constructor', 'none'],
+    ]) {
+        const p = avPlayer(win, { decode, audioClass });
+        assert.equal(startAudioClass(p.v), want, `${decode} / ${audioClass}`);
+    }
+    assert.equal(startAudioClass(null), 'none');
+    assert.equal(startAudioClass({ get dataset() { throw new Error('no'); } }), 'none');
+});
+
+// What blamed the audio travels with the audio's fallback (the event's
+// `by`), and nothing with the video's.
+test('the guards say what blamed the audio: its buffer, its codec, the element\'s message, the native rule', () => {
+    const got = [];
+    const capture = (make) => clocked(page(), (o) => make({ ...o, fallback: (...a) => got.push(a) }));
+    // Passthrough, the audio buffer's append.
+    let win = page();
+    let p = avPlayer(win);
+    let hls = p.hls();
+    let x = clocked(win, (o) => { const g = createPassthroughGuard({ video: p.v, win, doc: win.document, ...o, fallback: (...a) => got.push(a) }); g.setHls(hls); return g; });
+    x.g.onBufferCodecs(EC3);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    x.advance(SAME_INCIDENT_MS + 1);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    assert.deepEqual(got.pop(), ['media_error', 'mse', 'dolby', 'buffer']);
+    // Passthrough, the audio codec refused.
+    win = page();
+    p = avPlayer(win);
+    hls = p.hls();
+    x = clocked(win, (o) => { const g = createPassthroughGuard({ video: p.v, win, doc: win.document, ...o, fallback: (...a) => got.push(a) }); g.setHls(hls); return g; });
+    x.g.onBufferCodecs(EC3);
+    x.g.onHlsError(hls, { type: 'mediaError', details: 'bufferAddCodecError', sourceBufferName: 'audio', fatal: true });
+    assert.deepEqual(got.pop(), ['codecs_rejected', 'mse', 'dolby', 'codec']);
+    // Passthrough, native: the element's message.
+    win = page();
+    p = avPlayer(win, { audioClass: 'aac51' });
+    x = clocked(win, (o) => createPassthroughGuard({ video: p.v, win, doc: win.document, ...o, fallback: (...a) => got.push(a) }));
+    p.failWith(3, 'PIPELINE_ERROR_DECODE: audio decode error!');
+    assert.deepEqual(got.pop(), ['decode_error', 'native', 'aac51', 'message']);
+    // Dolby charged first with nothing pinned: `by` says so.
+    win = page();
+    p = avPlayer(win, { audioClass: 'dolby' });
+    x = clocked(win, (o) => createPassthroughGuard({ video: p.v, win, doc: win.document, ...o, fallback: (...a) => got.push(a) }));
+    p.failWith(3);
+    assert.deepEqual(got.pop(), ['decode_error', 'native', 'dolby', 'unpinned']);
+    // The video's fallback: no `by`.
+    win = page();
+    p = avPlayer(win, { audioClass: 'aac51' });
+    x = clocked(win, (o) => createPassthroughGuard({ video: p.v, win, doc: win.document, ...o, fallback: (...a) => got.push(a) }));
+    p.failWith(3);
+    assert.deepEqual(got.pop(), ['decode_error', 'native', null, null]);
+    // The audio guard: the buffer's pin, and the native rule.
+    win = page();
+    p = avPlayer(win, { route: 'reencode', decode: 'aac51', audioClass: 'aac51' });
+    hls = p.hls();
+    x = capture((o) => { const g = createAudioGuard({ video: p.v, ...o }); g.setHls(hls); return g; });
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    assert.deepEqual(got.pop(), ['media_error', 'mse', 'aac51', 'buffer']);
+    win = page();
+    p = avPlayer(win, { route: 'reencode', decode: 'aac51', audioClass: 'aac51' });
+    x = capture((o) => createAudioGuard({ video: p.v, ...o }));
+    p.failWith(4);
+    assert.deepEqual(got.pop(), ['src_unsupported', 'native', 'aac51', 'native']);
+    assert.equal(got.length, 0);
+});
+
+test('audio guard: an audio output that went away is not the audio failing -- hls-manager\'s, no restart, no strike', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onBufferCodecs({ audio: { codec: 'mp4a.40.2', container: 'audio/mp4', metadata: { channelCount: 6 } } });
+    for (let i = 0; i < 3; i++) {
+        // The element fails with the output's error; hls.js learns of it at
+        // its next append (the MediaSource has ended) -- a fatal media error.
+        p.setError(3, OUTPUT_GONE);
+        assert.equal(x.g.onHlsError(hls, MEDIA()), false, `failure ${i + 1}: left to hls-manager.js`);
+        x.advance(SAME_INCIDENT_MS + 1);
+    }
+    assert.equal(hls.recovered, 0, 'recovered by hls-manager, not by the guard');
+    assert.deepEqual(x.fired, []);
+});
+
+test('passthrough guard: an audio output that went away is not the AAC 5.1\'s; with Dolby, Dolby first', () => {
+    for (const [audioClass, want] of [['aac51', null], ['dolby', 'dolby']]) {
+        const win = page();
+        const p = avPlayer(win, { audioClass });
+        const hls = p.hls();
+        const x = ptGuard(win, p, hls);
+        p.failWith(3, OUTPUT_GONE);
+        assert.equal(hls.recovered, 1);
+        x.advance(SAME_INCIDENT_MS + 1);
+        p.failWith(3, OUTPUT_GONE);
+        // The passthrough guard's own rule reads the MediaError 3 as the
+        // decoder's; nothing pins it on a side, so with Dolby in play
+        // Dolby goes first (a restart without it, the video keeps its route)
+        // -- cheaper than the HEVC strike it was before.
+        assert.deepEqual(x.fired, [{ reason: 'decode_error', path: 'mse', audio: want }], audioClass);
+    }
+});
+
+test('audioFallbackClass: the audio\'s only where it is blamed -- Dolby or not -- never the picture\'s or the viewer\'s', () => {
     const REASONS_AUDIO = ['codecs_rejected', 'decode_error', 'media_error', 'src_unsupported'];
     for (const reason of REASONS_AUDIO) {
         assert.equal(audioFallbackClass({ reason, fault: 'audio', audio: 'aac51' }), 'aac51', reason);
         assert.equal(audioFallbackClass({ reason, fault: 'audio', audio: 'dolby' }), 'dolby', reason);
-        assert.equal(audioFallbackClass({ reason, fault: null, audio: 'dolby' }), 'dolby', reason);
+        assert.equal(audioFallbackClass({ reason, fault: null, audio: 'dolby' }), 'dolby', `${reason}: Dolby in play, nobody blamed -- Dolby first, the cheap wrong answer`);
         assert.equal(audioFallbackClass({ reason, fault: null, audio: 'aac51' }), null, `${reason}: AAC 5.1 nobody blamed is the video's`);
         assert.equal(audioFallbackClass({ reason, fault: 'video', audio: 'dolby' }), null, `${reason}: the video's`);
         assert.equal(audioFallbackClass({ reason, fault: 'audio', audio: null }), null, `${reason}: audio the declaration did not change`);
@@ -496,8 +641,8 @@ test('audioFallbackClass: the audio\'s when it is blamed, Dolby first when nobod
 // A player whose error carries a message, and an hls.js whose recovery
 // reloads the element -- which clears its error (the media element load
 // algorithm; hls.js detachMedia calls load()).
-// decode: the declaration the start sent -- by default one with the audio
-// tokens, a browser opted into audio (?audio=on).
+// decode: the declaration the start sent -- by default one with every audio
+// token (every browser that answers Dolby, since the audio's stage 5).
 const DECL_AV = 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq,aac51,ac3,ec3';
 function avPlayer(win, { route = 'passthrough', audioClass = '', cls = 'hevc10-2160', decode = DECL_AV } = {}) {
     const v = win.document.createElement('video');
@@ -511,11 +656,23 @@ function avPlayer(win, { route = 'passthrough', audioClass = '', cls = 'hevc10-2
     win.document.body.appendChild(v);
     let err = null;
     Object.defineProperty(v, 'error', { get: () => err, configurable: true });
+    let ct = 0;
+    Object.defineProperty(v, 'currentTime', { get: () => ct, set: (x) => { ct = x; }, configurable: true });
+    const tick = () => v.dispatchEvent(new win.Event('timeupdate'));
     return {
         v,
         failWith: (code, message = '') => { err = code ? { code, message } : null; v.dispatchEvent(new win.Event('error')); },
         setError: (code, message = '') => { err = code ? { code, message } : null; },
-        hls: () => ({ recovered: 0, recoverMediaError() { this.recovered++; err = null; } }),
+        hls: () => ({
+            recovered: 0, stopped: 0, detached: 0,
+            recoverMediaError() { this.recovered++; err = null; },
+            stopLoad() { this.stopped++; },
+            detachMedia() { this.detached++; },
+        }),
+        // plays `s` seconds of media: a timeupdate every 250 ms of it.
+        play: (s) => { tick(); for (let i = 0; i < s * 4; i++) { ct += 0.25; tick(); } },
+        // jumps (a seek): a single step, no playback.
+        seek: (to) => { ct = to; tick(); },
     };
 }
 
@@ -551,9 +708,12 @@ const auGuard = (win, p, hls) => clocked(win, (o) => {
 const APPENDING = (sb) => ({ type: 'mediaError', details: 'bufferAppendingError', sourceBufferName: sb, fatal: false });
 const EC3 = { audio: { codec: 'ec-3', container: 'audio/mp4', id: 'audio' } };
 
-// Finding 3: a 4K HEVC with E-AC-3 whose audio decoder fails must not strike
-// the video class and restart with no declaration (a 415 for 4K).
-test('passthrough guard: Dolby in play and nobody blamed -- the failure is charged to dolby', () => {
+// Dolby in play and nobody blaming a side: Dolby first. A false `dolby`
+// strike costs AAC 5.1 instead of Dolby for 7 days; a false HEVC strike
+// costs passthrough and 4K for 7 days -- the cheap wrong answer goes first,
+// and a video that was the one failing fails again without Dolby
+// (passthrough guard: the restart is the audio's, the video keeps its route).
+test('passthrough guard: Dolby in play and nobody blamed -- Dolby first, recovered once as before', () => {
     const win = page();
     const p = avPlayer(win);
     const hls = p.hls();
@@ -566,7 +726,7 @@ test('passthrough guard: Dolby in play and nobody blamed -- the failure is charg
     assert.deepEqual(x.fired, [{ reason: 'decode_error', path: 'mse', audio: 'dolby' }]);
 });
 
-test('passthrough guard, native HLS: the master\'s Dolby (data-audio-class) is enough', () => {
+test('passthrough guard, native HLS: the master\'s Dolby with nothing to name a side -- Dolby first', () => {
     for (const [code, reason] of [[3, 'decode_error'], [4, 'src_unsupported']]) {
         const win = page();
         const p = avPlayer(win, { audioClass: 'dolby' });
@@ -574,6 +734,43 @@ test('passthrough guard, native HLS: the master\'s Dolby (data-audio-class) is e
         p.failWith(code);
         assert.deepEqual(x.fired, [{ reason, path: 'native', audio: 'dolby' }], String(code));
     }
+});
+
+// A failure pinned on the video is the video's, Dolby in play or not.
+test('passthrough guard: Dolby in play, the video\'s own buffer failing -- the video\'s', () => {
+    const win = page();
+    const p = avPlayer(win);
+    const hls = p.hls();
+    const x = ptGuard(win, p, hls);
+    x.g.onBufferCodecs(EC3);
+    x.g.onHlsError(hls, APPENDING('video'));
+    p.failWith(3);
+    x.advance(SAME_INCIDENT_MS + 1);
+    x.g.onHlsError(hls, APPENDING('video'));
+    p.failWith(3);
+    assert.deepEqual(x.fired, [{ reason: 'decode_error', path: 'mse', audio: null }]);
+});
+
+// The evidence that still charges Dolby: the audio buffer's own append
+// failing, and the element's message naming the audio's decoder (the audio
+// codec refused: below).
+test('passthrough guard: Dolby is charged where the audio is blamed -- its buffer\'s append, or the element\'s word', () => {
+    let win = page();
+    let p = avPlayer(win);
+    const hls = p.hls();
+    let x = ptGuard(win, p, hls);
+    x.g.onBufferCodecs(EC3);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    x.advance(SAME_INCIDENT_MS + 1);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'dolby' }]);
+    win = page();
+    p = avPlayer(win, { audioClass: 'dolby' });
+    x = ptGuard(win, p);
+    p.failWith(3, 'PIPELINE_ERROR_DECODE: audio decode error!');
+    assert.deepEqual(x.fired, [{ reason: 'decode_error', path: 'native', audio: 'dolby' }]);
 });
 
 test('passthrough guard: a failure pinned on the video stays the video\'s, Dolby or not', () => {
@@ -676,7 +873,12 @@ test('passthrough guard: what hls.js buffers outranks the master; an AAC track o
     assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: null }]);
 });
 
-test('passthrough guard: the audio codec refused is the audio\'s; a refused manifest with Dolby goes Dolby first', () => {
+// A refused manifest names no codec: hls.js drops every variant one of whose
+// CODECS its MediaSource refuses (level-controller.ts). With Dolby in the
+// master, Dolby first: the restart without it settles which codec it was
+// (refused again -- the video's), where the video's fallback would have sent
+// a 4K film to the old route's refusal.
+test('passthrough guard: the audio codec refused is the audio\'s; a refused manifest with Dolby -- Dolby first', () => {
     let win = page();
     let p = avPlayer(win);
     let hls = p.hls();
@@ -737,7 +939,7 @@ test('guard: a failure right after the recovery is looked at again at the window
     x.g.onHlsError(hls, MEDIA());
     assert.deepEqual(x.fired, [], 'within the window: not yet');
     x.advance(SAME_INCIDENT_MS);
-    assert.deepEqual(x.fired, [{ reason: 'decode_error', path: 'mse', audio: 'dolby' }]);
+    assert.deepEqual(x.fired, [{ reason: 'decode_error', path: 'mse', audio: 'dolby' }], 'given up (Dolby first: nothing pinned)');
     // The same incident told twice: the recovery cleared the element, and
     // it stays clear -- nothing happens.
     win = page();
@@ -770,10 +972,10 @@ test('fallbackAudio, dolby: the start form again without Dolby -- the video keep
     const submits = captureSubmits(win);
     const events = [];
     const p = avPlayer(win, { audioClass: 'dolby' });
-    const how = fallbackAudio({ video: p.v, reason: 'decode_error', cls: 'dolby', path: 'mse', win, doc: win.document, track: (n, d) => events.push({ n, d }) });
+    const how = fallbackAudio({ video: p.v, reason: 'decode_error', cls: 'dolby', path: 'mse', by: 'buffer', win, doc: win.document, track: (n, d) => events.push({ n, d }) });
     assert.equal(how, 'form');
     assert.deepEqual(submits[0], { 'resource-id': 'res1', 'item-id': 'item1', decode: `${VIDEO},aac51`, 'decode-fallback': 'decode_error', 'decode-class': 'dolby' });
-    assert.deepEqual(events, [{ n: 'audio-fallback', d: { reason: 'decode_error', cls: 'dolby', path: 'mse', route: 'passthrough' } }]);
+    assert.deepEqual(events, [{ n: 'audio-fallback', d: { reason: 'decode_error', cls: 'dolby', path: 'mse', route: 'passthrough', audio: 'dolby', by: 'buffer' } }]);
     const m = loadMemory(win);
     assert.deepEqual(Object.keys(m.audio), ['res1/item1']);
     assert.deepEqual(m.sources, {}, 'the file keeps its declaration');
@@ -795,7 +997,7 @@ test('fallbackAudio, aac51 on the old route: without any audio token, the video 
     fallbackAudio({ video: p.v, reason: 'media_error', cls: 'aac51', path: 'mse', win, doc: win.document, track: (n, d) => events.push({ n, d }) });
     assert.equal(submits[0].decode, VIDEO);
     assert.equal(submits[0]['decode-class'], 'aac51');
-    assert.deepEqual(events[0].d, { reason: 'media_error', cls: 'aac51', path: 'mse', route: 'reencode' });
+    assert.deepEqual(events[0].d, { reason: 'media_error', cls: 'aac51', path: 'mse', route: 'reencode', audio: 'aac51', by: '' }, 'no `by` given: empty');
     assert.deepEqual(loadMemory(win).strikes.aac51.map((x) => x.src), ['res1/item1']);
 });
 
@@ -898,18 +1100,261 @@ test('audio guard: a PCE on the old route -- recovered once, then given up to a 
     assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
 });
 
-test('audio guard: the re-failure right after the recovery is not lost', () => {
+// The same, with nothing but hls.js's pin to say it is the audio (a
+// MediaError message that names no stream), and a seek between the two:
+// a jump is not playback, so the recovery has shown nothing.
+test('audio guard: the PCE case needs only the audio buffer\'s pin; a seek in between is no clean playback', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51` });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onBufferCodecs({ audio: { codec: 'mp4a.40.2', container: 'audio/mp4', metadata: { channelCount: 0 } } });
+    const failOnce = () => {
+        x.g.onHlsError(hls, APPENDING('audio'));
+        p.setError(4, 'CHUNK_DEMUXER_ERROR_APPEND_FAILED: RunSegmentParserLoop: stream parsing failed.');
+        return x.g.onHlsError(hls, MEDIA());
+    };
+    p.play(1);
+    assert.equal(failOnce(), true);
+    assert.equal(hls.recovered, 1);
+    p.seek(600);
+    x.advance(20000);
+    assert.equal(failOnce(), true);
+    assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
+});
+
+// Each report of the audio guard is a failure of its own (the recovery
+// forgets the pin): the re-failure right after the recovery gives up at
+// once, not at the end of a same-incident window.
+test('audio guard: the re-failure right after the recovery gives up at once', () => {
     const win = page();
     const p = avPlayer(win, { route: 'reencode', decode: 'aac51', audioClass: 'aac51' });
     const hls = p.hls();
     const x = auGuard(win, p, hls);
+    x.g.onHlsError(hls, APPENDING('audio'));
     x.g.onHlsError(hls, MEDIA());
     x.advance(150);
     p.setError(4);
+    x.g.onHlsError(hls, APPENDING('audio'));
     x.g.onHlsError(hls, MEDIA());
-    assert.deepEqual(x.fired, []);
-    x.advance(SAME_INCIDENT_MS);
     assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
+    assert.equal(hls.recovered, 1);
+});
+
+// What Chrome 154 with hls.js 1.6.14 did with the PCE stream in a muxed
+// media playlist (reproduced 2026-09-29 with ffmpeg -aac_pce): after the
+// recovery the element's error is not set yet when the append fails, so
+// buffer-controller.ts makes the bufferAppendError non-fatal, and hls.js's
+// error controller recovers the ended MediaSource by itself
+// (error-controller.ts onErrorOut) before any listener of ours -- ~1 000
+// times a second, never fatal again. The guard counts those, gives up at the
+// next one, and stops hls.js. The event as hls.js hands it to listeners:
+// resolved by content steering, the SourceBuffer's own message.
+const SELF_RECOVERED = () => ({ type: 'mediaError', details: 'bufferAppendError', sourceBufferName: 'audio', fatal: false,
+    error: new Error('audio SourceBuffer error. MediaSource readyState: ended'), errorAction: { action: 2, flags: 1, resolved: true } });
+// The same append error on the old route's real master (content-transcoder
+// golden_old_route.json: an EXT-X-MEDIA audio rendition beside the video
+// level), Chrome 154 + hls.js 1.6.14, reproduced 2026-09-29 by both reviews
+// of the audio stage 5: the SourceBuffer's error event comes while the
+// MediaSource still reads `open`. onErrorOut takes it as resolved and
+// recovers nothing; the element holds MediaError 4 and no error follows.
+const UNRECOVERED = () => ({ ...SELF_RECOVERED(), error: new Error('audio SourceBuffer error. MediaSource readyState: open') });
+test('audio guard: a failure hls.js recovered by itself counts; the next gives up and stops hls.js', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51` });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onBufferCodecs({ audio: { codec: 'mp4a.40.2', container: 'audio/mp4', metadata: { channelCount: 0 } } });
+    // The first failure, fatal: the guard's recovery.
+    x.g.onHlsError(hls, APPENDING('audio'));
+    p.setError(4, 'PipelineStatus::CHUNK_DEMUXER_ERROR_APPEND_FAILED: RunSegmentParserLoop: stream parsing failed.');
+    assert.equal(x.g.onHlsError(hls, MEDIA()), true);
+    assert.equal(hls.recovered, 1);
+    // The recovered attachment fails; hls.js recovers it itself.
+    x.advance(5);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    assert.equal(x.g.onHlsError(hls, SELF_RECOVERED()), false, 'a non-fatal error: hls-manager only warns');
+    assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
+    assert.equal(hls.recovered, 1, 'no recovery of the guard\'s own on top of hls.js\'s');
+    assert.deepEqual([hls.stopped, hls.detached], [1, 1], 'hls.js stopped: its own recovery re-attaches no more');
+    // Nothing after it is the guard's to act on.
+    x.advance(5);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    assert.equal(x.g.onHlsError(hls, SELF_RECOVERED()), true);
+    assert.equal(x.fired.length, 1);
+});
+
+test('audio guard: the first failure recovered by hls.js itself is the one recovery', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, SELF_RECOVERED());
+    assert.equal(hls.recovered, 0, 'hls.js recovered it: the guard makes no recovery of its own');
+    assert.deepEqual(x.fired, []);
+    x.advance(3);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, SELF_RECOVERED());
+    assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
+    // Without the pin a non-fatal append error is nobody's.
+    const w2 = page();
+    const q = avPlayer(w2, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const h2 = q.hls();
+    const y = auGuard(w2, q, h2);
+    for (let i = 0; i < 5; i++) {
+        y.advance(FAULT_TTL_MS + 1);
+        y.g.onHlsError(h2, SELF_RECOVERED());
+    }
+    assert.deepEqual(y.fired, []);
+});
+
+// The old route's real shape: the first failure of the audio comes
+// non-fatal and `open`, and hls.js recovers nothing. Without the guard's
+// own recovery the player stays dead -- no restart, no memory.
+test('audio guard: a non-fatal append error hls.js did not recover (readyState open) is the guard\'s to recover; the next gives up', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51` });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onBufferCodecs({ audio: { codec: 'mp4a.40.2', container: 'audio/mp4', metadata: { channelCount: 0 } } });
+    x.g.onHlsError(hls, APPENDING('audio'));
+    p.setError(4, 'PipelineStatus::CHUNK_DEMUXER_ERROR_APPEND_FAILED: RunSegmentParserLoop: stream parsing failed.');
+    assert.equal(x.g.onHlsError(hls, UNRECOVERED()), true, 'handled: hls-manager has nothing to add to it');
+    assert.equal(hls.recovered, 1, 'nobody else recovers it');
+    assert.deepEqual(x.fired, []);
+    // The recovered attachment fails the same way, `open` again or `ended`.
+    for (const again of [UNRECOVERED, SELF_RECOVERED]) {
+        const w = page();
+        const q = avPlayer(w, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+        const h = q.hls();
+        const y = auGuard(w, q, h);
+        y.g.onHlsError(h, APPENDING('audio'));
+        y.g.onHlsError(h, UNRECOVERED());
+        y.advance(5);
+        y.g.onHlsError(h, APPENDING('audio'));
+        y.g.onHlsError(h, again());
+        assert.deepEqual(y.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }], again.name);
+        assert.equal(h.recovered, 1, again.name);
+        assert.deepEqual([h.stopped, h.detached], [1, 1], again.name);
+    }
+    // Without the pin it is nobody's, as ever.
+    const w3 = page();
+    const r = avPlayer(w3, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const h3 = r.hls();
+    const z = auGuard(w3, r, h3);
+    assert.equal(z.g.onHlsError(h3, UNRECOVERED()), false);
+    assert.equal(h3.recovered, 0);
+});
+
+// The internal recovery these tests stand in for is the installed hls.js's:
+// an upgrade that drops or changes it must be looked at again.
+test('audio guard: the installed hls.js recovers an ended MediaSource by itself after a non-fatal append error, and only that', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const read = (p) => readFile(new URL(`../../../../../node_modules/hls.js/src/${p}`, import.meta.url), 'utf8');
+    const src = await read('controller/error-controller.ts');
+    const out = src.slice(src.indexOf('public onErrorOut('), src.indexOf('private sendAlternateToPenaltyBox('));
+    // The one recoverMediaError of onErrorOut, and the condition over it:
+    // resolved (else fatal) and `ended` -- an `open` one is left alone.
+    assert.equal(out.split('recoverMediaError(').length - 1, 1, 'one recovery in onErrorOut');
+    assert.match(out, /!data\.errorAction\.resolved[\s\S]*?data\.fatal = true;\s*\} else if \(\/MediaSource readyState: ended\/\.test\(data\.error\.message\)\) \{(?:(?!break;)[\s\S])*this\.hls\.recoverMediaError\(\);/);
+    // A non-fatal bufferAppendError is resolved by content steering, so it
+    // stays non-fatal whatever its message (a single level has no other
+    // resolution): the `open` case reaches us non-fatal, unrecovered.
+    const cs = await read('controller/content-steering-controller.ts');
+    assert.match(cs, /data\.details === ErrorDetails\.BUFFER_APPEND_ERROR && !data\.fatal\)\s*\{[^}]*errorAction\.resolved = true;/);
+    // onErrorOut runs before the application's listeners.
+    const hlsTs = await read('hls.ts');
+    assert.ok(hlsTs.indexOf('this.on(Events.ERROR, onErrorOut, errorController)') > 0);
+    const dist = await readFile(new URL('../../../../../node_modules/hls.js/dist/hls.mjs', import.meta.url), 'utf8');
+    assert.ok(dist.includes('Attempting to recover from media error'), 'the bundled build has it too');
+    const buf = await read('controller/buffer-controller.ts');
+    assert.match(buf, /SourceBuffer error\. MediaSource readyState: \$\{this\.mediaSource\?\.readyState\}/, 'the message onSBUpdateError gives the append error');
+});
+
+// Finding 1 of the audio stage 5 review: with AAC 5.1 declared by every
+// browser, about 45% of sources are multichannel, and the guard used to take
+// any two fatal media errors of a session -- the audio's or not, an hour
+// apart -- for the audio failing. A failure nobody pinned on the audio is
+// the old route's: hls-manager.js recovers it, as on every stream.
+test('audio guard: a fatal media error nobody pinned on the audio is hls-manager\'s, however many', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onBufferCodecs({ audio: { codec: 'mp4a.40.2', container: 'audio/mp4', metadata: { channelCount: 6 } } });
+    for (const [what, prep] of [
+        ['a bufferAppendError alone', () => {}],
+        ['the element said decode, naming no stream', () => p.setError(3, 'PIPELINE_ERROR_DECODE')],
+        ['a fragment that did not parse', () => {}],
+        ['a non-fatal append error of the video buffer', () => x.g.onHlsError(hls, APPENDING('video'))],
+    ]) {
+        x.advance(FAULT_TTL_MS + 1);
+        prep();
+        const data = what === 'a fragment that did not parse' ? MEDIA('fragParsingError') : MEDIA();
+        assert.equal(x.g.onHlsError(hls, data), false, what);
+    }
+    assert.equal(hls.recovered, 0, 'recovered by hls-manager, not by the guard');
+    assert.deepEqual(x.fired, []);
+});
+
+// The recovery worked when the stream then plays: a failure of the audio
+// after CLEAN_PLAY_S of media is a first one again, recovered -- not the
+// restart from the start.
+test('audio guard: two failures of the audio with CLEAN_PLAY_S played in between are two first ones', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    const failOnce = () => {
+        x.g.onHlsError(hls, APPENDING('audio'));
+        return x.g.onHlsError(hls, MEDIA());
+    };
+    assert.equal(failOnce(), true);
+    assert.equal(hls.recovered, 1);
+    p.play(CLEAN_PLAY_S + 1);
+    x.advance(60000);
+    assert.equal(failOnce(), true);
+    assert.equal(hls.recovered, 2, 'recovered again');
+    assert.deepEqual(x.fired, []);
+    // And the one right after that recovery, with nothing played: the same
+    // fault -- the file is given up.
+    x.advance(SAME_INCIDENT_MS + 1);
+    assert.equal(failOnce(), true);
+    assert.equal(hls.recovered, 2);
+    assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
+});
+
+test('audio guard: less than CLEAN_PLAY_S played since the recovery -- the same fault, given up', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    p.play(CLEAN_PLAY_S * 3);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    assert.equal(hls.recovered, 1, 'what played before the recovery does not count after it');
+    p.play(CLEAN_PLAY_S - 5);
+    x.advance(60000);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    assert.deepEqual(x.fired, [{ reason: 'media_error', path: 'mse', audio: 'aac51' }]);
+});
+
+// A viewer who paused after the recovery shows nothing either way; a
+// failure RELATED_MS later is not the same fault told again.
+test('audio guard: a failure of the audio RELATED_MS after the recovery is a first one, however little played', () => {
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const hls = p.hls();
+    const x = auGuard(win, p, hls);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    x.g.onHlsError(hls, MEDIA());
+    x.advance(RELATED_MS);
+    x.g.onHlsError(hls, APPENDING('audio'));
+    assert.equal(x.g.onHlsError(hls, MEDIA()), true);
+    assert.equal(hls.recovered, 2);
+    assert.deepEqual(x.fired, []);
 });
 
 test('audio guard: audio the declaration did not change, or a failure pinned on the video -- the old route\'s handling', () => {
@@ -960,11 +1405,40 @@ test('audio guard, native HLS: the element\'s 3 and 4, where the audio was chang
         p.failWith(code);
         assert.deepEqual(x.fired, want ? [{ reason: want, path: 'native', audio: 'aac51' }] : [], String(code));
     }
-    const win = page();
-    const p = avPlayer(win, { route: 'copy', decode: 'aac51' });
-    const x = auGuard(win, p);
+    let win = page();
+    let p = avPlayer(win, { route: 'copy', decode: 'aac51' });
+    let x = auGuard(win, p);
     p.failWith(3);
     assert.deepEqual(x.fired, [], 'the master said the audio is as it always was');
+    win = page();
+    p = avPlayer(win, { route: 'copy', decode: 'aac51', audioClass: 'aac51' });
+    x = auGuard(win, p);
+    p.failWith(3, 'video decoder error');
+    assert.deepEqual(x.fired, [], 'a message that names the video alone keeps it the video\'s');
+});
+
+// Native HLS names no side and recovers nothing: the guard acts only at
+// the start, where a restart from the start takes nothing from the viewer.
+// Once CLEAN_PLAY_S of media played the audio has decoded here, and an
+// error is the old route's (no restart), as on every stream.
+test('audio guard, native HLS: only before CLEAN_PLAY_S of media has played', () => {
+    for (const [played, want] of [[0, 1], [CLEAN_PLAY_S - 5, 1], [CLEAN_PLAY_S + 1, 0]]) {
+        const win = page();
+        const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+        const x = auGuard(win, p);
+        p.play(played);
+        p.failWith(3);
+        assert.equal(x.fired.length, want, `after ${played} s`);
+    }
+    // A seek far into the film is no playback: still the start.
+    const win = page();
+    const p = avPlayer(win, { route: 'reencode', decode: `${VIDEO},aac51`, audioClass: 'aac51' });
+    const x = auGuard(win, p);
+    p.play(1);
+    p.seek(3600);
+    p.play(5);
+    p.failWith(4);
+    assert.deepEqual(x.fired, [{ reason: 'src_unsupported', path: 'native', audio: 'aac51' }]);
 });
 
 test('audio guard: once, and nothing after it is hls-manager\'s to recover', () => {
@@ -977,7 +1451,8 @@ test('audio guard: once, and nothing after it is hls-manager\'s to recover', () 
     assert.equal(x.g.onHlsError(null, MEDIA()), true, 'the page is restarting');
 });
 
-// A browser not opted into audio declares no audio token (data-decode): its
+// A browser opted out of audio (?audio=off), or one whose probe answered no
+// audio token, declares none (data-decode): its
 // passthrough's failures keep the video's rules whatever hls.js reports --
 // even Dolby a transcoder sent anyway -- and fallbackAudio is never reached.
 test('passthrough guard: a start that declared no audio token has no audio class, whatever hls.js or the tag says', () => {
@@ -1015,10 +1490,29 @@ test('audio guard: nothing for a start that declared no audio token, even if one
     assert.deepEqual(y.fired, []);
 });
 
-test('fallbackAudio without the audio opt-in: the restart declares no audio token', () => {
-    const win = declaringPage();
+test('fallbackAudio of a browser opted out of audio (?audio=off): the restart declares no audio token', () => {
+    const win = audioDeclaringPage();
+    win.localStorage.setItem(AUDIO_OPTIN_KEY, 'off');
     startForm(win);
     const submits = captureSubmits(win);
     fallbackAudio({ video: avPlayer(win, { audioClass: 'dolby' }).v, reason: 'decode_error', cls: 'dolby', win, doc: win.document, track: () => {} });
     assert.equal(submits[0].decode, VIDEO, 'the video only, as every start of this browser');
+});
+
+// The default since the audio's stage 5 for AAC 5.1: aac51 without Dolby.
+// Since the audio's stage 5 for Dolby such a browser declares ac3/ec3 by
+// default; the restart after a Dolby failure is the rest: the video and aac51.
+test('fallbackAudio of a browser with the audio switch never opened: the restart keeps aac51', () => {
+    const win = audioDeclaringPage();
+    win.localStorage.removeItem(AUDIO_OPTIN_KEY);
+    startForm(win);
+    const submits = captureSubmits(win);
+    fallbackAudio({ video: avPlayer(win, { audioClass: 'dolby' }).v, reason: 'decode_error', cls: 'dolby', win, doc: win.document, track: () => {} });
+    assert.equal(submits[0].decode, `${VIDEO},aac51`);
+    const again = audioDeclaringPage();
+    again.localStorage.removeItem(AUDIO_OPTIN_KEY);
+    startForm(again);
+    const next = captureSubmits(again);
+    fallbackAudio({ video: avPlayer(again, { route: 'reencode', audioClass: 'aac51', decode: `${VIDEO},aac51` }).v, reason: 'media_error', cls: 'aac51', win: again, doc: again.document, track: () => {} });
+    assert.equal(next[0].decode, VIDEO, 'an AAC 5.1 failure: no audio token');
 });

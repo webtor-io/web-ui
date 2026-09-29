@@ -4,7 +4,7 @@ import Hls from 'hls.js';
 import { createDeadPlayerWatch, sourceKind, DEAD_AFTER_MS, CHECK_EVERY_MS, DEAD_EVENT, REVIVED_EVENT, RECOVERY_STORM } from './dead-player.js';
 
 // The element, as far as the watch reads it.
-function fakeVideo({ src = 'https://x.test/s/index.m3u8', route = '' } = {}) {
+function fakeVideo({ src = 'https://x.test/s/index.m3u8', route = '', decode, audioClass } = {}) {
     const handlers = new Map();
     return {
         paused: true,
@@ -15,7 +15,7 @@ function fakeVideo({ src = 'https://x.test/s/index.m3u8', route = '' } = {}) {
         error: null,
         currentSrc: src,
         buf: [],
-        dataset: { videoRoute: route },
+        dataset: { videoRoute: route, ...(decode !== undefined ? { decode } : {}), ...(audioClass !== undefined ? { audioClass } : {}) },
         get buffered() {
             const b = this.buf;
             return { length: b.length, start: (i) => b[i][0], end: (i) => b[i][1] };
@@ -101,7 +101,7 @@ test('the 29.09 death: hls.js gone, a revoked blob, MediaError 4 -- one player-d
     s.advance(DEAD_AFTER_MS * 3);
     assert.equal(dead(s.events).length, 1);
     assert.deepEqual(dead(s.events)[0].data, {
-        why: 'quiet', path: 'blob', hls: 'none', route: '', err: 4, rs: 0, ns: 3, inflight: 0, got: 'none', recoveries: 0, waited_s: 30,
+        why: 'quiet', path: 'blob', hls: 'none', route: '', audio: 'none', err: 4, rs: 0, ns: 3, inflight: 0, got: 'none', recoveries: 0, waited_s: 30,
     });
 });
 
@@ -229,6 +229,30 @@ test('it played after all: player-revived with the whole wait', () => {
     assert.equal(s.events[1].data.waited_s, 40);
     assert.equal(s.video.listeners(), 0);
 });
+
+// The start's audio class on both events (passthrough.js startAudioClass):
+// the master's Dolby or AAC 5.1 where the start declared an audio token, else
+// none -- dead players and their revivals counted per class, as stream-start
+// and the fallbacks are.
+for (const [name, decode, audioClass, want] of [
+    ['Dolby declared and made', 'hevc10,hevc10-2160,aac51,ac3,ec3', 'dolby', 'dolby'],
+    ['AAC 5.1 declared and made', 'hevc8,aac51', 'aac51', 'aac51'],
+    ['audio declared, the stereo of old made', 'hevc8,aac51,ac3,ec3', undefined, 'none'],
+    ['no audio token declared (?audio=off)', 'hevc8,hevc10', 'dolby', 'none'],
+    ['no declaration', undefined, 'dolby', 'none'],
+]) {
+    test(`player-dead and player-revived carry the start's audio class: ${name}`, () => {
+        const s = setup({ video: fakeVideo({ route: 'passthrough', decode, audioClass }) });
+        s.video.play();
+        s.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
+        assert.equal(dead(s.events).length, 1);
+        assert.equal(dead(s.events)[0].data.audio, want);
+        assert.equal(dead(s.events)[0].data.route, 'passthrough');
+        s.video.fire('playing');
+        assert.equal(s.events[1].name, REVIVED_EVENT);
+        assert.equal(s.events[1].data.audio, want);
+    });
+}
 
 test('after player-dead no timer runs; the clock moving later is a revival', () => {
     const s = setup();

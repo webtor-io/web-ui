@@ -367,8 +367,8 @@ function aac51Answer(env, path) {
 // strings and path as decodeTokens: the event measures the share that
 // declares. Without an HEVC token there is nothing for `hdr-pq` to qualify,
 // and the question is not asked; the audio is asked all the same -- unless
-// `opts.audio` is false (a page that does not declare audio,
-// decode-declaration.js takesPartAudio): then nothing is asked about it and
+// `opts.audio` is false (a page that declares no audio token,
+// decode-declaration.js allowedAudioTokens): then nothing is asked about it and
 // `audio` is null.
 export function declarationSupport(env = {}, opts = {}) {
     const path = decodePath(env);

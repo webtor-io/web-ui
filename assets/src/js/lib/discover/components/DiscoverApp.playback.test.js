@@ -98,9 +98,10 @@ test('Discover hands the browser\'s answer to the stream modal: HEVC off where t
     // Let the list settle on the probe's answer; if it never does, the
     // assertions below say what is wrong.
     await until(() => w.__wtDecode && w.__wtDecode.fresh && hevc().checked === false, 'the answer to reach the modal', 2000).catch(() => {});
-    // audio: null -- this browser has not opted into the audio declaration
-    // (?audio=on), so Discover's probe asks it nothing about audio.
-    assert.deepEqual(w.__wtDecode && w.__wtDecode.fresh, { hevc: [], pq: 'no', audio: null }, 'the probe ran, and jsdom decodes nothing');
+    // audio: [] -- every browser but one opted out (?audio=off) may declare
+    // aac51, so the page's one probe asks the audio part too; jsdom answers
+    // none, and Discover reads the video part only.
+    assert.deepEqual(w.__wtDecode && w.__wtDecode.fresh, { hevc: [], pq: 'no', audio: [] }, 'the probe ran, and jsdom decodes nothing');
     assert.equal(hevc().checked, false, 'a browser that decodes no HEVC: the switch is off');
     const titles = [...root.querySelectorAll('.cursor-pointer.flex.items-center.gap-3 .text-xs.text-w-sub')].map((el) => el.textContent);
     assert.deepEqual(titles, ['Movie.2023.1080p.WEB-DL.x264-GRP'], 'the HEVC release is hidden');

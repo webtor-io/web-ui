@@ -18,7 +18,7 @@ import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
 import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
-import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio } from './passthrough.js';
+import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, startAudioClass } from './passthrough.js';
 import { clearPendingFallback, declaresAudio } from './decode-declaration.js';
 import { reportReleaseCheck } from '../discover/release-check.js';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
@@ -268,20 +268,21 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // audio: the failure is charged to the audio the declaration
             // made (multichannel audio) -- the restart keeps the video's
             // route and leaves that audio out.
-            fallback: (reason, path, audio) => (audio
-                ? fallbackAudio({ video: videoEl, reason, path, cls: audio })
+            fallback: (reason, path, audio, by) => (audio
+                ? fallbackAudio({ video: videoEl, reason, path, cls: audio, by })
                 : fallbackToOldRoute({ video: videoEl, reason, path })),
         });
     }
     // Multichannel audio on every other route (passthrough.js
     // createAudioGuard): only where this start declared an audio token. A
-    // start that declared none -- every browser that has not opted in --
-    // gets no guard, and its errors are handled as they always were.
+    // start that declared none -- a browser opted out with ?audio=off, one
+    // that answered no audio token, a start with no declaration -- gets no
+    // guard, and its errors are handled as they always were.
     const audioGuardRef = useRef(null);
     if (isVideo && !passthroughRoute && declaresAudio(videoEl.dataset.decode) && !audioGuardRef.current) {
         audioGuardRef.current = createAudioGuard({
             video: videoEl,
-            fallback: (reason, path, audio) => fallbackAudio({ video: videoEl, reason, path, cls: audio }),
+            fallback: (reason, path, audio, by) => fallbackAudio({ video: videoEl, reason, path, cls: audio, by }),
         });
     }
     useEffect(() => () => {
@@ -620,6 +621,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             route: videoEl.dataset.videoRoute || '',
             reason: videoEl.dataset.routeReason || '',
             decl: videoEl.dataset.decode || '',
+            // The start's audio class (passthrough.js startAudioClass):
+            // none / aac51 / dolby -- the base audio-fallback and
+            // hevc-fallback are counted against, per class.
+            audio: startAudioClass(videoEl),
             // The remembered settings this stream started with: `player-speed`
             // counts changes, and a viewer who set 1.5x a week ago makes none.
             rate: videoRef.current ? videoRef.current.playbackRate : 1,

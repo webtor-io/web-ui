@@ -38,7 +38,31 @@ const BUFFER_ADD_CODEC = 'bufferAddCodecError';
 // thrown at once because the MediaSource has already ended in error (that
 // one is bufferAppendError, named after whichever buffer appended next).
 const BUFFER_APPENDING = 'bufferAppendingError';
+// The error of an append operation (buffer-controller.ts onError): fatal
+// once the element holds an error or after appendErrorMaxRetry, else left to
+// hls.js's error controller.
+const BUFFER_APPEND = 'bufferAppendError';
 const MEDIA_ERROR = 'mediaError';
+
+// recoveredByHls: hls.js has already called recoverMediaError for this
+// non-fatal bufferAppendError. hls.js 1.6.14 does that in one place,
+// error-controller.ts onErrorOut, which runs before any listener of ours
+// (hls.ts registers it in the constructor): for an append error whose
+// action is SendAlternateToPenaltyBox and resolved, and whose message says
+// `MediaSource readyState: ended`. Only the message is read: that message
+// is made by buffer-controller.ts onSBUpdateError alone, whose
+// bufferAppendError always gets that action (getLevelSwitchAction), and one
+// that reaches us non-fatal is resolved (else onErrorOut makes it fatal).
+// A resolved one saying `open` -- the SourceBuffer's error event before the
+// MediaSource ended: Chrome 154 on the old route's master, the audio a
+// rendition of its own -- is recovered by nobody. Content steering resolves
+// every non-fatal bufferAppendError (content-steering-controller.ts
+// onError), a level switch the rest; neither touches the MediaSource.
+function recoveredByHls(data) {
+    let msg = '';
+    try { msg = String((data.error && data.error.message) || ''); } catch (e) { msg = ''; }
+    return /MediaSource readyState: ended/.test(msg);
+}
 
 // MediaError codes (HTML).
 const MEDIA_ERR_DECODE = 3;
@@ -111,13 +135,48 @@ function attrAudio(video) {
     return isAudioClass(c) ? c : null;
 }
 
+const declOf = (video) => {
+    try { return (video.dataset && video.dataset.decode) || ''; } catch (e) { return ''; }
+};
+
+// startAudioClass is the audio class of this start, for the events
+// (stream-start, hevc-fallback, audio-fallback): what its declaration made
+// of the session's audio as the job read it from the master
+// (data-audio-class), where the start declared an audio token (data-decode)
+// -- 'dolby', 'aac51', else 'none' (the stereo AAC of old). Not what a
+// failure is charged to: that is the guards' (audioFallbackClass).
+export function startAudioClass(video) {
+    if (!video || !declaresAudio(declOf(video))) return 'none';
+    return attrAudio(video) || 'none';
+}
+
+// An audio output that failed, not a decoder: Chromium's MediaError message
+// is "<PipelineStatus>: <the first error its media log saw>"
+// (content/renderer/media/batching_media_log.cc GetErrorMessageLocked), and
+// an output device that goes away under a playing stream -- Bluetooth
+// headphones disconnecting, a USB DAC unplugged: the audio sink's render
+// error -- is AUDIO_RENDERER_ERROR (media/renderers/audio_renderer_impl.cc
+// OnRenderError, which logs "audio render error"), a MediaError 3 like a
+// decoder's (web_media_player_impl.cc PipelineErrorToNetworkState). It names
+// the audio, but not the audio the declaration changed. Chromium main,
+// read 2026-09-29; Chrome 154 puts the group before the code
+// ("PipelineStatus::CHUNK_DEMUXER_ERROR_APPEND_FAILED: ...", seen), so the
+// code is looked for anywhere in the text. Safari names no side in any
+// MediaError (WebKit's players give no errorMessage: "Media failed to
+// decode"), and Firefox raises its audio sink's error only for media
+// without video (MediaDecoderStateMachine::OnMediaSinkAudioError).
+const AUDIO_OUTPUT_ERROR = /AUDIO_RENDERER_ERROR/;
+
 // messageSide: the side the element's MediaError message names, where it
-// names only one ('audio' / 'video'), else null. The text is the browser's
-// own and not a standard (not verified in a real browser which ones name
-// the stream).
+// names only one ('audio' / 'video'), else null -- and null for the audio's
+// output failing (AUDIO_OUTPUT_ERROR), which is no decoder's. The text is
+// the browser's own and not a standard: Chromium's decoder failures name
+// their stream ("audio decode error!", "Failed to send audio packet for
+// decoding", "audio decoder initialization failed"), Safari's never do.
 export function messageSide(video) {
     let msg = '';
     try { msg = String((video.error && video.error.message) || ''); } catch (e) { msg = ''; }
+    if (AUDIO_OUTPUT_ERROR.test(msg)) return null;
     const a = /audio/i.test(msg);
     const v = /video/i.test(msg);
     if (a === v) return null;
@@ -136,14 +195,30 @@ function bufferSide(data) {
 // the rules the video has always had:
 //   - no audio the declaration changed (audio null), no picture while time
 //     ran (no_frames), the viewer's own choice (user) -> null;
-//   - the audio's failure, as far as anyone says (fault 'audio') -> its
+//   - the audio's failure, as far as there is evidence (fault 'audio': the
+//     audio SourceBuffer's own append failed or its codec was refused, or
+//     the element's MediaError message names the audio's decoder) -> its
 //     class;
-//   - nobody says which side (fault null) and the audio is Dolby -> dolby:
-//     Dolby as it is is the part of such a session no browser was handed
-//     before, and giving it up keeps the video's route. Where the video was
-//     at fault the restart fails again without Dolby, and that failure goes
-//     the video's way;
-//   - the video's failure, or an AAC 5.1 nobody blamed -> null.
+//   - the video's failure (fault 'video') -> null;
+//   - one nobody pinned on a side, in a session whose buffered audio is
+//     Dolby -> dolby: the restart goes without ac3/ec3 and keeps the HEVC
+//     route. The two wrong answers do not cost the same: a false `dolby`
+//     strike costs this browser Dolby for 7 days (the audio comes as AAC 5.1
+//     instead), a false HEVC strike costs it passthrough and 4K for 7 days.
+//     WebKit names no side in any MediaError (17 of the 28 hevc-fallback
+//     events in the 22 h to 2026-09-29 19:30Z were WebKit's native
+//     decode_error), so the ambiguous case is the common one there, and the
+//     cheap wrong answer goes first: if the video was the one failing, the
+//     start without Dolby fails again and the video's rules take it from
+//     there (one extra restart); a Dolby decoder that really fails is struck
+//     after two files like any class, and Dolby goes, not HEVC. (From 29 to
+//     30 September the branch charged the ambiguous case to the video; the
+//     review showed that a Dolby failure systematic on some WebKit device
+//     would then have taken its HEVC classes out one by one.)
+//   - one nobody pinned, with AAC 5.1 (or a Dolby master whose buffered
+//     track is AAC) -> null: a false aac51 strike takes every multichannel
+//     token, dearer than a restart, and nothing marks AAC 5.1 as the likely
+//     failure.
 export function audioFallbackClass({ reason, fault = null, audio = null }) {
     if (!isAudioClass(audio) || reason === 'no_frames' || reason === 'user') return null;
     if (fault === 'audio') return audio;
@@ -175,8 +250,9 @@ function totalFrames(video) {
 // A failure pinned on one side (bufferSide) counts for the incident that
 // follows it within this long. The pin is an append error, after which the
 // MediaSource has ended and the next report comes at the next append; where
-// hls.js recovered by itself instead (onErrorOut, a level switch) no report
-// of ours follows, and the pin must not wait for an unrelated failure.
+// hls.js resolved it by itself instead (onErrorOut's recovery, content
+// steering, a level switch) no fatal report follows, and the pin must not
+// wait for an unrelated failure.
 export const FAULT_TTL_MS = 30000;
 
 const liveError = (video) => {
@@ -193,28 +269,39 @@ const liveError = (video) => {
 // hls.js detachMedia calls load()), so an element that holds an error at
 // the window's end is playing the attachment that failed: that is the next
 // incident. Without an hls.js instance there is nothing to recover: the
-// first report gives up.
-function createIncidents({ video, now, setTimer, clearTimer, onRecover, giveUp }) {
+// first report gives up. `held()`, asked when a later incident comes, says
+// the recovery worked (createAudioGuard: clean playback since it, or too
+// long ago to be the same fault): that incident is a first one again. The
+// passthrough guard passes none -- its rule is unchanged.
+// `recovered: true` reports an incident hls.js has already recovered from by
+// itself (createAudioGuard, below): it counts as the one recovery, and no
+// second recoverMediaError is made for it. `sameMs` is the window of "one
+// incident told twice" -- 0 for a guard whose reports are never the same
+// failure twice (createAudioGuard: each is a fresh pin on the audio buffer).
+function createIncidents({ video, now, setTimer, clearTimer, onRecover, giveUp, held = () => false, sameMs = SAME_INCIDENT_MS }) {
     let recovered = 0;
     let lastAt = -Infinity;
     let recheck = null;
     return {
-        failure(hls) {
+        failure(hls, { recovered: byHls = false } = {}) {
             const t = now();
-            if (t - lastAt < SAME_INCIDENT_MS) {
+            if (t - lastAt < sameMs) {
                 if (recovered && recheck === null) {
                     recheck = setTimer(() => {
                         recheck = null;
                         if (liveError(video)) giveUp();
-                    }, Math.max(0, lastAt + SAME_INCIDENT_MS - t));
+                    }, Math.max(0, lastAt + sameMs - t));
                 }
                 return;
             }
             lastAt = t;
-            if (hls && recovered === 0) {
+            if (recovered && held()) recovered = 0;
+            if ((hls || byHls) && recovered === 0) {
                 recovered = 1;
                 onRecover();
-                try { hls.recoverMediaError(); } catch (e) { /* nothing to recover */ }
+                if (!byHls) {
+                    try { hls.recoverMediaError(); } catch (e) { /* nothing to recover */ }
+                }
                 return;
             }
             giveUp();
@@ -231,14 +318,19 @@ function createIncidents({ video, now, setTimer, clearTimer, onRecover, giveUp }
 // ('aac'), AAC 5.1 if the master names any changed audio (a master with a
 // Dolby rendition may have an AAC 5.1 one beside it), else the stereo of
 // old; and the side the last failure was pinned on (bufferSide within
-// FAULT_TTL_MS, else the element's message). A start that declared no
-// audio token (data-decode; a browser not opted into audio) has no audio
+// FAULT_TTL_MS, else the element's message) and what said so (`by`, for
+// the audio-fallback event: 'buffer' -- that SourceBuffer's own append
+// failed, 'codec' -- its codec was refused, 'message' -- the element's
+// MediaError message). A start that declared no
+// audio token (data-decode; a browser opted out with ?audio=off) has no audio
 // class whatever hls.js reports: its declaration changed nothing there,
 // and its failures keep the video's rules.
 function createAudioSide(video, now) {
     let trackAudio;
     let fault = null;
+    let faultBy = null;
     let faultAt = -Infinity;
+    const pinned = () => fault && now() - faultAt < FAULT_TTL_MS;
     return {
         onBufferCodecs(data) {
             const a = audioOfTrack(data && (data.audio || data.audiovideo));
@@ -246,22 +338,22 @@ function createAudioSide(video, now) {
         },
         noteError(data) {
             const side = bufferSide(data);
-            if (side && !(fault && now() - faultAt < FAULT_TTL_MS)) {
+            if (side && !pinned()) {
                 fault = side;
+                faultBy = data.details === BUFFER_ADD_CODEC ? 'codec' : 'buffer';
                 faultAt = now();
             }
         },
         forget() { fault = null; },
         audio: () => {
-            let decl = '';
-            try { decl = (video.dataset && video.dataset.decode) || ''; } catch (e) { decl = ''; }
-            if (!declaresAudio(decl)) return null;
+            if (!declaresAudio(declOf(video))) return null;
             const master = attrAudio(video);
             if (trackAudio === undefined) return master;
             if (trackAudio === 'aac') return master ? 'aac51' : null;
             return trackAudio;
         },
-        fault: () => (fault && now() - faultAt < FAULT_TTL_MS ? fault : messageSide(video)),
+        fault: () => (pinned() ? fault : messageSide(video)),
+        by: () => (pinned() ? faultBy : messageSide(video) ? 'message' : null),
     };
 }
 
@@ -285,11 +377,12 @@ function createAudioSide(video, now) {
 //     decoded frame where this page has seen the counter work -> no_frames.
 // Network errors are not its business: they go on as on every route.
 //
-// fallback gets (reason, path, audio): path 'mse' once setHls was given an
+// fallback gets (reason, path, audio, by): path 'mse' once setHls was given an
 // hls.js instance, 'native' otherwise; audio the audio class the failure is
 // charged to (audioFallbackClass: the audio hls.js buffers or the master
 // names, and the side the failure was pinned on), null for the video's
-// fallback. Returns { onHlsError(hls, data) -> handled,
+// fallback; by what blamed the audio (createAudioSide; 'unpinned' for Dolby
+// charged first with nothing pinned), null with audio null. Returns { onHlsError(hls, data) -> handled,
 // onBufferCodecs(data), setHls(hls), fire(reason), dispose() }.
 export function createPassthroughGuard({ video, fallback, win = window, doc = document,
     now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout }) {
@@ -306,7 +399,7 @@ export function createPassthroughGuard({ video, fallback, win = window, doc = do
         done = true;
         dispose();
         const audio = audioFallbackClass({ reason, fault: side.fault(), audio: side.audio() });
-        try { fallback(reason, hlsRef ? 'mse' : 'native', audio); } catch (e) { /* the page goes on */ }
+        try { fallback(reason, hlsRef ? 'mse' : 'native', audio, audio ? (side.by() || 'unpinned') : null); } catch (e) { /* the page goes on */ }
         return true;
     };
     const elementDecodeError = () => {
@@ -394,61 +487,174 @@ export function createPassthroughGuard({ video, fallback, win = window, doc = do
     };
 }
 
+// A stream that has played this much media since a recovery -- or, on
+// native HLS, since it started -- has shown that the audio the declaration
+// made decodes here: a failure after that is not charged to it
+// (createAudioGuard).
+export const CLEAN_PLAY_S = 30;
+// A failure this long after the recovery is not the same fault told again,
+// however little played in between (a viewer who paused): it is a first
+// one. The measured re-failure comes within seconds -- the recovery fetches
+// the same segment again.
+export const RELATED_MS = 5 * 60 * 1000;
+
+// A timeupdate step longer than this is a jump -- a seek, a gap hls.js
+// skipped, the reload of a recovery (the element goes to 0 and hls.js puts
+// it back) -- not playback; a step back is none either. codec-support.js
+// counts the minute of playback-quality by the same rule.
+const MAX_STEP_S = 2;
+
+// playedClock counts the seconds of media the element plays from now on,
+// for as long as it is not disposed of: one listener doing arithmetic on
+// `timeupdate`, nothing else touched.
+function playedClock(video) {
+    let played = 0;
+    let last = null;
+    const onTime = () => {
+        let t;
+        try { t = video.currentTime; } catch (e) { return; }
+        if (typeof t !== 'number' || !Number.isFinite(t)) return;
+        if (last !== null) {
+            const step = t - last;
+            if (step > 0 && step <= MAX_STEP_S) played += step;
+        }
+        last = t;
+    };
+    video.addEventListener('timeupdate', onTime);
+    return {
+        played: () => played,
+        dispose: () => video.removeEventListener('timeupdate', onTime),
+    };
+}
+
 // createAudioGuard watches a stream on any other route (old route: MPEG-TS,
 // H.264 as it has always been) whose start declared audio tokens
-// (Player.jsx, declaresAudio(data-decode)). Where the declaration changed
-// the audio -- what hls.js buffers says so (more than two channels, a PCE,
-// Dolby), else the master (data-audio-class) -- and nobody pins the failure
-// on the video (bufferSide, messageSide):
-//   - hls.js: a fatal media error is recovered once, and the next gives the
-//     file up (createIncidents): decode_error where the element said
-//     MediaError 3, else media_error. The measured case is AAC whose layout
-//     is in a PCE: Chrome refuses the append (MediaError 4,
-//     CHUNK_DEMUXER_ERROR_APPEND_FAILED, hls.js bufferAppendError), and a
-//     recovery only fails again;
-//   - native HLS: the element's MediaError 3 -> decode_error, 4 ->
-//     src_unsupported, at once.
+// (Player.jsx, declaresAudio(data-decode)) and restarts it without them only
+// for a failure that is the audio's -- never for one that is not, and never
+// for two failures with the audio shown working in between. It acts where
+// the declaration changed the audio (what hls.js buffers says so: more than
+// two channels, a PCE, Dolby; else the master, data-audio-class):
+//   - hls.js: only a media error pinned on the audio (fault 'audio': the
+//     audio SourceBuffer's own append failed -- hls.js bufferAppendingError,
+//     or a fatal bufferAddCodecError on it -- within FAULT_TTL_MS, or the
+//     element's MediaError message names the audio alone). A fatal one is
+//     recovered here. A non-fatal bufferAppendError after the pin is
+//     hls.js's own recovery only where its error controller made one
+//     (recoveredByHls: `MediaSource readyState: ended`; onErrorOut runs
+//     before this listener) -- that counts as the recovery, and none is
+//     made on top of it. Any other non-fatal one (`readyState: open`:
+//     resolved by content steering or a level switch, recovered by nobody,
+//     the element left in MediaError 4 with nothing after it) is recovered
+//     here, as a fatal one. The next incident gives the file up
+//     (createIncidents): decode_error where the element said MediaError 3,
+//     else media_error -- unless, since the recovery, CLEAN_PLAY_S of media
+//     played or RELATED_MS passed: then it is a first one again. Giving up
+//     also stops hls.js (stopLoad, detachMedia): its own recovery would
+//     otherwise go on until the page is replaced. The measured case is AAC
+//     whose layout is in a PCE (ADTS channel configuration 0): Chrome
+//     refuses the audio append (bufferAppendingError on the audio buffer,
+//     then a bufferAppendError; MediaError 4 CHUNK_DEMUXER_ERROR_APPEND_FAILED).
+//     Reproduced in Chrome 154 with hls.js 1.6.14 (2026-09-29) on two shapes:
+//     the old route's master (EXT-X-MEDIA audio rendition beside the video
+//     level, as content-transcoder writes it) -- the first failure non-fatal
+//     with `readyState: open`, nobody recovering, a dead player; and a
+//     muxed media playlist -- each failure after a recovery non-fatal with
+//     `readyState: ended`, hls.js recovering ~1 000 times a second.
+//     A media error nobody pinned -- a video
+//     decoder, a segment that did not parse, a bufferAppendError named after
+//     whichever buffer appended next once the MediaSource had ended -- is
+//     hls-manager.js's, which recovers it as on every old-route stream;
+//   - native HLS (iOS with ?mms=off, or without a ManagedMediaSource; since
+//     2026-09-30 an iPhone plays through hls.js otherwise): nothing names a
+//     side (Safari's MediaError messages are empty, and there is no
+//     SourceBuffer), and nothing recovers: an
+//     element in error is dead, and without a guard it stays so. So only
+//     while the stream has not played CLEAN_PLAY_S of media: MediaError 3 ->
+//     decode_error, 4 -> src_unsupported. There the restart from the start
+//     takes nothing from the viewer, and the audio is what the declaration
+//     changed at the start of an H.264 stream; after it the audio has
+//     decoded here, and an error is the old route's, as on every stream
+//     (no restart). A message that names the video alone still keeps it the
+//     video's.
 // Everything else goes on exactly as on the old route: onHlsError returns
 // false and hls-manager.js recovers every fatal media error as it always
-// has, and the element's errors are nobody's on the hls.js path. It never
-// looks at the element's errors there, which hls.js learns of at its next
-// append, as on every old-route stream.
+// has, and the element's errors are nobody's on the hls.js path (hls.js
+// learns of them at its next append, as on every old-route stream).
 //
-// fallback gets (reason, path, audio) as the passthrough guard's does,
-// audio never null. Returns { onHlsError, onBufferCodecs, setHls, dispose }.
+// fallback gets (reason, path, audio, by) as the passthrough guard's does,
+// audio never null, by 'native' for the native rule. Returns { onHlsError,
+// onBufferCodecs, setHls, dispose }.
 export function createAudioGuard({ video, fallback, now = () => Date.now(),
     setTimer = setTimeout, clearTimer = clearTimeout }) {
     let done = false;
     let hlsRef = null;
     const side = createAudioSide(video, now);
-    const ours = () => isAudioClass(side.audio()) && side.fault() !== 'video';
+    const changed = () => isAudioClass(side.audio());
     const code = () => {
         try { return video.error ? video.error.code : 0; } catch (e) { return 0; }
     };
+    const clock = playedClock(video);
+    let recoveredAt = -Infinity;
+    let playedAtRecovery = 0;
 
     const fire = (reason) => {
         if (done) return false;
         done = true;
         dispose();
-        try { fallback(reason, hlsRef ? 'mse' : 'native', side.audio()); } catch (e) { /* the page goes on */ }
+        if (hlsRef) {
+            // Nothing more to load or recover for this file: without this,
+            // hls.js's own recovery of an ended MediaSource re-attaches and
+            // fails again until the restart replaces the player.
+            try { hlsRef.stopLoad(); } catch (e) { /* stopped */ }
+            try { hlsRef.detachMedia(); } catch (e) { /* detached */ }
+        }
+        // by: what blamed the audio; on native HLS nothing does -- the rule
+        // before CLEAN_PLAY_S of playback.
+        try { fallback(reason, hlsRef ? 'mse' : 'native', side.audio(), side.by() || 'native'); } catch (e) { /* the page goes on */ }
         return true;
     };
     const incidents = createIncidents({
         video, now, setTimer, clearTimer,
-        onRecover: () => side.forget(),
+        onRecover: () => {
+            side.forget();
+            recoveredAt = now();
+            playedAtRecovery = clock.played();
+        },
+        held: () => clock.played() - playedAtRecovery >= CLEAN_PLAY_S || now() - recoveredAt >= RELATED_MS,
         giveUp: () => fire(code() === MEDIA_ERR_DECODE ? 'decode_error' : 'media_error'),
+        // Each report here is a failure of its own: one audio append failure
+        // makes one bufferAppendError (the pin before it is not a report),
+        // and the recovery forgets the pin, so a pinned report after it is
+        // the new attachment failing -- at once, where hls.js recovers by
+        // itself in a few milliseconds.
+        sameMs: 0,
     });
 
     const onHlsError = (hls, data) => {
         if (done || !data) return done;
         side.noteError(data);
-        if (!(data.fatal && data.type === MEDIA_ERROR) || !ours()) return false;
+        if (data.type !== MEDIA_ERROR || !changed() || side.fault() !== 'audio') return false;
+        if (data.fatal) {
+            incidents.failure(hls);
+            return true;
+        }
+        if (data.details !== BUFFER_APPEND) return false;
+        // hls.js has recovered it by itself: counted as the recovery, and
+        // left to hls-manager.js, which only warns of a non-fatal error.
+        if (recoveredByHls(data)) {
+            incidents.failure(hls, { recovered: true });
+            return false;
+        }
+        // hls.js resolved it without a recovery (content steering, a level
+        // switch): the element holds its error and nothing else follows --
+        // the guard's to recover, or the player stays dead.
         incidents.failure(hls);
         return true;
     };
 
     const onElementError = () => {
-        if (hlsRef || done || !ours()) return;
+        if (hlsRef || done || !changed() || side.fault() === 'video') return;
+        if (clock.played() >= CLEAN_PLAY_S) return;
         const c = code();
         if (c === MEDIA_ERR_DECODE) fire('decode_error');
         else if (c === MEDIA_ERR_SRC_NOT_SUPPORTED) fire('src_unsupported');
@@ -457,6 +663,7 @@ export function createAudioGuard({ video, fallback, now = () => Date.now(),
 
     function dispose() {
         video.removeEventListener('error', onElementError);
+        clock.dispose();
         incidents.dispose();
     }
 
@@ -576,7 +783,9 @@ function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate })
 // machine, §6):
 //   1. the memory: this file, and a strike against its class where the
 //      failure is the decoder's (STRIKING);
-//   2. Umami hevc-fallback {reason, cls, path};
+//   2. Umami hevc-fallback {reason, cls, path, audio} -- audio the start's
+//      audio class (startAudioClass): a Dolby decoder failing with nothing
+//      to blame it is counted here, per class;
 //   3. the restart, visibly, from the start:
 //      - in an embed: its POST again (restartEmbed);
 //      - on the resource page whose start form is this file's: the form,
@@ -600,7 +809,7 @@ export function fallbackToOldRoute({ video, reason, path = 'mse', win = window, 
     try {
         rememberFallback(win, { resourceId, itemId, cls, strike: STRIKING.has(reason) });
     } catch (e) { /* no memory: the restart still goes without a declaration */ }
-    try { track('hevc-fallback', { reason, cls, path }); } catch (e) { /* no telemetry */ }
+    try { track('hevc-fallback', { reason, cls, path, audio: startAudioClass(video) }); } catch (e) { /* no telemetry */ }
     return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate });
 }
 
@@ -620,12 +829,16 @@ export const AUDIO_STRIKING = new Set(['decode_error', 'media_error']);
 // any audio token (the stereo the transcoder has always made).
 //   1. the memory: this file's audio class, and a strike against it where
 //      AUDIO_STRIKING;
-//   2. Umami audio-fallback {reason, cls, path, route} -- not hevc-fallback,
-//      whose count stays the video's;
+//   2. Umami audio-fallback {reason, cls, path, route, audio, by} -- not
+//      hevc-fallback, whose count stays the video's; audio the start's
+//      class (startAudioClass; cls may differ: the master's Dolby with an
+//      AAC 5.1 rendition in play), by what blamed the audio ('buffer',
+//      'codec', 'message', 'native', 'unpinned' -- Dolby charged first on a
+//      failure nobody pinned, audioFallbackClass);
 //   3. the restart, as fallbackToOldRoute's; the server counts it by its
 //      class (webui_passthrough_fallback_total{class="dolby"|"aac51"}).
 // Returns which restart it took.
-export function fallbackAudio({ video, reason, cls, path = 'mse', win = window, doc = document,
+export function fallbackAudio({ video, reason, cls, path = 'mse', by = '', win = window, doc = document,
     track = (name, data) => { if (win.umami) win.umami.track(name, data); },
     navigate = (u) => loadDocument(win.location, u) }) {
     if (!isAudioClass(cls)) return fallbackToOldRoute({ video, reason, path, win, doc, track, navigate });
@@ -635,6 +848,8 @@ export function fallbackAudio({ video, reason, cls, path = 'mse', win = window, 
     try {
         rememberFallback(win, { resourceId, itemId, cls, strike: AUDIO_STRIKING.has(reason) });
     } catch (e) { /* no memory: the restart's note still leaves the class out */ }
-    try { track('audio-fallback', { reason, cls, path, route: d.videoRoute || '' }); } catch (e) { /* no telemetry */ }
+    try {
+        track('audio-fallback', { reason, cls, path, route: d.videoRoute || '', audio: startAudioClass(video), by: by || '' });
+    } catch (e) { /* no telemetry */ }
     return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate });
 }
