@@ -473,8 +473,13 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
 - **Firefox on Windows declares nothing** — the UA rule hls.js applies to that browser's HEVC answers
   (`userAgentHevcSupportIsInaccurate`, `/\(Windows.+Firefox\//i`): the player itself does not believe
   them. It covers `hdr-pq` too (the PQ question names an HEVC codec).
-- **`hdr-pq`** is the one asynchronous token: `decodingInfo` as `media-source` on the MSE path, `file`
-  on the native one, without `hdrMetadataType`; `supported` is enough. Missing API, a rejection or no
+- **`hdr-pq`** is the one asynchronous token: `decodingInfo` as `media-source`, on the MSE path only,
+  without `hdrMetadataType`; `supported` is enough. Never on the native path (iOS/iPadOS): native HLS
+  refuses a PQ variant without a word — the iPhone fetches the master and nothing after it, no error,
+  no fallback (2026-09-29: 0 of 9 PQ passthrough sessions on iPhones past the master in 24 h; the
+  owner's iPhone on five real files, PQ 0 of 3, SDR 2 of 2 with VIDEO-RANGE the only difference),
+  while `decodingInfo` as `file` said yes. PQ sources are re-encoded there as before passthrough: 1080p
+  plays in SDR, 4K is refused with its reason (`needs_pq`, over 1080p). Missing API, a rejection or no
   answer in 3 s → not declared. Asked at 4K, where ~89% of PQ sessions are: a browser that decodes
   1080p PQ but not 4K PQ is under-declared, and its 1080p PQ sources stay re-encoded, as today. The
   screen is not consulted (variant A); `dynamic-range` is only reported.

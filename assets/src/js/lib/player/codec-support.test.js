@@ -710,7 +710,7 @@ test('Firefox on Windows declares nothing, whatever it answers; Firefox elsewher
     }
 });
 
-test('iPhone: native HLS even with a ManagedMediaSource; canPlayType decides; PQ asked as a file', async () => {
+test('iPhone: native HLS even with a ManagedMediaSource; canPlayType decides; PQ never declared', async () => {
     const mc = pqCapabilities(PQ_YES);
     const env = {
         userAgent: UA.iPhone,
@@ -721,9 +721,11 @@ test('iPhone: native HLS even with a ManagedMediaSource; canPlayType decides; PQ
         mediaCapabilities: mc,
     };
     assert.equal(decodePath(env), 'native');
-    assert.deepEqual(await decodeTokens(env), ['hevc8', 'hevc10', 'hevc10-2160', 'hdr-pq']);
-    assert.equal(mc.calls[0].type, 'file');
-    assert.equal(mc.calls[0].video.contentType, 'video/mp4; codecs="hvc1.2.4.L153.90"');
+    // decodingInfo would say yes; native HLS refuses a PQ variant without a
+    // word (2026-09-29), so the question is not asked.
+    assert.deepEqual(await decodeTokens(env), ['hevc8', 'hevc10', 'hevc10-2160']);
+    assert.equal(videoCalls(mc).length, 0);
+    assert.deepEqual(await settled(declarationSupport(env).pq), { v: false });
 
     // A "maybe" is a yes too: any support counts.
     const maybe = { ...env, canPlayType: canPlay({ [HLS]: 'maybe', [fileType(hevcCodec['hevc-high'])]: 'maybe' }) };

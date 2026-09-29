@@ -222,23 +222,28 @@ export function hevcDecodeTokens(env = {}, path = decodePath(env)) {
     return DECODE_HEVC.filter(([, codec]) => yes(codec)).map(([token]) => token);
 }
 
-// decodesPQ answers `hdr-pq`: 'media-source' on the MSE path, 'file' on the
-// native one (the plan's choice; native HLS is neither, and 'file' is what
-// Safari answers for). The same Firefox-on-Windows rule: the question is
-// asked of an HEVC codec.
-const pqConfig = (path) => {
-    const mse = path === 'mse';
-    return {
-        type: mse ? 'media-source' : 'file',
-        video: { contentType: mse ? mseType(PQ_CODEC) : fileType(PQ_CODEC), ...PQ_VIDEO },
-    };
-};
+// decodesPQ answers `hdr-pq`, on the MSE path only ('media-source'). The
+// same Firefox-on-Windows rule: the question is asked of an HEVC codec.
+//
+// Native HLS -- iOS and iPadOS, where the element plays HLS itself -- is
+// never asked: it refuses a PQ passthrough variant without a word. The
+// iPhone fetches the master and nothing after it, no variant playlist, no
+// error, so no fallback either (2026-09-29: 0 of 9 PQ passthrough sessions
+// on iPhones got past the master in 24 h; the owner's iPhone on five real
+// files: PQ 0 of 3, SDR 2 of 2 -- one 4K at 6.4 Mbit/s, one 1080p at
+// 40 Mbit/s -- VIDEO-RANGE the only difference in the master). decodingInfo
+// said yes there all the same ('file'). A PQ source is re-encoded for these
+// viewers, as before passthrough.
+const pqConfig = () => ({
+    type: 'media-source',
+    video: { contentType: mseType(PQ_CODEC), ...PQ_VIDEO },
+});
 
 async function decodesPQ(env, path, opts) {
-    if (path === 'none' || hevcAnswerInaccurate(env)) return false;
+    if (path !== 'mse' || hevcAnswerInaccurate(env)) return false;
     const mc = safe(() => env.mediaCapabilities);
     if (safe(() => isFn(mc.decodingInfo)) !== true) return false;
-    const info = await decoding(mc, pqConfig(path), opts);
+    const info = await decoding(mc, pqConfig(), opts);
     return info.ok;
 }
 
@@ -262,10 +267,10 @@ function supportedAnswer(mc, config) {
 // that did not answer is not a browser that cannot decode
 // (decode-declaration.js).
 function pqAnswer(env, path) {
-    if (path === 'none' || hevcAnswerInaccurate(env)) return Promise.resolve(false);
+    if (path !== 'mse' || hevcAnswerInaccurate(env)) return Promise.resolve(false);
     const mc = safe(() => env.mediaCapabilities);
     if (safe(() => isFn(mc.decodingInfo)) !== true) return Promise.resolve(false);
-    return supportedAnswer(mc, pqConfig(path));
+    return supportedAnswer(mc, pqConfig());
 }
 
 // ---- the audio tokens --------------------------------------------------------
