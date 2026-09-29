@@ -19,7 +19,7 @@ type Helper struct {
 }
 
 // NewHelper builds a Helper from the urfave/cli context. Mirrors the
-// shape of umami.NewHelper / geoip.NewHelper used elsewhere in serve.go.
+// shape of umami.NewHelper used elsewhere in serve.go.
 func NewHelper(c *cli.Context) *Helper {
 	return &Helper{cfg: ConfigFromCLI(c)}
 }

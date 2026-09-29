@@ -251,8 +251,8 @@ func (s *Handler) login(c *gin.Context) {
 // administrator out, since there's nothing IP-specific to lock.
 //
 // Do not change this to ClientIP(), and do not add SetTrustedProxies to make
-// ClientIP() safe here — that would change ClientIP() app-wide (geoip, the
-// API rate limiter) with production consequences well beyond this form.
+// ClientIP() safe here — that would change ClientIP() app-wide (the API
+// rate limiter) with production consequences well beyond this form.
 func loginLimiterKey(c *gin.Context) string {
 	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
 	if err != nil {

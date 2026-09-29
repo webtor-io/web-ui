@@ -53,7 +53,6 @@ Build and configuration
   - Static assets: ASSETS_PATH (default ./assets/dist), WEB_ASSETS_HOST (handlers/static). For production, ensure assets/dist exists (via npm run build).
   - Optional integrations (feature toggles and endpoints):
     - Umami analytics: USE_UMAMI, UMAMI_WEBSITE_ID, UMAMI_HOST_URL (services/umami).
-    - GeoIP API cache: USE_GEOIP_API, GEOIP_API_SERVICE_HOST, GEOIP_API_SERVICE_PORT (services/geoip).
     - Claims-provider (user tiers/limits): USE_CLAIMS, CLAIMS_PROVIDER_SERVICE_HOST, CLAIMS_PROVIDER_SERVICE_PORT (services/claims). When enabled, claims are fetched via gRPC and cached with lazymap (1m success TTL, 10s error TTL).
     - Stremio addon HTTP client: STREMIO_ADDON_USER_AGENT (custom user agent for addon requests), STREMIO_ADDON_PROXY (proxy URL for addon HTTP client, supports http:// and socks5:// schemes). Flags: --stremio-addon-user-agent, --stremio-addon-proxy (services/stremio).
 
@@ -266,7 +265,7 @@ Frontend Development Philosophy
 
 - Template organization
   - Place reusable components in templates/partials/
-  - Use the existing template helper system for common functionality (web, umami, geoip helpers).
+  - Use the existing template helper system for common functionality (web, umami helpers).
   - Follow the established pattern of data-async-layout for progressive enhancement.
   - Ensure templates work without JavaScript for core functionality.
 
@@ -283,7 +282,7 @@ Additional development notes
   - For ad testing, setting a cookie test-ads or a query parameter test-ads forces Claims.Site.NoAds=false (useful for debugging ad rendering).
 
 - Static/templating
-  - Templates are composed via gin-contrib/multitemplate and a TemplateManager that injects helpers (web, umami, geoip). If you add templates, ensure they are registered via the TemplateManager before tm.Init().
+  - Templates are composed via gin-contrib/multitemplate and a TemplateManager that injects helpers (web, umami). If you add templates, ensure they are registered via the TemplateManager before tm.Init().
 
 - Jobs and queues
   - Job queues are backed by Redis (via common-services) with mode-dependent namespaces (gin.Mode). Ensure Redis connectivity in development if you exercise background jobs.

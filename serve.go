@@ -21,7 +21,6 @@ import (
 	"github.com/webtor-io/web-ui/handlers/embed_domain"
 	"github.com/webtor-io/web-ui/handlers/event"
 	"github.com/webtor-io/web-ui/handlers/ext"
-	"github.com/webtor-io/web-ui/handlers/geo"
 	hi18n "github.com/webtor-io/web-ui/handlers/i18n"
 	wi "github.com/webtor-io/web-ui/handlers/index"
 	"github.com/webtor-io/web-ui/handlers/instructions"
@@ -57,7 +56,6 @@ import (
 	ac "github.com/webtor-io/web-ui/services/anthropic_client"
 	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/common"
-	"github.com/webtor-io/web-ui/services/geoip"
 	si18n "github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
 	lr "github.com/webtor-io/web-ui/services/link_resolver"
@@ -129,7 +127,6 @@ func configureServe(c *cli.Command) {
 	c.Flags = as.RegisterFlags(c.Flags)
 	c.Flags = cs.RegisterPprofFlags(c.Flags)
 	c.Flags = umami.RegisterFlags(c.Flags)
-	c.Flags = geoip.RegisterFlags(c.Flags)
 	c.Flags = event.RegisterFlags(c.Flags)
 	c.Flags = library.RegisterFlags(c.Flags)
 	c.Flags = embed.RegisterFlags(c.Flags)
@@ -189,7 +186,6 @@ func serve(c *cli.Context) error {
 	tm := template.NewManager[*w.Context](re).
 		WithHelper(w.NewHelper(c)).
 		WithHelper(umami.NewHelper(c)).
-		WithHelper(geoip.NewHelper()).
 		WithHelper(rec.NewHelper(c)).
 		WithHelper(si18n.NewHelper(i18nSvc)).
 		WithHelper(turnstile.NewHelper(c)).
@@ -333,16 +329,6 @@ func serve(c *cli.Context) error {
 
 	// Setting S3 Client
 	s3Cl := cs.NewS3Client(c, cl)
-
-	// Setting GeoIP
-	gapi := geoip.New(c, cl)
-
-	if gapi != nil {
-		err = geo.RegisterHandler(gapi, r)
-		if err != nil {
-			return err
-		}
-	}
 
 	// Setting Api
 	sapi := api.New(c, cl)

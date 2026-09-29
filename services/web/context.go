@@ -2,13 +2,11 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/webtor-io/web-ui/handlers/geo"
 	"github.com/webtor-io/web-ui/handlers/session"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
-	"github.com/webtor-io/web-ui/services/geoip"
 	"github.com/webtor-io/web-ui/services/i18n"
 )
 
@@ -89,7 +87,6 @@ type Context struct {
 	User         *auth.User
 	Claims       *claims.Data
 	TierUpdated  bool
-	Geo          *geoip.Data
 	ApiClaims    *api.Claims
 	UserSettings *models.UserSettings
 	Lang         string
@@ -157,7 +154,6 @@ func NewContext(c *gin.Context) *Context {
 		// empty session (anonymous, no CSRF) instead of panicking.
 		sess = &session.Session{}
 	}
-	geoData := geo.GetFromContext(c)
 	aCl := api.GetClaimsFromContext(c)
 	tu := claims.GetTierUpdateFromContext(c)
 	lang := i18n.GetLang(c)
@@ -174,7 +170,6 @@ func NewContext(c *gin.Context) *Context {
 		Claims:              cl,
 		ApiClaims:           aCl,
 		SessionID:           sess.ID,
-		Geo:                 geoData,
 		TierUpdated:         tu,
 		UserSettings:        settings,
 		Lang:                lang,

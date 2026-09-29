@@ -288,10 +288,6 @@ func (s *EmbedScript) renderAds(j *job.Job, c *web.Context, dsd *embed.DomainSet
 }
 
 func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, api *api.Api, i18nSvc *i18n.Service, enricher *enrich.Enricher, settings *models.EmbedSettings, file string, dsd *embed.DomainSettingsData, warmup WarmupSettings, decl models.DecodeRequest) (r job.Runnable, hash string, err error) {
-	geoHash := ""
-	if c.Geo != nil {
-		geoHash = c.Geo.Country
-	}
 	hourKey := actionClock().UTC().Format("2006010215")
 	// The visitor's session identity is part of the key for the same reason
 	// it is in the action key: without it every visitor of a given embed
@@ -306,7 +302,7 @@ func Embed(tb template.Builder[*web.Context], cl *http.Client, c *web.Context, a
 	// The declaration, like the action key's: a render for one browser's
 	// decoders is not another's. Only when there is one, so an embed that
 	// declares nothing keeps the key it has always had.
-	hash = fmt.Sprintf("%x", sha1.Sum([]byte(geoHash+"/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang+"/"+sessionKey+decl.Key())))
+	hash = fmt.Sprintf("%x", sha1.Sum([]byte("/"+fmt.Sprintf("%+v", dsd)+"/"+c.ApiClaims.Role+"/"+fmt.Sprintf("%+v", settings)+"/"+hourKey+"/"+c.Lang+"/"+sessionKey+decl.Key())))
 	r = NewEmbedScript(tb, cl, c, api, i18nSvc, enricher, settings, file, dsd, warmup, decl)
 	return
 }
