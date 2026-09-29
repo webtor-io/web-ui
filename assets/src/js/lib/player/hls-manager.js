@@ -29,9 +29,10 @@ const HLS_CONFIG = {
  */
 export { Hls };
 
-// iOS/iPadOS detection — use native HLS there (ManagedMediaSource is unreliable),
-// unless this browser opted into hls.js with `?mms=on` (decode-declaration.js
-// iosPlaysHlsJs).
+// iOS/iPadOS detection — native HLS there only where this browser opted out
+// of hls.js with `?mms=off`, or has no ManagedMediaSource (before iOS 17.1:
+// Hls.isSupported() is false). hls.js is the default since 2026-09-30
+// (decode-declaration.js iosPlaysHlsJs): native HLS refuses a PQ variant.
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 

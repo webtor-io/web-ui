@@ -216,21 +216,22 @@ export function applyMmsUrlSwitch(win) {
 }
 
 // iosPlaysHlsJs: does this iPhone or iPad play HLS with hls.js, on a
-// ManagedMediaSource (iOS 17.1+), instead of natively? Only one that opted
-// in with `?mms=on`, until the owner's iPhone checks pass (HDR, fullscreen,
-// seeks, subtitles). Native HLS refuses a PQ variant without a word
-// (2026-09-29, codec-support.js pqConfig); hls.js on a ManagedMediaSource
-// plays one on a Mac. The cost: hls.js sets disableRemotePlayback on such
-// an element -- no AirPlay. Read where the path is chosen (hls-manager.js
-// createHls) and where the declaration asks it (codec-support.js
-// decodePath); on any other device it changes nothing.
+// ManagedMediaSource (iOS 17.1+; without one it stays native), instead of
+// natively? Every one but one that opted out with `?mms=off` (default since
+// 2026-09-30, owner's go: his iPhone played a 4K PQ passthrough this way;
+// before it, only one that opted in with `?mms=on`). Native HLS refuses a PQ
+// variant without a word (2026-09-29, codec-support.js pqConfig). The cost:
+// hls.js sets disableRemotePlayback on such an element -- no AirPlay. Read
+// where the path is chosen (hls-manager.js createHls) and where the
+// declaration asks it (codec-support.js decodePath); on any other device it
+// changes nothing.
 export function iosPlaysHlsJs(win) {
     const s = state(win);
     // Read once per page: the probe (which path it asks) and every
     // createHls on this page see the same answer, whatever another tab
     // switches meanwhile.
     if (s.mmsOptin === undefined) s.mmsOptin = read(win, MMS_OPTIN_KEY);
-    return s.mmsOptin === 'on';
+    return s.mmsOptin !== 'off';
 }
 
 // takesPart: does this page send a declaration? Every browser but one
@@ -277,13 +278,13 @@ function freshAudio(win) {
 // only the part's own tokens; null for none, another browser's, one asked
 // of the other HLS path (`mms`: an iPhone on hls.js, iosPlaysHlsJs -- the
 // native path would be sent hdr-pq, which it refuses without a word), or
-// one older than CACHE_TTL_MS. An entry from before `mms` is the native
-// path's, as every iPhone's was.
+// one older than CACHE_TTL_MS. An entry from before `mms` says nothing of
+// its path and is taken, for the probe's first milliseconds, as before.
 function cachedTokens(win, key, allowed, now) {
     try {
         const c = JSON.parse(read(win, key) || 'null');
         if (!c || c.ua !== userAgent(win) || !Array.isArray(c.tokens)) return null;
-        if ((c.mms === true) !== iosPlaysHlsJs(win)) return null;
+        if (typeof c.mms === 'boolean' && c.mms !== iosPlaysHlsJs(win)) return null;
         if (typeof c.at !== 'number' || c.at > now || now - c.at > CACHE_TTL_MS) return null;
         return allowed.filter((t) => c.tokens.includes(t));
     } catch (e) {

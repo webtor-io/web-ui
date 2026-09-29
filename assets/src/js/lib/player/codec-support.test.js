@@ -1315,7 +1315,7 @@ test('hls.js distrusts the HEVC answers of Firefox on Windows, and no audio answ
     assert.ok(dist.includes("new Error('Unsupported EC-3 in M2TS found')"));
 });
 
-test('an iPhone on hls.js (?mms=on) asks its ManagedMediaSource, PQ as media-source; without one it stays native', async () => {
+test('an iPhone on hls.js (the default; ?mms=off opts out) asks its ManagedMediaSource, PQ as media-source; without one it stays native', async () => {
     const mc = pqCapabilities(PQ_YES);
     const env = {
         userAgent: UA.iPhone,
@@ -1339,6 +1339,8 @@ test('envFromWindow carries the ?mms= switch', () => {
         navigator: { userAgent: UA.iPhone },
     });
     assert.equal(envFromWindow(win()).iosHlsJs, true);
-    store.delete('wt-mms');
+    store.set('wt-mms', 'off');
     assert.equal(envFromWindow(win()).iosHlsJs, false);
+    store.delete('wt-mms');
+    assert.equal(envFromWindow(win()).iosHlsJs, true, 'hls.js by default (2026-09-30)');
 });

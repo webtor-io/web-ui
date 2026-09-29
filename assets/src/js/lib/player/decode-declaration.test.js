@@ -934,53 +934,58 @@ test('the real probe without the audio opt-in: no audio question at all', async 
 
 // ---- how an iPhone plays HLS (`?mms=on|off`, wt-mms) ------------------------
 
-test('?mms=on: an iPhone plays HLS with hls.js, ?mms=off natively again; the other switches untouched', () => {
-    let win = page({ url: 'https://webtor.io/?mms=on' });
-    assert.equal(iosPlaysHlsJs(win), false, 'native until the switch is read');
-    assert.equal(applyMmsUrlSwitch(win), 'on');
-    assert.equal(iosPlaysHlsJs(win), true);
-    assert.equal(win.localStorage.getItem(MMS_OPTIN_KEY), 'on');
+test('an iPhone plays HLS with hls.js by default; ?mms=off natively, ?mms=on back; the other switches untouched', () => {
+    let win = page({ url: 'https://webtor.io/?mms=off' });
+    assert.equal(iosPlaysHlsJs(win), true, 'hls.js by default (2026-09-30)');
+    assert.equal(applyMmsUrlSwitch(win), 'off');
+    assert.equal(iosPlaysHlsJs(win), false);
+    assert.equal(win.localStorage.getItem(MMS_OPTIN_KEY), 'off');
     assert.equal(win.localStorage.getItem(OPTIN_KEY), null);
     assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), null);
     assert.equal(applyUrlSwitch(win), null, '?mms= is neither the video switch');
     assert.equal(applyAudioUrlSwitch(win), null, 'nor the audio one');
     // A later page of the same browser.
     win = page({ url: 'https://webtor.io/ru/other' });
-    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'off');
     assert.equal(applyMmsUrlSwitch(win), null);
-    assert.equal(iosPlaysHlsJs(win), true);
-    win = page({ url: 'https://webtor.io/?mms=off' });
-    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
-    assert.equal(applyMmsUrlSwitch(win), 'off');
     assert.equal(iosPlaysHlsJs(win), false);
+    win = page({ url: 'https://webtor.io/?mms=on' });
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'off');
+    assert.equal(applyMmsUrlSwitch(win), 'on');
+    assert.equal(iosPlaysHlsJs(win), true);
 });
 
 test('initDecodeDeclaration reads ?mms= too', () => {
-    const win = page({ url: 'https://webtor.io/?mms=on' });
+    const win = page({ url: 'https://webtor.io/?mms=off' });
     initDecodeDeclaration(win, win.document);
-    assert.equal(iosPlaysHlsJs(win), true);
+    assert.equal(iosPlaysHlsJs(win), false);
 });
 
 test('the ?mms= switch is read once per page: another tab switching does not split this page', () => {
     const win = page({ url: 'https://webtor.io/ru/other' });
-    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
-    assert.equal(iosPlaysHlsJs(win), true);
     win.localStorage.setItem(MMS_OPTIN_KEY, 'off');
-    assert.equal(iosPlaysHlsJs(win), true, 'the probe asked hls.js\'s path on this page; createHls must take it');
+    assert.equal(iosPlaysHlsJs(win), false);
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
+    assert.equal(iosPlaysHlsJs(win), false, 'the probe asked the native path on this page; createHls must take it');
 });
 
 test('a cached answer from the other HLS path is not sent', () => {
     let win = page({ url: 'https://webtor.io/ru/other' });
     optIn(win);
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'off');
     win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, mms: true, tokens: ['hevc10', 'hdr-pq'], at: Date.now() - 1000 }));
     assert.equal(declarationFor(win, {}), 'unknown', '?mms=off since: that answer was the MSE path\'s -- no answer yet');
     win = page({ url: 'https://webtor.io/ru/other' });
     optIn(win);
-    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
     win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, mms: true, tokens: ['hevc10', 'hdr-pq'], at: Date.now() - 1000 }));
     assert.equal(declarationFor(win, {}), 'hevc10,hdr-pq', 'the same path: kept');
     win = page({ url: 'https://webtor.io/ru/other' });
     optIn(win);
     win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, tokens: ['hevc10'], at: Date.now() - 1000 }));
-    assert.equal(declarationFor(win, {}), 'hevc10', 'an entry from before `mms` is the native path\'s');
+    assert.equal(declarationFor(win, {}), 'hevc10', 'an entry from before `mms` says nothing of its path: taken');
+    win = page({ url: 'https://webtor.io/ru/other' });
+    optIn(win);
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'off');
+    win.localStorage.setItem(CACHE_KEY, JSON.stringify({ ua: UA_A, mms: false, tokens: ['hevc10'], at: Date.now() - 1000 }));
+    assert.equal(declarationFor(win, {}), 'hevc10', 'the native path\'s own entry, where the browser plays natively');
 });
