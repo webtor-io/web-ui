@@ -5430,3 +5430,51 @@ test('no audio token declared, no audio guard: the element gets the listeners it
     assert.equal(await errorListeners((page) => oldRouteAudio(page, { decode: DECL_VIDEO, audioClass: 'aac51' })), plain, 'the video only');
     assert.equal(await errorListeners((page) => oldRouteAudio(page)), plain + 1, 'an audio token: its guard');
 });
+
+// dead-player.js in the player: asked to play, nothing for DEAD_AFTER_MS --
+// one player-dead; a restart the passthrough guard has begun is the guard's.
+// jsdom plays nothing: no hls.js, no source, readyState 0 -- a dead player.
+// The clock goes in the watch's own steps: a mocked tick runs every interval
+// due in it with Date.now() already at its end.
+const tickBy = (t, ms, step = 2000) => { for (let d = 0; d < ms; d += step) t.mock.timers.tick(step); };
+// The mocked clock only around `fn`: the player's teardown (t.after) must
+// clear its intervals with the real clearInterval, or the ones made at mount
+// outlive the test and the process never exits.
+const mockClock = (t, fn) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1000000 });
+    try { fn(); } finally { t.mock.timers.reset(); }
+};
+test('a player asked to play that shows nothing sends player-dead, with its route', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer(passthroughPlayer);
+    mockClock(t, () => {
+        p.video.paused = false;
+        p.video.dispatchEvent(new dom.window.Event('play'));
+        tickBy(t, 28000);
+        assert.equal(p.events.find((e) => e.name === 'player-dead'), undefined, 'not before the quiet');
+        tickBy(t, 4000);
+    });
+    const ev = p.events.filter((e) => e.name === 'player-dead');
+    assert.equal(ev.length, 1);
+    assert.equal(ev[0].data.route, 'passthrough');
+    assert.equal(ev[0].data.waited_s, 30);
+});
+
+test('a passthrough the guard gave up on is not a dead player', async (t) => {
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        pageStartForm(page);
+    });
+    p.video.paused = false;
+    Object.defineProperty(p.video, 'error', { value: { code: 3 }, configurable: true });
+    mockClock(t, () => {
+        p.video.dispatchEvent(new dom.window.Event('play'));
+        p.video.dispatchEvent(new dom.window.Event('error'));
+        assert.equal(rec.got.length, 1, 'the restart on the old route');
+        tickBy(t, 60000);
+    });
+    assert.equal(p.events.find((e) => e.name === 'player-dead'), undefined);
+});

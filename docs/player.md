@@ -340,6 +340,40 @@ are ours to get right: **position state is reported in film time** (a transcoder
 (a session seek is a POST, not a `currentTime` write). `navigator.mediaSession` and
 `MediaMetadata` are injected — testable, and a browser without them is a no-op.
 
+## A player that never starts — `dead-player.js`
+
+On 29.09 Safari on a Mac had a dead player on every route for an hour and a half (hls.js on a
+ManagedMediaSource swaps in its own `blob:` `<source>`, see `stream-url.js`) and no event said so:
+`stream-start` needs 5 s of playback, the passthrough guard watches a decoder. The watch closes
+that gap with telemetry only — no restart, the viewer sees nothing.
+
+Armed by `play` (the viewer or autoplay), off at the first `playing` or the clock moving past
+where the request found it; a pause disarms (resume prompt, grace hold), a hidden tab restarts
+the quiet, a restart a guard has begun (`guard.done`) or an element taken off the page ends it.
+One `player-dead` per player, when any of three holds 30 s after the request:
+
+- **`why: quiet`** — nothing moved towards playback for 30 s: no playlist request pending
+  (manifest always; video/audio playlist only before the first fragment is in — after that
+  hls.js polls a live playlist whatever the element does), no fragment in flight before its
+  headers or receiving bytes (`loader-restart.js` `loadProgress`/`loadWork` — a 4K segment at the
+  cap raises no event for minutes), no change of the element's buffered ranges or `readyState`,
+  no `progress`, and — without hls.js — no `networkState` LOADING without an error. An hls.js
+  error is not progress (a retry is a new request, which counts); neither are `emptied`,
+  `loadstart`, `durationchange` (a recovery fires them and does nothing else). An error ends
+  only the pending request its `details` names.
+- **`why: error`** — the element held a MediaError for 30 s, however busy hls.js was. A
+  SourceBuffer append failure on the production master shape is a non-fatal `bufferAppendError`
+  with the MediaSource still open: hls.js does not recover it, keeps loading, and the element sits
+  on MediaError 4 (AAC 5.1 session's bench, headless Chrome 154 + hls.js 1.6.14). An `emptied`
+  (any recovery: `load()`) restarts the clock.
+- **`why: recovering`** — 5 re-attachments (`emptied`) since the request and no start: on a muxed
+  TS shape hls.js recovers ~1000 times a second.
+
+`player-dead` carries the state it died in (`path`, `hls`, `err`, `rs`, `ns`, `inflight`, `got`,
+`recoveries`); `player-revived` follows if it plays after all — their count is the rule's error.
+No timer outlives the report. Not verified in a browser: native HLS in Safari keeping
+`networkState` at LOADING while stuck would hide a quiet death there.
+
 ## Usage events — `player-telemetry.js`
 
 One Umami event per **decision**, not per press (`settled()` holds the last value until the
@@ -356,6 +390,8 @@ presses stop and is flushed on teardown):
 | `stream-start` | + `rate`, `subtitleDelay`, `route`, `reason`, `decl` | what the stream started with (remembered settings make no change event); the transcoder session's route and reason and the declaration it was started with (`data-video-route`, `data-route-reason`, `data-decode`; `''` where the element has none) — the base the HEVC passthrough is measured against |
 | `hevc-fallback` | `reason`, `cls`, `path: mse\|native` | a passthrough given up to the old route (see "Passthrough: errors and fallback") |
 | `audio-fallback` | `reason`, `cls: dolby\|aac51`, `path: mse\|native`, `route` | a file restarted without the multichannel audio its declaration made, on any route (see "Multichannel audio and the fallback"); never counted in `hevc-fallback` |
+| `player-dead` | `why: quiet\|error\|recovering`, `path: hlsjs\|native\|direct\|blob\|none`, `hls: on\|off\|none`, `route`, `err`, `rs`, `ns`, `inflight`, `got: none\|playlist\|frags`, `recoveries`, `waited_s` | asked to play and not started 30 s on: nothing moving, an element error held, or a recovery loop (see "A player that never starts"); once per player |
+| `player-revived` | `path`, `route`, `waited_s` (since the play request), `recoveries` | it played after a `player-dead`: the rule's error, count it against `player-dead` |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`.
 

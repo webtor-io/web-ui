@@ -49,6 +49,7 @@ import { getLang } from '../i18n';
 import { shareResource } from '../share/share';
 import '../../../styles/player.css';
 import { readStreamUrl } from './stream-url.js';
+import { createDeadPlayerWatch } from './dead-player.js';
 
 let _currentPlayer = null;
 
@@ -345,6 +346,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // effect is declared above this one, so the new instance is already
         // in the ref by the time this re-runs.
     }, [trackContainer, sourceUrl]);
+
+    // A player that never starts says so (dead-player.js): an Umami event,
+    // nothing the viewer sees. A restart a guard has begun is the guard's.
+    useEffect(() => createDeadPlayerWatch({
+        video: videoEl,
+        getHls: () => hlsRef.current,
+        Hls,
+        handled: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
+            || (audioGuardRef.current && audioGuardRef.current.done)),
+        track,
+    }).dispose, []);
 
     // Resume prompt state — must be declared before useWatchHistory which reads it.
     const [showResumePrompt, setShowResumePrompt] = useState(false);
