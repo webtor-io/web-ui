@@ -48,6 +48,7 @@ import { init as initI18n, t, tf } from './i18n';
 import { getLang } from '../i18n';
 import { shareResource } from '../share/share';
 import '../../../styles/player.css';
+import { readStreamUrl } from './stream-url.js';
 
 let _currentPlayer = null;
 
@@ -157,9 +158,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         delayEventRef.current.push({ delay: d, source: announce ? 'key' : 'dialog' });
     }, [delayKey, showToast]);
 
-    // Source URL from first <source> element
-    const sourceEl = videoEl.querySelector('source');
-    const sourceUrl = sourceEl ? sourceEl.getAttribute('src') : videoEl.src;
+    // The stream's URL: the last real one the element held (stream-url.js).
+    // Not re-read raw on every render: hls.js on a ManagedMediaSource puts
+    // its own blob: <source> in the element, and handing that to useHls
+    // killed the player in Safari on a Mac. A new real URL (the next item
+    // swapping the <source>) still counts.
+    const lastSourceUrl = useRef(null);
+    const renderedUrl = readStreamUrl(videoEl);
+    if (renderedUrl) lastSourceUrl.current = renderedUrl;
+    const sourceUrl = lastSourceUrl.current;
 
     // Parse features from settings
     const features = parseFeatures(settings, isVideo, duration, isSession);
