@@ -1,5 +1,17 @@
 import { init as initI18n, t, tf } from '../../lib/auth/i18n';
 
+const EMAIL_KEY = 'auth.loginEmail';
+
+(function restoreEmail() {
+    try {
+        const email = sessionStorage.getItem(EMAIL_KEY);
+        if (!email) return;
+        sessionStorage.removeItem(EMAIL_KEY);
+        const input = document.querySelector('form input[name=email]');
+        if (input && !input.value) input.value = email;
+    } catch {}
+})();
+
 window.submitLoginForm = function(target, e) {
     (async (data) => {
         await initI18n();
@@ -13,13 +25,15 @@ window.submitLoginForm = function(target, e) {
             e.done(tf('auth.progress.magicLinkSent', data.email));
         } catch (err) {
             console.error(err);
-            if (err.statusText) {
-                e.error(err.statusText.toLowerCase());
-            } else if (err.message) {
-                e.error(err.message.toLowerCase());
-            } else {
-                e.error(t('auth.progress.unknownError'));
+            const {describeAuthError} = await import('../../lib/auth/errors');
+            const {message, reloading} = await describeAuthError(err, {t, tf});
+            if (reloading) {
+                // The reloaded page starts empty; the viewer only presses Send again.
+                try {
+                    sessionStorage.setItem(EMAIL_KEY, data.email);
+                } catch {}
             }
+            e.error(message);
         }
         e.close();
     })({

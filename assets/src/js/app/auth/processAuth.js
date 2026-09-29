@@ -1,4 +1,4 @@
-import { init as initI18n, t } from '../../lib/auth/i18n';
+import { init as initI18n, t, tf } from '../../lib/auth/i18n';
 
 export async function processAuth(el, name, descriptionKey, action) {
     await initI18n();
@@ -22,13 +22,8 @@ export async function processAuth(el, name, descriptionKey, action) {
             e.error(t(`auth.progress.${name}Failed`));
         }
     } catch (err) {
-        if (err.statusText) {
-            e.error(err.statusText.toLowerCase());
-        } else if (err.message) {
-            e.error(err.message.toLowerCase());
-        } else {
-            e.error(t('auth.progress.unknownError'));
-        }
+        const {describeAuthError} = await import('../../lib/auth/errors');
+        e.error((await describeAuthError(err, {t, tf})).message);
     }
     e.close();
 }
