@@ -7,6 +7,7 @@ import { applySubtitleSelection, selectionFor } from './subtitle-apply.js';
 import { markUnsnapshottedTracksStale } from './subtitle-track-reload.js';
 import { createLoaderRestart } from './loader-restart.js';
 import { passthroughHlsConfig } from './passthrough.js';
+import { iosPlaysHlsJs } from './decode-declaration.js';
 
 const HLS_CONFIG = {
     autoStartLoad: true,
@@ -28,7 +29,9 @@ const HLS_CONFIG = {
  */
 export { Hls };
 
-// iOS/iPadOS detection — use native HLS there (ManagedMediaSource is unreliable)
+// iOS/iPadOS detection — use native HLS there (ManagedMediaSource is unreliable),
+// unless this browser opted into hls.js with `?mms=on` (decode-declaration.js
+// iosPlaysHlsJs).
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -40,7 +43,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 // every error. Without them the instance is exactly what every stream has
 // always had.
 export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
-    if (!Hls || !Hls.isSupported() || isIOS) {
+    if (!Hls || !Hls.isSupported() || (isIOS && !iosPlaysHlsJs(window))) {
         // Native HLS (Safari/iOS) — browser handles m3u8 natively
         if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
             videoEl.src = sourceUrl;

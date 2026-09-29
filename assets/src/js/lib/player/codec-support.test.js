@@ -893,7 +893,7 @@ test('isIOSLike is hls-manager.js\'s own iOS rule', () => {
     const src = readFileSync(path.join(HERE, 'hls-manager.js'), 'utf8');
     assert.ok(src.includes('/iPad|iPhone|iPod/.test(navigator.userAgent) ||\n    (navigator.platform === \'MacIntel\' && navigator.maxTouchPoints > 1)'),
         'the player changed when it plays HLS natively; change isIOSLike with it');
-    assert.ok(src.includes('if (!Hls || !Hls.isSupported() || isIOS) {'),
+    assert.ok(src.includes('if (!Hls || !Hls.isSupported() || (isIOS && !iosPlaysHlsJs(window))) {'),
         'the player changed how it picks hls.js over native HLS; change decodePath with it');
 });
 
@@ -1313,4 +1313,32 @@ test('hls.js distrusts the HEVC answers of Firefox on Windows, and no audio answ
     // into fMP4 (a passthrough session), so ec3 is safe to declare on any
     // route.
     assert.ok(dist.includes("new Error('Unsupported EC-3 in M2TS found')"));
+});
+
+test('an iPhone on hls.js (?mms=on) asks its ManagedMediaSource, PQ as media-source; without one it stays native', async () => {
+    const mc = pqCapabilities(PQ_YES);
+    const env = {
+        userAgent: UA.iPhone,
+        ManagedMediaSource: mediaSource(mseYes('hevc8', 'hevc10', 'hevc10-2160')),
+        canPlayType: canPlay(nativeYes(...ALL_HEVC)),
+        mediaCapabilities: mc,
+        iosHlsJs: true,
+    };
+    assert.equal(decodePath(env), 'mse');
+    assert.deepEqual(await decodeTokens(env), ['hevc8', 'hevc10', 'hevc10-2160', 'hdr-pq']);
+    assert.equal(videoCalls(mc)[0].type, 'media-source');
+    // Before iOS 17.1 there is no ManagedMediaSource: native, switch or not.
+    assert.equal(decodePath({ ...env, ManagedMediaSource: undefined }), 'native');
+    assert.equal(decodePath({ ...env, iosHlsJs: false }), 'native');
+});
+
+test('envFromWindow carries the ?mms= switch', () => {
+    const store = new Map([['wt-mms', 'on']]);
+    const win = () => ({
+        localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) },
+        navigator: { userAgent: UA.iPhone },
+    });
+    assert.equal(envFromWindow(win()).iosHlsJs, true);
+    store.delete('wt-mms');
+    assert.equal(envFromWindow(win()).iosHlsJs, false);
 });

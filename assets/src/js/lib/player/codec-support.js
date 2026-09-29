@@ -27,6 +27,8 @@
 // page), so the probe is testable with fakes, and every access is wrapped: an
 // old browser or a throwing API answers `false`, never an exception.
 
+import { iosPlaysHlsJs } from './decode-declaration.js';
+
 export const EVENT = 'codec-support';
 export const STORAGE_KEY = 'wt-codec-support';
 export const TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -202,9 +204,10 @@ export function hlsJsSupported(env = {}) {
 
 // decodePath is how this browser's player would play an HLS stream, by
 // hls-manager.js createHls: 'mse' (hls.js), 'native' (the element's own HLS:
-// iOS always, or where hls.js cannot run), 'none' (neither — no HLS here).
+// iOS, unless it opted into hls.js -- env.iosHlsJs, decode-declaration.js
+// iosPlaysHlsJs -- or where hls.js cannot run), 'none' (neither — no HLS here).
 export function decodePath(env = {}) {
-    if (!isIOSLike(env) && hlsJsSupported(env)) return 'mse';
+    if ((!isIOSLike(env) || env.iosHlsJs === true) && hlsJsSupported(env)) return 'mse';
     return canPlay(env, HLS_TYPE) ? 'native' : 'none';
 }
 
@@ -477,6 +480,7 @@ export function envFromWindow(win, video) {
         userAgent: safe(() => nav.userAgent),
         platform: safe(() => nav.platform),
         maxTouchPoints: safe(() => nav.maxTouchPoints),
+        iosHlsJs: safe(() => iosPlaysHlsJs(win)) === true,
         matchMedia,
     };
 }

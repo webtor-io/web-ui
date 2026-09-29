@@ -5,7 +5,7 @@ const debug = await makeDebug('webtor:embed:check');
 // Both client and server must agree on the algorithm, so migrating to SHA-256
 // would require a coordinated change and would break all existing embeds.
 import sha1 from 'sha1';
-import { applyUrlSwitch, applyAudioUrlSwitch, takesPart, startProbe, whenDeclared, declarationFor } from '../../lib/player/decode-declaration';
+import { applyUrlSwitch, applyAudioUrlSwitch, applyMmsUrlSwitch, takesPart, startProbe, whenDeclared, declarationFor } from '../../lib/player/decode-declaration';
 // The HEVC passthrough declaration (lib/player/decode-declaration.js). An
 // embed takes part the way any page does -- its own storage says so -- and
 // only then probes. Wrapped: this module has top-level awaits, and a throw
@@ -13,6 +13,7 @@ import { applyUrlSwitch, applyAudioUrlSwitch, takesPart, startProbe, whenDeclare
 try {
     applyUrlSwitch(window);
     applyAudioUrlSwitch(window);
+    applyMmsUrlSwitch(window);
     if (takesPart(window)) startProbe(window);
 } catch (e) { /* no declaration */ }
 message.send('init');

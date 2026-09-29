@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import {
-    OPTIN_KEY, AUDIO_OPTIN_KEY, CACHE_KEY, AUDIO_CACHE_KEY, MEMORY_KEY, MEMORY_TTL_MS, CACHE_TTL_MS, TOKENS, VIDEO_TOKENS, AUDIO_TOKENS,
+    OPTIN_KEY, AUDIO_OPTIN_KEY, MMS_OPTIN_KEY, CACHE_KEY, AUDIO_CACHE_KEY, MEMORY_KEY, MEMORY_TTL_MS, CACHE_TTL_MS, TOKENS, VIDEO_TOKENS, AUDIO_TOKENS,
     AUDIO_STRUCK_BY_CLASS, AUDIO_DROP_BY_CLASS, STRUCK_BY_CLASS,
-    applyUrlSwitch, applyAudioUrlSwitch, takesPart, takesPartAudio, startProbe, whenDeclared, declaredTokens, declarationFor, decodedTokens,
+    applyUrlSwitch, applyAudioUrlSwitch, applyMmsUrlSwitch, iosPlaysHlsJs, takesPart, takesPartAudio, startProbe, whenDeclared, declaredTokens, declarationFor, decodedTokens,
     rememberFallback, loadMemory, installSubmitHook, applyDeclaration, initDecodeDeclaration,
     setPendingFallback, clearPendingFallback, declaresAudio, isAudioClass,
 } from './decode-declaration.js';
@@ -930,4 +930,33 @@ test('the real probe without the audio opt-in: no audio question at all', async 
     await both.__wtDecode.audio;
     assert.ok(calls > 0);
     assert.equal(declarationFor(both, {}), [...DECODE_VIDEO_TOKENS, 'aac51'].join(','));
+});
+
+// ---- how an iPhone plays HLS (`?mms=on|off`, wt-mms) ------------------------
+
+test('?mms=on: an iPhone plays HLS with hls.js, ?mms=off natively again; the other switches untouched', () => {
+    let win = page({ url: 'https://webtor.io/?mms=on' });
+    assert.equal(iosPlaysHlsJs(win), false, 'native until the switch is read');
+    assert.equal(applyMmsUrlSwitch(win), 'on');
+    assert.equal(iosPlaysHlsJs(win), true);
+    assert.equal(win.localStorage.getItem(MMS_OPTIN_KEY), 'on');
+    assert.equal(win.localStorage.getItem(OPTIN_KEY), null);
+    assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), null);
+    assert.equal(applyUrlSwitch(win), null, '?mms= is neither the video switch');
+    assert.equal(applyAudioUrlSwitch(win), null, 'nor the audio one');
+    // A later page of the same browser.
+    win = page({ url: 'https://webtor.io/ru/other' });
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
+    assert.equal(applyMmsUrlSwitch(win), null);
+    assert.equal(iosPlaysHlsJs(win), true);
+    win = page({ url: 'https://webtor.io/?mms=off' });
+    win.localStorage.setItem(MMS_OPTIN_KEY, 'on');
+    assert.equal(applyMmsUrlSwitch(win), 'off');
+    assert.equal(iosPlaysHlsJs(win), false);
+});
+
+test('initDecodeDeclaration reads ?mms= too', () => {
+    const win = page({ url: 'https://webtor.io/?mms=on' });
+    initDecodeDeclaration(win, win.document);
+    assert.equal(iosPlaysHlsJs(win), true);
 });

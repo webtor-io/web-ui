@@ -66,6 +66,8 @@
 export const OPTIN_KEY = 'wt-passthrough';
 // The audio part's own opt-in (`?audio=on|off`), independent of OPTIN_KEY.
 export const AUDIO_OPTIN_KEY = 'wt-audio';
+// `?mms=on|off`: an iPhone or iPad plays HLS with hls.js (iosPlaysHlsJs).
+export const MMS_OPTIN_KEY = 'wt-mms';
 export const CACHE_KEY = 'wt-decode';
 export const AUDIO_CACHE_KEY = 'wt-decode-audio';
 export const MEMORY_KEY = 'wt-decode-fallback';
@@ -131,7 +133,7 @@ export function declaresAudio(decl) {
 function state(win) {
     let s = win[STATE];
     if (!s) {
-        s = { optin: undefined, audioOptin: undefined, probe: null, audio: null, askAudio: false, fresh: null, ready: null, readyResolve: null, memory: null, hooked: false, pending: null };
+        s = { optin: undefined, audioOptin: undefined, mmsOptin: undefined, probe: null, audio: null, askAudio: false, fresh: null, ready: null, readyResolve: null, memory: null, hooked: false, pending: null };
         s.ready = new Promise((r) => { s.readyResolve = r; });
         win[STATE] = s;
     }
@@ -201,6 +203,31 @@ export function applyAudioUrlSwitch(win) {
     state(win).audioOptin = v;
     write(win, AUDIO_OPTIN_KEY, v);
     return v;
+}
+
+// applyMmsUrlSwitch is the same for how an iPhone or iPad plays HLS:
+// `?mms=on|off`, remembered as MMS_OPTIN_KEY (iosPlaysHlsJs).
+export function applyMmsUrlSwitch(win) {
+    const v = urlSwitch(win, 'mms');
+    if (v === null) return null;
+    state(win).mmsOptin = v;
+    write(win, MMS_OPTIN_KEY, v);
+    return v;
+}
+
+// iosPlaysHlsJs: does this iPhone or iPad play HLS with hls.js, on a
+// ManagedMediaSource (iOS 17.1+), instead of natively? Only one that opted
+// in with `?mms=on`, until the owner's iPhone checks pass (HDR, fullscreen,
+// seeks, subtitles). Native HLS refuses a PQ variant without a word
+// (2026-09-29, codec-support.js pqConfig); hls.js on a ManagedMediaSource
+// plays one on a Mac. The cost: hls.js sets disableRemotePlayback on such
+// an element -- no AirPlay. Read where the path is chosen (hls-manager.js
+// createHls) and where the declaration asks it (codec-support.js
+// decodePath); on any other device it changes nothing.
+export function iosPlaysHlsJs(win) {
+    const s = state(win);
+    const v = s.mmsOptin !== undefined ? s.mmsOptin : read(win, MMS_OPTIN_KEY);
+    return v === 'on';
 }
 
 // takesPart: does this page send a declaration? Every browser but one
@@ -579,6 +606,7 @@ export function initDecodeDeclaration(win, doc) {
     try {
         applyUrlSwitch(win);
         applyAudioUrlSwitch(win);
+        applyMmsUrlSwitch(win);
         if (takesPart(win)) startProbe(win);
         installSubmitHook(doc, win);
     } catch (e) {

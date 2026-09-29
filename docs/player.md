@@ -566,6 +566,17 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
   audio guards); the audio part's own opt-in 128 B on `layout.js`, 123 B on `embed/check.js`. All of
   it against stage 5 (`ef1e89a2`): `layout.js` +511 B, `embed/check.js` +523 B, `decode-probe`
   +352 B, `discover.js` +392 B, the player chunk +1.69 KB, `resource/get.js` +103 B.
+- **How an iPhone plays HLS: `?mms=on`.** iOS and iPadOS play HLS natively (`hls-manager.js`,
+  since 00369751: "ManagedMediaSource is unreliable", reasons not recorded), and native HLS refuses a
+  PQ variant without a word (see `hdr-pq` above). `?mms=on` on any page (localStorage `wt-mms`)
+  makes this iPhone or iPad play through hls.js on a ManagedMediaSource (iOS 17.1+; without one it
+  stays native), and the declaration then asks what hls.js will use: the ManagedMediaSource's
+  `isTypeSupported`, and `hdr-pq` as `media-source` (`applyMmsUrlSwitch`, `iosPlaysHlsJs`,
+  `decodePath` via `env.iosHlsJs`). `?mms=off` goes back. Opt-in only until the owner's iPhone checks
+  pass: HDR on screen, fullscreen (`webkitEnterFullscreen`), seeks, subtitles. What it costs:
+  hls.js sets `disableRemotePlayback` on such an element — no AirPlay. Under hls.js, Play before any
+  data no longer calls `load()` (`usePlayerState` togglePlay): it dropped the element's
+  MediaSource.
 - **Who declares audio.** The audio tokens (`aac51`, `ac3`, `ec3`) have an opt-in of their own,
   independent of the video's: `?audio=on` on any page (localStorage `wt-audio`; where storage throws,
   the page's own state), `?audio=off` takes the browser out (`applyAudioUrlSwitch`,

@@ -5478,3 +5478,24 @@ test('a passthrough the guard gave up on is not a dead player', async (t) => {
     });
     assert.equal(p.events.find((e) => e.name === 'player-dead'), undefined);
 });
+
+// usePlayerState togglePlay: Play before any data calls load() for native
+// HLS, never under hls.js -- load() drops the element's MediaSource (an
+// iPhone on `?mms=on`, or Chrome) and the player is dead.
+test('Play before any data: load() for native HLS, never under hls.js', async (t) => {
+    t.after(() => { window.hlsPlayer = null; destroyPlayer(); });
+    const p = await mountPlayer((page) => page.video.setAttribute('controls', ''));
+    let loads = 0;
+    p.video.load = () => { loads++; };
+    p.video.play = () => Promise.resolve();
+    const play = () => p.container.querySelector('.wt-player-big-play').click();
+    assert.equal(p.video.readyState, 0);
+    play();
+    assert.equal(loads, 1, 'native HLS: loaded first');
+    window.hlsPlayer = { media: p.video, on() {}, off() {}, stopLoad() {}, destroy() {} };
+    play();
+    assert.equal(loads, 1, 'hls.js attached: no load()');
+    window.hlsPlayer = { media: null, on() {}, off() {}, stopLoad() {}, destroy() {} };
+    play();
+    assert.equal(loads, 2, 'an hls.js that let the element go is not attached');
+});
