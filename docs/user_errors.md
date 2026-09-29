@@ -34,6 +34,37 @@ Every render logs one structured line — `user error shown` with `err_key` and
 {app="web-ui"} |= "user error shown" | logfmt | err_key != ""
 ```
 
+A client that left is not an error to show. When an error attached to the
+request is `context.Canceled` and the request's own context (taken before the
+chain ran) is done, the error page (`services/web/middleware.go`
+`ErrorHandler`) logs it at info as `client closed request` instead of
+`request failed`, renders nothing and records nginx's 499
+(`web.StatusClientClosedRequest`) in gin's log and `webui_http_requests_total`
+— the same rule as torrent-http-proxy's `clientGone`. Both halves are needed:
+a cancel of the chain's own with the client still connected, and a failure
+that reaches the handler as itself (a deadline of our own, go-pg's
+`pg: connection pool timeout`, a gRPC error) before the client left, stay 500
+and `request failed`. A handler that already answered (a redirect, its own
+`AbortWithError` status) keeps its status; only the line's level changes.
+Before this, one viewer closing a page with dozens of status streams still
+passing the auth middleware produced a burst of `error.generic` 500s on
+`/:resource_id/status` (305 on 2026-09-27, 33 in one second).
+
+What the rule cannot see: a Postgres failure that go-pg was retrying when the
+client left. go-pg retries EOF, a reset or refused connection and a network
+timeout (`PG_MAX_RETRIES`, 3 in common-services, 100 ms–1 s apart) and sleeps
+between tries on the request's context; when the client leaves during that
+sleep it returns a bare `context.Canceled` and drops the failure (go-pg
+v10.15.0 `base.go` exec/query). "Postgres failed, then the client left" is
+then indistinguishable from "the client left while waiting for a pool
+connection", and is a 499 at info too. So a 499 means the client left, not
+that nothing failed. In the PG failover of 2026-09-27 01:19–01:35Z this shape
+was 45 of 1324 `request failed` lines (25 with nothing written, 499 now; 20
+already answered, which keep their status and drop to info). The outage stays
+visible at error level through what go-pg does not retry: 308 pool timeouts
+and 646 claims errors in that window. During a DB incident, 499s rising with
+the pool timeouts are its tail, not viewers leaving.
+
 ## What the form accepts (2026-09)
 
 The search field on the home page and the 20 tool pages (`POST /`, also the

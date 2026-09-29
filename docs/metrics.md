@@ -39,6 +39,13 @@ value would be a series kept for the life of the process.
   a series.
 - `method` is the request method when it is one the router can answer
   (standard verbs plus the WebDAV set); anything else is `other`.
+- `status` is the code gin recorded. `499` (nginx's "client closed
+  request") is a request the chain gave up on because the client left
+  before anything was written (`web.ErrorHandler`, docs/user_errors.md). It is
+  not in a `5..` match, and it is not proof that nothing failed: a Postgres
+  failure go-pg was retrying when the client left comes back as a bare
+  `context.Canceled` and is counted here too. During a DB incident, 499s that
+  rise with `pg: connection pool timeout` errors are the incident's tail.
 - `job` is the queue name: `load`, `enrich`, `embded`, `payment`, and the
   action names (`stream-video`, `stream-audio`, `download`, `preview-image`).
 - `lang` on the paywall counter is one of the locale codes a clip was rendered
