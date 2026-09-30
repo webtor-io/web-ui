@@ -10,7 +10,7 @@ import { Hls } from './hls-manager';
 import { applyCueOffset, setTrackDelay, normalizeDelay, SUBTITLE_DELAY_STEP } from './cue-offset';
 import { stepRate, rateLabel, loadSubtitleDelay, saveSubtitleDelay, loadPrefs, savePrefs } from './player-prefs';
 import { createTapSeek } from './tap-seek';
-import { localSeekTarget, producedEnd } from './local-seek';
+import { localSeekTarget, producedEnd, exactPlace } from './local-seek';
 import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
 import { createNextItemGo, canMoveOn, takeFallbackNote } from './next-item-go';
@@ -50,8 +50,16 @@ import { shareResource } from '../share/share';
 import '../../../styles/player.css';
 import { readStreamUrl } from './stream-url.js';
 import { createDeadPlayerWatch } from './dead-player.js';
+import {
+    createRecoveryPolicy, fileKey as restartKey, safeSessionStorage, takeNote, writeNote, restartStream, clearPurgeMarks, markNextStart,
+} from './stream-restart.js';
 
 let _currentPlayer = null;
+
+// A stream restart's exact place (exactRestartPlace): how often it looks at
+// the new run, and for how long at most.
+const RESTART_CHECK_MS = 500;
+const RESTART_EXACT_MAX_MS = 2 * 60 * 1000;
 
 // ENGAGEMENT_SECONDS is the playback time (not wall clock) after which a
 // session counts as real viewing, so press-play-and-bounce does not skew
@@ -261,6 +269,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // gives the file up to the old route at most once -- the same way the
     // "Compatibility mode" item does. Every other stream gets none of it.
     const passthroughRoute = isVideo && videoEl.dataset.videoRoute === 'passthrough';
+    // The stream restart after a lost session (below, stream-restart.js):
+    // declared here, since a guard's restart and ours read each other -- one
+    // owner of what the viewer sees. A restart of ours on its way leaves the
+    // guard's out: the page is being started again anyway.
+    const recoverPolicyRef = useRef(null);
+    const ownRestart = () => !!(recoverPolicyRef.current && recoverPolicyRef.current.restarting);
     const passthroughGuardRef = useRef(null);
     if (passthroughRoute && !passthroughGuardRef.current) {
         passthroughGuardRef.current = createPassthroughGuard({
@@ -268,9 +282,11 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // audio: the failure is charged to the audio the declaration
             // made (multichannel audio) -- the restart keeps the video's
             // route and leaves that audio out.
-            fallback: (reason, path, audio, by) => (audio
-                ? fallbackAudio({ video: videoEl, reason, path, cls: audio, by })
-                : fallbackToOldRoute({ video: videoEl, reason, path })),
+            fallback: (reason, path, audio, by) => {
+                if (ownRestart()) return;
+                if (audio) fallbackAudio({ video: videoEl, reason, path, cls: audio, by });
+                else fallbackToOldRoute({ video: videoEl, reason, path });
+            },
         });
     }
     // Multichannel audio on every other route (passthrough.js
@@ -282,7 +298,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     if (isVideo && !passthroughRoute && declaresAudio(videoEl.dataset.decode) && !audioGuardRef.current) {
         audioGuardRef.current = createAudioGuard({
             video: videoEl,
-            fallback: (reason, path, audio, by) => fallbackAudio({ video: videoEl, reason, path, cls: audio, by }),
+            fallback: (reason, path, audio, by) => {
+                if (!ownRestart()) fallbackAudio({ video: videoEl, reason, path, cls: audio, by });
+            },
         });
     }
     useEffect(() => () => {
@@ -294,12 +312,172 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // (decode-declaration.js setPendingFallback).
     useEffect(() => { clearPendingFallback(window); }, []);
 
+    // ---- a stream whose transcoder session is gone -------------------------
+    //
+    // hls.js's network errors that nothing can load again -- a dead
+    // session's answer, fatal or not, and a failure that outlasted the
+    // retries (network-recovery.js) -- and a session seek that finds the
+    // session gone (session-seek.js onSessionGone) end here, never in a
+    // blind startLoad(): the stream is restarted at the viewer's place in the
+    // film, at most once in five minutes per file, and past that -- or where
+    // nothing can be loaded again -- the card with one button, once the film
+    // has nothing left to play (stream-restart.js createRecoveryPolicy;
+    // docs/player.md "Network errors and the stream restart").
+    //
+    // This player may BE such a restart: the note says where the last one
+    // stood, and the resume below goes there without asking. Its grace-popup
+    // answer, if the viewer gave one, is this element's too: the popup is not
+    // shown again, and the transfer status and the buffering label read the
+    // answer where they read it on every player (data-grace-cta-answered,
+    // lib/playerActivity.js offerAnswered; data-grace-cta-shown: the popup is
+    // not "on its way").
+    //
+    // A film that was paused comes back paused (the note's `play: false`),
+    // and the element's own `autoplay` must not start it: at mount, and
+    // again when the resume's session seek reloads the element (hls.js
+    // loadSource re-attaches it, and a reload re-arms autoplay). That was
+    // every paused restart in Chrome (5 of 5, playing by itself 1.7-2.5 s
+    // after the restart's POST): a viewer who paused and left the tab got
+    // the film's sound from it after a transcoder rollout. So `autoplay` is
+    // off from here -- before hls.js attaches -- until the viewer's own Play
+    // (the effect below puts it back); the resume's seek lands paused
+    // (session-seek.js landsPaused) and the exact place waits for that Play
+    // (exactRestartPlace).
+    const restartNoteRef = useRef(undefined);
+    const autoplayHeldRef = useRef(false);
+    if (restartNoteRef.current === undefined) {
+        restartNoteRef.current = takeNote(safeSessionStorage(), resourceID, path);
+        if (restartNoteRef.current && restartNoteRef.current.grace && graceDurationSec) {
+            graceShownRef.current = true;
+            videoEl.dataset.graceCtaShown = '';
+            videoEl.dataset.graceCtaAnswered = restartNoteRef.current.grace;
+        }
+        if (restartNoteRef.current && !restartNoteRef.current.play && videoEl.autoplay) {
+            videoEl.autoplay = false;
+            autoplayHeldRef.current = true;
+        }
+    }
+    // The viewer's Play: the element is as every other again (a later paused
+    // session seek plays its new run by itself, as everywhere).
+    useEffect(() => {
+        if (!autoplayHeldRef.current) return undefined;
+        const back = () => {
+            autoplayHeldRef.current = false;
+            videoEl.autoplay = true;
+        };
+        videoEl.addEventListener('play', back, { once: true });
+        return () => videoEl.removeEventListener('play', back);
+    }, []);
+    // The purge field the restart put on the page's start form has done its
+    // work: the viewer's next press of the button is an ordinary start.
+    useEffect(() => { clearPurgeMarks(document); }, []);
+    const [recoverCard, setRecoverCard] = useState(null);
+    // What the policy needs from further down (the watch history, the next
+    // file): filled in there, read when it acts.
+    const recoverLate = useRef({ restart: () => {}, leaving: () => false });
+    // The player-dead watch (below): once it has declared this player dead,
+    // the player is its, and ours reads so.
+    const deadWatchRef = useRef(null);
+    // The element starves -- playing and nothing ahead to play, or paused by
+    // the viewer. Not a pause of the page's own: a session seek's (its run
+    // is on its way) or the grace popup's hold (its answer plays on). Ended
+    // is not starving either: the film is over, the next file's card is up.
+    const starving = () => {
+        const v = videoRef.current;
+        if (!v || v.ended) return false;
+        if (sessionSeekingRef.current || graceHoldRef.current.isActive()) return false;
+        return !!v.paused || (v.readyState || 0) < 3;
+    };
+    if (!recoverPolicyRef.current) {
+        recoverPolicyRef.current = createRecoveryPolicy({
+            storage: safeSessionStorage(),
+            key: restartKey(resourceID, path),
+            // The grace popup up, or on its way (the film past the window
+            // and the popup not shown yet: it comes from a render effect):
+            // its answer first (grace-hold.js), then the restart.
+            graceBlocks: (at) => {
+                if (graceHoldRef.current.isActive()) return true;
+                if (!graceDurationSec || graceShownRef.current) return false;
+                return at >= graceDurationSec && !!document.querySelector('#grace-cta');
+            },
+            leaving: () => recoverLate.current.leaving(),
+            // One owner of what the viewer sees: a guard that has begun its
+            // own restart (passthrough.js: the old route, or the file without
+            // its multichannel audio -- the audio guard also stops and
+            // detaches hls.js), or player-dead's verdict on a player that
+            // never started (dead-player.js: a player dead for a reason of
+            // its own, which a new session would not cure) -- until it plays
+            // after all (player-revived). Then nothing of ours: no restart,
+            // no card.
+            blocked: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
+                || (audioGuardRef.current && audioGuardRef.current.done)
+                || (deadWatchRef.current && deadWatchRef.current.dead)),
+            // The card waits while the film plays from its buffer.
+            playingFromBuffer: () => !starving(),
+            whenStarving: (fn) => {
+                const v = videoRef.current;
+                if (!v) return () => {};
+                const check = () => { if (starving()) fn(); };
+                const evs = ['waiting', 'stalled', 'pause', 'timeupdate', 'emptied'];
+                for (const ev of evs) v.addEventListener(ev, check);
+                return () => { for (const ev of evs) v.removeEventListener(ev, check); };
+            },
+            position: () => {
+                const v = videoRef.current;
+                return { at: ((v && v.currentTime) || 0) + seekOffsetRef.current, play: !!v && !v.paused };
+            },
+            restart: (pos) => recoverLate.current.restart(pos),
+            stopLoad: () => {
+                const h = hlsRef.current;
+                if (h && typeof h.stopLoad === 'function') h.stopLoad();
+            },
+            // Paused under the card: the film cannot go on, and the controls
+            // should not say it does.
+            showCard: (card) => {
+                const v = videoRef.current;
+                if (v && !v.paused && typeof v.pause === 'function') v.pause();
+                setRecoverCard(card);
+                // The viewer's own press of the page's button next goes past
+                // the job cache too (stream-restart.js markNextStart): its
+                // job, replayed, is this one with the dead session in it.
+                try { markNextStart({ win: window, doc: document, video: videoEl, root: trackContainer }); } catch (e) { /* the card still shows */ }
+                // The card is due before the first frame too (a restarted
+                // job whose new session is dead at its first request): the
+                // page that keeps the rendered player hidden until
+                // player_ready (app/action.js) shows it now -- the card is
+                // the one message, and it must be seen.
+                window.dispatchEvent(new CustomEvent('player_show'));
+            },
+            // The film loads again under it after all: the card goes, and
+            // the controls, the pill and the big play button are back -- and
+            // the page's next start is an ordinary one again.
+            hideCard: () => {
+                setRecoverCard(null);
+                clearPurgeMarks(document);
+            },
+            track,
+        });
+    }
+    useEffect(() => () => recoverPolicyRef.current.dispose(), []);
+    const recoveryRef = useRef(null);
+    if (!recoveryRef.current) {
+        recoveryRef.current = {
+            // info.via: 'load' (a fatal error) or 'error-nonfatal' (an answer
+            // hls.js would have asked again); info.loader: which one asked.
+            onSessionGone: (reason, status, info = {}) => recoverPolicyRef.current.sessionGone(
+                reason, status, null, info.via || 'load', info.loader || ''),
+            onGiveUp: (status) => recoverPolicyRef.current.giveUp(status),
+            onFilmLoaded: () => recoverPolicyRef.current.resumed(),
+        };
+    }
+
     // HLS hook
     const hlsRef = useHls(videoRef, sourceUrl, {
         passthrough: passthroughRoute
             ? { fragLoadMs: parseInt(videoEl.dataset.fragLoadMs || '0', 10) || 0, guard: passthroughGuardRef.current }
             : null,
         audioGuard: audioGuardRef.current,
+        recovery: recoveryRef.current,
     });
 
     // Re-assert the picker's answer on hls.js's own transitions.
@@ -350,14 +528,23 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
     // A player that never starts says so (dead-player.js): an Umami event,
     // nothing the viewer sees. A restart a guard has begun is the guard's.
-    useEffect(() => createDeadPlayerWatch({
-        video: videoEl,
-        getHls: () => hlsRef.current,
-        Hls,
-        handled: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
-            || (audioGuardRef.current && audioGuardRef.current.done)),
-        track,
-    }).dispose, []);
+    // Nor one the stream restart has taken over (stream-restart.js engaged:
+    // a restart gone out, its card up or waiting, a restart waiting for the
+    // grace popup): that player is not dead, it is being replaced or has
+    // said so itself -- one message, not two.
+    useEffect(() => {
+        const w = createDeadPlayerWatch({
+            video: videoEl,
+            getHls: () => hlsRef.current,
+            Hls,
+            handled: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
+                || (audioGuardRef.current && audioGuardRef.current.done)
+                || (recoverPolicyRef.current && recoverPolicyRef.current.engaged)),
+            track,
+        });
+        deadWatchRef.current = w;
+        return w.dispose;
+    }, []);
 
     // Resume prompt state — must be declared before useWatchHistory which reads it.
     const [showResumePrompt, setShowResumePrompt] = useState(false);
@@ -382,6 +569,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         duration: state.duration,
         playing: state.playing,
         paused: showResumePrompt,
+        // A restart of this player's own (stream-restart.js): its note is the
+        // position, not the server's copy.
+        resumeFrom: restartNoteRef.current ? restartNoteRef.current.at : undefined,
     });
 
     // A settings change that re-renders the player (the preferred language,
@@ -512,9 +702,32 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     };
     useEffect(() => () => seekEventRef.current.flush(), []);
 
+    // A stream restart's exact place (stream-restart.js, local-seek.js
+    // exactPlace): the run the restart's resume seek starts is the
+    // transcoder's quantized one, up to 30 s before where the viewer was.
+    // Once that run has written the place, the film goes there by a plain
+    // currentTime write -- no second session seek. Any seek of the viewer's
+    // (handleSeek) cancels it: their seek is the place now.
+    const restartTargetRef = useRef(null);
+    const restartTimerRef = useRef(null);
+    const stopRestartTarget = () => {
+        restartTargetRef.current = null;
+        if (restartTimerRef.current !== null) {
+            clearInterval(restartTimerRef.current);
+            restartTimerRef.current = null;
+        }
+    };
+    useEffect(() => stopRestartTarget, []);
+
     // Seek handler (session or direct)
     const handleSeek = useCallback((time, { play = false } = {}) => {
         if (sessionSeekingRef.current) return;
+        stopRestartTarget();
+        // The target of an earlier seek that found the session gone is no
+        // longer where the viewer is (stream-restart.js, the viewer's place):
+        // this seek is -- a local one by moving the element, a session one
+        // by its own report if it finds the session gone too.
+        recoverPolicyRef.current.seeking();
         if (isSession && sessionSeekUrl) {
             // Inside the run that is playing? Then it is a plain seek
             // (local-seek.js): no POST, no new FFmpeg, no frozen frame. The
@@ -557,6 +770,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     // The grace popup up: the new run is loaded, not played,
                     // until the viewer answers it (grace-hold.js).
                     holdPlayback: () => graceHoldRef.current.holds(),
+                    // The POST found the session gone: the restart at the
+                    // seek's target (stream-restart.js).
+                    onSessionGone: (reason, status, pos) => recoverPolicyRef.current.sessionGone(reason, status, pos, 'seek'),
                 });
             }
             if (sessionSeekerRef.current) {
@@ -580,6 +796,52 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
     }, [isSession, sessionSeekUrl, sourceUrl, kickTranslationPoll, onSessionSeekingChange, onDirectSeek]);
     handleSeekRef.current = handleSeek;
+
+    // exactRestartPlace arms the restart's exact place (above): checked every
+    // RESTART_CHECK_MS -- the run grows by itself, a paused film included --
+    // until the film stands within a second of the target, the viewer seeks,
+    // or RESTART_EXACT_MAX_MS have passed. `onPlay`: a paused restart -- the
+    // film stays where the resume's seek landed it, paused, and goes to the
+    // place when the viewer presses Play: the checks and their deadline start
+    // then (a viewer back after ten minutes still gets there), the first one
+    // at once.
+    const exactRestartPlace = (target, { onPlay = false } = {}) => {
+        stopRestartTarget();
+        if (!(target > 0)) return;
+        restartTargetRef.current = target;
+        let until = Date.now() + RESTART_EXACT_MAX_MS;
+        const check = () => {
+            const t = restartTargetRef.current;
+            const video = videoRef.current;
+            if (t === null || !video || Date.now() > until) {
+                stopRestartTarget();
+                return;
+            }
+            // The resume's own session seek is still out: its run is not
+            // the one to measure.
+            if (sessionSeekingRef.current) return;
+            const offset = seekOffsetRef.current;
+            const at = exactPlace(t, (video.currentTime || 0) + offset, offset, producedEnd(video, hlsRef.current));
+            if (at === null) return;
+            stopRestartTarget();
+            if (at === 'there') return;
+            video.currentTime = at;
+            state.setCurrentTime(t);
+            onDirectSeek();
+        };
+        const video = videoRef.current;
+        if (onPlay && video && video.paused) {
+            // A seek of the viewer's before it has dropped the target: the
+            // first check lets go (above).
+            video.addEventListener('play', () => {
+                until = Date.now() + RESTART_EXACT_MAX_MS;
+                restartTimerRef.current = setInterval(check, RESTART_CHECK_MS);
+                check();
+            }, { once: true });
+            return;
+        }
+        restartTimerRef.current = setInterval(check, RESTART_CHECK_MS);
+    };
 
     // Auto-hide controls
     const resetHideTimer = useCallback(() => {
@@ -736,6 +998,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             const paused = hold.held();
             hold.release({ play: via === 'play' });
             if (window.umami) window.umami.track('grace-soft-cta-click', { action, via, paused });
+            // A stream restart that waited for this answer goes now
+            // (stream-restart.js createRecoveryPolicy).
+            recoverPolicyRef.current.graceAnswered();
         };
         graceAnswerRef.current = hide;
         const closeBtn = el.querySelector('.grace-cta-close');
@@ -837,6 +1102,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         }
         function onPlayerPlay() {
             forcePaused = false;
+            // The embed's page starts its player once it can play
+            // (app/embed/index.js startPlayer): autoplay by another name,
+            // and a paused film's restart holds it too (autoplayHeldRef).
+            if (autoplayHeldRef.current) return;
             videoRef.current?.play().catch(() => {});
         }
         function onPlaying() {
@@ -913,11 +1182,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // Video only, like the prompt's markup and the hold below: an
         // <audio> with a saved position has no prompt to answer, and a
         // prompt that is "open" and invisible kept position saving paused.
-        if (isVideo && resumePosition && resumePosition > 0) {
+        // A player that is a stream restart of its own (stream-restart.js)
+        // continues from its note, audio too: the "prompt" is answered at
+        // once below and never drawn for an <audio>.
+        const restarted = !!restartNoteRef.current && resumePosition > 0;
+        if ((isVideo || restarted) && resumePosition && resumePosition > 0) {
             // A player that came back from a settings change (the preferred
             // language, preferred-lang.js) continues without asking: the
             // viewer never left.
-            autoResumeRef.current = takeAutoResume(resourceID, path);
+            autoResumeRef.current = restarted || takeAutoResume(resourceID, path);
             setShowResumePrompt(true);
         }
     }, [resumeReady]);
@@ -946,13 +1219,15 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (r && r.catch) r.catch(() => {});
     }, []);
 
-    // Handle resume choice
-    const handleResume = useCallback(() => {
+    // Handle resume choice. `play: false` is for a stream restart whose film
+    // was paused (stream-restart.js): the position without playback.
+    const handleResume = useCallback(({ play = true } = {}) => {
         setShowResumePrompt(false);
         resumeAnsweredRef.current = true;
         setResumeAnswered(true);
         const video = videoRef.current;
         if (!video) return;
+        if (!play && !video.paused && typeof video.pause === 'function') video.pause();
         if (isSession && sessionSeekUrl) {
             // Not play() and then seek: the old run would be heard from the
             // film's beginning for as long as the new one takes to start.
@@ -961,10 +1236,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // handleSeek a no-op, and the prompt is closed by now: the
             // answer is kept and carried out when that seek lets go.
             if (sessionSeekingRef.current) pendingResumeRef.current = resumePosition;
-            else handleSeek(resumePosition, { play: true });
+            else handleSeek(resumePosition, { play });
         } else {
             video.currentTime = resumePosition;
-            playAfterPrompt();
+            if (play) playAfterPrompt();
         }
         // Save resumed position immediately
         const dur = duration > 0 ? duration : (video.duration || 0);
@@ -995,6 +1270,17 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     useEffect(() => {
         if (!showResumePrompt || !autoResumeRef.current) return;
         autoResumeRef.current = false;
+        // A stream restart goes back exactly where it stood, the end of the
+        // film included: resumeAt's "all but finished" is about a viewer
+        // coming back to a file, not about a session that died under one.
+        const note = restartNoteRef.current;
+        if (note) {
+            handleResume({ play: note.play });
+            // hls.js only: native HLS (iOS) is left as it was. A paused film
+            // gets there with the viewer's Play.
+            if (isSession && sessionSeekUrl && hlsRef.current) exactRestartPlace(note.at, { onPlay: !note.play });
+            return;
+        }
         const dur = duration > 0 ? duration : ((videoRef.current && videoRef.current.duration) || 0);
         if (resumeAt(resumePosition, dur) > 0) handleResume();
         else handleStartOver();
@@ -1210,6 +1496,37 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const [nextProgress, setNextProgress] = useState('');
     const nextLoadingRef = useRef(false);
     nextLoadingRef.current = nextLoading;
+    // The stream restart's two late parts (createRecoveryPolicy above): the
+    // player leaving for the next file does not restart this one, and the
+    // restart itself -- the position to the server where it keeps one, the
+    // note for the next player, then the stream job again.
+    recoverLate.current.leaving = () => nextLoadingRef.current;
+    recoverLate.current.restart = ({ at, play }) => {
+        const video = videoRef.current;
+        // The place is carried -- to the server and in the note -- only
+        // where the viewer is at one:
+        //   - past the resume question: the saved position fetched, and the
+        //     prompt answered where there is one (video only). Before that
+        //     the film stands at the run's start (0, or autoplay's fraction
+        //     of a second before the hold), not where the viewer will be.
+        //     A session found dead at mounting -- a replayed job's -- ends
+        //     here within a second: its note would make the next player
+        //     skip /watch/position, and its PUT would overwrite the saved
+        //     position with next to nothing;
+        //   - past 0: a note at 0 says nothing the next player would not do
+        //     anyway, except to skip the server's copy. (A prompt answered
+        //     "Continue" whose seek found the session gone is not at 0: the
+        //     policy's place is that seek's target -- stream-restart.js.)
+        // Without the note the next player asks as a fresh one does.
+        const settled = resumeReady && (resumeAnsweredRef.current || !(isVideo && resumePosition > 0));
+        if (settled && at > 0) {
+            const dur = duration > 0 ? duration : ((video && video.duration) || 0);
+            if (dur > 0) forceSendPosition(at, dur);
+            // The grace popup's answer rides along: asked once per film.
+            writeNote(safeSessionStorage(), { resourceID, path, at, play, grace: videoEl.dataset.graceCtaAnswered || '' });
+        }
+        restartStream({ win: window, doc: document, video: videoEl, root: trackContainer });
+    };
     const nextGoRef = useRef(null);
     const earlyGoneRef = useRef(false); // the credits countdown fires once
     const cardShownAtRef = useRef(null); // film time the card came up at (countdown)
@@ -1458,7 +1775,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setCapCardUp(capCardOpen());
         return onCapCard(setCapCardUp);
     }, []);
-    const bufferingShown = showControls && isVideo && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading));
+    const bufferingShown = showControls && isVideo && !recoverCard && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading));
     // The grace popup is up, or comes up in this very render's effect (the
     // clock, a session seek's target included, has just crossed the window):
     // the frame before it must not draw the lock, nor count it seen.
@@ -1517,6 +1834,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (e.target.closest('.wt-resume-prompt')) return;
         if (e.target.closest('.wt-catchup')) return;
         if (e.target.closest('.wt-offer-card')) return;
+        if (e.target.closest('.wt-recover')) return;
         resetHideTimer();
         if (fromTouch() && containerEl) {
             const r = containerEl.getBoundingClientRect();
@@ -1661,8 +1979,25 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 </div>
             )}
 
+            {/* The stream cannot go on and was not restarted by itself
+                (stream-restart.js): one button, which restarts it where it
+                stood. Where the big play button would be; it wins that slot. */}
+            {recoverCard && (
+                <div class="wt-player-overlay wt-recover" role="alert"
+                     onClick={(e) => e.stopPropagation()} onDblClick={(e) => e.stopPropagation()}>
+                    <div class="wt-recover-card">
+                        <p class="wt-recover-text">{t('player.streamLost')}</p>
+                        <button type="button" class="wt-resume-btn wt-resume-btn--primary"
+                            onClick={(e) => { e.stopPropagation(); recoverPolicyRef.current.click(); }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" /></svg>
+                            {t('player.resumeWatching')}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Big play button — shown when paused, regardless of loading state */}
-            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && !awaitingStart && !nextLoading && (
+            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && !awaitingStart && !nextLoading && !recoverCard && (
                 <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
                     <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); togglePlay(); }} aria-label={t('player.play')}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">

@@ -122,6 +122,15 @@ function busHls() {
     };
 }
 const fatalMedia = { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.BUFFER_APPEND_ERROR, fatal: true };
+// A fatal network error is answered after the backoff's first step, not at
+// once (network-recovery.js): these tests turn that timer by hand.
+function netTimers() {
+    const due = [];
+    return {
+        opts: { setTimer: (fn, ms) => { due.push({ fn, ms }); return due.length; }, clearTimer: () => {}, log: () => {} },
+        fire() { const d = due.splice(0); for (const x of d) x.fn(); return d.map((x) => x.ms); },
+    };
+}
 
 // The old route is exactly what it was: every fatal media error recovers,
 // however many (the passthrough's "once" is its own).
@@ -140,11 +149,14 @@ test('passthrough: the guard is first, and the rest is the old handling', () => 
     const hls = busHls();
     const seen = [];
     const guard = { onHlsError: (h, data) => { seen.push(data.details); return data.type === Hls.ErrorTypes.MEDIA_ERROR; } };
-    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard);
+    const net = netTimers();
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard, net.opts);
     hls.trigger(Hls.Events.ERROR, fatalMedia);
     assert.equal(hls.recovered, 0, 'the guard decides on media errors');
     hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });
-    assert.equal(hls.startLoads, 1, 'a network error restarts loading as on every route');
+    assert.equal(hls.startLoads, 0, 'not at once');
+    assert.deepEqual(net.fire(), [1000]);
+    assert.equal(hls.startLoads, 1, 'a network error restarts loading as on every route, after the backoff\'s first step');
     assert.deepEqual(seen, [Hls.ErrorDetails.BUFFER_APPEND_ERROR, Hls.ErrorDetails.FRAG_LOAD_TIMEOUT]);
 });
 
@@ -154,12 +166,16 @@ import { createAudioGuard, SAME_INCIDENT_MS } from './passthrough.js';
 
 // Every stream without a guard -- every browser that has not opted in --
 // registers exactly what it registered before multichannel audio (recorded
-// off the code at 1bea6ac8): no BUFFER_CODECS listener, nothing else new.
+// off the code at 1bea6ac8): no BUFFER_CODECS listener. The last three are
+// the fatal network errors' handler (network-recovery.js, 2026-09-29): a
+// fragment of the film resets its backoff, a new source is a new start,
+// destroy clears its timer.
 test('no guard: the listeners are exactly today\'s', () => {
     const names = [];
     const hls = { ...busHls(), on(ev) { names.push(ev); } };
     setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} });
-    assert.deepEqual(names, ['hlsManifestParsed', 'hlsError', 'hlsError', 'hlsStallResolved', 'hlsManifestLoading', 'hlsMediaDetaching', 'hlsDestroying']);
+    assert.deepEqual(names, ['hlsManifestParsed', 'hlsError', 'hlsError', 'hlsStallResolved', 'hlsManifestLoading', 'hlsMediaDetaching', 'hlsDestroying',
+        'hlsFragLoaded', 'hlsManifestLoading', 'hlsDestroying']);
     const withGuard = [];
     setupHlsEvents({ ...busHls(), on(ev) { withGuard.push(ev); } }, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, { onHlsError: () => false, onBufferCodecs() {} });
     assert.deepEqual(withGuard.filter((n) => !names.includes(n)), [Hls.Events.BUFFER_CODECS], 'a guard is told what audio hls.js buffers');
@@ -214,7 +230,8 @@ test('old route, multichannel audio declared but stereo in play: every fatal med
     const fired = [];
     const guard = createAudioGuard({ video, fallback: (...a) => fired.push(a), now: () => t, setTimer: () => 0, clearTimer: () => {} });
     guard.setHls(hls);
-    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard);
+    const net = netTimers();
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard, net.opts);
     hls.trigger(Hls.Events.BUFFER_CODECS, { audio: { codec: 'mp4a.40.2', metadata: { channelCount: 2 } } });
     for (let i = 0; i < 3; i++) {
         t += SAME_INCIDENT_MS + 1;
@@ -223,5 +240,6 @@ test('old route, multichannel audio declared but stereo in play: every fatal med
     assert.equal(hls.recovered, 3);
     assert.deepEqual(fired, []);
     hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });
+    net.fire();
     assert.equal(hls.startLoads, 1);
 });

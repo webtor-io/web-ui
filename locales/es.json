@@ -740,6 +740,8 @@
     "player.buffering": "Cargando",
     "player.bufferingCap": "Cargando: velocidad limitada a %v",
     "player.close": "Cerrar",
+    "player.streamLost": "La reproducción se interrumpió",
+    "player.resumeWatching": "Seguir viendo",
     "job.retrievingData": "obteniendo datos del recurso",
     "job.retrievingStreamUrl": "obteniendo URL de reproducción",
     "job.probingMedia": "analizando información multimedia",

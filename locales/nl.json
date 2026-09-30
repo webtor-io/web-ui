@@ -740,6 +740,8 @@
     "player.buffering": "Bufferen",
     "player.bufferingCap": "Bufferen: snelheid beperkt tot %v",
     "player.close": "Sluiten",
+    "player.streamLost": "Het afspelen is onderbroken",
+    "player.resumeWatching": "Doorgaan met kijken",
     "job.retrievingData": "bron-gegevens ophalen",
     "job.retrievingStreamUrl": "stream-URL ophalen",
     "job.probingMedia": "media-info verkennen",

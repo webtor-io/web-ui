@@ -24,6 +24,11 @@ type PostArgs struct {
 	// Decode is the embed page's HEVC passthrough declaration and, on a
 	// restart after a failed passthrough, why (models.DecodeRequest).
 	Decode models.DecodeRequest
+	// Purge: start the job again rather than replay the cached one. The
+	// player's own restart after its transcoder session is gone sends it
+	// (lib/player/stream-restart.js): the embed's render is cached for the
+	// hour, and a replay hands back the dead session.
+	Purge bool
 }
 
 type PostData struct {
@@ -46,6 +51,7 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 		ID:            id,
 		EmbedSettings: &settings,
 		Decode:        models.ParseDecodeRequest(c.PostForm("decode"), c.PostForm("decode-fallback"), c.PostForm("decode-class")),
+		Purge:         c.PostForm("purge") == "true",
 	}, nil
 
 }
@@ -94,7 +100,7 @@ func (s *Handler) post(c *gin.Context) {
 			"embed":  domain,
 		}).Info("passthrough fallback")
 	}
-	embedJob, err := s.jobs.Embed(web.NewContext(c), s.cl, args.EmbedSettings, dsd, args.Decode)
+	embedJob, err := s.jobs.Embed(web.NewContext(c), s.cl, args.EmbedSettings, dsd, args.Decode, args.Purge)
 	if err != nil {
 		tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(pd).WithErr(err))
 		return

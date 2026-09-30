@@ -25,7 +25,11 @@ const withCredits = (payload, creditsAtRef) => {
     return typeof at === 'number' && at > 0 ? { ...payload, credits_at: at } : payload;
 };
 
-export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing, paused, creditsAtRef }) {
+// `resumeFrom`: a position this player already has from its own restart
+// (stream-restart.js takeNote) -- the one to resume from, exactly, without
+// asking the server (whose copy is 15 s old at best, absent for a viewer
+// without an account, and never under 30 s).
+export function useWatchHistory(videoRef, { resourceID, path, currentTime, duration, playing, paused, creditsAtRef, resumeFrom }) {
     const [resumePosition, setResumePosition] = useState(null);
     const [resumeReady, setResumeReady] = useState(false);
     const lastSentPositionRef = useRef(0);
@@ -43,6 +47,11 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
 
     // Fetch saved position on mount
     useEffect(() => {
+        if (typeof resumeFrom === 'number') {
+            if (resumeFrom > 0) setResumePosition(resumeFrom);
+            setResumeReady(true);
+            return;
+        }
         if (!resourceID || !path) {
             setResumeReady(true);
             return;

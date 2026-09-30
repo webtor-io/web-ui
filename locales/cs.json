@@ -768,6 +768,8 @@
     "player.buffering": "Načítání",
     "player.bufferingCap": "Načítání: rychlost omezena na %v",
     "player.close": "Zavřít",
+    "player.streamLost": "Přehrávání bylo přerušeno",
+    "player.resumeWatching": "Pokračovat ve sledování",
     "job.retrievingData": "získávám data zdroje",
     "job.retrievingStreamUrl": "získávám stream url",
     "job.probingMedia": "zkoumám info o médiu",

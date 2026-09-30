@@ -22,7 +22,9 @@
 // thing a startLoad() can fix is a loader that is not loading what the
 // playhead needs -- stopped, or left in its ERROR state by a fatal error --
 // and that still deserves a way out. hls-manager's fatal handler restarts
-// loading after a network error; after a media error recoverMediaError()
+// loading after a network error that loading again can cure -- on a backoff,
+// never for a transcoder session that is gone (network-recovery.js); after a
+// media error recoverMediaError()
 // does it itself in 1.6 (hls.ts 661-671: startLoad at the playhead), which
 // 1.5.6's did not (hls.ts 488-495). Everything else is hls.js's own: a
 // fragment that errors or times out is retried by its load policy

@@ -744,6 +744,8 @@
     "player.buffering": "Chargement",
     "player.bufferingCap": "Chargement : vitesse limitée à %v",
     "player.close": "Fermer",
+    "player.streamLost": "La lecture a été interrompue",
+    "player.resumeWatching": "Reprendre la lecture",
     "job.retrievingData": "récupération des données de la ressource",
     "job.retrievingStreamUrl": "récupération de l'URL du flux",
     "job.probingMedia": "analyse des infos média du contenu",

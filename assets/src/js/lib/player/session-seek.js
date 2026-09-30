@@ -41,7 +41,14 @@ function captureFrame(videoEl) {
 // the new run can play, paused under the popup; the holder starts it with the
 // answer. Asking is the seek saying it would play: the holder counts it as
 // playback to resume, and a seek that lands paused never asks.
-export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange, trackContainer, holdPlayback }) {
+//
+// `onSessionGone(reason, status, { at, play })` (hls.js path only): the POST
+// answered that the session is gone -- 404 (the transcoder dropped it: 10 min
+// without a request, or a rollout) or 403 (the token expired). The old run is
+// as dead as the session, so it is not played again; the player restarts the
+// stream at the seek's target instead (Player.jsx, stream-restart.js). Native
+// HLS (iOS) is left as it was.
+export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, onSeekOffsetChange, onSeekingChange, trackContainer, holdPlayback, onSessionGone }) {
     let isSeeking = false;
     let seekOffset = 0;
     const isNative = !hls; // native HLS (iOS) — no HLS.js instance
@@ -67,6 +74,8 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
         if (isSeeking) return;
         setIsSeeking(true);
         let freezeFrame = null;
+        // The status of a POST that said the session is gone (onSessionGone).
+        let gone = 0;
         // The old run is over the moment the viewer seeks. The frozen frame
         // hides its picture while the POST is out, but nothing hid its
         // sound: it kept playing the old position -- for as long as the
@@ -75,6 +84,16 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
         // comes first on purpose: the player's pause listener reads it and
         // does not take this pause for the viewer's.
         const playAfter = play || !videoEl.paused;
+        // A seek that does not play, on an element nothing will start: the
+        // reload below (hls.js loadSource re-attaches the element) re-arms
+        // the element's `autoplay` -- which is what starts a paused seek's
+        // new run everywhere else, and what the `playing` below waits for
+        // (Chrome 154: a paused <video autoplay> plays by itself after a
+        // reload). Without `autoplay` -- a stream restart of a paused film
+        // holds it until the viewer's Play (Player.jsx) -- nothing starts
+        // it: the seek settles when the new run can play, paused, as a held
+        // one does. Native HLS starts its new run itself (below), as before.
+        const landsPaused = !isNative && !playAfter && videoEl.autoplay === false;
 
         try {
             // Freeze current frame as overlay to avoid black flash
@@ -99,7 +118,12 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
             // offset (and reloading) anyway would shift every side-loaded cue
             // and tell the translation service the player watches a run that
             // does not exist.
-            if (res && res.ok === false) throw new Error(`seek POST answered ${res.status}`);
+            if (res && res.ok === false) {
+                if (!isNative && onSessionGone && (res.status === 404 || res.status === 403)) {
+                    gone = res.status;
+                }
+                throw new Error(`seek POST answered ${res.status}`);
+            }
 
             // The transcoder answers with the run's real start: for a
             // copy-mode video that is the keyframe before the quantized
@@ -199,6 +223,12 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 function onCanPlay() {
                     videoEl.removeEventListener('canplay', onCanPlay);
                     if (settled) return;
+                    // Landing paused: the new run can play, and nothing
+                    // is going to play it.
+                    if (landsPaused) {
+                        onPlaying();
+                        return;
+                    }
                     // The retry of a refused play() -- which the hold may
                     // take over by now (the popup came up meanwhile).
                     if (!held) startPlayback();
@@ -243,11 +273,20 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
                 videoEl.addEventListener('playing', onPlaying);
                 // Held already, above (the new run was loaded, not played).
                 if (held) onHeld();
+                // Landing paused (above): settled at canplay -- or by the
+                // viewer's Play before it, on `playing`.
+                if (landsPaused) videoEl.addEventListener('canplay', onCanPlay);
             });
         } catch (e) {
             console.error('Session seek failed:', e);
             if (freezeFrame) freezeFrame.remove();
             setIsSeeking(false);
+            if (gone) {
+                try {
+                    onSessionGone(gone === 403 ? '403' : '404', gone, { at: targetTime, play: playAfter });
+                } catch (err) { /* the page goes on */ }
+                return;
+            }
             // A refused seek moves nothing, the pause above included -- but
             // not behind a hold (holdPlayback, asked last): its answer
             // starts the film.

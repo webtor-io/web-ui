@@ -111,6 +111,8 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     let quietSince = 0;
     let timer = null;
     let reportedAt = null;
+    // It played after the report: the rule's error (player-revived).
+    let revived = false;
     let stopped = false;
     let sig = '';
     let rs = -1;
@@ -215,6 +217,7 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     const advanced = () => safe(() => video.currentTime - startAt, 0) > STARTED_ADVANCE_S;
     const started = () => {
         if (reportedAt !== null) {
+            revived = true;
             const t = now();
             const s = state(t);
             track(REVIVED_EVENT, { path: s.path, route: s.route, audio: s.audio, waited_s: s.waited_s, recoveries });
@@ -329,5 +332,11 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
     if (!safe(() => video.paused, true)) onPlay();
     else if (safe(() => video.autoplay, false) === true) arm('autoplay');
 
-    return { dispose, get reported() { return reportedAt !== null; } };
+    // dead: reported and not revived -- the player is this watch's verdict
+    // (the stream restart, stream-restart.js, stands back while it is).
+    return {
+        dispose,
+        get reported() { return reportedAt !== null; },
+        get dead() { return reportedAt !== null && !revived; },
+    };
 }

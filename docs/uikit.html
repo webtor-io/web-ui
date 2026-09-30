@@ -2640,6 +2640,56 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
   <hr class="uikit-divider">
 
+  <!-- =========================================================
+       22. PLAYER: THE STREAM COULD NOT GO ON
+       ========================================================= -->
+  <div class="uikit-section" id="player-recover">
+    <h2>22. Player: "Playback was interrupted" card</h2>
+    <p class="desc">
+      The player's one visible error (<code>assets/src/js/lib/player/Player.jsx</code>, styles in
+      <code>assets/src/styles/player.css</code> <code>.wt-recover</code>): the stream's transcoder session is gone and was
+      not restarted by itself (at most once per file every 5 min), or it answered another 4xx, or loading failed
+      20 rounds in a row after hls.js's own retries (a round: every track failing together; ~8 min for a connection
+      error, ~3 min past them for a 5xx). Never over a film that still plays from its buffer: it waits
+      until the element starves or the viewer pauses. Not while another part of the player owns what the viewer sees
+      (a passthrough or audio guard restarting the file, a player-dead verdict).
+      One line and one button that restarts the stream at the viewer's place in the film &mdash; where they
+      last asked to be: the target of a seek that found the session gone, though the element never went there
+      (docs/player.md &ldquo;Network errors and the stream restart&rdquo;). Drawn with the player's own classes, not the
+      site's &mdash; the static demo below inlines their look.
+    </p>
+    <div class="uikit-card" style="position:relative;height:220px;background:#0b0b10;overflow:hidden">
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55)">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 20px;border:1px solid rgba(255,255,255,0.12);border-radius:14px;background:rgba(0,0,0,0.72);color:#fff;text-align:center">
+          <p style="margin:0;font-size:14px;line-height:1.35;color:rgba(255,255,255,0.85)">Playback was interrupted</p>
+          <button type="button" style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;font-size:14px;font-weight:600;color:#fff;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15);border-radius:8px">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clip-rule="evenodd" /></svg>
+            Continue watching
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="uikit-label">.wt-player-overlay.wt-recover[role=alert] &gt; .wt-recover-card &gt; p.wt-recover-text + button.wt-resume-btn.wt-resume-btn--primary</div>
+    <div class="uikit-rule">
+      <strong>Rules:</strong> the resume prompt's vocabulary &mdash; a dim scrim, the glass button with the play icon
+      (<code>.wt-resume-btn--primary</code>) &mdash; in a small glass card of the next card's kind; never pink (pink is
+      &ldquo;buy&rdquo; in this design system, this is &ldquo;play&rdquo;), no emoji, no second button. It takes the big play
+      button's slot (that one and the buffering pill are not drawn under it) and sits above the overlays and the
+      catch-up pill (z 45), below the resume prompt (50). It comes only once the film has nothing left to play
+      &mdash; never pausing a picture that still moves &mdash; and the film is paused under it, so the controls say
+      so; it comes down by itself when the film loads again under it (Play from the keyboard, a stall's reload). Due
+      before the first frame (a restarted job whose new session is dead at once), it is still seen: the resource page,
+      which keeps a player hidden under the job's log until it can play, shows it (<code>player_show</code>) and the
+      log goes &mdash; one message. Texts:
+      <code>player.streamLost</code>, <code>player.resumeWatching</code> (&ldquo;Продолжить просмотр&rdquo;). In the audio
+      player, which is its control bar, the card is one row. Events: <code>player-recover-card-shown</code>,
+      <code>player-recover-card-click</code> (<code>reason</code>: <code>limit</code> | <code>network</code>; counted
+      when the card shows, not when it starts waiting).
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
   <p class="text-center text-w-muted text-sm py-8">
     Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
   </p>

@@ -10,8 +10,12 @@ import { createHls, initDefaultTracks, Hls } from '../hls-manager';
  * any other route that declared multichannel audio (createAudioGuard). A
  * guard is told which path plays (setHls: the instance, or null for native
  * HLS) and sees hls.js's errors first; Player.jsx disposes of it.
+ * recovery: { onSessionGone, onGiveUp, onFilmLoaded }, what the player
+ * does after a fatal network error hls.js cannot recover from, and when a
+ * fragment of the film arrives (network-recovery.js); read when the instance
+ * is created, so the player hands a stable object.
  */
-export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audioGuard = null } = {}) {
+export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audioGuard = null, recovery = null } = {}) {
     const hlsRef = useRef(null);
     const tracksInitialized = useRef(false);
 
@@ -24,10 +28,12 @@ export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audio
 
         if (isHls) {
             const guard = passthrough ? passthrough.guard : audioGuard;
+            const opts = passthrough ? { passthrough: true, fragLoadMs: passthrough.fragLoadMs, guard: passthrough.guard }
+                : audioGuard ? { guard: audioGuard } : {};
+            if (recovery) opts.recovery = recovery;
             const hls = createHls(video, sourceUrl, () => {
                 if (onReady) onReady(hls);
-            }, passthrough ? { passthrough: true, fragLoadMs: passthrough.fragLoadMs, guard: passthrough.guard }
-                : audioGuard ? { guard: audioGuard } : {});
+            }, opts);
             if (guard) guard.setHls(hls);
 
             if (hls) {

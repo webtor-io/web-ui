@@ -744,6 +744,8 @@
     "player.buffering": "Buffering",
     "player.bufferingCap": "Buffering: velocità limitata a %v",
     "player.close": "Chiudi",
+    "player.streamLost": "La riproduzione si è interrotta",
+    "player.resumeWatching": "Continua a guardare",
     "job.retrievingData": "recupero dati della risorsa",
     "job.retrievingStreamUrl": "recupero URL dello stream",
     "job.probingMedia": "analisi delle info media del contenuto",

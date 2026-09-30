@@ -84,6 +84,10 @@ av( async function() {
     const action = urlParams.get('action');
     const modal = urlParams.get('modal');
     const purge = urlParams.get('purge');
+    // The slow-download modal already answered "watch as is" for this file:
+    // a player's restart of its stream (lib/player/stream-restart.js
+    // restartURL) does not ask it again.
+    const forceSlow = urlParams.get('force-slow') === 'true';
     const debug = urlParams.get('debug');
     if (!action) return;
     // "stream" is a shorthand — try stream-video first, then stream-audio.
@@ -94,12 +98,27 @@ av( async function() {
     // nothing at all. Wait for the form instead (lib/waitForElement.js).
     const form = await waitForElement(findForm);
     if (!form) return;
+    // Marked as the stream restart's fields (lib/player/stream-restart.js
+    // PURGE_MARK; the literal here keeps the player's code out of this
+    // page's bundle): they ride on this start, and on the viewer's next
+    // press of the button if this start ends before any player (the no-peers
+    // or the slow-download modal), and the next player takes them off -- the
+    // presses after it are ordinary starts again, as on the form path.
     if (purge) {
         const purgeInput = document.createElement('input');
         purgeInput.setAttribute('type', 'hidden');
         purgeInput.setAttribute('name', 'purge');
         purgeInput.setAttribute('value', 'true');
+        purgeInput.setAttribute('data-stream-restart', '');
         form.appendChild(purgeInput);
+    }
+    if (forceSlow) {
+        const forceSlowInput = document.createElement('input');
+        forceSlowInput.setAttribute('type', 'hidden');
+        forceSlowInput.setAttribute('name', 'force-slow');
+        forceSlowInput.setAttribute('value', 'true');
+        forceSlowInput.setAttribute('data-stream-restart', '');
+        form.appendChild(forceSlowInput);
     }
     if (debug) {
         const debugInput = document.createElement('input');

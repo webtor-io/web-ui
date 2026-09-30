@@ -934,6 +934,59 @@ button.wt-buffering-pill:focus-visible {
     color: rgba(255, 255, 255, 0.8);
 }
 
+/* The stream could not go on and was not restarted by itself
+   (stream-restart.js): one line saying so, one button that restarts it.
+   The resume prompt's vocabulary -- a dim scrim, the glass button -- and a
+   small glass card of the next card's kind around them; no pink (that is
+   "buy" in this design system, not "play"). Above the overlays and the
+   catch-up pill (40), below the resume prompt (50). */
+.wt-recover {
+    pointer-events: auto;
+    z-index: 45;
+    background: rgba(0, 0, 0, 0.55);
+}
+.wt-recover-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100% - 32px);
+    padding: 16px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #fff;
+    text-align: center;
+}
+.wt-recover-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.85);
+}
+/* The audio player is its control bar: the card is one row inside it. */
+.wt-player--audio .wt-recover-card {
+    flex-direction: row;
+    gap: 10px;
+    padding: 4px 10px;
+    border-radius: 10px;
+}
+.wt-player--audio .wt-recover-card .wt-resume-btn--primary {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+@media (max-width: 600px) {
+    .wt-recover-card {
+        gap: 10px;
+        padding: 12px 14px;
+    }
+    .wt-recover-text {
+        font-size: 13px;
+    }
+}
+
 /* The "AI translation is catching up" pill.
 
    Top-centre and out of the way of both things it could cover: the

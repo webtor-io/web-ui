@@ -41,3 +41,25 @@ export function localSeekTarget(filmTime, seekOffset, produced, { edge = EDGE_S 
     if (local > produced - edge) return null;    // past what FFmpeg has written
     return local;
 }
+
+// A restarted stream (stream-restart.js) comes back through a session seek,
+// and the transcoder starts the run at its quantized point -- floor(t/30)*30,
+// or the keyframe before it -- so the film came back up to 30 s before where
+// the viewer was (Chrome, 2026-09-30: 21.2 -> 1.2, 345 -> 324.5, 525 ->
+// 510.3). Once the new run has written that place, it is one currentTime
+// write away: no second session seek.
+//
+// How close counts as there.
+export const RESTART_EXACT_S = 1;
+
+// exactPlace: for a restart's target (film time) and where the film stands
+// (filmTime, the run's seekOffset, what the run has produced): 'there' when
+// it stands within RESTART_EXACT_S of the target or past it -- nothing left
+// to do; the run-time position to put the element at when the run has
+// produced it (localSeekTarget, EDGE_S from the end of what is written);
+// null to wait for more of the run.
+export function exactPlace(target, filmTime, seekOffset, produced) {
+    if (!Number.isFinite(target) || !Number.isFinite(filmTime)) return 'there';
+    if (filmTime >= target - RESTART_EXACT_S) return 'there';
+    return localSeekTarget(target, seekOffset, produced);
+}

@@ -272,6 +272,12 @@ type SlowDownloadData struct {
 	LogTargetID   string
 	ArchiveFormat string
 	SelectedPaths []string
+	// Purge: the start this modal answers asked past the job cache
+	// (purge=true) -- the player's own restart of a stream whose transcoder
+	// session was gone (assets/src/js/lib/player/stream-restart.js). Its
+	// "watch as is" asks past it too: the force-slow job of the same 10-min
+	// bucket is the one whose session died, and a replay hands it back.
+	Purge bool
 }
 
 type SlowDownloadError struct {
@@ -1663,6 +1669,7 @@ type ErrorWrapperScript struct {
 	itemId        string
 	archiveFormat string
 	selectedPaths []string
+	purge         bool
 }
 
 // actionEndpoint maps the internal action id to the public POST route the
@@ -1683,20 +1690,28 @@ func actionEndpoint(action string) string {
 	return ""
 }
 
+// resubmitContext fills in what the slow-download modal's "watch as is"
+// form posts back: the endpoint, the file, the archive options, and whether
+// the start asked past the job cache (Purge).
+func (s *ErrorWrapperScript) resubmitContext(d *SlowDownloadData) {
+	d.Action = s.action
+	d.Endpoint = actionEndpoint(s.action)
+	d.ResourceID = s.resourceId
+	d.ItemID = s.itemId
+	d.ArchiveFormat = s.archiveFormat
+	d.SelectedPaths = s.selectedPaths
+	d.Purge = s.purge
+	// Streaming buttons (MakeAudio/MakeVideo) wire data-async-target to
+	// "#log-{ItemID}" because MakeButton sets ButtonItem.ID = Item.ID.
+	// Mirroring that here keeps the resubmit landing in the same
+	// progress-log container that just rendered this modal.
+	d.LogTargetID = s.itemId
+}
+
 func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 	err = s.Script.Run(ctx, j)
 	if sde, ok := err.(*SlowDownloadError); ok {
-		sde.Data.Action = s.action
-		sde.Data.Endpoint = actionEndpoint(s.action)
-		sde.Data.ResourceID = s.resourceId
-		sde.Data.ItemID = s.itemId
-		sde.Data.ArchiveFormat = s.archiveFormat
-		sde.Data.SelectedPaths = s.selectedPaths
-		// Streaming buttons (MakeAudio/MakeVideo) wire data-async-target to
-		// "#log-{ItemID}" because MakeButton sets ButtonItem.ID = Item.ID.
-		// Mirroring that here keeps the resubmit landing in the same
-		// progress-log container that just rendered this modal.
-		sde.Data.LogTargetID = s.itemId
+		s.resubmitContext(&sde.Data)
 		tpl := s.tb.Build("action/errors/slow_download").WithLayoutBody(`{{ template "main" . }}`)
 		str, terr := tpl.ToString(s.c.WithData(&sde.Data))
 		if terr != nil {
@@ -1750,7 +1765,10 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 // test pins it to compare keys with the ones recorded before a change.
 var actionClock = time.Now
 
-func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, cacheIndex CacheIndexer, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
+// purge is the start's own purge=true (the job queue runs it past the stored
+// job): not part of the id, only carried to the slow-download modal's
+// resubmit (SlowDownloadData.Purge).
+func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Service, userSubtitles *us.Service, thumbnailSvc *thumb.Service, enricher *enrich.Enricher, prefs *streamprefs.Service, cacheIndex CacheIndexer, c *web.Context, resourceID string, itemID string, action string, settings *models.StreamSettings, dsd *embed.DomainSettingsData, vsud *models.VideoStreamUserData, warmup WarmupSettings, grace GraceSettings, forceSlow bool, purge bool, debug string, archiveFormat string, selectedPaths []string) (r job.Runnable, id string) {
 	vsudID := vsud.AudioID + "/" + vsud.SubtitleID + "/" + vsud.PreferredLang + "/" + fmt.Sprintf("%+v", vsud.AcceptLangTags) + "/" + vsud.Carry.Key()
 	// A render for one declaration must not be served to another: the
 	// transcoder may give the browser that declared HEVC the source as it
@@ -1833,6 +1851,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 		itemId:        itemID,
 		archiveFormat: archiveFormat,
 		selectedPaths: selectedPaths,
+		purge:         purge,
 		Script: &ActionScript{
 			tb:            tb,
 			api:           api,

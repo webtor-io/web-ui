@@ -300,14 +300,301 @@ finish (1 request); no headers for 30 s — left to hls.js's TTFB (7.8 s frozen,
 
 Everything else is hls.js's: a fragment that errors or times out is retried by its load policy
 (`fragLoadingMaxRetry` in `HLS_CONFIG`, TTFB 10 s, 120 s a load), playlists likewise, holes and
-nudges by the gap-controller; the fatal handler restarts loading after a network error, and after a
-media error hls.js 1.6's `recoverMediaError()` restarts it at the playhead itself (1.5.6's did not).
+nudges by the gap-controller; the fatal handler restarts loading after a network error that asking
+again can cure (on a backoff — see "Network errors and the stream restart"), and after a media error
+hls.js 1.6's `recoverMediaError()` restarts it at the playhead itself (1.5.6's did not).
 Disarmed by `STALL_RESOLVED`, a pause, the end, `MANIFEST_LOADING` (a session seek's reload),
 detaching and destroying.
 
 Not covered: on HTTP/2 (the stream host negotiates h2) a re-request shares the connection, so a
 hang of the browser↔edge connection itself is not cured by asking again — only hangs further
 upstream are; how often requests hang in production is not measured.
+
+## Network errors and the stream restart — `network-recovery.js`, `stream-restart.js`
+
+**The bug (2026-09-29).** On *any* fatal `NETWORK_ERROR` the player called `hls.startLoad()` at once,
+with no delay and no limit (only `levelParsingError` waited 3 s). The transcoder keeps its sessions in
+the pod's memory and drops one after 10 min without a request (`sessionInactivityExpiry`) and on every
+rollout; `/session/<id>/…` then answers 404 `session not found` (18 bytes; a passthrough init: `init
+not found`), and a day later the token in the URLs is refused (403). hls.js 1.6 does not retry a 4xx
+(`error-helper.ts retryForHttpStatus`) and a fragment's 404 ends fatal once no other level is left to
+switch to — so each `startLoad()` met the same answer at once: up to 66 requests a second from one
+tab, a spinner, no error. 2.27M 404 + 594k 403 a day on `~hls` in thp; 114 of 929 viewer sessions a day
+hit a dead session. Triggers: idle over 10 min (a pause, a hidden or sleeping tab) 57% of the volume,
+a transcoder rollout 13% (every active view dies; 48 on 29.09 06:10Z), abandoned tabs 30%. iOS
+(native HLS) never looped and is untouched.
+
+**Most of a dead session's answers are never fatal (found in Chrome, 2026-09-30).** The transcoder's
+variants are `#EXT-X-PLAYLIST-TYPE:EVENT` — live to hls.js 1.6.14. A fragment's 404 there is skipped as a
+gap (`base-stream-controller.ts onFragmentOrKeyLoadError` → `treatAsGap`: a media fragment of a live level
+with no alternate) and the next fragment asked; a playlist's 403/404 is asked again on hls.js's backoff
+(`base-playlist-controller.ts checkRetry` retries a `SendAlternateToPenaltyBox` that carries a
+`retryConfig`) until `playlistError` reaches `levelLoadingMaxRetry` — 100 in `HLS_CONFIG`. Iteration 1
+acted on fatal errors only, so in a real browser a dead session looped 3,044–5,607 404s (~12 a second)
+for 300–411 s, a 403 101 times over 324 s, and at the end of an episode the level playlist was polled on a
+backoff under a spinner; it came at once only where a subtitle `.vtt` was loading (that one is fatal).
+So **a dead session's answer on any loader — the video's, an audio rendition's, a subtitle's, the master's
+— fatal or not, stops loading and restarts the stream at the first one** (`network-recovery.js observe`;
+Umami `via: error-nonfatal`, `loader`). Every later answer of the dead session (hls.js already walking to
+the next fragment, a stall's `startLoad`) stops loading again, quietly. One exception: the transcoder's
+`init not found` while hls.js still asks again. Only a live session says it (`sessionRouter` answers
+`session not found` first), and one of its three causes is the 10 s wait for a slow run's init
+(`passthrough_web.go passthroughInitWait`), which hls.js's own retry rides out — as a restart trigger it
+would restart slow passthrough starts every 10 s. It is the session's end only once hls.js gives it up
+(fatal), as before. Real hls.js with the player's own `HLS_CONFIG`, jsdom XHRs and a local server
+(`network-recovery.hls.test.js`): the video's and an audio rendition's playlist 404, a 403 — non-fatal,
+restarted at the first, the playlist asked once; a non-fatal `init not found` left to hls.js.
+
+**What each network error gets now** (`createNetworkRecovery`, wired in `setupHlsEvents`; the
+guards of `passthrough.js` still see every error first):
+
+| failure | answer |
+|---|---|
+| 404 with the transcoder's `session not found` (`init not found`: fatal only), or with no readable body on a `/session/<id>/` URL; 403 — fatal or not | the session (or its token) is gone: loading stays stopped, the player restarts the stream (below) |
+| 404 `segment not found` on a session URL | the run was released under the request, the session lives (`serveSegment`): the backoff below |
+| 429 (thp's limiter) | `Retry-After` where CORS exposes it (capped at 60 s), else 5 s — thp sends no `Access-Control-Expose-Headers`, so cross-origin it is the 5 s default, thp's own value; then `startLoad` |
+| any other 4xx | no retry: the card (below) |
+| 5xx, a timeout, status 0, none | `startLoad` after 1 s, 2, 4, 8, 16, then 30 s each; reset by a fragment of the film that loads (a subtitle segment does not count); after 20 rounds in a row — hls.js's own retries after the first fatal error included (below) — the card |
+| `levelParsingError` | 3 s, as before |
+
+Where hls.js 1.6.14 puts what this reads, off its source and checked against a real instance with
+real XHRs (`network-recovery.hls.test.js`): the status in `data.response.code` (fragments:
+`fragment-loader.ts` `onError`; every playlist: `playlist-loader.ts` `handleNetworkError`); the body
+not in `response.data` (always `undefined` on an error) but in `data.networkDetails`, the loader's
+XHR — `response` as an `ArrayBuffer` for a fragment, `responseText` for a playlist; headers only via
+`getAllResponseHeaders()` (asking `getResponseHeader` for an unexposed one logs an error in Chrome).
+The error-controller's `onErrorOut` is registered in the `Hls` constructor, before our listener, and
+has already called `stopLoad()` on a fatal error. A failed **master** playlist is loaded again with
+`loadSource(hls.url)`, not `startLoad()`: hls.js asks for the master only on `MANIFEST_LOADING`
+(`playlist-loader.ts` `startLoad` is empty) — the old handler's answer to a fatal manifest error
+loaded nothing at all. A new source (a session seek's `loadSource`) is a new start of the backoff;
+our own master reload is not. `DESTROYING` clears the timer.
+
+**The two retry layers.** A fatal 5xx or timeout comes only after hls.js's own retries of that request
+(`fragLoadingMaxRetry`/`levelLoadingMaxRetry` 100 in `HLS_CONFIG`, at most 10 s apart; a passthrough
+retries a timeout twice) — its patience, untouched: ~16 min for a fragment's 5xx, ~17 min for a
+timeout (100 × the 10 s TTFB). The fatal error's `stopLoad()` zeroes the counters it retries by
+(`level-controller.ts stopLoad`: `fragmentError`, `loadError`; `error-controller.ts stopLoad`:
+`playlistError`), so each `startLoad` of ours used to buy all 100 again: a 503 for good (the
+transcoder's `restart limit reached`, variant playlists and segments) reached the card after 21 of
+hls.js's cycles, ~5.5 h. So from the first fatal error on, hls.js's retries count as attempts too
+(`observe`: an `ERROR` with `fatal: false`, a 5xx/timeout/status 0/429 of the film — not a subtitle's,
+and not another 4xx: hls.js never retries one, so `fatal: false` there is a level switch, and if it
+ends fatal `handle` reads it — a dead session still restarts). A 503 for good now reaches the card ~3 min after the first fatal
+error (1 s of ours, then 1+2+4+8 s and 15 × 10 s of hls.js's), ~19 min from the start; a timeout ~3.5
+min after it. A passthrough's timeouts, which went through our backoff every third request, get 20
+requests after the first fatal error instead of 60: ~7 min to the card, down from ~18 — not measured
+how often a passthrough waits that long and then plays. Status 0 (CORS, connection) is not retried by
+hls.js: the card after ~8 min of our backoff (1+2+4+8+16 s, then 15 × 30 s), as before. Not covered:
+the master's retries happen inside hls.js's loader and send no event (`xhr-loader.ts retry`), so a
+master answering 5xx for good still gets a whole cycle per attempt (the transcoder's 503 is not on the
+master; thp's is not measured).
+
+**Rounds, not requests.** An attempt is a round of failures, not one request's. A round opens with the
+first failure after our retry has gone (the fatal error stopped all of hls.js's loaders; our `startLoad`
+asks for every track again) — or, with no retry of ours out, `ROUND_MS` (2 s) after the last one opened —
+and takes in everything failing while our next retry waits and within 2 s of its opening; for a 429, within
+its `Retry-After`. thp's limiter refuses the viewer's session, not a request: the video's, the audio's
+and the subtitles' playlists and fragments come back 429 together, 5–6 a round, a round every ~7 s (the
+5 s default wait plus thp's 2 s hold). Counted per request (iteration 1), four rounds in 30 s spent all
+twenty attempts (Chrome, 2026-09-30). hls.js's own retries after the first fatal error are 1, 2, 4, 8,
+then 10 s apart — past 2 s, a round each, so the 5xx arithmetic above stands within a retry or two. A
+429 storm with no fatal error at all (no subtitle track loading) is hls.js's alone: its playlist retries
+and its gap-skips, never counted.
+
+**The restart** (`stream-restart.js`). A dead session cannot be revived from the browser —
+`POST /session/<id>/seek` answers 404 too — so it is a new start of the stream job, at the viewer's
+place in the film:
+
+1. **the position**: movie time, `video.currentTime + seekOffset` (the run's offset, the same number
+   as `data-run-offset`), and whether the film was playing — for a session seek that found the
+   session gone (`session-seek.js onSessionGone`, hls.js path only), the seek's target. Such a seek
+   moves neither the element nor the offset (it throws before either), so the element still stands
+   where the viewer was before it — on a restarted player whose resume seek found its session gone,
+   at the run's 0. The target stays the viewer's place for everything that follows: the automatic
+   restart, one that waited for the grace popup, and the card's click — whether that seek opened the
+   card, came while it waited, or came under a card already up (which swallows the report itself) —
+   until the viewer seeks again (`createRecoveryPolicy` `seeking`, from `handleSeek`: a local seek
+   moves the element, and its place is theirs) or a fragment of the film loads (`resumed`). Review
+   F2, 2026-09-30: past the budget the card dropped the target, and its click restarted at the old
+   place — the note and a signed-in viewer's PUT with it (`forceSendPosition` has no 30 s floor, so a
+   restarted player's click at 0.x overwrote the saved position). Written as a
+   note in `sessionStorage` (`wt-stream-restart`, 10 min); the next player of the same file takes it
+   on mounting and seeks there **without the resume prompt** — exactly there, the last tenth of the
+   film included (`resumeAt`'s "start from the top" is about coming back to a file). Not
+   `/watch/position`: it answers 204 to a viewer without an account and saves nothing under 30 s. A
+   signed-in viewer's position is still sent there too (`forceSendPosition`). **Only a place the viewer
+   is at is carried** — the note and the PUT both: past the resume question (the saved position
+   fetched, and the prompt answered where there is one — video only) and past 0. A session found dead
+   at mounting (a replayed job: the job id stays 10 min on the site, an hour in the embed, and a
+   rollout in between kills its session) answers the master 404 within a second, before any of that: a
+   note at 0 there made the next player skip `/watch/position`, and a signed-in viewer's saved
+   position was never offered — then overwritten by the new player's saves from 0. With the question
+   open, the film stands at autoplay's fraction of a second before the hold, and a PUT of that would
+   overwrite the saved position. A note at 0 is never written: it would only make the next player
+   skip the server's copy. ("Continue" answered under the card, its seek finding the session gone, is
+   no longer such a case: the click restarts at the answer — iteration 1 restarted from the element's
+   0 and left the question to the server's copy, asked again.) Without a note the next player asks as
+   a fresh one does;
+2. **the restart, with `purge=true`**: a finished job is replayed to anyone who asks for its id, and
+   the id changes only every 10 min on the site (every hour in the embed) — a replay hands back the
+   very session that is gone (a rollout kills sessions minutes after their start). On the
+   resource page, this file's start form (`form[action$=/stream-video|/stream-audio]` with this
+   resource and item — the item from `data-item-id` on the element or on its `#subtitles` dialog) is
+   submitted again, as the preferred-language change does (Turnstile, the declaration hook); the
+   purge field it gets is marked (`data-stream-restart`) and taken off by the next player — until
+   then it rides on every start from that form, so a restart that ends before any player mounts (the
+   no-peers or the slow-download modal, an error) leaves the viewer's next press of the button purged
+   too, once. The deep link's fields are marked the same way (`app/resource/get.js`): before
+   2026-09-30 they stayed on the form for good, and every later press on that page purged. When the
+   form is another file's (a quiet move to the next episode) or there is none (an audio render has
+   no dialog), the deep link
+   `?file=<path>#action=stream&purge=true` is loaded (`passthrough.js loadDocument`). In an embed,
+   its POST again (`postEmbedStart`) with the declaration it started with and `purge=true` — the
+   embed POST reads `purge` since 2026-09-29 (`handlers/embed/post.go`);
+   **The viewer's answers ride along.** Where this run was the slow-download modal's "watch as is"
+   (a free viewer over the cap; the force-slow start renders `data-offer-answered`,
+   `StreamContent.StatusAnswered`), the restart carries `force-slow=true` too — on the start form (marked
+   and taken off by the next player, like the purge), on the deep link (`&force-slow=true`, read by
+   `app/resource/get.js`). Without it the job ran its gate again and put the modal up before any player
+   (Chrome, 2026-09-30: `slow-download-shown` right after `player-recover-restart`, the modal below the
+   fold on a phone). And where a restart still ends on that modal (the viewer had not answered it before),
+   its own "watch as is" carries `purge=true` (`SlowDownloadData.Purge`, set from the start's purge by
+   `ErrorWrapperScript.resubmitContext`): the force-slow job of the same 10-minute bucket is the viewer's
+   earlier one, whose session is the dead one — replayed, it was a master 404, the card, and a player
+   that never became ready. The grace popup's answer (`data-grace-cta-answered`: `continue` or `dismiss`)
+   goes in the note; the next player marks its element answered and shown
+   (`data-grace-cta-answered`, `data-grace-cta-shown`) — so the popup is not shown again, and the transfer
+   status (`playerActivity.js offerAnswered`) and the buffering label read the answer as on any answered
+   player. The embed's POST carries neither: its start never asks;
+3. **at most one automatic restart per file every 5 min, per tab** (`wt-stream-restarts` in
+   `sessionStorage`). A session that dies again within five minutes is not a pause the viewer took:
+   the card instead. Where the budget cannot be read or written (storage blocked — an embed with
+   third-party storage off), no automatic restart at all: an unrecorded restart is no limit; the card
+   comes at once and its click restarts (from the beginning or the server's saved position there:
+   the note cannot be written either);
+4. **never while the grace popup is up or on its way** (the film past `data-grace-duration-sec` and
+   the popup not shown yet): loading stays stopped and the restart waits for the viewer's answer,
+   then goes. Not while the next file loads (`nextLoading`): that player is leaving anyway;
+5. **the exact place.** The restarted session's run starts at the transcoder's quantized seek point
+   (`floor(t/30)*30`, or the keyframe before it), so the resume's session seek brought the viewer back
+   up to 30 s early (Chrome: 21.2 → 1.2, 150 → 118.2, 345 → 324.5, 525 → 510.3). Once the resume's seek
+   has settled and the new run has written the place (`local-seek.js exactPlace`: inside what is
+   produced, `EDGE_S` from its end), the film goes there by a `currentTime` write — no second session
+   seek (`Player.jsx exactRestartPlace`, checked every 500 ms for at most 2 min). Nothing is done within
+   a second of it, or past it; any seek of the viewer's cancels it. hls.js path only: native HLS is left
+   as it was. A paused restart gets there when the viewer presses Play (below): the checks and their 2
+   minutes start with that Play, the first one at once — a viewer back after ten minutes still gets
+   there, and hears at most a moment of the quantized point.
+
+**A paused film comes back paused** (Chrome, 2026-09-30: 5 of 5 paused restarts started playing by
+themselves 1.7–2.5 s after the restart's POST — a viewer who paused and left the tab got the film's sound
+from a background tab after a transcoder rollout). The cause is the element's `autoplay`
+(`stream_video.html`, `stream_audio.html`): Chrome plays a paused element with `autoplay` by itself once
+a new source has data, and every reload re-arms it — hls.js's `attachMedia` at mount, and its
+`loadSource` on the resume's session seek (it detaches and re-attaches the element: the media element
+load algorithm sets the "can autoplay" flag again). Checked in headless Chrome 154 on a plain `<video>`:
+play, pause, reload → `play`, `playing` at `canplay`; the same with `autoplay` off → paused at
+`readyState` 4. (The grace popup's hold had met the same re-arming on 2026-09-26 and pauses it back.)
+"The seek settles on `playing`" was that autoplay: nothing else plays a paused seek's new run. So the
+restarted player of a paused film (the note's `play: false`) takes `autoplay` off its element before
+hls.js attaches and puts it back at the viewer's own Play (`Player.jsx`, the note's block); in an embed,
+the page's own start once the player is ready (`player_play`, `app/embed/index.js startPlayer` — autoplay
+by another name) is held the same way. A session seek that does not play, on an element without
+`autoplay`, settles when the new run can play (`session-seek.js landsPaused`: `canplay`, the freeze
+frame gone, seeking unlocked — as a seek held by the grace popup does), not on a `playing` that nothing
+would cause: the film lands paused, the big Play up, the timeline at the note's place (the seek's
+target; it moves only while playing) over the run's first frame, up to 30 s before it; Play plays it
+and the exact place (5) follows. Seeks the viewer makes before that Play land paused too; after it the
+element is as every other (a paused session seek's new run plays by itself, as it always has). A
+playing film's restart keeps its `autoplay`. The dead-player watch of such a player is armed by the
+viewer's Play, not at mount (`dead-player.js` arms at mount on `autoplay` only): a paused film nobody
+asked to play is not dead. Native HLS is left as it was (its session seek starts the new run itself;
+the recovery never restarts there).
+
+**One owner of what the viewer sees.** While a guard of `passthrough.js` has begun its own restart (the
+passthrough guard's old route; the audio guard's file without its multichannel audio — which also stops
+and detaches hls.js) or `player-dead` has declared the player dead and it has not revived
+(`dead-player.js` `dead`), the recovery does nothing at all: no restart, no card, no event
+(`createRecoveryPolicy` `blocked`). A dead player is dead for a reason of its own that a new session
+would not cure, and its verdict is the one message. The other way round: once the recovery has taken the
+player over (`engaged`: a restart gone out, its card up or waiting for the buffer, a restart waiting for
+the grace popup), the dead-player watch stands down (`handled`), so the old player left on the page while
+the restarted job runs (a median 58 s) is not reported dead; and a guard's failure after a restart of ours
+has gone out restarts nothing on top (its `fallback` is skipped; the next player's guard sees the same
+failure if it is real).
+
+**The card** (`.wt-recover`, `Player.jsx`): the film paused, loading stopped, one line
+`player.streamLost` and one glass button `player.resumeWatching` ("Продолжить просмотр") — the
+resume prompt's vocabulary, see `docs/uikit.html` §22. Shown past the budget (reason `limit`), for
+another 4xx and when the backoff ran out (reason `network`). Its click restarts at the viewer's
+place (**The restart**, 1: a dead seek's target, else the element's), playing, and counts in the
+budget. **It never stops a film that still plays from its buffer**: while the element plays with data
+ahead (`readyState` ≥ 3), the card waits — nothing stopped, nothing counted — and comes when the
+element starves (`waiting`/`stalled`, `readyState` < 3) or the viewer pauses; not on a pause of the
+page's own (a session seek's, the grace popup's hold) nor at the film's end. A fragment of the film
+loading meanwhile drops it. Another report while it waits asks the element again: a far seek that
+found the session gone paused the old run itself while it was out (no starving then) and never plays
+it again, so no event of the element's follows — the waiting card never came, and the viewer had a
+paused film with the timeline at the target (review F2). Chrome, 2026-09-30: the 429 give-up paused a
+film at `readyState` 4 just as the refusals stopped, and the card stayed. So the give-up (`network-recovery.js giveUp`) no longer stops
+loading itself: a fatal error has stopped hls.js already, and after hls.js's own counted retries its
+paced ones go on under the waiting card — one that loads takes it back; the card stops loading when it
+shows. It takes the big play button's place and hides the buffering pill. **It comes down when
+a fragment of the film loads under it** (`network-recovery.js onFilmLoaded` → the policy's
+`resumed`): the keyboard and the media session still play and seek under the card, a stall's
+`startLoad` (loader-restart) or a session seek's reload can bring the stream back, and the film would
+otherwise play under a scrim that blocks the controls, with every later dead session swallowed by the
+open card. The network watch resumes with it (after a give-up it waited for a new source only). A
+subtitle segment does not count.
+
+**Seen before the first frame too.** The resource page keeps a rendered player out of sight, under the
+job's log, until `player_ready` (`canplay`; `app/action.js`). A restarted job whose new session is dead
+at its first request never gets there: the card went up inside the hidden player, `card-shown` was
+counted, and the viewer read "ожидание инициализации плеера" for minutes (Chrome, 2026-09-30, scenario
+9b; `player-dead` stays silent while the recovery is engaged, so there was no message at all). The card
+now also sends `player_show` (a window event), on which `action.js` shows the player and hides the log,
+as on `player_ready`: the card is the one message, where the log was. Not in the embed: its page
+(`app/embed/index.js`) shows the player on `player_ready` only, with a `player_play` and the ads' turn —
+not changed here.
+
+**The page's own button after the card.** The viewer who pressed the page's "Смотреть" instead of the
+card's button got the job cache's replay — the same 10-minute job id, the job with the dead session in
+it — and the card again, hidden (9c). The card marks this file's start form now (`stream-restart.js
+markNextStart`, the restart's marked fields: `purge`, and `force-slow` where the run was the slow-download
+modal's "watch as is"), starting nothing; the next start from the form — the card's click or the
+button — goes past the job cache, and the next player takes the fields off; so does the card coming
+down (the stream is back: `hideCard`). Where the page has no form of this file (another file's after a
+quiet move, an audio render without an item id) nothing is marked; in an embed there is no page button.
+The marks are this file's: a move to the next file from under the card (N, the next-item card's button)
+starts that file from a copy of this file's form, and `next-item-go.js nextStartForm` drops the marked
+fields from the copy — before, the next episode's start carried `purge=true` past its job cache and
+`force-slow=true` past its own slow-download question (review of iteration 3).
+
+**Events** (Umami, `player-telemetry.js track`; defaults as in `docs/analytics.md`):
+`player-recover-restart {reason: 404|403, status, via: load|error-nonfatal|seek, loader?}` for every
+automatic restart (`via`: `load` a fatal hls.js error, `error-nonfatal` an answer hls.js would have asked
+again, `seek` a session seek's POST; `loader`: `video|audio|subtitle|master`, hls.js's only);
+`player-recover-card-shown {reason: limit|network, status, cause?, via?}` (`cause`: the 404/403 behind a
+`limit`, `via` as above; sent when the card shows, not when it starts waiting for the buffer);
+`player-recover-card-click {reason, status}`. Read `player-recover-restart` against `stream-start`; after
+a transcoder rollout expect a burst of `via: error-nonfatal` (the first answer of most dead sessions).
+
+Verified in a real browser (iteration 1, Chrome 154 headless, desktop and phone, against prod through
+a scratch web-ui): the restart with purge, the card and its button, the budget, the grace wait, a seek's
+target, the next episode — which found the non-fatal answers, the lost viewer's answers, the quantized
+place and the 429 counting fixed above. Iteration 2 in jsdom (real hls.js with jsdom XHRs for playlists;
+a subtitle playlist needs attached media, and fragments a MediaSource, so those are the shapes read off
+`fragment-loader.ts` and `base-stream-controller.ts`), then in Chrome again (2026-09-30, 20 scenarios,
+17 passed): the three failures were a paused restart playing by itself, the card before the first frame
+out of sight (9b), and the page's button replaying the dead job (9c) — fixed above, in jsdom (the
+player's wiring with a real `Hls` whose loading is stubbed and an element that autoplays on a reload as
+Chrome's does; `app/action.js` with its log fed by hand) and, for the autoplay mechanism alone, a plain
+`<video>` in headless Chrome 154 — not the whole run in a browser again. Not verified: how long the
+restarted job takes for the viewer (a median 58 s from click to first frame for any start); whether
+thp's 429 carries CORS headers (without them the browser sees status 0 — the backoff, not the 5 s); how
+often the card waits for the buffer or comes down by itself (no event for either); Firefox and Safari
+(the autoplay re-arming is the spec's load algorithm, not checked there).
 
 ## Subtitle delay — `cue-offset.js`, `player-prefs.js`
 
@@ -356,7 +643,11 @@ never gets any, or whose element errors before any press (`play()` then rejects 
 past where the request found it; a pause disarms (not one the element takes with an error: Chrome
 sets the error and pauses in the same moment on an append failure before metadata), a hidden tab
 restarts the quiet, a restart a
-guard has begun (`guard.done`) or an element taken off the page ends it.
+guard has begun (`guard.done`), a player the stream restart has taken over (`stream-restart.js`
+`engaged`: its restart gone out, its card up or waiting — the old player stays on the page while the
+restarted job runs, and is not dead) or an element taken off the page ends it. Its verdict is read the
+other way too: while `dead` (reported and not revived) the stream restart does nothing (see "Network
+errors and the stream restart", one owner).
 One `player-dead` per player, when any of three holds 30 s after the request:
 
 - **`why: quiet`** — nothing moved towards playback for 30 s. Progress is an answer or bytes, and
@@ -408,6 +699,9 @@ presses stop and is flushed on teardown):
 | `audio-fallback` | `reason`, `cls: dolby\|aac51`, `path: mse\|native`, `route`, `audio`, `by` | a file restarted without the multichannel audio its declaration made, on any route (see "Multichannel audio and the fallback"); never counted in `hevc-fallback`. `cls` is the class charged, `audio` the start's (they differ where the master names Dolby and the rendition in play is AAC 5.1); `by` what blamed the audio: `buffer` (its SourceBuffer's own append failed), `codec` (its codec refused), `message` (the element's MediaError message), `native` (the old route's native-HLS rule, nothing named) — since 2026-09-29 |
 | `player-dead` | `why: quiet\|error\|recovering`, `path: hlsjs\|native\|direct\|blob\|none`, `hls: on\|off\|none`, `route`, `audio`, `err`, `rs`, `ns`, `inflight`, `got: none\|playlist\|frags`, `recoveries`, `waited_s` | asked to play and not started 30 s on: nothing moving, an element error held, or a recovery loop (see "A player that never starts"); once per player |
 | `player-revived` | `path`, `route`, `audio`, `waited_s` (since the play request), `recoveries` | it played after a `player-dead`: the rule's error, count it against `player-dead`. `audio` on both is the start's audio class, as in `stream-start` (since 2026-09-30) |
+| `player-recover-restart` | `reason: 404\|403`, `status`, `via: load\|error-nonfatal\|seek`, `loader: video\|audio\|subtitle\|master` (hls.js only) | the stream restarted by itself after its transcoder session (or token) was gone; `error-nonfatal`: an answer hls.js would have asked again (see "Network errors and the stream restart") |
+| `player-recover-card-shown` | `reason: limit\|network`, `status`, `cause` (404/403, for `limit`), `via` (for `limit`) | the card instead: the automatic restart spent within 5 min, another 4xx, or the backoff run out; sent when it shows (it waits while the film plays from its buffer) |
+| `player-recover-card-click` | `reason`, `status` | its "Continue watching" |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`. The browser is the
 Umami session's (`session.browser`, `session.os`: `edge-chromium`, `safari`, `ios`, `crios`, …); no

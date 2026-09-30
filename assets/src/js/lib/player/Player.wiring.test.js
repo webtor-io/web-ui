@@ -5622,3 +5622,1570 @@ test('Play before any data: load() for native HLS, never under hls.js', async (t
     play();
     assert.equal(loads, 2, 'an hls.js that let the element go is not attached');
 });
+
+// ---- a stream whose transcoder session is gone -------------------------------
+//
+// network-recovery.js decides what a fatal network error is, stream-restart.js
+// what the page does about it; these are the player's own wiring of the two:
+// hls.js's fatal error and a session seek's POST reach the policy, the restart
+// carries the viewer's place in the film to the next player, the grace popup
+// is answered first, and past the budget the card with one button.
+
+const { NOTE_KEY: RESTART_NOTE_KEY, BUDGET_KEY: RESTART_BUDGET_KEY } = await import('./stream-restart.js');
+
+// A real hls.js instance for the player: jsdom has no MediaSource, so hls.js
+// is told it is supported and its two calls that need one do nothing (as in
+// hooks/useHls.test.js). Everything the player and hls-manager wire is real.
+function withHlsJs(t) {
+    const saved = { isSupported: Hls.isSupported, loadSource: Hls.prototype.loadSource, attachMedia: Hls.prototype.attachMedia };
+    Hls.isSupported = () => true;
+    Hls.prototype.loadSource = function loadSource() {};
+    Hls.prototype.attachMedia = function attachMedia() {};
+    t.after(() => {
+        Hls.isSupported = saved.isSupported;
+        Hls.prototype.loadSource = saved.loadSource;
+        Hls.prototype.attachMedia = saved.attachMedia;
+    });
+}
+
+// sessionPlayer: the element as a transcoder session's render has it.
+function sessionPlayer(page, { seek = () => ({ ok: true, status: 200, json: async () => ({ offset: 1830 }) }) } = {}) {
+    page.video.dataset.sessionId = 'f1097e82';
+    page.video.dataset.sessionSeekUrl = 'https://api.test/x/movie.mkv~hls/session/f1097e82/seek';
+    page.video.setAttribute('data-duration', '3600');
+    page.video.setAttribute('controls', '');
+    const src = document.createElement('source');
+    src.setAttribute('src', 'https://api.test/x/movie.mkv~hls/session/f1097e82/index.m3u8');
+    src.setAttribute('type', 'application/vnd.apple.mpegurl');
+    page.video.appendChild(src);
+    page.setResponse((url, params) => (params && params.method === 'POST'
+        ? seek(url)
+        : { ok: true, status: 200, json: async () => ({ offset: 0 }) }));
+}
+
+// A fatal 404 as hls.js 1.6 hands it for a fragment of a dead session
+// (fragment-loader.ts onError; the body the transcoder sends, in the xhr).
+const deadFragment = (status = 404, body = 'session not found\n') => ({
+    type: Hls.ErrorTypes.NETWORK_ERROR,
+    details: Hls.ErrorDetails.FRAG_LOAD_ERROR,
+    fatal: true,
+    frag: { url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/v0-720-34.ts', type: 'main' },
+    response: { url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/v0-720-34.ts', data: undefined, code: status, text: '' },
+    networkDetails: { status, responseType: 'arraybuffer', response: new TextEncoder().encode(body).buffer, getAllResponseHeaders: () => '' },
+});
+
+const restartNote = () => JSON.parse(window.sessionStorage.getItem(RESTART_NOTE_KEY) || 'null');
+const cleanRestart = () => {
+    window.sessionStorage.removeItem(RESTART_NOTE_KEY);
+    window.sessionStorage.removeItem(RESTART_BUDGET_KEY);
+};
+
+test('a dead session, hls.js path: no startLoad loop -- the page\'s start form again, purged, at the viewer\'s place', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    const hls = window.hlsPlayer;
+    assert.ok(hls instanceof Hls, 'the player runs hls.js');
+    let startLoads = 0;
+    hls.startLoad = () => { startLoads++; };
+    // The film at 20:34 of a run that started at 1200 s (the run's offset).
+    p.video.dataset.runOffset = '1200';
+    await playPast(p, 34);
+    // What the old handler answered at once, again and again.
+    for (let i = 0; i < 50; i++) hls.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(startLoads, 0, 'never a blind startLoad');
+    assert.equal(rec.got.length, 1, 'one restart');
+    assert.equal(rec.got[0]['item-id'], 'item');
+    assert.equal(rec.got[0].purge, 'true');
+    const note = restartNote();
+    assert.equal(note.resourceID, 'res');
+    assert.equal(note.path, 'movie.mkv');
+    assert.equal(note.play, true);
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')), [
+        { name: 'player-recover-restart', data: { reason: '404', status: 404, via: 'load', loader: 'video' } },
+    ]);
+});
+
+// The movie time is the element's clock plus the run's offset: a run that
+// started mid-film (a resume, a seek) is at 0 on the element.
+test('the restart goes to the movie time: the element\'s clock plus the session\'s run offset', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+        // The run this render started at: GET .../seek answers its offset.
+        page.setResponse((url, params) => (params && params.method === 'POST'
+            ? { ok: true, status: 200, json: async () => ({ offset: 1830 }) }
+            : { ok: true, status: 200, json: async () => ({ offset: 1830 }) }));
+    });
+    await settle();
+    assert.equal(p.video.dataset.runOffset, '1830');
+    p.video.paused = true;
+    p.video.currentTime = 42;
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment(403, ''));
+    await settle();
+    const note = restartNote();
+    assert.equal(note.at, 1872, '1830 + 42');
+    assert.equal(note.play, false, 'a paused film comes back paused');
+    assert.equal(p.events.find((e) => e.name === 'player-recover-restart').data.reason, '403');
+});
+
+test('the next player takes the note: the session seek to that time, no prompt, no /watch/position', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: true, until: Date.now() + 60000,
+    }));
+    let purgeLeft = null;
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        const f = pageStartForm(page, 'item');
+        f.insertAdjacentHTML('beforeend', '<input type="hidden" name="purge" value="true" data-stream-restart>');
+        purgeLeft = () => f.querySelector('input[name="purge"]');
+    });
+    await settle();
+    const posts = p.calls.filter((c) => c.params && c.params.method === 'POST' && String(c.url).includes('/seek'));
+    assert.equal(posts.length, 1);
+    assert.ok(String(posts[0].url).endsWith('t=1872'), posts[0].url);
+    assert.equal(p.calls.filter((c) => String(c.url).startsWith('/watch/position?')).length, 0, 'the note, not the server\'s copy');
+    assert.equal(p.container.querySelector('.wt-resume-prompt'), null, 'no "continue from" question');
+    assert.equal(restartNote(), null, 'taken once');
+    assert.equal(purgeLeft(), null, 'the purge the restart left on the form is gone');
+});
+
+// A seek after a long pause is the other way a dead session shows itself:
+// POST /session/<id>/seek answers 404 too. The film goes to where the viewer
+// asked, not where the dead run stood.
+test('a session seek that finds the session gone restarts at the seek\'s target', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: () => ({ ok: false, status: 404, json: async () => null }) });
+        pageStartForm(page, 'item');
+    });
+    await playPast(p, 100);
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(restartNote().at, 115, 'the target: 100 + 15');
+    assert.deepEqual(p.events.find((e) => e.name === 'player-recover-restart').data, { reason: '404', status: 404, via: 'seek' });
+});
+
+test('once per 5 minutes: past it, loading stops and the card shows; its button restarts, playing', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    // This file was restarted a minute ago (the player before this one).
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    const hls = window.hlsPlayer;
+    let stops = 0;
+    const stop = hls.stopLoad.bind(hls);
+    hls.stopLoad = () => { stops++; return stop(); };
+    await playPast(p, 50);
+    // jsdom's pause() does nothing: the element is paused by hand, as a
+    // browser would.
+    p.video.pause = () => { p.video.paused = true; };
+    hls.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 0, 'no second automatic restart');
+    assert.ok(stops >= 1, 'loading stopped');
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the card');
+    assert.equal(card.querySelector('.wt-recover-text').textContent, 'player.streamLost');
+    assert.equal(p.container.querySelector('.wt-player-big-play'), null, 'the card is the one button');
+    assert.equal(p.video.paused, true, 'the dead film is paused under it');
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')), [
+        { name: 'player-recover-card-shown', data: { reason: 'limit', status: 404, cause: '404', via: 'load' } },
+    ]);
+    click(card.querySelector('button'));
+    await settle();
+    assert.equal(rec.got.length, 1, 'the click restarts');
+    assert.equal(rec.got[0].purge, 'true');
+    assert.equal(restartNote().play, true, '"Continue watching" plays');
+    assert.equal(p.events.at(-1).name, 'player-recover-card-click');
+});
+
+test('the grace popup up: no restart until it is answered; then the restart', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+        page.video.dataset.graceDurationSec = '30';
+        const cta = document.createElement('div');
+        cta.id = 'grace-cta';
+        cta.className = 'hidden';
+        cta.innerHTML = '<button type="button" class="grace-cta-close"></button><button type="button" class="grace-cta-continue"></button>';
+        page.container.appendChild(cta);
+    });
+    await playPast(p, 31);
+    assert.equal(document.getElementById('grace-cta').classList.contains('hidden'), false, 'the popup is up');
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 0, 'no restart behind the popup');
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'and no card');
+    click(document.querySelector('.grace-cta-continue'));
+    await settle();
+    assert.equal(rec.got.length, 1, 'its answer, then the restart');
+});
+
+// On its way: the element's clock has crossed the window, the popup comes
+// from a render effect a frame later. The fatal error in between waits too.
+test('the grace popup on its way: the restart waits for it as well', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+        page.video.dataset.graceDurationSec = '30';
+        const cta = document.createElement('div');
+        cta.id = 'grace-cta';
+        cta.className = 'hidden';
+        cta.innerHTML = '<button type="button" class="grace-cta-close"></button>';
+        page.container.appendChild(cta);
+    });
+    p.video.paused = false;
+    p.video.currentTime = 31;
+    // Before any frame has run the popup's effect.
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    assert.equal(rec.got.length, 0);
+    await settle();
+    assert.equal(rec.got.length, 0, 'still waiting, the popup now up');
+    click(document.querySelector('.grace-cta-close'));
+    await settle();
+    assert.equal(rec.got.length, 1);
+});
+
+test('another 4xx: no retry, the card at once (reason network)', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionPlayer(page));
+    let startLoads = 0;
+    window.hlsPlayer.startLoad = () => { startLoads++; };
+    window.hlsPlayer.trigger(Hls.Events.ERROR, { ...deadFragment(410, ''), frag: { url: 'https://api.test/x/movie.mp4', type: 'main' }, response: { url: 'https://api.test/x/movie.mp4', code: 410 } });
+    await settle();
+    await new Promise((r) => setTimeout(r, 1200));
+    assert.equal(startLoads, 0);
+    assert.ok(p.container.querySelector('.wt-recover'));
+    assert.deepEqual(p.events.find((e) => e.name === 'player-recover-card-shown').data, { reason: 'network', status: 410 });
+});
+
+test('unmounted with a retry pending: its timer goes with the instance', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionPlayer(page));
+    const hls = window.hlsPlayer;
+    let startLoads = 0;
+    hls.startLoad = () => { startLoads++; };
+    hls.trigger(Hls.Events.ERROR, deadFragment(502, 'bad gateway'));
+    destroyPlayer();
+    await new Promise((r) => setTimeout(r, 1300));
+    assert.equal(startLoads, 0, 'no startLoad on a destroyed instance');
+    assert.equal(p.events.filter((e) => e.name.startsWith('player-recover')).length, 0);
+});
+
+// resumeAt starts a file the viewer had all but finished from the top -- a
+// rule about coming back to a file. A session that died in the credits is
+// not that: the restart goes back to where it stood.
+test('a restart in the last tenth of the film goes back there, not to the start', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 3500, play: true, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => sessionPlayer(page));
+    await settle();
+    const posts = p.calls.filter((c) => c.params && c.params.method === 'POST' && String(c.url).includes('/seek'));
+    assert.equal(posts.length, 1);
+    assert.ok(String(posts[0].url).endsWith('t=3500'), posts[0].url);
+});
+
+// ---- the note carries a place the viewer is at ---------------------------
+//
+// A page load can replay a job whose session is already gone (the job id
+// stays for 10 min on the site, an hour in the embed; a transcoder rollout
+// in between). The master answers 404 at mounting, before the resume
+// question is answered, before anything played: there is no place to carry.
+// A note there made the next player skip /watch/position, and a signed-in
+// viewer's saved position was never offered -- then overwritten by the
+// restarted player's own saves from 0.
+
+// sessionWithSaved: a session render, with a position saved on the server
+// (600 s of 3000) and the seek POST answered by `seek`. `watch` answers the
+// GET of /watch/position (a pending promise: the fetch still out).
+function sessionWithSaved(page, { seek = () => ({ ok: true, status: 200, json: async () => ({ offset: 0 }) }), watch = null } = {}) {
+    sessionPlayer(page, { seek });
+    page.setResponse((url, params) => {
+        if (params && params.method === 'POST') return seek(url);
+        if (String(url).startsWith('/watch/position?')) {
+            return watch ? watch() : { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ position: 600, duration: 3000 }) };
+        }
+        return { ok: true, status: 200, headers: new dom.window.Headers(), json: async () => ({ offset: 0 }) };
+    });
+}
+
+// The master of a session the transcoder no longer has (playlist-loader.ts
+// handleNetworkError: fatal; the body in the xhr).
+const deadMaster = () => ({
+    type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.MANIFEST_LOAD_ERROR, fatal: true,
+    url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/index.m3u8',
+    response: { url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/index.m3u8', data: undefined, code: 404, text: '' },
+    networkDetails: { status: 404, responseType: 'text', responseText: 'session not found\n', getAllResponseHeaders: () => '' },
+});
+
+const positionGets = (p) => p.calls.filter((c) => String(c.url).startsWith('/watch/position?')).length;
+const positionPuts = (p) => p.calls.filter((c) => String(c.url) === '/watch/position' && c.params && c.params.method === 'PUT');
+
+test('a session found dead at mounting: no note -- the next player still asks /watch/position and offers it', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const first = await mountPlayer((page) => {
+        sessionWithSaved(page);
+        pageStartForm(page, 'item');
+    });
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadMaster());
+    await settle();
+    assert.equal(rec.got.length, 1, 'restarted');
+    assert.equal(restartNote(), null, 'nothing to carry');
+    assert.equal(positionPuts(first).length, 0, 'and the saved position is left alone');
+    destroyPlayer();
+    const next = await mountPlayer((page) => sessionWithSaved(page));
+    await settle();
+    assert.equal(positionGets(next), 1, 'the server\'s copy is asked for');
+    assert.ok(resumePrompt(next), '"Continue from 10:00?"');
+});
+
+// The question open: the hold paused autoplay a fraction of a second in.
+// That is not where the viewer is.
+test('the resume question open: autoplay\'s head start is no place -- no note, no PUT', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionWithSaved(page);
+        pageStartForm(page, 'item');
+    });
+    assert.ok(resumePrompt(p), 'the question is open');
+    p.video.paused = true;
+    p.video.currentTime = 0.4;
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1, 'restarted');
+    assert.equal(restartNote(), null);
+    assert.deepEqual(positionPuts(p), [], 'the saved 600 s is not overwritten with 0.4');
+});
+
+// The saved position still being fetched: autoplay is not held yet, the
+// film runs from 0 -- and the prompt may still come up and move it.
+test('the saved position still being fetched: the film\'s first seconds are no place -- no note', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionWithSaved(page, { watch: () => new Promise(() => {}) });
+        pageStartForm(page, 'item');
+    });
+    p.video.paused = false;
+    p.video.currentTime = 3;
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1, 'restarted');
+    assert.equal(restartNote(), null);
+    assert.deepEqual(positionPuts(p), []);
+});
+
+// Answered: from then on the film's place is the viewer's, and it is carried.
+test('the prompt answered "Continue", the film plays on: its place is carried', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionWithSaved(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset: 600 }) }) });
+        pageStartForm(page, 'item');
+    });
+    click(resumePrompt(p).querySelector('.wt-resume-btn--primary'));
+    await settle();
+    assert.equal(p.video.dataset.runOffset, '600', 'the new run starts at the saved place');
+    p.video.paused = false;
+    p.video.currentTime = 20;
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1);
+    const note = restartNote();
+    assert.ok(note, 'the note');
+    assert.equal(note.at, 620);
+    assert.equal(note.play, true);
+});
+
+// An <audio> never draws the prompt: its question is settled once the
+// saved position is known, and a place in it is carried as a film's is.
+test('audio: no prompt to answer -- a place in it is carried', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionWithSaved(page), { tag: 'audio' });
+    assert.equal(resumePrompt(p), null);
+    p.video.paused = false;
+    p.video.currentTime = 100;
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    const note = restartNote();
+    assert.ok(note, 'the note');
+    assert.equal(note.at, 100);
+});
+
+// "Continue" answered under the budget's card: its session seek finds the
+// session gone too (the card already up, so it is swallowed). Its target is
+// the viewer's answer, and the card's button restarts there: the note and
+// the PUT at 600, and the next player goes there without asking again.
+// (Iteration 1 restarted from the element's 0, wrote no note -- a note at 0
+// would have started the next player at 0 without asking -- and left the
+// question to the server's copy; review F2, 2026-09-30.)
+test('the prompt answered under the card, its seek found the session gone: the card\'s click restarts at the answer', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const p = await mountPlayer((page) => {
+        sessionWithSaved(page, { seek: () => ({ ok: false, status: 404, json: async () => null }) });
+        pageStartForm(page, 'item');
+    });
+    p.video.pause = () => { p.video.paused = true; };
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadMaster());
+    await settle();
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the budget\'s card');
+    click(resumePrompt(p).querySelector('.wt-resume-btn--primary'));
+    await settle();
+    const posts = p.calls.filter((c) => c.params && c.params.method === 'POST' && String(c.url).includes('/seek'));
+    assert.equal(posts.length, 1, 'the answer\'s seek went out');
+    assert.equal(rec.got.length, 0);
+    assert.equal(p.video.currentTime, 0, 'the element never left the run\'s 0');
+    click(p.container.querySelector('.wt-recover button'));
+    await settle();
+    assert.equal(rec.got.length, 1, 'the card\'s click restarts');
+    const note = restartNote();
+    assert.ok(note, 'the note');
+    assert.equal(note.at, 600, 'the answer\'s place, not the element\'s 0');
+    assert.equal(note.play, true);
+    assert.equal(JSON.parse(positionPuts(p).at(-1).params.body).position, 600);
+});
+
+// ---- the card comes down when the film loads again under it ---------------
+
+// A fragment of the film as hls.js hands FRAG_LOADED (fragment-loader.ts):
+// an init segment, which hls.js's own listeners (abr-controller,
+// fragment-tracker) look at and let go.
+const filmLoaded = () => ({
+    frag: { type: 'main', sn: 'initSegment', level: 0, stats: { loading: { start: 0, first: 0, end: 0 }, loaded: 0 } },
+    part: null, payload: new ArrayBuffer(0), networkDetails: {},
+});
+
+test('the film loads again under the card: the card comes down, and a later dead session restarts', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    p.video.pause = () => { p.video.paused = true; };
+    const hls = window.hlsPlayer;
+    hls.trigger(Hls.Events.ERROR, { ...deadFragment(410, ''), frag: { url: 'https://api.test/x/movie.mp4', type: 'main' }, response: { url: 'https://api.test/x/movie.mp4', code: 410 } });
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'), 'the card');
+    // Space under the card, a stall, loader-restart's startLoad: a fragment.
+    hls.trigger(Hls.Events.FRAG_LOADED, filmLoaded());
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'the card came down');
+    assert.ok(p.container.querySelector('.wt-player-big-play'), 'the big play button is back');
+    hls.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1, 'the dead session restarts: neither layer swallowed it');
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')).map((e) => e.name), [
+        'player-recover-card-shown', 'player-recover-restart',
+    ]);
+});
+
+// ---- iteration 2: what the real-Chrome run found (2026-09-30) ---------------
+
+// A. On the transcoder's EVENT variants hls.js makes almost none of a dead
+// session's answers fatal: a fragment's 404 is skipped as a gap and the next
+// one asked, a playlist's 404/403 asked again on a backoff. 3,000-5,600 404s
+// over ~300 s before the first fatal one. The first answer restarts.
+// The shape: an audio rendition's playlist that hls.js asks again
+// (playlist-loader.ts handleNetworkError; the body in the xhr). A fragment's
+// gap cannot be made here: this hls.js has no levels, and its own
+// error-controller would turn a fragment error fatal on the spot (the
+// fragment shapes are network-recovery.test.js's).
+const deadGap = () => ({
+    type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.AUDIO_TRACK_LOAD_ERROR, fatal: false,
+    url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/a0.m3u8',
+    context: { type: 'audioTrack', url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/a0.m3u8', groupId: 'aud', id: 0 },
+    response: { url: 'https://api.test/x/movie.mkv~hls/session/f1097e82/a0.m3u8', data: undefined, code: 404, text: '' },
+    networkDetails: { status: 404, responseType: 'text', responseText: 'session not found\n', getAllResponseHeaders: () => '' },
+});
+
+test('a dead session hls.js keeps asking (not fatal): the restart at the first answer, and the walk stopped', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    const hls = window.hlsPlayer;
+    let startLoads = 0;
+    let stops = 0;
+    hls.startLoad = () => { startLoads++; };
+    const stop = hls.stopLoad.bind(hls);
+    hls.stopLoad = () => { stops++; return stop(); };
+    await playPast(p, 34);
+    const fatal = [];
+    hls.on(Hls.Events.ERROR, (e, d) => fatal.push(d.fatal));
+    hls.trigger(Hls.Events.ERROR, deadGap());
+    assert.deepEqual(fatal, [false], 'hls.js left it non-fatal');
+    assert.equal(p.events.filter((e) => e.name === 'player-recover-restart').length, 1, 'restarted at the first answer');
+    assert.equal(stops, 1, 'and hls.js stopped');
+    // What hls.js would have gone on with: the next fragment, and the next.
+    for (let i = 0; i < 200; i++) hls.trigger(Hls.Events.ERROR, deadGap());
+    await settle();
+    assert.equal(rec.got.length, 1, 'one restart');
+    assert.equal(rec.got[0].purge, 'true');
+    assert.equal(startLoads, 0);
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')), [
+        { name: 'player-recover-restart', data: { reason: '404', status: 404, via: 'error-nonfatal', loader: 'audio' } },
+    ]);
+});
+
+// B1. A free viewer over the cap answered the slow-download modal "watch as
+// is" (the force-slow run: data-offer-answered). The restart without it ran
+// the gate again and put the modal up before any player.
+test('a run answered "watch as is": the restart carries force-slow, with the purge', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+        page.video.dataset.offerAnswered = 'continue-slow';
+    });
+    await playPast(p, 20);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(rec.got[0]['force-slow'], 'true', 'the modal is not asked again');
+    assert.equal(rec.got[0].purge, 'true');
+});
+
+// B2. The grace popup answered: the restarted player showed it a second
+// time. The note carries the answer; the next player marks its element as
+// every answered player is marked, and the popup stays down.
+const withGraceCta = (page) => {
+    page.video.dataset.graceDurationSec = '30';
+    const cta = document.createElement('div');
+    cta.id = 'grace-cta';
+    cta.className = 'hidden';
+    cta.innerHTML = '<button type="button" class="grace-cta-close"></button><button type="button" class="grace-cta-continue"></button>';
+    page.container.appendChild(cta);
+};
+
+test('the grace popup answered: the restart carries the answer, and the next player does not ask again', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+        withGraceCta(page);
+    });
+    await playPast(p, 31);
+    click(document.querySelector('.grace-cta-continue'));
+    await settle();
+    p.video.paused = false;
+    p.video.currentTime = 40;
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(restartNote().grace, 'continue');
+    destroyPlayer();
+    const next = await mountPlayer((page) => {
+        sessionPlayer(page);
+        withGraceCta(page);
+    });
+    assert.equal(next.video.dataset.graceCtaAnswered, 'continue', 'the answer, where the status and the label read it');
+    assert.ok('graceCtaShown' in next.video.dataset, 'and the popup is not "on its way"');
+    await playPast(next, 45);
+    assert.equal(document.getElementById('grace-cta').classList.contains('hidden'), true, 'the popup stays down');
+    assert.equal(next.events.find((e) => e.name === 'grace-soft-cta-shown'), undefined);
+});
+
+// C. The restarted session's run starts at the transcoder's quantized point:
+// the film came back 15-20 s early. Once the run has written the place, the
+// film goes there -- a currentTime write, no second session seek.
+const produced = (video, end) => Object.defineProperty(video, 'seekable', {
+    configurable: true, get: () => ({ length: 1, start: () => 0, end: () => end }),
+});
+const seekPosts = (p) => p.calls.filter((c) => c.params && c.params.method === 'POST' && String(c.url).includes('/seek'));
+
+test('the restarted player goes to the exact place inside the quantized run, without a second session seek', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: true, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => sessionPlayer(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset: 1860 }) }) }));
+    await settle();
+    assert.equal(seekPosts(p).length, 1, 'the resume\'s session seek');
+    assert.equal(p.video.dataset.runOffset, '1860', 'the run starts 12 s early');
+    p.video.paused = false;
+    p.video.currentTime = 0.5;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    produced(p.video, 10);
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 0.5, 'not written yet: it waits');
+    produced(p.video, 30);
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 12, 'at 1872: 1860 + 12');
+    assert.equal(seekPosts(p).length, 1, 'no second session seek');
+});
+
+test('the restarted player\'s exact place: a seek of the viewer\'s wins', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    // The headset's or the OS's seek bar (media-session.js seekto): a seek
+    // to an exact film time, through handleSeek like every other.
+    const handlers = {};
+    const saved = Object.getOwnPropertyDescriptor(navigator, 'mediaSession');
+    Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { setActionHandler: (a, fn) => { handlers[a] = fn; } } });
+    t.after(() => {
+        destroyPlayer();
+        cleanRestart();
+        if (saved) Object.defineProperty(navigator, 'mediaSession', saved);
+        else delete navigator.mediaSession;
+    });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: true, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => sessionPlayer(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset: 1860 }) }) }));
+    await settle();
+    p.video.paused = false;
+    p.video.currentTime = 0.5;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await settle();
+    // The viewer goes to 31:03 -- inside the run, before the restart's place
+    // -- the moment the run has written it.
+    produced(p.video, 20);
+    assert.equal(typeof handlers.seekto, 'function');
+    handlers.seekto({ seekTime: 1863 });
+    assert.equal(p.video.currentTime, 3, 'a plain seek inside the run');
+    produced(p.video, 60);
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 3, 'where the viewer went, not the restart\'s place');
+});
+
+// The resume's own session seek is out: the run playing is the old one, and
+// a place measured against it would be lost with the reload.
+test('the restarted player\'s exact place: not measured while the resume\'s seek is out', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 21.2, play: true, until: Date.now() + 60000,
+    }));
+    let answer = null;
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        page.setResponse((url, params) => (params && params.method === 'POST'
+            ? new Promise((r) => { answer = r; })
+            : { ok: true, status: 200, json: async () => ({ offset: 0 }) }));
+    });
+    await settle();
+    assert.equal(seekPosts(p).length, 1, 'the resume\'s seek is out');
+    // The render's own run (from 0) has written the place already.
+    p.video.currentTime = 0.2;
+    produced(p.video, 40);
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 0.2, 'not while the seek is out');
+    answer({ ok: true, status: 200, json: async () => ({ offset: 0 }) });
+    await settle();
+    p.video.paused = false;
+    p.video.currentTime = 0.3;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 21.2, 'the new run: the exact place');
+});
+
+// Native HLS (iOS on ?mms=off) is left as it was: no hls.js, nothing moved.
+test('the restarted player\'s exact place: native HLS is left as it was', async (t) => {
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: true, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => sessionPlayer(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset: 1860 }) }) }));
+    await settle();
+    assert.equal(window.hlsPlayer, null, 'native HLS');
+    p.video.paused = false;
+    p.video.currentTime = 0.5;
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    produced(p.video, 60);
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 0.5);
+});
+
+// D. The card never stops a film that still plays from its buffer: it waits
+// for the element to starve. Chrome, 2026-09-30: the 429 give-up paused a
+// film at readyState 4 just as the refusals stopped.
+test('the card waits while the film plays from its buffer, and comes when it starves', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    let paused = 0;
+    p.video.pause = () => { paused++; p.video.paused = true; };
+    let rs = 4;
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => rs });
+    await playPast(p, 50);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'no card over a film that plays');
+    assert.equal(paused, 0, 'and it is not paused');
+    assert.equal(p.events.filter((e) => e.name.startsWith('player-recover')).length, 0);
+    p.video.dispatchEvent(new dom.window.Event('timeupdate'));
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'still playing');
+    rs = 2;
+    p.video.dispatchEvent(new dom.window.Event('waiting'));
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'), 'the buffer ran out: the card');
+    assert.equal(paused, 1);
+    assert.equal(p.events.filter((e) => e.name === 'player-recover-card-shown').length, 1);
+});
+
+test('the card waits, and the viewer\'s pause brings it', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionPlayer(page));
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => 4 });
+    await playPast(p, 50);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, { ...deadFragment(410, ''), frag: { url: 'https://api.test/x/movie.mp4', type: 'main' }, response: { url: 'https://api.test/x/movie.mp4', code: 410 } });
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null);
+    p.video.paused = true;
+    p.video.dispatchEvent(new dom.window.Event('pause'));
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'));
+});
+
+// E. One owner of what the viewer sees.
+test('player-dead has declared the player dead: a dead session after it is not restarted, and no card', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    mockClock(t, () => {
+        p.video.paused = false;
+        p.video.dispatchEvent(new dom.window.Event('play'));
+        tickBy(t, 32000);
+    });
+    assert.equal(p.events.filter((e) => e.name === 'player-dead').length, 1);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadGap());
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 0, 'no restart');
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'no card');
+    assert.equal(p.events.filter((e) => e.name.startsWith('player-recover')).length, 0, 'no second message');
+});
+
+// player-revived: the verdict was the rule's error, and the player is ours
+// again.
+test('player-dead, then it played after all: a later dead session restarts', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    mockClock(t, () => {
+        p.video.paused = false;
+        p.video.dispatchEvent(new dom.window.Event('play'));
+        tickBy(t, 32000);
+    });
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-')).map((e) => e.name).filter((n) => n === 'player-dead' || n === 'player-revived'),
+        ['player-dead', 'player-revived']);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadGap());
+    await settle();
+    assert.equal(rec.got.length, 1);
+});
+
+test('a restart of ours gone out: the old player is not reported dead while the page restarts', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    mockClock(t, () => {
+        p.video.paused = false;
+        p.video.dispatchEvent(new dom.window.Event('play'));
+        window.hlsPlayer.trigger(Hls.Events.ERROR, deadGap());
+        assert.equal(p.events.filter((e) => e.name === 'player-recover-restart').length, 1, 'the restart');
+        // The job runs a median 58 s; the old player is still on the page.
+        tickBy(t, 60000);
+    });
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(p.events.find((e) => e.name === 'player-dead'), undefined);
+});
+
+const codecsRejected = () => ({ type: Hls.ErrorTypes.MEDIA_ERROR, details: 'manifestIncompatibleCodecsError', fatal: true });
+
+test('a guard\'s restart owns the player: a seek that then finds the session gone restarts nothing more', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        sessionPlayer(page, { seek: () => ({ ok: false, status: 404, json: async () => null }) });
+        pageStartForm(page);
+    });
+    await playPast(p, 100);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, codecsRejected());
+    await settle();
+    assert.equal(rec.got.length, 1, 'the guard\'s restart on the old route');
+    assert.ok(rec.got[0]['decode-fallback']);
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    assert.equal(rec.got.length, 1, 'no restart of ours on top');
+    assert.equal(p.events.filter((e) => e.name.startsWith('player-recover')).length, 0);
+});
+
+test('a restart of ours gone out: a guard\'s failure after it restarts nothing more', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        sessionPlayer(page);
+        pageStartForm(page);
+    });
+    await playPast(p, 100);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadGap());
+    await settle();
+    assert.equal(rec.got.length, 1, 'ours');
+    window.hlsPlayer.trigger(Hls.Events.ERROR, codecsRejected());
+    await settle();
+    assert.equal(rec.got.length, 1, 'not the guard\'s on top');
+    assert.equal(p.events.find((e) => e.name === 'hevc-fallback'), undefined);
+});
+
+// The audio guard of the old route (passthrough.js createAudioGuard) gave
+// the file up: it stopped and detached hls.js and restarts the file without
+// its multichannel audio. The player is its: a seek that then finds the
+// session gone restarts nothing more, and no card comes.
+test('the audio guard gave up (stopLoad, detachMedia, its restart): nothing of ours after it', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const undo = declaringBrowser();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); undo(); });
+    const p = await mountPlayer((page) => {
+        oldRouteAudio(page);
+        sessionPlayer(page, { seek: () => ({ ok: false, status: 404, json: async () => null }) });
+        pageStartForm(page);
+    });
+    const hls = window.hlsPlayer;
+    let detached = 0;
+    hls.detachMedia = () => { detached++; };
+    hls.recoverMediaError = () => {};
+    await playPast(p, 10);
+    // The element names the audio's decoder (Chrome's MediaError message):
+    // the failure is the audio's; a recovery, then the same again.
+    Object.defineProperty(p.video, 'error', { value: { code: 3, message: 'PIPELINE_ERROR_DECODE: audio decode error!' }, configurable: true });
+    const media = () => ({ type: Hls.ErrorTypes.MEDIA_ERROR, details: 'bufferAppendError', fatal: true });
+    hls.trigger(Hls.Events.ERROR, media());
+    hls.trigger(Hls.Events.ERROR, media());
+    await settle();
+    assert.equal(rec.got.length, 1, 'the guard\'s restart');
+    assert.equal(rec.got[0]['decode-class'], 'aac51');
+    assert.equal(detached, 1, 'hls.js detached');
+    hls.trigger(Hls.Events.ERROR, deadGap());
+    hls.trigger(Hls.Events.ERROR, deadFragment());
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    assert.equal(rec.got.length, 1, 'no restart of ours on top');
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'no card');
+    assert.equal(p.events.filter((e) => e.name.startsWith('player-recover')).length, 0);
+});
+
+// The card waits for the element to starve or the viewer to pause -- not
+// for a pause of the page's own, nor for the film's end.
+const give410 = () => window.hlsPlayer.trigger(Hls.Events.ERROR, { ...deadFragment(410, ''), frag: { url: 'https://api.test/x/movie.mp4', type: 'main' }, response: { url: 'https://api.test/x/movie.mp4', code: 410 } });
+const pausing = (video) => { video.pause = () => { video.paused = true; video.dispatchEvent(new dom.window.Event('pause')); }; };
+
+test('the waiting card: a session seek\'s own pause is not the viewer\'s', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionPlayer(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset: 600 }) }) }));
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => 4 });
+    pausing(p.video);
+    await playPast(p, 20);
+    give410();
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'waiting');
+    // A far seek of the viewer's: the seek pauses the old run itself.
+    p.video.currentTime = 600;
+    document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await settle();
+    assert.equal(p.video.paused, true, 'the seek paused it');
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'no card over the seek');
+});
+
+test('the waiting card: the grace popup\'s hold is not the viewer\'s pause', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        withGraceCta(page);
+    });
+    let rs = 4;
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => rs });
+    pausing(p.video);
+    await playPast(p, 20);
+    give410();
+    await settle();
+    await playPast(p, 31);
+    assert.equal(document.getElementById('grace-cta').classList.contains('hidden'), false, 'the popup is up');
+    assert.equal(p.video.paused, true, 'its hold paused the film');
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'no card behind the popup');
+    click(document.querySelector('.grace-cta-continue'));
+    await settle();
+    p.video.paused = false;
+    rs = 2;
+    p.video.dispatchEvent(new dom.window.Event('waiting'));
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'), 'once it starves: the card');
+});
+
+test('the waiting card: the film\'s end is no starving', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionPlayer(page));
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => 4 });
+    await playPast(p, 20);
+    give410();
+    await settle();
+    Object.defineProperty(p.video, 'ended', { configurable: true, get: () => true });
+    p.video.paused = true;
+    p.video.dispatchEvent(new dom.window.Event('pause'));
+    p.video.dispatchEvent(new dom.window.Event('ended'));
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null);
+});
+
+test('a restart of ours gone out: the audio guard giving up after it restarts nothing more', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const undo = declaringBrowser();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); undo(); });
+    const p = await mountPlayer((page) => {
+        oldRouteAudio(page);
+        sessionPlayer(page);
+        pageStartForm(page);
+    });
+    const hls = window.hlsPlayer;
+    hls.detachMedia = () => {};
+    hls.recoverMediaError = () => {};
+    await playPast(p, 10);
+    hls.trigger(Hls.Events.ERROR, deadGap());
+    await settle();
+    assert.equal(rec.got.length, 1, 'ours');
+    Object.defineProperty(p.video, 'error', { value: { code: 3, message: 'PIPELINE_ERROR_DECODE: audio decode error!' }, configurable: true });
+    const media = () => ({ type: Hls.ErrorTypes.MEDIA_ERROR, details: 'bufferAppendError', fatal: true });
+    hls.trigger(Hls.Events.ERROR, media());
+    hls.trigger(Hls.Events.ERROR, media());
+    await settle();
+    assert.equal(rec.got.length, 1, 'not the guard\'s on top');
+    assert.equal(p.events.find((e) => e.name === 'audio-fallback'), undefined);
+});
+
+// ---- review F2: the card's click goes where the viewer asked (2026-09-30) ---
+//
+// A session seek that finds the session gone moves neither the element nor
+// the run's offset: the element's place is where the viewer was before it.
+// Past the budget the card dropped the seek's target, and its click restarted
+// at that old place -- the note and a signed-in viewer's PUT with it.
+
+const deadSeek = () => ({ ok: false, status: 404, json: async () => null });
+const lastPut = (p) => JSON.parse(positionPuts(p).at(-1).params.body).position;
+
+test('past the budget, a seek that finds the session gone: the card, and its click restarts at the seek\'s target', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: deadSeek });
+        pageStartForm(page, 'item');
+    });
+    p.video.pause = () => { p.video.paused = true; };
+    await playPast(p, 50);
+    keydown('ArrowRight'); // 0:50 -> 1:05, past what the run has produced
+    await settle();
+    assert.equal(seekPosts(p).length, 1, 'a session seek');
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the budget\'s card');
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')).map((e) => e.data), [
+        { reason: 'limit', status: 404, cause: '404', via: 'seek' },
+    ]);
+    assert.equal(p.video.currentTime, 50, 'the element stayed where it was');
+    click(card.querySelector('button'));
+    await settle();
+    assert.equal(rec.got.length, 1, 'the click restarts');
+    const note = restartNote();
+    assert.equal(note.at, 65, 'the target, not 50');
+    assert.equal(note.play, true);
+    assert.equal(lastPut(p), 65);
+});
+
+// The one place that is still no place: 0. The prompt answered (the question
+// settled) and the film not moved yet -- a note at 0 would only make the
+// next player skip the server's copy. (Iteration 1 held this rule's only test
+// in the "Continue under the card" case, which now restarts at the answer.)
+test('a place at 0 is none: "Start over" answered, the session gone before the film moved -- no note, no PUT of the restart', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionWithSaved(page);
+        pageStartForm(page, 'item');
+    });
+    click(resumePrompt(p).querySelector('.wt-resume-btn--ghost'));
+    await settle();
+    const puts = positionPuts(p).length;
+    assert.equal(p.video.currentTime, 0);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1, 'the restart');
+    assert.equal(restartNote(), null, 'no note at 0');
+    assert.equal(positionPuts(p).length, puts, 'no PUT of 0 on top of the answer\'s');
+});
+
+// The finding's second case: the restarted player's own resume seek finds
+// its session gone past the budget. The element stands at the run's 0; the
+// click restarted from there -- no note at 0, so a viewer without an account
+// (no server copy) started from the beginning.
+test('a restarted player whose resume seek finds the session gone past the budget: the card\'s click goes back to the note\'s place', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: true, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: deadSeek });
+        pageStartForm(page, 'item');
+    });
+    p.video.pause = () => { p.video.paused = true; };
+    await settle();
+    assert.equal(seekPosts(p).length, 1, 'the resume\'s session seek');
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the budget\'s card');
+    assert.equal(p.video.currentTime, 0);
+    click(card.querySelector('button'));
+    await settle();
+    assert.equal(rec.got.length, 1);
+    const note = restartNote();
+    assert.ok(note, 'the note');
+    assert.equal(note.at, 1872);
+});
+
+// The card waiting for the buffer, then a far seek of the viewer's that finds
+// the session gone. The seek paused the old run itself while it was out (no
+// starving then) and never plays it again: no event of the element's
+// follows, so the waiting card never came -- a paused film, no card, the
+// timeline at the target.
+test('the waiting card, then a seek that finds the session gone: the card at once, and its click restarts at the target', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: deadSeek });
+        pageStartForm(page, 'item');
+    });
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => 4 });
+    pausing(p.video);
+    await playPast(p, 50);
+    give410();
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'waiting: the film plays from its buffer');
+    keydown('ArrowRight');
+    await settle();
+    assert.equal(seekPosts(p).length, 1);
+    assert.equal(p.video.paused, true, 'the seek paused it');
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the card, at once');
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')).map((e) => e.data), [
+        { reason: 'network', status: 410 },
+    ]);
+    click(card.querySelector('button'));
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(restartNote().at, 65);
+});
+
+// The target is the viewer's only until they seek again: a local seek under
+// the card (inside what the run has produced -- no POST, nothing reported)
+// moves the element, and the element's place is theirs.
+test('a dead seek\'s card, then a local seek under it: the click restarts where the local seek went', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    const handlers = {};
+    const saved = Object.getOwnPropertyDescriptor(navigator, 'mediaSession');
+    Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { setActionHandler: (a, fn) => { handlers[a] = fn; } } });
+    t.after(() => {
+        rec.stop();
+        destroyPlayer();
+        cleanRestart();
+        if (saved) Object.defineProperty(navigator, 'mediaSession', saved);
+        else delete navigator.mediaSession;
+    });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: deadSeek });
+        pageStartForm(page, 'item');
+    });
+    p.video.pause = () => { p.video.paused = true; };
+    await playPast(p, 50);
+    handlers.seekto({ seekTime: 1500 });
+    await settle();
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the budget\'s card');
+    produced(p.video, 100);
+    handlers.seekto({ seekTime: 30 });
+    await settle();
+    assert.equal(seekPosts(p).length, 1, 'a local seek: no POST');
+    assert.equal(p.video.currentTime, 30);
+    click(card.querySelector('button'));
+    await settle();
+    assert.equal(rec.got.length, 1);
+    assert.equal(restartNote().at, 30, 'the local seek\'s place, not 1500');
+});
+
+// ---- iteration 3: what the second Chrome run found (2026-09-30) -------------
+
+// 1. A paused film restarted played by itself (5 of 5, 1.7-2.5 s after the
+// restart's POST). The element's `autoplay`: Chrome plays a paused <video
+// autoplay> once a new source has data, and every reload of it -- hls.js's
+// attachMedia at mount, its loadSource on the resume's session seek -- arms
+// that again (Chrome 154, scratchpad repro: pause, reload -> play, playing at
+// canplay; `autoplay` off -> paused, readyState 4). jsdom plays nothing by
+// itself, so the element here does what Chrome does: a reload of an element
+// with `autoplay` plays it once the source "has data".
+function withAutoplayingReloads(t) {
+    withHlsJs(t);
+    const reload = () => {
+        const v = document.querySelector('video.player');
+        if (v && v.autoplay) setTimeout(() => { if (v.autoplay && v.paused) v.play(); }, 5);
+    };
+    Hls.prototype.loadSource = function loadSource() { reload(); };
+    Hls.prototype.attachMedia = function attachMedia() { reload(); };
+}
+
+// The restarted player of a paused film: its note, a render with `autoplay`.
+async function pausedRestart(t, { at = 1872, offset = 1860 } = {}) {
+    withAutoplayingReloads(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at, play: false, until: Date.now() + 60000,
+    }));
+    let log = null;
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset }) }) });
+        page.video.setAttribute('autoplay', '');
+        log = playback(page.video);
+    });
+    await settle();
+    return { p, log };
+}
+// The new run can play (a browser's readyState by then).
+async function newRunCanPlay(p) {
+    Object.defineProperty(p.video, 'readyState', { configurable: true, get: () => 4 });
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await settle();
+}
+
+test('a paused film restarted comes back paused: nothing starts it -- not the mount, not the resume\'s reload; it lands at canplay, the big Play up', async (t) => {
+    const { p, log } = await pausedRestart(t);
+    assert.equal(seekPosts(p).length, 1, 'the resume\'s session seek');
+    assert.ok(String(seekPosts(p)[0].url).endsWith('t=1872'), seekPosts(p)[0].url);
+    assert.equal(p.video.autoplay, false, 'autoplay held until the viewer\'s Play');
+    await settle();
+    assert.equal(log.play, 0, 'no sound from a tab the viewer left');
+    assert.equal(p.video.paused, true);
+    assert.ok(p.container.querySelector('.wt-buffering'), 'the seek is out: the pill');
+    await newRunCanPlay(p);
+    assert.equal(log.play, 0, 'the new run can play, and nothing plays it');
+    assert.equal(p.video.paused, true);
+    assert.equal(p.container.querySelector('.wt-buffering'), null, 'the seek let go: no spinner over a paused film');
+    assert.ok(p.container.querySelector('.wt-player-big-play'), 'the big Play: the viewer\'s to press');
+    assert.equal(p.container.querySelector('.wt-player-time span').textContent, '31:12', 'the timeline at the note\'s place');
+    click(p.container.querySelector('.wt-player-big-play'));
+    await settle();
+    assert.equal(log.play, 1, 'the viewer\'s Play');
+    assert.equal(p.video.autoplay, true, 'the element is as every other again');
+});
+
+// A playing film is left as it was: its element keeps `autoplay` from the
+// mount on (read while the resume's seek is still out -- the seek's own
+// play() would put it back anyway).
+// In an embed the page itself starts the player once it is ready
+// (app/embed/index.js startPlayer: player_play) -- autoplay by another name,
+// and the restart of a paused film (postEmbedStart) holds it too.
+test('a paused restart in an embed: the page\'s player_play does not start it; the viewer\'s Play does', async (t) => {
+    const { p, log } = await pausedRestart(t);
+    await newRunCanPlay(p);
+    window.dispatchEvent(new CustomEvent('player_play'));
+    await settle();
+    assert.equal(log.play, 0, 'held');
+    assert.equal(p.video.paused, true);
+    click(p.container.querySelector('.wt-player-big-play'));
+    await settle();
+    assert.equal(log.play, 1);
+    assert.equal(p.video.paused, false, 'and not paused back');
+});
+
+test('a playing film restarted keeps its autoplay', async (t) => {
+    withAutoplayingReloads(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: true, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        page.setResponse((url, params) => (params && params.method === 'POST'
+            ? new Promise(() => {})
+            : { ok: true, status: 200, json: async () => ({ offset: 0 }) }));
+        page.video.setAttribute('autoplay', '');
+        playback(page.video);
+    });
+    await settle();
+    assert.equal(seekPosts(p).length, 1, 'the resume\'s seek is out');
+    assert.equal(p.video.autoplay, true);
+});
+
+// Held is only what was there: a render without `autoplay` gets none from the
+// viewer's Play.
+test('a paused restart of an element without autoplay: nothing held, nothing put back', async (t) => {
+    withAutoplayingReloads(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_NOTE_KEY, JSON.stringify({
+        resourceID: 'res', path: 'movie.mkv', at: 1872, play: false, until: Date.now() + 60000,
+    }));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page, { seek: () => ({ ok: true, status: 200, json: async () => ({ offset: 1860 }) }) });
+        playback(page.video);
+    });
+    await settle();
+    await newRunCanPlay(p);
+    click(p.container.querySelector('.wt-player-big-play'));
+    await settle();
+    assert.equal(p.video.paused, false);
+    assert.equal(p.video.autoplay, false);
+});
+
+// The exact place (C) of a paused restart comes with the viewer's Play -- as
+// documented -- and its two minutes count from that Play: a viewer back after
+// ten minutes still gets there.
+test('a paused restart goes to the exact place with the viewer\'s Play: not before, however long they were away', async (t) => {
+    const { p } = await pausedRestart(t);
+    await newRunCanPlay(p);
+    assert.equal(p.video.dataset.runOffset, '1860', 'the run starts 12 s early');
+    produced(p.video, 30);
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 0, 'paused: the film stays where the seek landed it');
+    // Three minutes away: past the two minutes the place is looked for.
+    const realNow = Date.now;
+    Date.now = () => realNow() + 3 * 60 * 1000;
+    t.after(() => { Date.now = realNow; });
+    click(p.container.querySelector('.wt-player-big-play'));
+    await settle();
+    assert.equal(p.video.currentTime, 12, 'at 1872 the moment it plays: 1860 + 12');
+    assert.equal(seekPosts(p).length, 1, 'no second session seek');
+});
+
+test('a paused restart: a seek of the viewer\'s before their Play is the place -- Play does not jump away from it', async (t) => {
+    const handlers = {};
+    const saved = Object.getOwnPropertyDescriptor(navigator, 'mediaSession');
+    Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { setActionHandler: (a, fn) => { handlers[a] = fn; } } });
+    t.after(() => {
+        if (saved) Object.defineProperty(navigator, 'mediaSession', saved);
+        else delete navigator.mediaSession;
+    });
+    const { p } = await pausedRestart(t);
+    await newRunCanPlay(p);
+    produced(p.video, 60);
+    // 31:03, inside the run, before the restart's place -- still paused.
+    handlers.seekto({ seekTime: 1863 });
+    assert.equal(p.video.currentTime, 3, 'a plain seek inside the run');
+    click(p.container.querySelector('.wt-player-big-play'));
+    await new Promise((r) => setTimeout(r, 650));
+    assert.equal(p.video.currentTime, 3, 'where the viewer went, not the restart\'s place');
+});
+
+// The session seek itself: a seek that does not play, on an element nothing
+// will start, settles when the new run can play -- it waited for a `playing`
+// that never came (the spinner up, every later seek refused). With
+// `autoplay` it waits for the `playing` the reload brings, as before.
+test('a paused seek on an element without autoplay settles at canplay; with autoplay, on playing as before', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((it) => { it.installHls({}); });
+    const log = playback(p.video);
+    const seeker = () => createSessionSeeker({
+        hls: window.hlsPlayer, videoEl: p.video, sessionSeekUrl: '/session/seek',
+        sourceUrl: 'https://x.test/index.m3u8', trackContainer: p.container,
+    });
+    p.video.autoplay = false;
+    const a = seeker();
+    const first = a.seek(120);
+    await flush();
+    await flush();
+    assert.equal(a.isSeeking(), true);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await flush();
+    assert.equal(a.isSeeking(), false, 'settled paused');
+    await first;
+    assert.equal(log.play, 0);
+    p.video.autoplay = true;
+    const b = seeker();
+    const second = b.seek(240);
+    await flush();
+    await flush();
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    await flush();
+    assert.equal(b.isSeeking(), true, 'autoplay will start it: waits for playing');
+    p.video.dispatchEvent(new dom.window.Event('playing'));
+    await flush();
+    assert.equal(b.isSeeking(), false);
+    await second;
+});
+
+// 2. A card due before the first frame: the resource page keeps the rendered
+// player hidden until player_ready (app/action.js), and the restarted job
+// whose new session is dead at its first request never gets there -- its
+// card sat hidden, the viewer on "waiting for the player" (9b).
+test('the card before the first frame: player_show, so the page that hides the player until canplay shows it', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    let shown = 0;
+    const onShow = () => { shown++; };
+    window.addEventListener('player_show', onShow);
+    t.after(() => window.removeEventListener('player_show', onShow));
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    assert.equal(shown, 0, 'nothing to show yet');
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'), 'the card');
+    assert.equal(shown, 1, 'the page is told to show it');
+    assert.equal(rec.got.length, 0);
+});
+
+// 3. That card's page: the viewer pressed the page's "Смотреть" instead of
+// the card's button, and the job cache replayed the job with the dead
+// session in it (9c). The card marks this file's start form; the card coming
+// down (the stream is back) takes the marks off.
+test('the card marks this file\'s start form: the viewer\'s own press goes past the job cache, the answer with it; the card coming down unmarks it', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    let form = null;
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        form = pageStartForm(page, 'item');
+        page.video.dataset.offerAnswered = 'continue-slow';
+    });
+    await playPast(p, 50);
+    p.video.pause = () => { p.video.paused = true; };
+    const hls = window.hlsPlayer;
+    hls.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'), 'the card');
+    assert.equal(rec.got.length, 0, 'nothing started by the card itself');
+    form.requestSubmit();
+    assert.equal(rec.got.length, 1);
+    assert.equal(rec.got[0].purge, 'true', 'past the job cache: its replay is the dead session');
+    assert.equal(rec.got[0]['force-slow'], 'true', '"watch as is" rides along');
+    // The stream is back under the card after all: an ordinary start again.
+    hls.trigger(Hls.Events.FRAG_LOADED, filmLoaded());
+    await settle();
+    assert.equal(p.container.querySelector('.wt-recover'), null, 'the card came down');
+    form.requestSubmit();
+    assert.equal(rec.got[1].purge, undefined);
+    assert.equal(rec.got[1]['force-slow'], undefined);
+});
+
+// A restart that ends before any player mounts (the no-peers modal, an
+// error): the viewer's next press still goes past the job cache -- the fields
+// stay on the form until a player takes them off.
+test('a restart that ends before any player: the next press of the button is purged too; the next player takes it off', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    let form = null;
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        form = pageStartForm(page, 'item');
+        page.video.dataset.offerAnswered = 'continue-slow';
+    });
+    await playPast(p, 20);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 1, 'the restart');
+    // Its job ends on a modal: the player goes, no other comes.
+    destroyPlayer();
+    form.requestSubmit();
+    assert.equal(rec.got[1].purge, 'true');
+    assert.equal(rec.got[1]['force-slow'], 'true');
+    // A player at last: the presses after it are ordinary starts.
+    window.sessionStorage.removeItem(RESTART_NOTE_KEY);
+    const host = document.getElementById('page');
+    const v = document.createElement('video');
+    v.className = 'player';
+    v.dataset.resourceId = 'res';
+    v.dataset.path = 'movie.mkv';
+    host.appendChild(v);
+    await initPlayer(host);
+    await settle();
+    form.requestSubmit();
+    assert.equal(rec.got[2].purge, undefined, 'once');
+    assert.equal(rec.got[2]['force-slow'], undefined);
+});
+
+// The card's marks are this file's (review of iteration 3, F1): with the card
+// up, the viewer moves on to the next file (N; nothing prewarmed, the film is
+// paused under the card), and next-item-go.js started it from a copy of this
+// file's start form -- marks and all: a purge past the next file's job cache,
+// and a force-slow that skipped its own slow-download question.
+test('the card up, the viewer moves on to the next file: its start carries neither the purge nor the force-slow', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    window.sessionStorage.setItem(RESTART_BUDGET_KEY, JSON.stringify({ 'res:movie.mkv': Date.now() - 60 * 1000 }));
+    const { p, streams, deliver } = await mountWithNext(t, (page) => {
+        sessionPlayer(page);
+        page.video.dataset.itemId = 'i1';
+        page.video.dataset.offerAnswered = 'continue-slow';
+        const rid = document.createElement('input');
+        rid.setAttribute('type', 'hidden');
+        rid.setAttribute('name', 'resource-id');
+        rid.setAttribute('value', 'res');
+        document.querySelector('form[action="/stream-video"]').appendChild(rid);
+    });
+    // A failed assertion before deliver() would leave the next file's render
+    // waiting out its 10-minute timeout, and the run with it.
+    t.after(() => { for (const s of streams) { try { s.onerror(); } catch (e) { /* closed */ } } });
+    const starts = [];
+    const inner = globalThis.fetch;
+    globalThis.fetch = (url, params) => {
+        if (params && params.method === 'POST' && String(url).endsWith('/stream-video')) starts.push(Object.fromEntries(params.body));
+        return inner(url, params);
+    };
+    window.fetch = globalThis.fetch;
+    await playPast(p, 50);
+    p.video.pause = () => { p.video.paused = true; };
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.ok(p.container.querySelector('.wt-recover'), 'fixture: the card');
+    const form = document.querySelector('form[action="/stream-video"]');
+    assert.deepEqual(Object.fromEntries(new dom.window.FormData(form)),
+        { 'item-id': 'i1', 'resource-id': 'res', purge: 'true', 'force-slow': 'true' }, 'fixture: this file\'s form marked');
+    keydown('n');
+    await settle();
+    assert.equal(starts.length, 1, 'the next file\'s start');
+    assert.equal(starts[0]['item-id'], 'i2');
+    assert.equal(starts[0].purge, undefined, 'no purge: the next file\'s job cache is its own');
+    assert.equal(starts[0]['force-slow'], undefined, 'no force-slow: the next file asks its own question');
+    // Its job ends (else its render's 10-minute timeout holds the run): the
+    // next file's player is up, and it takes this file's marks off.
+    await deliver();
+    assert.equal(document.querySelector('video.player').getAttribute('data-path'), 'ep2.mkv', 'fixture: the next file\'s player is up');
+    assert.equal(document.querySelectorAll('input[data-stream-restart]').length, 0, 'the marks are gone from the page');
+});

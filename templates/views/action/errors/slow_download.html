@@ -58,6 +58,12 @@
             <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
             <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
             <input type="hidden" name="force-slow" value="true" />
+            {{- /* A start that asked past the job cache -- the player's restart
+                 of a stream whose session was gone -- answers past it too:
+                 the force-slow job of the same bucket is the dead one. */}}
+            {{- if .Data.Purge }}
+            <input type="hidden" name="purge" value="true" />
+            {{- end }}
             {{- /* Directory downloads must resubmit with the same archive
                  format and partial-archive selection — without these the
                  slow re-run would fall back to a whole-directory zip. */}}

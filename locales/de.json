@@ -740,6 +740,8 @@
     "player.buffering": "Puffern",
     "player.bufferingCap": "Puffern: Tempo auf %v begrenzt",
     "player.close": "Schließen",
+    "player.streamLost": "Die Wiedergabe wurde unterbrochen",
+    "player.resumeWatching": "Weiterschauen",
     "job.retrievingData": "Ressourcendaten werden abgerufen",
     "job.retrievingStreamUrl": "Stream-URL wird abgerufen",
     "job.probingMedia": "Medieninformationen werden analysiert",

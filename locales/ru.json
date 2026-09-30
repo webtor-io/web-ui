@@ -768,6 +768,8 @@
     "player.buffering": "Буферизация",
     "player.bufferingCap": "Буферизация: ограничение скорости %v",
     "player.close": "Закрыть",
+    "player.streamLost": "Воспроизведение прервалось",
+    "player.resumeWatching": "Продолжить просмотр",
     "job.retrievingData": "получение данных ресурса",
     "job.retrievingStreamUrl": "получение ссылки для просмотра",
     "job.probingMedia": "анализ медиа-информации",

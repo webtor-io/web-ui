@@ -721,12 +721,12 @@ export function loadDocument(loc, url) {
     return 'assign';
 }
 
-// restartEmbed starts the embed again the way it was started (app/embed/
-// check.js initEmbed: a POST of its settings), with the fallback's fields and
-// without a declaration -- not a reload: the embed's page is the answer to a
-// POST, and a reload would send the same body again, `decode` included.
-// `decode` is the declaration an audio fallback keeps (null: none).
-function restartEmbed(win, doc, reason, cls, decode = null) {
+// postEmbedStart starts the embed again the way it was started (app/embed/
+// check.js initEmbed: a POST of its settings) with `fields` ([name, value]
+// pairs, a null value left out) -- not a reload: the embed's page is the
+// answer to a POST, and a reload would send the same body again, `decode`
+// included. Also the stream restart's (stream-restart.js).
+export function postEmbedStart(win, doc, fields = []) {
     const form = doc.createElement('form');
     form.setAttribute('method', 'post');
     form.setAttribute('enctype', 'multipart/form-data');
@@ -740,11 +740,18 @@ function restartEmbed(win, doc, reason, cls, decode = null) {
     add('_csrf', win._CSRF || '');
     add('_sessionID', win._sessionID || '');
     add('settings', JSON.stringify(win._embedSettings));
-    if (decode) add('decode', decode);
-    add('decode-fallback', reason);
-    add('decode-class', cls);
+    for (const [name, value] of fields) {
+        if (value !== null && value !== undefined && value !== '') add(name, value);
+    }
     doc.body.append(form);
     form.submit();
+}
+
+// restartEmbed: the embed's POST again with the fallback's fields and
+// without a declaration. `decode` is the declaration an audio fallback keeps
+// (null: none).
+function restartEmbed(win, doc, reason, cls, decode = null) {
+    postEmbedStart(win, doc, [['decode', decode], ['decode-fallback', reason], ['decode-class', cls]]);
 }
 
 // restartFile starts the file again, visibly, from the start, with why --

@@ -8,8 +8,11 @@ import { markUnsnapshottedTracksStale } from './subtitle-track-reload.js';
 import { createLoaderRestart } from './loader-restart.js';
 import { passthroughHlsConfig } from './passthrough.js';
 import { iosPlaysHlsJs } from './decode-declaration.js';
+import { createNetworkRecovery } from './network-recovery.js';
 
-const HLS_CONFIG = {
+// Exported for the tests (network-recovery.hls.test.js): the retry policy a
+// real instance runs with.
+export const HLS_CONFIG = {
     autoStartLoad: true,
     startPosition: 0,
     manifestLoadingTimeOut: 1000 * 60 * 10,
@@ -42,7 +45,11 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 // (passthrough.js) -- a passthrough's, or, on any other route, the one of a
 // start that declared multichannel audio (createAudioGuard) -- first to see
 // every error. Without them the instance is exactly what every stream has
-// always had.
+// always had. opts.recovery: the player's answers to a network error hls.js
+// cannot recover from -- a dead session's, fatal or not, and a failure that
+// outlasted the retries (network-recovery.js: onSessionGone, onGiveUp) --
+// the stream restart and the card (Player.jsx) -- and onFilmLoaded, a
+// fragment of the film arriving (the card comes down).
 export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     if (!Hls || !Hls.isSupported() || (isIOS && !iosPlaysHlsJs(window))) {
         // Native HLS (Safari/iOS) — browser handles m3u8 natively
@@ -70,7 +77,7 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     hls.loadSource(sourceUrl);
     hls.attachMedia(videoEl);
 
-    setupHlsEvents(hls, undefined, opts.guard || null);
+    setupHlsEvents(hls, undefined, opts.guard || null, opts.recovery || {});
 
     if (onReady) {
         hls.on(Hls.Events.MANIFEST_PARSED, onReady);
@@ -86,8 +93,11 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
 // string the browser refused, a media error -- goes no further; everything
 // else, network errors included, is handled as on every route. It is also
 // told which audio hls.js buffers (BUFFER_CODECS) -- a listener no stream
-// without a guard gets.
-export function setupHlsEvents(hls, restartOpts, guard = null) {
+// without a guard gets. recoveryOpts go to the network errors' handler
+// (network-recovery.js createNetworkRecovery: the player's onSessionGone,
+// onGiveUp and onFilmLoaded, and the timers for the tests); the returned
+// loader restart carries it as `.network`.
+export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}) {
     hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         if (hls.levels.length > 1) {
             hls.startLevel = 1;
@@ -101,16 +111,18 @@ export function setupHlsEvents(hls, restartOpts, guard = null) {
         });
     }
 
+    // Declared before the listeners below, registered after them (its own
+    // FRAG_LOADED / MANIFEST_LOADING / DESTROYING come last).
+    let network = null;
     hls.on(Hls.Events.ERROR, (event, data) => {
         if (guard && guard.onHlsError(hls, data)) return;
         if (data.fatal) {
             switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                    if (data.details === 'levelParsingError') {
-                        setTimeout(() => hls.startLoad(), 3000);
-                    } else {
-                        hls.startLoad();
-                    }
+                    // Never startLoad() blindly: a 404 of a dead transcoder
+                    // session answered at once, again and again, was up to
+                    // 66 requests a second from one tab (network-recovery.js).
+                    network.handle(data);
                     break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
                     hls.recoverMediaError();
@@ -120,6 +132,11 @@ export function setupHlsEvents(hls, restartOpts, guard = null) {
                     break;
             }
         } else {
+            // hls.js asks again itself, or skips a live fragment as a gap:
+            // a dead session's answer stops that at the first one, and once
+            // a fatal error has been seen each round of such requests counts
+            // toward the give-up (network-recovery.js observe).
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) network.observe(data);
             console.warn('HLS non-fatal error:', data.type, data.details);
         }
     });
@@ -128,7 +145,10 @@ export function setupHlsEvents(hls, restartOpts, guard = null) {
     // when nothing is loading: at the plan's cap the segment the player
     // waits for is still arriving, and startLoad() would abort it
     // (loader-restart.js).
-    return createLoaderRestart(hls, Hls, restartOpts);
+    const restart = createLoaderRestart(hls, Hls, restartOpts);
+    network = createNetworkRecovery(hls, Hls, recoveryOpts);
+    restart.network = network;
+    return restart;
 }
 
 /**

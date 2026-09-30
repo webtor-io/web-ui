@@ -224,7 +224,10 @@ test('it played after all: player-revived with the whole wait', () => {
     s.video.play();
     s.advance(40000);
     assert.equal(dead(s.events).length, 1);
+    assert.equal(s.watch.dead, true, 'the verdict stands (the stream restart stands back)');
     s.video.fire('playing');
+    assert.equal(s.watch.reported, true);
+    assert.equal(s.watch.dead, false, 'revived: the verdict was the rule\'s error');
     assert.deepEqual(s.events.map((e) => e.name), [DEAD_EVENT, REVIVED_EVENT]);
     assert.equal(s.events[1].data.waited_s, 40);
     assert.equal(s.video.listeners(), 0);

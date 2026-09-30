@@ -24,7 +24,7 @@ func pinClock(t *testing.T) {
 }
 
 func actionID(vsud *models.VideoStreamUserData) string {
-	_, id := Action(nil, nil, nil, nil, nil, nil, nil, nil, jobKeyContext(), "08ada5a7a6183aae1e09d831df6748d566095a10", "item-1", "stream-video", &models.StreamSettings{}, nil, vsud, WarmupSettings{}, GraceSettings{}, false, "", "", nil)
+	_, id := Action(nil, nil, nil, nil, nil, nil, nil, nil, jobKeyContext(), "08ada5a7a6183aae1e09d831df6748d566095a10", "item-1", "stream-video", &models.StreamSettings{}, nil, vsud, WarmupSettings{}, GraceSettings{}, false, false, "", "", nil)
 	return id
 }
 
