@@ -220,7 +220,8 @@ func serve(c *cli.Context) error {
 	// reads the status once the chain returns, and a panic returns through
 	// recovery, which writes the 500 (metrics.Middleware).
 	r := gin.New()
-	r.Use(gin.Logger(), metrics.Middleware(), gin.CustomRecovery(w.RecoverToLog))
+	// The access log without the credentials some paths carry (w.AccessLog).
+	r.Use(w.AccessLog(), metrics.Middleware(), gin.CustomRecovery(w.RecoverToLog))
 	r.Use(w.ErrorHandler(tm.MustRegisterViews("error/*").WithLayout("main")))
 	s3Hosts := s3svc.Hosts(c)
 	apiHosts := libapi.Hosts(c)
