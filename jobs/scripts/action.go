@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
@@ -720,6 +721,10 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 	seMeta := exportMeta(se)
 	noteCache(s.cacheIndex, resourceID, exportResponse.Source, seMeta.Cache)
+	// Whether the file goes to the transcoder, and its stream URL: rest-api's
+	// word by extension, until the probe says an MP4's audio does not play
+	// as nginx-vod serves it (vod_route.go).
+	transcode, streamURL := seMeta.Transcode, se.URL
 
 	var downloadSpeed float64
 	var quickElapsed time.Duration
@@ -797,7 +802,18 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	} else {
 		sc.MediaProbe = mp
 		sc.CreditsAt = creditsFromChapters(mp)
-		s.setStatusMarks(sc, c, mp, seMeta.Transcode)
+		if !transcode && vsud != nil && exportResponse.Source.MediaFormat == ra.Video {
+			if why := vodReroute(mp, vsud.DecodeRequest); why != "" {
+				if u, uerr := transcodeURLFromVOD(streamURL); uerr == nil {
+					transcode, streamURL = true, u
+					metrics.VODReroute(why)
+					log.WithFields(log.Fields{"reason": why, "decode": vsud.DecodeRequest.Decode}).Info("stream: MP4 sent to the transcoder instead of nginx-vod")
+				} else {
+					log.WithError(uerr).WithField("reason", why).Warn("stream: MP4 kept on nginx-vod, no transcoder URL for it")
+				}
+			}
+		}
+		s.setStatusMarks(sc, c, mp, transcode)
 		log.Infof("got media probe %+v", mp)
 	}
 	j.Done()
@@ -828,7 +844,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	if sc.MediaProbe != nil {
 		fileRate := getVideoBitrate(sc.MediaProbe)
 		// Falls back to fileRate, so it is known whenever fileRate is.
-		streamRate := capGateBitrate(sc.MediaProbe, seMeta.Transcode)
+		streamRate := capGateBitrate(sc.MediaProbe, transcode)
 		if streamRate > 0 {
 			if s.forceSlow {
 				j.Skip(s.t("job.checkingBandwidth"))
@@ -897,8 +913,8 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	}
 
 	// Step 4: Session transcoder (after bandwidth check)
-	if seMeta.Transcode && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
-		result, serr := s.bufferSessionHLS(ctx, j, exportResponse.ExportItems["stream"].URL, 30*time.Second, vsud.DecodeRequest)
+	if transcode && (exportResponse.Source.MediaFormat == ra.Video || exportResponse.Source.MediaFormat == ra.Audio) {
+		result, serr := s.bufferSessionHLS(ctx, j, streamURL, 30*time.Second, vsud.DecodeRequest)
 		if serr != nil {
 			return errors.Wrap(serr, "failed to buffer session HLS")
 		}
@@ -908,7 +924,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			Type: "application/vnd.apple.mpegurl",
 		}}
 		sc.SessionSeekURL = result.SeekURL
-		if base, err := sessionBaseURL(exportResponse.ExportItems["stream"].URL); err == nil {
+		if base, err := sessionBaseURL(streamURL); err == nil {
 			if u, perr := url.Parse(base); perr == nil {
 				u.Path += "/session/" + result.Session.ID
 				sc.SubtitleOpts.HLSSessionBase = u.String()

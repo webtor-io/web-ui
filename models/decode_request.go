@@ -172,6 +172,17 @@ func (d DecodeRequest) DeclaresAudio() bool {
 	return false
 }
 
+// Declares: token is one of the declaration's own. A start that declares
+// nothing declares no token.
+func (d DecodeRequest) Declares(token string) bool {
+	for _, t := range strings.Split(d.Decode, ",") {
+		if t == token {
+			return true
+		}
+	}
+	return false
+}
+
 // ParseDecodeRequest reads the three fields of a stream start. The class is
 // kept only with a reason.
 func ParseDecodeRequest(decode, fallback, class string) DecodeRequest {

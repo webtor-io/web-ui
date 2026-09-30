@@ -1139,6 +1139,63 @@ so the cap card and "this file needs N" work as for H.264. Every other caller of
 unchanged, and the cap gate before the session still falls back to the file's rate for HEVC —
 conservative, and right for a passthrough.
 
+#### An MP4 whose audio nginx-vod cannot hand the browser — `jobs/scripts/vod_route.go`
+
+rest-api sends a file to nginx-vod or to the transcoder by its extension alone: an `.mp4` goes to
+nginx-vod (`~vod/hls/<id>/index.m3u8`), which serves its first video and first audio track as they are,
+muxed. Where the browser cannot take that audio it played nothing, or played without sound, with no error
+the viewer sees: hls.js cannot add the SourceBuffer (`video/mp4;codecs=ec-3,hev1…` → `NotSupportedError`,
+a fatal `bufferAddCodecError`) and the old route's handling recovers it every ~110 ms for as long as the
+page is open (2026-09-30, a 2160p HEVC MP4 with E-AC-3 in Chrome 154; 7 `player-dead why=recovering` on
+vod in 12 h). After the probe the stream job sends such an MP4 to the transcoder instead — the vod URL's
+file with `~hls/index.m3u8`, the path cut, not re-encoded — and the transcoder encodes the audio as the
+declaration allows (the repro's file: HEVC passed through, AAC 5.1, both audio tracks; it plays).
+
+What nginx-vod serves (nginx-vod-module `26f06877`, the one the image builds):
+
+- **the first video and the first audio track it counts** (`v1-a1`). For HLS it counts H.264, HEVC and AV1
+  video, and AAC, MP3, AC-3, E-AC-3, FLAC and DTS-in-`mp4a` audio (`mp4_parser.c`, `ngx_http_vod_hls.c`
+  `SUPPORTED_CODECS`). A track in any other codec — VP9, VP8, Opus, ALAC, PCM, TrueHD (`mlpa`), DTS in
+  `dtsc`/`dtsh` — is skipped and takes no index, so `a1` is the next audio track. The viewer's pick does
+  not change it: the pick is the job's key and the list's default, not the stream's;
+- **fMP4 when its first track is a video that is not H.264, MPEG-TS otherwise**
+  (`ngx_http_vod_hls_get_container_format`, container `auto`). In fMP4 the browser's MSE decodes the
+  audio. In MPEG-TS hls.js demuxes, and nginx-vod writes E-AC-3 under AC-3's stream type (`0x81`,
+  `mpegts_encoder_filter.c`): a browser without AC-3 drops it (silence), one with AC-3 has E-AC-3 frames
+  fed to the AC-3 parser. E-AC-3 in TS plays nowhere.
+
+| `a1` (the first audio track nginx-vod counts) | goes to the transcoder | `webui_vod_reroute_total{reason}` |
+|---|---|---|
+| E-AC-3, container MPEG-TS (H.264, or no video nginx-vod serves) | always | `eac3_ts` |
+| E-AC-3, container fMP4 | where the start does not declare `ec3` | `eac3` |
+| AC-3 | where the start does not declare `ac3` | `ac3` |
+| DTS | always: no browser decodes it | `no_decoder` |
+| none — the file has audio, nginx-vod serves none of it | always: silence on nginx-vod | `unserved_audio` |
+
+A start without the token counts as a browser that cannot play it, whatever the reason: no
+declaration, `unknown`, video tokens only (`?audio=off`, or the audio answer not in yet), a restart after a
+failed passthrough or in compatibility mode (the page sends no declaration), the page's 7-day memory of
+one. Most browsers cannot (Chrome, Firefox), and a start without the token is most often a file that
+already failed there — reading it as "unknown, keep vod" put a fallback restart straight back on
+nginx-vod's dead player.
+
+What it costs:
+- a browser that could play Dolby but did not say so (Safari on its first page, before its audio answer;
+  `?audio=off`) gets AAC from the transcoder instead of Dolby from nginx-vod; a 2160p HEVC the transcoder
+  cannot pass through (HLG, Dolby Vision 5) gets its refusal where nginx-vod had played it in Safari;
+- `eac3_ts` also takes a browser on native HLS (iOS before 17.1, `?mms=off`) off nginx-vod, where native
+  HLS played it. On the transcoder that H.264 file takes the old route, and Dolby is copied only into a
+  passthrough's fMP4, so that viewer hears AAC 5.1 instead of Dolby;
+- DTS stored as `dtsc` (which ffprobe does not tell from DTS in `mp4a`) goes to the transcoder where
+  nginx-vod may have served the next, playable track;
+- every reroute is an FFmpeg run (the video copied, the audio encoded) where nginx-vod needed none. Hold a
+  day of `webui_vod_reroute_total` against the transcoder's CPU after the rollout.
+
+The job key already carries the declaration, and its 10-minute bucket lets a render made before the change
+go. Not handled: a video codec the browser lacks on nginx-vod (an HEVC MP4 in a browser without HEVC) —
+unmeasured; the player's endless recovery of a fatal codec error on the old route (`hls-manager.js`) is
+left to `player-dead` to count.
+
 #### Passthrough: errors and fallback — `passthrough.js`
 
 Only where the session's route is `passthrough` (`data-video-route`); every other stream's error

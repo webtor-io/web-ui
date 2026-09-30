@@ -223,6 +223,7 @@ func TestMetricNames(t *testing.T) {
 	s.caps.WithLabelValues("unknown")
 	s.capChecks.WithLabelValues("failed")
 	s.fallback.WithLabelValues("user", "unknown")
+	s.vodRoute.WithLabelValues("eac3")
 	families, err := reg.Gather()
 	if err != nil {
 		t.Fatal(err)
@@ -237,6 +238,7 @@ func TestMetricNames(t *testing.T) {
 		"webui_transcoder_capability":              dto.MetricType_GAUGE,
 		"webui_transcoder_capability_checks_total": dto.MetricType_COUNTER,
 		"webui_passthrough_fallback_total":         dto.MetricType_COUNTER,
+		"webui_vod_reroute_total":                  dto.MetricType_COUNTER,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]
@@ -381,5 +383,24 @@ func TestPassthroughFallbackIsBounded(t *testing.T) {
 	}
 	if got := testutil.CollectAndCount(s.fallback); got != 6 {
 		t.Errorf("%d series, want 6", got)
+	}
+}
+
+// The reroute counter's label is the job's reason; anything else is one
+// series.
+func TestVODRerouteIsBounded(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	for _, r := range []string{"eac3_ts", "eac3", "ac3", "no_decoder", "eac3", "<x>", ""} {
+		s.vodReroute(r)
+	}
+	if got := testutil.ToFloat64(s.vodRoute.WithLabelValues("eac3")); got != 2 {
+		t.Errorf("eac3 = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(s.vodRoute.WithLabelValues("other")); got != 2 {
+		t.Errorf("other = %v, want 2", got)
+	}
+	if got := testutil.CollectAndCount(s.vodRoute); got != 5 {
+		t.Errorf("%d series, want 5", got)
 	}
 }
