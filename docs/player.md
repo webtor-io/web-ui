@@ -905,11 +905,12 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
   entry from before `mms` says nothing and is taken). What it costs: hls.js sets
   `disableRemotePlayback` on such an element — no AirPlay. Under hls.js, Play before any data no
   longer calls `load()` (`usePlayerState` togglePlay): it dropped the element's MediaSource.
-- **Who declares audio.** Every browser `aac51` where it answers it, unless it opened `?audio=off` —
-  the audio's **stage 5 is done for AAC 5.1** (2026-09-29); Dolby (`ac3`, `ec3`) only a browser that
-  opened `?audio=on`, until an iPhone has played it (2026-09-30). The audio tokens have a switch of
-  their own, independent of the video's: `?audio=on|off` on any page (localStorage `wt-audio`; where
-  storage throws, the page's own state; `applyAudioUrlSwitch`). Two predicates, one per question,
+- **Who declares audio.** Every browser, every audio token it answers, unless it opened
+  `?audio=off` — the audio's **stage 5 is done for all three tokens** (AAC 5.1 2026-09-29, Dolby
+  2026-09-30; between the two Dolby went out only with `?audio=on`). The audio tokens
+  have a switch of their own, independent of the video's: `?audio=off` on any page (localStorage
+  `wt-audio`; where storage throws, the page's own state; `applyAudioUrlSwitch`), and `?audio=on`,
+  still read and remembered, which now only takes an `off` back. Two predicates, one per question,
   both reading the one switch (`audioSwitch`):
   - **`aac51`** (`mayDeclareAac51`: `!== 'off'`) — since the audio's stage 5 for AAC 5.1
     (2026-09-29, after the owner's device test of 2026-09-29 15:36–15:45Z: Chrome 154 on a Mac
@@ -918,12 +919,20 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
     browser: 635 of 638 `codec-support` events since the multichannel-audio release answered `aac51`
     (MSE: `decodingInfo` says `supported` for six channels; native: `canPlayType` for AAC, which says
     nothing about channels).
-  - **`ac3`, `ec3`** (Dolby as it is; `mayDeclareDolby`: `=== 'on'`) — only a browser that opened
-    `?audio=on`. Safari 26.6.2 on a Mac played E-AC-3 copied on three files (Oak Street, Dune with
-    Atmos, Love Hypothesis with Atmos) and AAC 5.1 copied, once `4da7d00a` had fixed that browser's
-    blob `<source>`, and the owner decided on 2026-09-29 to declare it everywhere; the rollout keeps
-    it behind `?audio=on` until an iPhone has played it — iOS is about a quarter of the video starts
-    and plays through hls.js since 2026-09-30 (above), a path no Dolby has been through. Who answers it (`codec-support`, sessions from 2026-09-28 21:10Z to 2026-09-29
+  - **`ac3`, `ec3`** (Dolby as it is; `mayDeclareDolby`: `!== 'off'`) — since 2026-09-30, after
+    Safari 26.6.2 on a Mac played E-AC-3 copied on three files (1080p HEVC 10-bit; 4K HDR10 and 4K
+    Dolby Vision 8.1, both with Atmos) and AAC 5.1 copied, once `4da7d00a` had fixed that browser's
+    blob `<source>` (2026-09-29), and an iPhone did on 2026-09-30 06:30–07:07Z (every start checked
+    in the transcoder's log: `session: audio audio=ac codecs=ec-3|ac-3`, the audio copied into
+    fMP4): Chrome on iOS on hls.js — 1080p HEVC 10-bit with E-AC-3, 1080p HEVC with AC-3, 4K HDR10
+    with E-AC-3 and Atmos; Safari on iOS on native HLS (`?mms=off`) — the two 1080p files; Safari on
+    iOS on hls.js — the E-AC-3 1080p file, with a switch to another app and back for 30 s mid-play:
+    it went on from where it was, no fallback. One fallback in all of it: the 4K file's second start
+    in Chrome on iOS, a `decode_error` about 75 s in that nobody pinned (`audio-fallback cls=dolby
+    by=unpinned`, the restart without Dolby), which the owner did not see — he had left the page by
+    then; not explained (the app switch in Safari did not reproduce it). Before, only a browser that
+    opened
+    `?audio=on`. Who answers it (`codec-support`, sessions from 2026-09-28 21:10Z to 2026-09-29
     19:20Z): every Safari on a Mac (26 of 26) and every iOS browser (Safari 80/80, Chrome on iOS
     31/33, web views 8/8), Edge on Windows 32 of 40, Opera on Windows 8 of 15; Chrome on Windows 1
     of 255, on a Mac 0 of 33, on Android 1 of 108; Firefox none. The iOS answers are the native
@@ -939,10 +948,8 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
     without `ENABLE_PLATFORM_AC3_EAC3_AUDIO` (Chrome) says no. Not read: Edge's and Opera's forks, and
     a decoder that is there and fails. A failure there that names no side is charged to `dolby` first
     (see "Dolby first, without an HEVC strike" below); what to watch
-    is under "Watching the audio after the rollout". **Dolby's stage 5** is one line:
-    `mayDeclareDolby` → `!== 'off'` (and its tests in `decode-declaration.test.js`); the probe
-    already asks every browser both questions and remembers the whole answer, so it takes effect
-    with the next page load, no new question.
+    is under "Watching the audio after the rollout". **Rolling Dolby back** is one line:
+    `mayDeclareDolby` → `=== 'on'` (and its tests in `decode-declaration.test.js`).
   - **`?audio=off`** takes the browser out of every audio token: its pages send the video part
     alone, their probe asks nothing about audio (`declarationSupport(env, {audio: false})`: no
     `decodingInfo` and no `isTypeSupported` for audio, no `wt-decode-audio` written), `whenDeclared`
@@ -950,8 +957,8 @@ Rules (owner's decisions of 2026-09-27 over the plan's §2.2):
     viewer's (and support's) way out of multichannel audio: the stereo of old where 5.1 or Dolby
     does not play.
   `allowedAudioTokens` combines them: none where the page does not take part in the declaration at
-  all, else `aac51` where `mayDeclareAac51`, `ac3`/`ec3` where `mayDeclareDolby` — today `aac51`
-  but for `?audio=off`, Dolby with `?audio=on`. Where any audio token may go out the probe asks the whole audio part (Dolby's
+  all, else `aac51` where `mayDeclareAac51`, `ac3`/`ec3` where `mayDeclareDolby` — today all three
+  but for `?audio=off`. Where any audio token may go out the probe asks the whole audio part (Dolby's
   two questions are synchronous).
   The codec-support event is measurement, not the declaration: it asks every viewer the audio
   questions whatever the switch. Downstream everything keys on the declaration a start actually
@@ -1290,10 +1297,9 @@ side, and the iOS rates above were measured on native HLS and are to be measured
 
 What closes it:
 
-- **Before Dolby's stage 5** (the owner's devices, with `?audio=on`): an iPhone plays one HEVC
-  passthrough with E-AC-3 and one with AC-3 — on hls.js, the default now, and once with `?mms=off`
-  (native HLS) — and Safari on a Mac one with AC-3. Until then Dolby is declared only with
-  `?audio=on` (2026-09-30); AAC 5.1 went out to every browser without it.
+- **Before the rollout** (the owner's devices, done 2026-09-30, see "Who declares audio"): an iPhone
+  played HEVC passthroughs with E-AC-3 and with AC-3 on hls.js and on native HLS (`?mms=off`). Not
+  done: AC-3 in Safari on a Mac, anything on Edge or Opera.
 - **24 h after**: the query under "Watching the audio after the rollout". Roll Dolby back
   (`mayDeclareDolby` → `=== 'on'`) where a browser's `dolby` passthroughs fall back to the audio
   (`pt_audio_fb` with `by = 'unpinned'`) or to the video more than twice as often as its `none`
@@ -1418,7 +1424,7 @@ there) — gets the `open` shape: `bufferAppendingError` on the audio buffer, a 
 after it: no fallback, the player at 0 s (2 of 2 runs, under either rule for an unpinned failure). The
 controls: the same video with AAC stereo plays (5.6–5.8 s of 6 s); with the master saying `ec-3`
 Chrome refuses the variant and the guard gives up at once (`codecs_rejected`, 7–12 ms, charged to
-`dolby` — "Dolby first"). With Dolby declared the trigger is a
+`dolby` — "Dolby first"). With Dolby declared by default the trigger is a
 master and an init that disagree about the audio — or a browser whose MediaSource takes a codec its
 parser then refuses; neither is known to happen now. The second one is reachable on the Dolby master
 itself (`CODECS="hvc1…,ec-3"`, the audio a rendition of its own): with `isTypeSupported` and
@@ -1459,7 +1465,7 @@ have to offer is "stereo sound", a different item with its own text in 11 langua
 guard sees now restart by themselves, and the ones it cannot see (a 5.1 track that plays with a
 wrong layout, a silent centre channel) are the transcoder's to get right for every browser at once —
 the owner's device matrix, not a per-viewer escape. Since the audio's stage 5 every browser
-declares `aac51` where it answers it and `?audio=off` is the only way back to stereo, by address; whether an
+declares every audio token it answers and `?audio=off` is the only way back to stereo, by address; whether an
 audio item in the menu is worth its text in 11 languages now is the owner's call (not built). On a passthrough the item stays what it was: the restart with no declaration.
 
 Seen in a real browser (headless Chrome 154.0.8037.58 on a Mac, hls.js 1.6.14, 2026-09-29): the
@@ -1468,8 +1474,7 @@ declares `…,hdr-pq,aac51`, the same with `?audio=on`, the video alone with `?a
 stands (the old route's master: given up after one recovery in 228–320 ms, `by: buffer`; the muxed
 playlist: after hls.js's two recoveries in 26–126 ms; standard 5.1 plays 5.7–6.1 s of 6 s — the same
 as before these changes); a passthrough-shaped fMP4 (HEVC, the audio a rendition of its own) with AAC
-stereo plays, with an `ec-3` variant Chrome refuses the manifest (`codecs_rejected`, charged to
-`dolby` — "Dolby first"),
+stereo plays, with an `ec-3` variant Chrome refuses the manifest (`codecs_rejected`, now the video's),
 with an E-AC-3 init behind a master that says AAC the player dies (the known gap above); the MediaError
 texts quoted under "Which side failed". Chrome decodes neither AC-3 nor E-AC-3, so everything about a
 Dolby decoder at work is **not verified**: what Safari, iOS, Edge and Opera raise when one fails and
@@ -1481,8 +1486,8 @@ ManagedMediaSource since 2026-09-30, native HLS with `?mms=off`) — the owner's
 
 #### Watching the audio after the rollout
 
-Since the audio's stage 5 every browser declares `aac51` where it answers it, and Dolby with
-`?audio=on` until its own stage 5 (see "Who declares audio"). What to look at, and against what. The browser is Umami's session; `audio` is the start's
+Since the audio's stage 5 every browser declares every audio token it answers (see "Who declares
+audio"). What to look at, and against what. The browser is Umami's session; `audio` is the start's
 class on `stream-start`, both fallbacks and `player-dead` / `player-revived`. Dolby is copied only
 into a passthrough's fMP4, and a passthrough is a small share of video starts (the day to 2026-09-30:
 10% on iOS, 15% in Chrome on Windows, 3% in Edge), so `dolby` rows exist only on that route while
@@ -1602,10 +1607,9 @@ The server's count (Prometheus, every browser together, by the class the restart
 against the video's `class=~"hevc.*"`. A strike takes a class out for 7 days, so a rising `dolby`
 count followed by a fall is browsers striking it out, not a fix.
 
-**Rollback.** Dolby alone (once its stage 5 is out): `mayDeclareDolby` → `=== 'on'`
-(`decode-declaration.js`; its tests). All audio: `mayDeclareAac51` the same. For one viewer:
-`?audio=off`. A rollback reaches a viewer with the next full page load and lifts no strike already
-written (`wt-decode-fallback`, 7 days). A player that dies with no error and no fallback is `player-dead`'s,
+**Rollback.** Dolby alone: `mayDeclareDolby` → `=== 'on'` (`decode-declaration.js`; its tests). All
+audio: `mayDeclareAac51` the same. For one viewer: `?audio=off`. A rollback reaches a viewer with the
+next full page load and lifts no strike already written (`wt-decode-fallback`, 7 days). A player that dies with no error and no fallback is `player-dead`'s,
 counted per class since it carries `audio` (2026-09-30); one whose element errs before metadata and
 pauses is not counted at all yet (see "Known gap").
 

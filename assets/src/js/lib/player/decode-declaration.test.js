@@ -822,18 +822,18 @@ test('not taking part: no declaration, whatever the audio memory says', async ()
 
 // ---- the audio switch (`?audio=on|off`, wt-audio) ----------------------------
 
-// Since the audio's stage 5 for AAC 5.1 (2026-09-29): `aac51` by default,
-// Dolby with `?audio=on`, `?audio=off` takes every one out. The two
-// predicates are the two questions; one switch answers both.
-test('the audio switch: aac51 by default, Dolby with ?audio=on, nothing with ?audio=off; independent of ?passthrough=', () => {
+// Since the audio's stage 5 (2026-09-29: AAC 5.1, then Dolby): every audio
+// token by default, `?audio=off` takes every one out, `?audio=on` only takes
+// that back. The two predicates are the two questions; one switch answers
+// both.
+test('the audio switch: every audio token by default, nothing with ?audio=off, ?audio=on takes it back; independent of ?passthrough=', () => {
     const answers = (win) => [mayDeclareAac51(win), mayDeclareDolby(win), allowedAudioTokens(win).join(',')];
-    const DEFAULT_AUDIO = [true, false, 'aac51'];
     const ALL_AUDIO = [true, true, 'aac51,ac3,ec3'];
     let win = page();
-    assert.deepEqual(answers(win), DEFAULT_AUDIO, 'a browser that never opened the switch');
+    assert.deepEqual(answers(win), ALL_AUDIO, 'a browser that never opened the switch');
     win = page({ url: 'https://webtor.io/?audio=on' });
-    assert.equal(applyAudioUrlSwitch(win), 'on', '?audio=on is read');
-    assert.deepEqual(answers(win), ALL_AUDIO, 'and adds Dolby');
+    assert.equal(applyAudioUrlSwitch(win), 'on', '?audio=on is still read');
+    assert.deepEqual(answers(win), ALL_AUDIO, 'and changes nothing for a browser that was not opted out');
     assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), 'on');
     assert.equal(win.localStorage.getItem(OPTIN_KEY), null, 'the video switch untouched');
     assert.equal(applyUrlSwitch(win), null, 'and ?audio= is not the video switch');
@@ -858,12 +858,12 @@ test('the audio switch: aac51 by default, Dolby with ?audio=on, nothing with ?au
     for (const url of ['https://webtor.io/', 'https://webtor.io/?audio=yes', 'https://webtor.io/?audio=']) {
         win = page({ url });
         assert.equal(applyAudioUrlSwitch(win), null, url);
-        assert.deepEqual(answers(win), DEFAULT_AUDIO, url);
+        assert.deepEqual(answers(win), ALL_AUDIO, url);
     }
     // A stored value that is neither: the default too.
     win = page();
     win.localStorage.setItem(AUDIO_OPTIN_KEY, 'garbage');
-    assert.deepEqual(answers(win), DEFAULT_AUDIO);
+    assert.deepEqual(answers(win), ALL_AUDIO);
     // No audio token where the page takes no part in the declaration.
     win = page({ url: 'https://webtor.io/?passthrough=off&audio=on' });
     applyUrlSwitch(win);
@@ -874,12 +874,12 @@ test('the audio switch: aac51 by default, Dolby with ?audio=on, nothing with ?au
     applyUrlSwitch(win);
     applyAudioUrlSwitch(win);
     assert.equal(win.localStorage.getItem(AUDIO_OPTIN_KEY), null);
-    assert.deepEqual(allowedAudioTokens(win), ['aac51']);
+    assert.deepEqual(allowedAudioTokens(win), ['aac51', 'ac3', 'ec3']);
 });
 
 test('the audio switch with a throwing localStorage: the page\'s own, and no exception', () => {
     let win = page({ storageThrows: true });
-    assert.deepEqual([mayDeclareAac51(win), mayDeclareDolby(win)], [true, false]);
+    assert.deepEqual([mayDeclareAac51(win), mayDeclareDolby(win)], [true, true]);
     win = page({ storageThrows: true, url: 'https://webtor.io/?audio=off' });
     assert.doesNotThrow(() => applyAudioUrlSwitch(win));
     assert.deepEqual(allowedAudioTokens(win), [], 'held for the page');
@@ -914,34 +914,27 @@ function askingProbe(audio = ['aac51', 'ac3', 'ec3']) {
     };
 }
 
-// The audio's stage 5 for AAC 5.1: a browser that never touched either
-// switch declares its video and aac51 where it answers it -- not Safari's
-// Dolby, which only ?audio=on declares; the whole answer is remembered, so
-// Dolby's own stage 5 needs no new question.
-test('stage 5 for the audio: a browser that never opened either switch declares its video and aac51, Dolby with ?audio=on', async () => {
+// The audio's stage 5 (AAC 5.1, then Dolby): a browser that never touched
+// either switch declares its video and every audio token it answers --
+// Safari's Dolby included; Chrome, which answers no to ac-3 and ec-3,
+// aac51 alone.
+test('stage 5 for the audio: a browser that never opened either switch declares its video and every audio token it answers', async () => {
     const win = page();
-    assert.deepEqual([takesPart(win), allowedAudioTokens(win)], [true, ['aac51']]);
+    assert.deepEqual([takesPart(win), allowedAudioTokens(win)], [true, ['aac51', 'ac3', 'ec3']]);
     const probe = askingProbe();
     await startProbe(win, probe);
     await win.__wtDecode.audio;
     assert.deepEqual(probe.asked, [{ audio: true }], 'the whole audio part is asked');
-    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), `${VIDEO_ALL},aac51`);
-    assert.deepEqual(JSON.parse(win.localStorage.getItem(AUDIO_CACHE_KEY)).tokens, ['aac51', 'ac3', 'ec3'], 'the answer, whole');
+    assert.equal(declarationFor(win, { resourceId: 'r', itemId: 'i' }), `${VIDEO_ALL},aac51,ac3,ec3`);
+    assert.deepEqual(JSON.parse(win.localStorage.getItem(AUDIO_CACHE_KEY)).tokens, ['aac51', 'ac3', 'ec3']);
     // The start form says the same.
     installSubmitHook(win.document, win);
     const f = startForm(win);
     f.addEventListener('submit', (e) => e.preventDefault());
     f.requestSubmit();
-    assert.equal(decodeOf(f), `${VIDEO_ALL},aac51`);
-    // The same answer with ?audio=on: Dolby too.
-    const on = page();
-    optInAudio(on);
-    await startProbe(on, askingProbe());
-    await on.__wtDecode.audio;
-    assert.equal(declarationFor(on, {}), `${VIDEO_ALL},aac51,ac3,ec3`);
-    // A browser that answers no Dolby (Chrome) declares aac51 alone, either way.
+    assert.equal(decodeOf(f), `${VIDEO_ALL},aac51,ac3,ec3`);
+    // A browser that answers no Dolby (Chrome) declares aac51 alone.
     const chrome = page();
-    optInAudio(chrome);
     await startProbe(chrome, fakeProbe({ audio: ['aac51'] }));
     await chrome.__wtDecode.audio;
     assert.equal(declarationFor(chrome, {}), `${VIDEO_ALL},aac51`);
@@ -949,7 +942,7 @@ test('stage 5 for the audio: a browser that never opened either switch declares 
     const bare = page();
     await startProbe(bare, fakeProbe({ hevc: [], pq: false, audio: ['aac51', 'ac3', 'ec3'] }));
     await bare.__wtDecode.audio;
-    assert.equal(declarationFor(bare, {}), 'aac51');
+    assert.equal(declarationFor(bare, {}), 'aac51,ac3,ec3');
 });
 
 // A browser opted out of audio declares no audio token, is asked nothing
@@ -1011,7 +1004,7 @@ test('whenDeclared: a page opted out of audio waits for the video part only', as
     assert.ok(Date.now() - t1 < 50);
 });
 
-test('the real probe: ?audio=off asks no audio question; the default asks them and declares aac51, ?audio=on every token answered', async () => {
+test('the real probe: ?audio=off asks no audio question; the default asks them and declares every token answered', async () => {
     let calls = 0;
     const env = {
         userAgent: UA_A,
@@ -1028,8 +1021,8 @@ test('the real probe: ?audio=off asks no audio question; the default asks them a
     await startProbe(dflt, { env });
     await dflt.__wtDecode.audio;
     assert.ok(calls > 0);
-    assert.equal(declarationFor(dflt, {}), [...DECODE_VIDEO_TOKENS, 'aac51'].join(','));
-    // And with ?audio=on: Dolby too.
+    assert.equal(declarationFor(dflt, {}), DECODE_TOKENS.join(','));
+    // And with ?audio=on: the same.
     const on = page();
     optInAudio(on);
     await startProbe(on, { env });

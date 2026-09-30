@@ -39,11 +39,11 @@
 // The audio tokens (aac51, ac3, ec3: multichannel audio) are a part of their
 // own, answered and remembered apart from the video part and appended to it.
 // They have a switch of their own, independent of the video's: `?audio=on|off`
-// on any page (localStorage `wt-audio`). Since the audio's stage 5 for AAC
-// 5.1 (2026-09-29) every browser may declare `aac51` (mayDeclareAac51) but
-// one that opened `?audio=off`; Dolby (`ac3`, `ec3`, mayDeclareDolby) only
-// one that opened `?audio=on`, until it has been played on an iPhone. A
-// browser opted out of audio declares no audio token at
+// on any page (localStorage `wt-audio`). Since the audio's stage 5
+// (AAC 5.1 2026-09-29, Dolby 2026-09-30) every browser may declare
+// every audio token it answers -- `aac51` (mayDeclareAac51) and `ac3`, `ec3`
+// (mayDeclareDolby) -- but one that opened `?audio=off`; `?audio=on` only
+// takes that back. A browser opted out of audio declares no audio token at
 // all: its page sends exactly the video part, asks the browser nothing about
 // audio and waits for nothing of it. Elsewhere the probe asks the whole audio
 // part (Dolby's questions are synchronous).
@@ -265,13 +265,14 @@ export function mayDeclareAac51(win) {
 }
 
 // mayDeclareDolby: may it carry `ac3` / `ec3` -- AC-3 / E-AC-3 copied as it
-// is into a passthrough's fMP4? Only a browser that opened `?audio=on`.
-// Safari 26.6.2 on a Mac played E-AC-3 copied on three files, Atmos
-// included (2026-09-29), but no iPhone has played Dolby yet -- iOS is a
-// quarter of the video starts and plays through hls.js since 2026-09-30 --
-// nor anything AC-3. Its stage 5 is this line: `!== 'off'`.
+// is into a passthrough's fMP4? Every browser but one that opened
+// `?audio=off` (the audio's stage 5 for Dolby, 2026-09-30, after Safari
+// 26.6.2 on a Mac played E-AC-3 copied on three files, Atmos included, and
+// an iPhone played E-AC-3 and AC-3 copied on hls.js and on native HLS).
+// Before it only a browser that opened `?audio=on`; rolling it back is this
+// line again: `=== 'on'`.
 export function mayDeclareDolby(win) {
-    return audioSwitch(win) === 'on';
+    return audioSwitch(win) !== 'off';
 }
 
 const DOLBY_TOKENS = ['ac3', 'ec3'];
@@ -279,8 +280,7 @@ const DOLBY_TOKENS = ['ac3', 'ec3'];
 // allowedAudioTokens: the audio tokens this page's declaration may carry,
 // in their order -- none where the page does not take part in the
 // declaration at all; else `aac51` where mayDeclareAac51, `ac3`, `ec3` where
-// mayDeclareDolby (today `aac51` for every one but `?audio=off`, Dolby
-// with `?audio=on`).
+// mayDeclareDolby (today both: every one but for `?audio=off`).
 export function allowedAudioTokens(win) {
     if (!takesPart(win)) return [];
     return AUDIO_TOKENS.filter((t) => (DOLBY_TOKENS.includes(t) ? mayDeclareDolby(win) : mayDeclareAac51(win)));
