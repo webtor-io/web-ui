@@ -180,7 +180,7 @@ type Viewer struct {
 //   - three capped streams, events with throttled >= 0.5 (n = 11, 163, 259):
 //     use p05 0.955-0.978 by stream, median 0.99-1.00; once on, the verdict
 //     held at use 0.742 at the lowest (0.965 and 0.993 on the other two).
-//   - a file under the cap (Sintel from Vault, buffer-fill bursts, n = 30
+//   - a file under the cap (the demo film from Vault, buffer-fill bursts, n = 30
 //     with throttled >= 0.5): use median 0.77, p90 0.917, max 1.016.
 //
 // planUseOn anywhere in 0.85-0.95 gives the capped streams the same fact and

@@ -831,8 +831,8 @@ func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, 
 		torrentInfos = append(torrentInfos, ti)
 	}
 	// Drop sample/preview clips when the same torrent already carries the
-	// real release. Without this, "Sicario/sicario.sample.mkv" + the main
-	// "Sicario.2015...mkv" produce two distinct movie rows and two AI
+	// real release. Without this, "Title/title.sample.mkv" + the main
+	// "Title.2015...mkv" produce two distinct movie rows and two AI
 	// fallback calls. Fall back to processing samples only when nothing
 	// else is present (rare — a torrent that is purely a sample).
 	if len(torrentInfos) == 0 && len(samples) > 0 {

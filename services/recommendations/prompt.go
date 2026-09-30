@@ -659,7 +659,7 @@ func anyRecentTitle(uc *UserContext) string {
 		return "a film you'd remember"
 	}
 	// First line of HistoryText is the most recent entry. It looks like
-	// "- Interstellar (2014) [liked]" — strip leading "- " and trailing
+	// "- Movie A (2014) [liked]" — strip leading "- " and trailing
 	// " [tag]" for a clean title reference.
 	line := uc.HistoryText
 	if nl := strings.IndexByte(line, '\n'); nl >= 0 {

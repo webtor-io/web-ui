@@ -761,7 +761,7 @@ func TestSubtitleHintsIgnoresTmdbOnlyID(t *testing.T) {
 }
 
 func TestSubtitleHintsEpisodeFromPath(t *testing.T) {
-	h := subtitleHints("", &models.VideoMetadata{VideoID: "tt0903747"}, &ra.ListItem{PathStr: "/Breaking.Bad.S01/Breaking.Bad.S01E03.1080p.mkv"})
+	h := subtitleHints("", &models.VideoMetadata{VideoID: "tt0903747"}, &ra.ListItem{PathStr: "/Show.S01/Show.S01E03.1080p.mkv"})
 	if h.ImdbID != "tt0903747" || h.Season != 1 || h.Episode != 3 {
 		t.Fatalf("got %+v", h)
 	}

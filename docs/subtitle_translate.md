@@ -395,7 +395,7 @@ Still deliberately **not** `ladderRank` — the ladder answers "which track does
 read", this order answers "which text will the machine translate correctly" — but the sidecar
 sits above the hash match (owner ruling 2026-09-17, reversing 2026-09-16): a hash match fits the
 *timing* to this very file and says nothing about the *text*, and community uploads routinely
-carry injected ad cues — Sintel's hash-matched English track turned out to be mostly ads, and the
+carry injected ad cues — the demo film's hash-matched English track turned out to be mostly ads, and the
 machine dutifully translated the ads. A sidecar's timing can belong to another cut, but its text
 is the film's, and a wrongly-timed line is a smaller failure for a translation source than a
 correctly-timed advertisement. Equal ranks keep list order, which is the only stable tie-break

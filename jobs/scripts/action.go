@@ -326,7 +326,7 @@ func (e *NoPeersError) Error() string {
 
 // resourceLeafTitle picks the human label the player overlay shows.
 // Order:
-//  1. Enriched metadata title (e.g. "Sintel (2010)") — best UX for
+//  1. Enriched metadata title (e.g. "Title (2010)") — best UX for
 //     anything that matched IMDb/TMDB; survives sloppy filenames.
 //  2. File basename minus extension — fallback for un-enriched
 //     torrents; reflects what's actually playing in a multi-file pack.

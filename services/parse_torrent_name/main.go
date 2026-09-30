@@ -252,7 +252,7 @@ var fieldParsers = FieldParsers{
 	// Codec — added HEVC (H.265 alias) and AV1.
 	// Codec. First two alternatives consume the combined "x265.HEVC" /
 	// "x264.AVC" / "HEVC.x264" forms so the alias half doesn't leak
-	// into Extra (test 159 = Sicario "...x265.HEVC-PSA.mkv" used to
+	// into Extra (test 159 = a "...x265.HEVC-PSA.mkv" release used to
 	// stash HEVC in Extra). Inner capture stays the canonical name.
 	// MapTransformer normalises h.264 / H265 / HEVC / AVC variants
 	// to "x264" / "x265" so downstream consumers see one stable token.

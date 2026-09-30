@@ -303,10 +303,10 @@ func normalizeLocale(locale string) string {
 //
 // Example:
 //
-//	- Interstellar (2014) [liked]
-//	- Tenet (2020) [disliked]
-//	- Arrival (2016) [watched]
-//	- Dune (2021) [queued]
+//	- Movie A (2014) [liked]
+//	- Movie B (2020) [disliked]
+//	- Movie C (2016) [watched]
+//	- Movie D (2021) [queued]
 // renderWatchlist mirrors renderHistory for watchlist entries. Format is a
 // dash-prefixed line per title with the content type tagged in brackets so
 // Claude can tell movies from series at a glance.

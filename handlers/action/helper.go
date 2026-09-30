@@ -631,7 +631,7 @@ func isEmbeddedSource(li ListItem) bool {
 // The sidecar sits above the hash-matched OpenSubtitles track (owner
 // ruling, 2026-09-17, reversing 2026-09-16). A hash match guarantees the
 // TIMING fits this very file; it says nothing about the TEXT, and
-// community uploads routinely carry injected ad cues -- Sintel's
+// community uploads routinely carry injected ad cues -- the demo film's
 // hash-matched English track turned out to be mostly ads, and the machine
 // translated the ads. A sidecar shipped in the torrent is whatever the
 // release carries: its timing can be off for another cut, but its text is

@@ -158,7 +158,7 @@ from the caps snapshot and falls back:
 1. **Query by id** (`t=movie&imdbid=…`, or `t=tvsearch&imdbid=…&season=&ep=`)
    when caps advertise it, or when caps are missing entirely. Exact, and it
    needs no metadata lookup.
-2. **Query by title** (`The Matrix 1999`, `Person of Interest S05E14`) when
+2. **Query by title** (`Movie Title 1999`, `Show Title S05E14`) when
    the first attempt is unavailable or returns nothing.
 
 The title comes from Cinemeta (`services/torznab/title.go`), cached 24h. The

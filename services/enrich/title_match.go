@@ -117,7 +117,7 @@ func acceptableTMDBMatch(query string, sr *tmdb.SearchResult) bool {
 	}
 
 	// Squashed exact match handles compound-word splits that the token
-	// comparison would miss ("Spiderman" vs "Spider-Man" -> spiderman).
+	// comparison would miss ("Webmaster" vs "Web-Master" -> webmaster).
 	rSig := significantTitleTokens(sr.Title)
 	if len(rSig) == 0 {
 		rSig = rFull
@@ -148,7 +148,7 @@ func acceptableTMDBMatch(query string, sr *tmdb.SearchResult) bool {
 // Low-signal == a single token that is either pure-numeric ("01", "9"),
 // very short ("R", "v34", "Up"), or shaped like release-group salt /
 // hash (isGarbageTitle). Anything with two or more tokens, or a single
-// real word ("Inception", "Naruto"), is a confident query and trusted.
+// real, unusual word ("Labyrinthine", "Kaleidoscope"), is a confident query and trusted.
 // Note a low-signal query that genuinely matches still passes the
 // alignment check ("9" -> "9", "Up" -> "Up"); only fuzzy collisions
 // ("01" -> "0187 UFO", "R" -> "Dhurandhar") are rejected.
@@ -196,7 +196,7 @@ func titleTokens(s string) []string {
 }
 
 // significantTitleTokens drops leading articles and bare year tokens so
-// "The Matrix" compares as {matrix} and "Sicario 2015" as {sicario}.
+// "The Harbor" compares as {harbor} and "Harbor 2015" as {harbor}.
 func significantTitleTokens(s string) []string {
 	toks := titleTokens(s)
 	out := make([]string, 0, len(toks))
