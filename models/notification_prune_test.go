@@ -51,8 +51,12 @@ func startTestPostgres(t *testing.T) *pg.DB {
 	if out, err := exec.Command("docker", runArgs...).CombinedOutput(); err != nil {
 		t.Fatalf("docker run postgres: %v\n%s", err, out)
 	}
+	// -v: the image's data directory is an anonymous volume, which `rm -f`
+	// leaves behind (--rm removes it only when the container exits by
+	// itself) -- ~50 MB a run, until Docker's disk is full and every
+	// container fails at initdb.
 	t.Cleanup(func() {
-		_ = exec.Command("docker", "rm", "-f", containerName).Run()
+		_ = exec.Command("docker", "rm", "-f", "-v", containerName).Run()
 	})
 
 	// pg_isready is checked from inside the container (over its own unix
