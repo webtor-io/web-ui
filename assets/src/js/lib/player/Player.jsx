@@ -18,7 +18,7 @@ import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
 import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
-import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, startAudioClass } from './passthrough.js';
+import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, fallbackToTranscoder, startAudioClass } from './passthrough.js';
 import { clearPendingFallback, declaresAudio } from './decode-declaration.js';
 import { reportReleaseCheck } from '../discover/release-check.js';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
@@ -51,6 +51,7 @@ import '../../../styles/player.css';
 import { readStreamUrl } from './stream-url.js';
 import { createDeadPlayerWatch } from './dead-player.js';
 import { loopGivesUp } from './fragment-loop.js';
+import { createVodGuard, isVodStream, composeGuards } from './vod-guard.js';
 import {
     createRecoveryPolicy, fileKey as restartKey, safeSessionStorage, takeNote, writeNote, restartStream, clearPurgeMarks, markNextStart,
 } from './stream-restart.js';
@@ -304,6 +305,20 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             },
         });
     }
+    // A stream nginx-vod serves as the source is (~vod/) whose codecs this
+    // browser refuses: given up at once and restarted to the transcoder
+    // (vod-guard.js), not recovered for ever. It shares the old route's guard
+    // slot with the audio guard, asked first.
+    const vodGuardRef = useRef(null);
+    if (isVideo && !passthroughRoute && isVodStream(renderedUrl) && !vodGuardRef.current) {
+        vodGuardRef.current = createVodGuard({
+            giveUp: (details, mime) => {
+                if (!ownRestart()) fallbackToTranscoder({ video: videoEl, mime });
+            },
+        });
+    }
+    const oldRouteGuardRef = useRef(null);
+    if (!oldRouteGuardRef.current) oldRouteGuardRef.current = composeGuards(vodGuardRef.current, audioGuardRef.current);
     useEffect(() => () => {
         if (passthroughGuardRef.current) passthroughGuardRef.current.dispose();
         if (audioGuardRef.current) audioGuardRef.current.dispose();
@@ -468,6 +483,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             onSessionGone: (reason, status, info = {}) => recoverPolicyRef.current.sessionGone(
                 reason, status, null, info.via || 'load', info.loader || ''),
             onGiveUp: (status) => recoverPolicyRef.current.giveUp(status),
+            // The old route's fatal media errors, recovered and then given
+            // up (media-recovery.js): the same card.
+            onMediaGiveUp: () => recoverPolicyRef.current.mediaGiveUp(),
             onFilmLoaded: () => recoverPolicyRef.current.resumed(),
         };
     }
@@ -497,7 +515,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         passthrough: passthroughRoute
             ? { fragLoadMs: parseInt(videoEl.dataset.fragLoadMs || '0', 10) || 0, guard: passthroughGuardRef.current }
             : null,
-        audioGuard: audioGuardRef.current,
+        audioGuard: oldRouteGuardRef.current,
         recovery: recoveryRef.current,
         loop: loopRef.current,
     });
@@ -561,6 +579,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             Hls,
             handled: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
                 || (audioGuardRef.current && audioGuardRef.current.done)
+                || (vodGuardRef.current && vodGuardRef.current.done)
                 || (recoverPolicyRef.current && recoverPolicyRef.current.engaged)),
             track,
         });

@@ -4,11 +4,11 @@ import { JSDOM } from 'jsdom';
 import {
     REASONS, STRIKING, AUDIO_STRIKING, SAME_INCIDENT_MS, NO_FRAMES_AFTER_MS, FAULT_TTL_MS, CLEAN_PLAY_S, RELATED_MS,
     passthroughHlsConfig, createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, fallbackURL, framesCounted,
-    audioOfTrack, audioFallbackClass, messageSide, startAudioClass,
+    audioOfTrack, audioFallbackClass, messageSide, startAudioClass, fallbackToTranscoder, VOD_REASON,
 } from './passthrough.js';
 import {
     MEMORY_KEY, OPTIN_KEY, AUDIO_OPTIN_KEY, CACHE_KEY, AUDIO_CACHE_KEY, PENDING_TTL_MS, loadMemory, installSubmitHook, clearPendingFallback, pendingFallbackFor,
-    setPendingFallback, applyAudioUrlSwitch, startProbe,
+    setPendingFallback, applyAudioUrlSwitch, startProbe, vodRescueFor,
 } from './decode-declaration.js';
 
 // ---- the fragment policy -----------------------------------------------------
@@ -1516,4 +1516,65 @@ test('fallbackAudio of a browser with the audio switch never opened: the restart
     const next = captureSubmits(again);
     fallbackAudio({ video: avPlayer(again, { route: 'reencode', audioClass: 'aac51', decode: `${VIDEO},aac51` }).v, reason: 'media_error', cls: 'aac51', win: again, doc: again.document, track: () => {} });
     assert.equal(next[0].decode, VIDEO, 'an AAC 5.1 failure: no audio token');
+});
+
+// ---- nginx-vod's stream refused (vod-guard.js) ------------------------------
+
+// The restart to the transcoder: the start form again with vod_codecs, the
+// whole declaration kept (the refusal may be the audio's; a video the browser
+// decodes keeps its passthrough), nothing remembered, vod-fallback counted --
+// not hevc-fallback.
+test('fallbackToTranscoder: the start form again with vod_codecs and the whole declaration, nothing remembered', () => {
+    const win = declaringPage();
+    startForm(win);
+    const submits = captureSubmits(win);
+    const events = [];
+    const p = player(win);
+    const how = fallbackToTranscoder({ video: p.v, mime: 'video/mp4;codecs=ec-3,hev1.2.4.H150.B0', win, doc: win.document, track: (n, d) => events.push({ n, d }) });
+    assert.equal(how, 'form');
+    assert.equal(submits.length, 1);
+    assert.equal(submits[0]['decode-fallback'], VOD_REASON);
+    assert.equal(submits[0]['decode-class'], 'vod');
+    assert.equal(submits[0].decode, 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq', 'the declaration is kept');
+    assert.deepEqual(events, [{ n: 'vod-fallback', d: { reason: 'vod_codecs', mime: 'video/mp4;codecs=ec-3,hev1.2.4.H150.B0' } }]);
+    const m = loadMemory(win);
+    assert.deepEqual(m.sources, {}, 'no file remembered');
+    assert.deepEqual(m.strikes, {}, 'nothing struck');
+});
+
+test('fallbackToTranscoder in an embed: its POST with vod_codecs and the declaration', () => {
+    const win = declaringPage({ url: 'https://webtor.io/embed?id=e1' });
+    win._embedSettings = { magnet: 'x', lang: 'en' };
+    win._CSRF = 'csrf';
+    win._sessionID = 'sid';
+    const posted = [];
+    win.HTMLFormElement.prototype.submit = function () { posted.push(Object.fromEntries(new win.FormData(this))); };
+    const p = player(win);
+    assert.equal(fallbackToTranscoder({ video: p.v, win, doc: win.document, track: () => {} }), 'embed');
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0]['decode-fallback'], 'vod_codecs');
+    assert.equal(posted[0]['decode-class'], 'vod');
+    assert.equal(posted[0].decode, 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq');
+});
+
+// The rescued file stays rescued on the page: once the rescued player is up
+// (the pending note gone), a later start of it -- the stream restart after
+// its transcoder session died -- carries vod_codecs again, and the whole
+// declaration; another file does not.
+test('after fallbackToTranscoder, a later start of the same file on the page carries vod_codecs again', () => {
+    const win = declaringPage();
+    const form = startForm(win);
+    const submits = captureSubmits(win);
+    const p = player(win);
+    fallbackToTranscoder({ video: p.v, win, doc: win.document, track: () => {} });
+    clearPendingFallback(win); // the rescued player mounted
+    assert.equal(vodRescueFor(win, { resourceId: 'res1', itemId: 'item1' }), true);
+    form.requestSubmit();
+    assert.equal(submits.length, 2);
+    assert.equal(submits[1]['decode-fallback'], 'vod_codecs');
+    assert.equal(submits[1]['decode-class'], 'vod');
+    assert.equal(submits[1].decode, 'hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq');
+    const other = startForm(win, { iid: 'item2' });
+    other.requestSubmit();
+    assert.equal(submits[2]['decode-fallback'], undefined, 'another file: an ordinary start');
 });

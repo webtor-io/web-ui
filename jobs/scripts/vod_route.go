@@ -48,6 +48,14 @@ import (
 // (Safari on its first page, before its audio answer) gets AAC from the
 // transcoder instead of Dolby from nginx-vod, and a 2160p HEVC the
 // transcoder cannot pass through (HLG, Dolby Vision 5) its refusal.
+//
+// The video is held to a declaration that answered: HEVC where it has no
+// hevc8, or taller than 1080 or wider than 1920 (the transcoder's own 2160
+// rule, by size -- the probe has no level) where it has no hevc8-2160. A
+// 10-bit HEVC in a browser that declares only 8-bit the probe cannot tell,
+// nor a browser that did not answer: the player gives those up
+// (vod-guard.js), and any restart after the browser failed the file -- a
+// fallback reason, whichever, probe or not -- goes to the transcoder here.
 
 // Why an MP4 is sent to the transcoder instead of nginx-vod
 // (webui_vod_reroute_total{reason}).
@@ -57,6 +65,8 @@ const (
 	vodRerouteAC3      = "ac3"            // AC-3, and the declaration has no ac3
 	vodRerouteNoDecode = "no_decoder"     // DTS: no browser decodes it
 	vodRerouteUnserved = "unserved_audio" // audio nginx-vod serves none of: silence on nginx-vod
+	vodRerouteHEVC     = "hevc"           // HEVC the declaration does not cover
+	vodRerouteFallback = "fallback"       // a restart after the browser failed the file
 )
 
 // vodVideoCodecs are the video codecs nginx-vod's HLS serves (ffprobe names).
@@ -73,14 +83,34 @@ var vodAudioCodecs = map[string]bool{"aac": true, "mp3": true, "ac3": true, "eac
 // nginx-vod, must go to the transcoder for the browser that declared decl,
 // or "" where nginx-vod plays it.
 func vodReroute(mp *api.MediaProbe, decl models.DecodeRequest) string {
+	// A restart after the browser failed the file, with or without a probe.
+	if decl.FallbackReason != "" {
+		return vodRerouteFallback
+	}
 	if mp == nil {
 		return ""
 	}
+	// The video is held only to a declaration that answered: without one
+	// ("" or "unknown": the check had not answered, ?passthrough=off, the
+	// page's memory of a failed passthrough) nginx-vod stays, and the
+	// player gives it up if the browser refuses it (vod-guard.js) -- a 4K
+	// HEVC a first visitor's browser plays would get the transcoder's
+	// refusal instead. A declaration of audio tokens only is an answer: no
+	// HEVC.
+	answered := decl.Decode != "" && decl.Decode != models.DecodeUnknown
 	// MPEG-TS unless the first video nginx-vod serves is not H.264.
 	ts := true
 	for _, st := range mp.Streams {
 		if st.CodecType == "video" && vodVideoCodecs[st.CodecName] {
 			ts = st.CodecName == "h264"
+			if st.CodecName == "hevc" && answered {
+				if !decl.Declares("hevc8") {
+					return vodRerouteHEVC
+				}
+				if (st.Height > 1080 || st.Width > 1920) && !decl.Declares("hevc8-2160") {
+					return vodRerouteHEVC
+				}
+			}
 			break
 		}
 	}

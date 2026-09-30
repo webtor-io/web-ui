@@ -7269,3 +7269,137 @@ test('a fragment loop on a 4K passthrough: the event only -- the old route refus
     assert.equal(p.events.find((e) => e.name === 'hevc-fallback'), undefined);
     assert.equal(rec.got.length, 0, 'no restart');
 });
+
+// ---- nginx-vod's stream refused by the browser (vod-guard.js) -----------------
+//
+// An MP4 nginx-vod serves as it is (~vod/) whose codecs the browser cannot add:
+// hls.js raises a fatal bufferAddCodecError, which the old route's handling
+// used to recover every ~110 ms for ever (2026-09-30). The player gives it up
+// once -- the page's start form again with vod_codecs -- and recovers nothing.
+
+const vodSource = (page) => {
+    const src = document.createElement('source');
+    src.setAttribute('src', 'https://api.test/x/movie.mp4~vod/hls/54e2/index.m3u8?token=T');
+    src.setAttribute('type', 'application/vnd.apple.mpegurl');
+    page.video.appendChild(src);
+    page.video.setAttribute('controls', '');
+    page.video.setAttribute('data-item-id', 'item1');
+};
+const codecRefusal = () => ({
+    type: Hls.ErrorTypes.MEDIA_ERROR,
+    details: Hls.ErrorDetails.BUFFER_ADD_CODEC_ERROR,
+    fatal: true,
+    error: new Error("Failed to execute 'addSourceBuffer' on 'MediaSource': The type provided ('video/mp4;codecs=ec-3,hev1.2.4.H150.B0') is unsupported."),
+    sourceBufferName: 'audiovideo',
+    mimeType: 'video/mp4;codecs=ec-3,hev1.2.4.H150.B0',
+});
+// raise: an error through hls.js's own listeners first, as it raises one; one
+// of theirs throwing would end the event before the player's.
+const raise = (hls, data) => {
+    const internal = [];
+    const onError = (e, d) => { if (d.details === Hls.ErrorDetails.INTERNAL_EXCEPTION) internal.push(d.error); };
+    hls.on(Hls.Events.ERROR, onError);
+    hls.trigger(Hls.Events.ERROR, data);
+    hls.off(Hls.Events.ERROR, onError);
+    assert.deepEqual(internal, [], 'fixture: hls.js took the error');
+};
+
+test('nginx-vod\'s stream refused: one restart with vod_codecs, no recovery, nothing after', async (t) => {
+    withHlsJs(t);
+    freshDecodeMemory();
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        vodSource(page);
+        pageStartForm(page);
+    });
+    const hls = window.hlsPlayer;
+    assert.ok(hls instanceof Hls, 'the player runs hls.js');
+    let recovered = 0;
+    hls.recoverMediaError = () => { recovered++; };
+    for (let i = 0; i < 5; i++) raise(hls, codecRefusal());
+    await settle();
+    assert.equal(recovered, 0, 'recoverMediaError never');
+    assert.equal(rec.got.length, 1, 'one restart');
+    assert.equal(rec.got[0]['decode-fallback'], 'vod_codecs');
+    assert.equal(rec.got[0]['decode-class'], 'vod');
+    assert.deepEqual(p.events.filter((e) => e.name === 'vod-fallback').map((e) => e.data),
+        [{ reason: 'vod_codecs', mime: 'video/mp4;codecs=ec-3,hev1.2.4.H150.B0' }]);
+    assert.equal(p.events.find((e) => e.name === 'hevc-fallback'), undefined, 'not a passthrough fallback');
+    // Nothing restarts it again: the guard takes every fatal error after it
+    // gave up, so none reaches the stream restart (nor a non-fatal one).
+    hls.trigger(Hls.Events.ERROR, deadFragment());
+    hls.trigger(Hls.Events.ERROR, { ...deadFragment(), fatal: false });
+    await settle();
+    assert.equal(rec.got.length, 1, 'no second start');
+    assert.deepEqual(p.events.filter((e) => e.name.startsWith('player-recover')), []);
+});
+
+// The old route off nginx-vod is what it was: a fatal media error is recovered.
+test('a transcoder session\'s fatal media error: recovered as before, no vod restart', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    const hls = window.hlsPlayer;
+    let recovered = 0;
+    hls.recoverMediaError = () => { recovered++; };
+    raise(hls, codecRefusal());
+    await settle();
+    assert.equal(rec.got.filter((g) => g['decode-fallback'] === 'vod_codecs').length, 0);
+    assert.ok(recovered >= 1, 'hls-manager recovers it');
+});
+
+// The old route no longer recovers a fatal media error for ever
+// (media-recovery.js): recovered, recovered with the audio codec swapped,
+// then the card -- the one message, whose button restarts the stream.
+test('fatal media errors in a row on the old route: recovered, swapped, then the card', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        pageStartForm(page, 'item');
+    });
+    const hls = window.hlsPlayer;
+    let recovered = 0;
+    let swaps = 0;
+    hls.recoverMediaError = () => { recovered++; };
+    hls.swapAudioCodec = () => { swaps++; };
+    const appendFailed = { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.BUFFER_APPEND_ERROR, fatal: true, error: new Error('append') };
+    for (let i = 0; i < 6; i++) raise(hls, appendFailed);
+    await settle();
+    assert.deepEqual([recovered, swaps], [2, 1], 'twice, the second with the audio codec swapped; never again');
+    assert.ok(p.container.querySelector('.wt-recover'), 'the card');
+    assert.deepEqual(p.events.filter((e) => e.name === 'player-recover-card-shown').map((e) => e.data.reason), ['media']);
+    assert.equal(rec.got.length, 0, 'no restart until the viewer asks');
+});
+
+// While the restart the vod guard began is on its way (a job, a new session:
+// tens of seconds), the player it leaves is not a dead one (handled()).
+test('an nginx-vod stream the guard gave up on is not a dead player', async (t) => {
+    withHlsJs(t);
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        vodSource(page);
+        pageStartForm(page);
+    });
+    const hls = window.hlsPlayer;
+    hls.recoverMediaError = () => {};
+    p.video.paused = false;
+    mockClock(t, () => {
+        p.video.dispatchEvent(new dom.window.Event('play'));
+        raise(hls, codecRefusal());
+        assert.equal(rec.got.length, 1, 'fixture: the restart to the transcoder');
+        tickBy(t, 60000);
+    });
+    assert.equal(p.events.find((e) => e.name === 'player-dead'), undefined);
+});

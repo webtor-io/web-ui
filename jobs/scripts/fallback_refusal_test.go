@@ -42,6 +42,9 @@ func TestBufferSessionHLSMarksAFallbackRefusal(t *testing.T) {
 		{models.DecodeRequest{}, false, "error.resolution_not_supported"},
 		{models.DecodeRequest{Decode: "hevc8,hevc10,aac51", FallbackReason: "decode_error", FallbackClass: "dolby"}, false, "error.resolution_not_supported"},
 		{models.DecodeRequest{FallbackReason: "media_error", FallbackClass: "aac51"}, false, "error.resolution_not_supported"},
+		// After nginx-vod's stream was refused the file need not be HEVC: the
+		// route's own word, not "this browser could not show this 4K HEVC".
+		{models.DecodeRequest{Decode: "hevc8,hevc10,aac51", FallbackReason: "vod_codecs", FallbackClass: "unknown"}, false, "error.resolution_not_supported"},
 	} {
 		j := job.New(context.Background(), "t", "test", nil, &job.NilStorage{}, false, nil)
 		_, err := s.bufferSessionHLS(context.Background(), j, srv.URL+"/abc/f.mkv~hls/index.m3u8", time.Second, c.decl)

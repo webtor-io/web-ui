@@ -303,7 +303,10 @@ func (s *ActionScript) bufferSessionHLS(ctx context.Context, j *job.Job, streamU
 	session, err := s.api.CreateTranscoderSession(bufferCtx, baseURL, decl.Decode)
 	if err != nil {
 		var tr *api.TranscoderRefusal
-		if errors.As(err, &tr) && decl.FallbackReason != "" && !decl.IsAudioFallback() {
+		// A refusal after a passthrough failed reads "this browser could
+		// not show this 4K HEVC video". Not after nginx-vod's stream was
+		// refused (vod_codecs): that file need not be HEVC at all.
+		if errors.As(err, &tr) && decl.FallbackReason != "" && !decl.IsAudioFallback() && decl.FallbackReason != "vod_codecs" {
 			tr.Fallback = true
 		}
 		return nil, errors.Wrap(err, "failed to create transcoder session")

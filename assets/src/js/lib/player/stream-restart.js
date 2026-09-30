@@ -46,7 +46,7 @@
 // no automatic restart happens at all: an unrecorded restart is no limit.
 
 import { loadDocument, postEmbedStart } from './passthrough.js';
-import { applyDeclaration } from './decode-declaration.js';
+import { applyDeclaration, vodRescueFor, VOD_FALLBACK_REASON, VOD_FALLBACK_CLASS } from './decode-declaration.js';
 
 export const AUTO_RESTART_EVERY_MS = 5 * 60 * 1000;
 export const BUDGET_KEY = 'wt-stream-restarts';
@@ -225,7 +225,12 @@ export function restartStream({ win = window, doc = document, video, root = null
         // Nothing to carry: an embed's start never answers the modal (its
         // job is started with forceSlow false, jobs/scripts/embed.go, and
         // its POST reads no force-slow).
-        postEmbedStart(win, doc, [['decode', d.decode || null], ['purge', 'true']]);
+        // A file rescued from nginx-vod's refused stream stays rescued
+        // (decode-declaration.js markVodRescue): the site's form gets it from
+        // applyDeclaration, the embed's POST here.
+        const vod = vodRescueFor(win, { resourceId: d.resourceId || '', itemId: d.itemId || '' })
+            ? [['decode-fallback', VOD_FALLBACK_REASON], ['decode-class', VOD_FALLBACK_CLASS]] : [];
+        postEmbedStart(win, doc, [['decode', d.decode || null], ['purge', 'true'], ...vod]);
         return 'embed';
     }
     const form = startFormOf(video, root, doc);
@@ -281,6 +286,9 @@ export function clearPurgeMarks(doc = document) {
 //     'limit';
 //   - giveUp(status): the card, reason 'network' (another 4xx, or the
 //     backoff ran out);
+//   - mediaGiveUp(): the card, reason 'media' (the old route recovered a
+//     fatal media error twice within the window and gave it up,
+//     media-recovery.js);
 //   - click(): the card's button -- the restart at the viewer's place,
 //     playing, counted in the budget too;
 //   - seeking(): a seek of the viewer's has begun (Player.jsx handleSeek);
@@ -429,6 +437,14 @@ export function createRecoveryPolicy({
             if (disposed || restarting) return;
             if (isBlocked() || leaving()) return;
             openCard('network', status);
+        },
+        // The old route gave a fatal media error up (media-recovery.js):
+        // the same card, reason 'media' -- its button restarts the stream at
+        // the viewer's place.
+        mediaGiveUp() {
+            if (disposed || restarting) return;
+            if (isBlocked() || leaving()) return;
+            openCard('media', 0);
         },
         graceAnswered() {
             if (disposed || !pending) return;

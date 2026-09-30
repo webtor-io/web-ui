@@ -10,6 +10,7 @@ import { passthroughHlsConfig } from './passthrough.js';
 import { iosPlaysHlsJs } from './decode-declaration.js';
 import { createNetworkRecovery } from './network-recovery.js';
 import { createFragmentLoopWatch } from './fragment-loop.js';
+import { createMediaRecovery } from './media-recovery.js';
 
 // Exported for the tests (network-recovery.hls.test.js): the retry policy a
 // real instance runs with.
@@ -90,14 +91,16 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
 // Exported for the tests (loader-restart.test.js), with the loader restart's
 // options: the error handling every instance goes through. guard is a
 // passthrough stream's (passthrough.js createPassthroughGuard) or a
-// multichannel-audio start's (createAudioGuard): what it handles -- a codec
-// string the browser refused, a media error -- goes no further; everything
-// else, network errors included, is handled as on every route. It is also
-// told which audio hls.js buffers (BUFFER_CODECS) -- a listener no stream
-// without a guard gets. recoveryOpts go to the network errors' handler
+// multichannel-audio start's (createAudioGuard), or an nginx-vod stream's
+// (vod-guard.js, before the audio guard): what it handles -- a codec string
+// the browser refused, a media error -- goes no further; everything else,
+// network errors included, is handled as on every route. It is also told
+// which audio hls.js buffers (BUFFER_CODECS) -- a listener no stream without
+// a guard gets. recoveryOpts go to the network errors' handler
 // (network-recovery.js createNetworkRecovery: the player's onSessionGone,
-// onGiveUp and onFilmLoaded, and the timers for the tests); the returned
-// loader restart carries it as `.network`.
+// onGiveUp and onFilmLoaded, and the timers for the tests) and to the media
+// errors' (media-recovery.js: onMediaGiveUp, now); the returned loader
+// restart carries them as `.network` and `.media`.
 export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}, loopOpts = null) {
     hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         if (hls.levels.length > 1) {
@@ -115,6 +118,7 @@ export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}
     // Declared before the listeners below, registered after them (its own
     // FRAG_LOADED / MANIFEST_LOADING / DESTROYING come last).
     let network = null;
+    let media = null;
     hls.on(Hls.Events.ERROR, (event, data) => {
         if (guard && guard.onHlsError(hls, data)) return;
         if (data.fatal) {
@@ -126,7 +130,10 @@ export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}
                     network.handle(data);
                     break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                    hls.recoverMediaError();
+                    // Recovered, then with the audio codec swapped, then
+                    // given up to the player's card (media-recovery.js) --
+                    // never for ever.
+                    media.handle(data);
                     break;
                 default:
                     hls.destroy();
@@ -148,7 +155,12 @@ export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}
     // (loader-restart.js).
     const restart = createLoaderRestart(hls, Hls, restartOpts);
     network = createNetworkRecovery(hls, Hls, recoveryOpts);
+    media = createMediaRecovery(hls, { now: recoveryOpts.now, onGiveUp: recoveryOpts.onMediaGiveUp });
+    // A new source on this instance (a session seek, a restart) starts the
+    // media errors' ladder again.
+    hls.on(Hls.Events.MANIFEST_LOADING, () => media.reset());
     restart.network = network;
+    restart.media = media;
     // The same fragment loaded again and again (fragment-loop.js): nothing
     // errors, so neither the guard nor the recovery above sees it. loopOpts
     // is the player's ({ onLoop }); without it, no watch.

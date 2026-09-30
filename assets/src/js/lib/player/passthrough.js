@@ -12,6 +12,7 @@
 
 import {
     rememberFallback, setPendingFallback, applyDeclaration, declarationFor, declaresAudio, isAudioClass, STRUCK_BY_CLASS,
+    VOD_FALLBACK_CLASS, VOD_FALLBACK_REASON, markVodRescue,
 } from './decode-declaration.js';
 
 // Why a passthrough was given up -- the same closed set the server accepts
@@ -764,7 +765,7 @@ function restartEmbed(win, doc, reason, cls, decode = null) {
 function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate }) {
     if (win._embedSettings) {
         let decode = null;
-        if (isAudioClass(cls)) {
+        if (isAudioClass(cls) || cls === VOD_FALLBACK_CLASS) {
             try { decode = declarationFor(win, { resourceId, itemId }); } catch (e) { decode = null; }
         }
         restartEmbed(win, doc, reason, cls, decode);
@@ -820,6 +821,32 @@ export function fallbackToOldRoute({ video, reason, path = 'mse', win = window, 
     } catch (e) { /* no memory: the restart still goes without a declaration */ }
     try { track('hevc-fallback', { reason, cls, path, audio: startAudioClass(video) }); } catch (e) { /* no telemetry */ }
     return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate });
+}
+
+// VOD_REASON: why a stream nginx-vod served was given up (vod-guard.js) --
+// its own reason, not codecs_rejected, whose count alerts as a build fault of
+// the passthrough (models.ParseFallbackReason accepts it).
+export const VOD_REASON = VOD_FALLBACK_REASON;
+
+// fallbackToTranscoder restarts a file whose nginx-vod stream this browser
+// refused (vod-guard.js), visibly, from the start, as the passthrough's
+// fallback does (restartFile) -- with decode-fallback=vod_codecs, which the
+// server sends to the transcoder (jobs/scripts/vod_route.go), and the whole
+// declaration (class VOD_FALLBACK_CLASS): the refusal may be the audio's,
+// and a video the browser decodes keeps its passthrough. No memory: the
+// server's rules send the next start of the same file to the transcoder
+// where they can tell, and nothing is struck. Umami vod-fallback {reason,
+// mime} -- not hevc-fallback, whose count is the passthrough's.
+export function fallbackToTranscoder({ video, mime = '', win = window, doc = document,
+    track = (name, data) => { if (win.umami) win.umami.track(name, data); },
+    navigate = (u) => loadDocument(win.location, u) }) {
+    const d = video.dataset || {};
+    const file = { resourceId: d.resourceId || '', itemId: d.itemId || '' };
+    try { track('vod-fallback', { reason: VOD_REASON, mime }); } catch (e) { /* no telemetry */ }
+    // Every later start of this file on the page carries vod_codecs too
+    // (decode-declaration.js markVodRescue).
+    try { markVodRescue(win, file); } catch (e) { /* the restart still goes */ }
+    return restartFile({ win, doc, d, ...file, reason: VOD_REASON, cls: VOD_FALLBACK_CLASS, navigate });
 }
 
 // The audio failures that strike their class: the decoder's (MediaError 3)

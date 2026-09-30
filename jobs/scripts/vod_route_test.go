@@ -3,12 +3,15 @@ package scripts
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	ra "github.com/webtor-io/rest-api/services"
 
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
@@ -17,13 +20,22 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-// probeOf is a media probe with streams "type:codec", in order.
+// probeOf is a media probe with streams "type:codec" or
+// "type:codec:WxH", in order.
 func probeOf(t *testing.T, streams ...string) *api.MediaProbe {
 	t.Helper()
-	var ss []map[string]string
+	var ss []map[string]any
 	for _, s := range streams {
-		typ, codec, _ := strings.Cut(s, ":")
-		ss = append(ss, map[string]string{"codec_type": typ, "codec_name": codec})
+		parts := strings.Split(s, ":")
+		st := map[string]any{"codec_type": parts[0], "codec_name": parts[1]}
+		if len(parts) > 2 {
+			var w, h int
+			if _, err := fmt.Sscanf(parts[2], "%dx%d", &w, &h); err != nil {
+				t.Fatal(err)
+			}
+			st["width"], st["height"] = w, h
+		}
+		ss = append(ss, st)
 	}
 	b, _ := json.Marshal(map[string]any{"streams": ss})
 	var mp api.MediaProbe
@@ -51,14 +63,25 @@ func TestVODReroute(t *testing.T) {
 		{"HEVC + E-AC-3, no ec3", []string{"video:hevc", "audio:eac3", "audio:eac3", "video:mjpeg"}, chrome, vodRerouteEAC3},
 		{"HEVC + E-AC-3, ec3 declared", []string{"video:hevc", "audio:eac3"}, dolby, ""},
 		// Without the token, whatever the reason, a browser that cannot.
-		{"HEVC + E-AC-3, nothing declared", []string{"video:hevc", "audio:eac3"}, none, vodRerouteEAC3},
-		{"HEVC + E-AC-3, unknown", []string{"video:hevc", "audio:eac3"}, start{models.DecodeUnknown, "", ""}, vodRerouteEAC3},
+		{"H.264 + AC-3, nothing declared", []string{"video:h264", "audio:ac3"}, none, vodRerouteAC3},
 		{"HEVC + E-AC-3, video tokens only", []string{"video:hevc", "audio:eac3"}, start{"hevc8,hevc10,hevc8-2160,hevc10-2160,hdr-pq", "", ""}, vodRerouteEAC3},
-		// A restart after a failed passthrough sends no declaration: it must
-		// not land back on nginx-vod's dead player.
-		{"restart after a passthrough failure", []string{"video:hevc", "audio:eac3"}, start{"", "decode_error", "hevc10"}, vodRerouteEAC3},
-		{"restart in compatibility mode", []string{"video:hevc", "audio:eac3"}, start{"", "user", "hevc10-2160"}, vodRerouteEAC3},
-		{"restart after an aac51 failure", []string{"video:h264", "audio:ac3"}, start{"", "media_error", "aac51"}, vodRerouteAC3},
+		// A restart after the browser failed the file -- whichever reason --
+		// goes to the transcoder: never back on nginx-vod's dead player.
+		{"restart after a passthrough failure", []string{"video:hevc", "audio:eac3"}, start{"", "decode_error", "hevc10"}, vodRerouteFallback},
+		{"restart in compatibility mode", []string{"video:hevc", "audio:eac3"}, start{"", "user", "hevc10-2160"}, vodRerouteFallback},
+		{"restart after an aac51 failure", []string{"video:h264", "audio:ac3"}, start{"", "media_error", "aac51"}, vodRerouteFallback},
+		{"restart after nginx-vod's stream was refused", []string{"video:h264", "audio:aac"}, start{chromeDecl, "vod_codecs", "vod"}, vodRerouteFallback},
+		// HEVC is held to a declaration that answered: hevc8 at all,
+		// hevc8-2160 over 1080. One that did not answer keeps nginx-vod (the
+		// player gives it up if the browser refuses it).
+		{"HEVC 2160 + AAC, nothing declared", []string{"video:hevc:3840x2160", "audio:aac"}, none, ""},
+		{"HEVC 2160 + AAC, unknown", []string{"video:hevc:3840x2160", "audio:aac"}, start{models.DecodeUnknown, "", ""}, ""},
+		{"HEVC + AAC, audio tokens only (answered: no HEVC)", []string{"video:hevc", "audio:aac"}, start{"aac51,ac3,ec3", "", ""}, vodRerouteHEVC},
+		{"HEVC 1080 + AAC, hevc8 only", []string{"video:hevc:1920x1080", "audio:aac"}, start{"hevc8", "", ""}, ""},
+		{"HEVC 2160 + AAC, hevc8 only", []string{"video:hevc:3840x2160", "audio:aac"}, start{"hevc8,hevc10", "", ""}, vodRerouteHEVC},
+		{"HEVC 1920x800 wide scope + AAC, hevc8 only", []string{"video:hevc:1920x800", "audio:aac"}, start{"hevc8", "", ""}, ""},
+		{"HEVC 2048x858 + AAC, hevc8 only", []string{"video:hevc:2048x858", "audio:aac"}, start{"hevc8", "", ""}, vodRerouteHEVC},
+		{"HEVC 2160 + AAC, 2160 declared", []string{"video:hevc:3840x2160", "audio:aac"}, chrome, ""},
 		// H.264 is MPEG-TS: E-AC-3 plays in no hls.js, whatever is declared.
 		{"H.264 + E-AC-3, ec3 declared", []string{"video:h264", "audio:eac3"}, dolby, vodRerouteEAC3TS},
 		{"audio only + E-AC-3 (MPEG-TS)", []string{"audio:eac3"}, dolby, vodRerouteEAC3TS},
@@ -76,14 +99,13 @@ func TestVODReroute(t *testing.T) {
 		{"AAC first, E-AC-3 second, no ec3", []string{"video:hevc", "audio:aac", "audio:eac3"}, chrome, ""},
 		{"E-AC-3 first, AAC second, no ec3", []string{"video:hevc", "audio:eac3", "audio:aac"}, chrome, vodRerouteEAC3},
 		{"Opus first (skipped), then E-AC-3", []string{"video:hevc", "audio:opus", "audio:eac3"}, chrome, vodRerouteEAC3},
-		{"TrueHD first (skipped), then AAC", []string{"video:hevc", "audio:truehd", "audio:aac"}, none, ""},
+		{"TrueHD first (skipped), then AAC", []string{"video:hevc", "audio:truehd", "audio:aac"}, chrome, ""},
 		{"PCM first (skipped), then AC-3", []string{"video:h264", "audio:pcm_s16le", "audio:ac3"}, chrome, vodRerouteAC3},
 		// Audio nginx-vod serves none of: silence there.
 		{"Opus only", []string{"video:h264", "audio:opus"}, dolby, vodRerouteUnserved},
-		{"TrueHD only", []string{"video:hevc", "audio:truehd"}, none, vodRerouteUnserved},
+		{"TrueHD only", []string{"video:hevc", "audio:truehd"}, chrome, vodRerouteUnserved},
 		// What plays stays.
 		{"H.264 + AAC", []string{"video:h264", "audio:aac"}, chrome, ""},
-		{"HEVC + AAC, nothing declared", []string{"video:hevc", "audio:aac"}, none, ""},
 		{"H.264 + MP3", []string{"video:h264", "audio:mp3"}, none, ""},
 		{"no audio at all", []string{"video:h264", "subtitle:mov_text"}, none, ""},
 	} {
@@ -96,6 +118,11 @@ func TestVODReroute(t *testing.T) {
 	}
 	if got := vodReroute(nil, models.ParseDecodeRequest(chromeDecl, "", "")); got != "" {
 		t.Errorf("no probe: %q, want \"\"", got)
+	}
+	// A restart after the browser refused nginx-vod's stream goes to the
+	// transcoder with no probe too: it must not land back on nginx-vod.
+	if got := vodReroute(nil, models.ParseDecodeRequest(chromeDecl, "vod_codecs", "vod")); got != vodRerouteFallback {
+		t.Errorf("a restart with no probe: %q, want %q", got, vodRerouteFallback)
 	}
 }
 
@@ -146,5 +173,22 @@ func TestRerouteOpensATranscoderSession(t *testing.T) {
 	_, _ = s.bufferSessionHLS(context.Background(), j, u, time.Second, models.ParseDecodeRequest(chromeDecl, "", ""))
 	if !strings.HasPrefix(asked, "/abc/f.mp4~hls/session?") || !strings.Contains(asked, "decode=") {
 		t.Errorf("session asked at %q, want /abc/f.mp4~hls/session with the declaration", asked)
+	}
+}
+
+// The player gives an nginx-vod stream up to a restart (vod-guard.js) and
+// needs the file's item id for it: data-item-id is on every ~vod stream.
+func TestPlayerRestartsOffVOD(t *testing.T) {
+	tag := func(src string) *StreamContent {
+		return &StreamContent{ExportTag: &ra.ExportTag{Sources: []ra.ExportSource{{Src: src}}}}
+	}
+	if !tag("https://x.test/h/a.mp4~vod/hls/54e2/index.m3u8?token=T").PlayerRestarts() {
+		t.Error("an nginx-vod stream: no restart")
+	}
+	if tag("https://x.test/h/a.mp3").PlayerRestarts() {
+		t.Error("a file served as it is: restarts")
+	}
+	if (&StreamContent{}).PlayerRestarts() {
+		t.Error("no export tag: restarts")
 	}
 }

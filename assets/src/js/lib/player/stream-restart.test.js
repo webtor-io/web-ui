@@ -639,3 +639,40 @@ test('policy: engaged -- a restart gone, a card up or waiting, a restart waiting
     c.p.resumed();
     assert.equal(c.p.engaged, false);
 });
+
+// The old route gave a fatal media error up (media-recovery.js): the same
+// card, reason 'media' -- and not where a guard or player-dead owns the
+// player (blocked), or the page is leaving.
+test('policy: a media error given up -> the card, reason media; not when blocked or leaving', () => {
+    const x = policy({ storage: page().sessionStorage });
+    x.p.mediaGiveUp();
+    x.p.mediaGiveUp();
+    assert.deepEqual(x.cards, [{ reason: 'media', status: 0 }]);
+    assert.equal(x.stops(), 1, 'loading stopped under the card');
+    assert.deepEqual(x.events, [{ name: 'player-recover-card-shown', data: { reason: 'media', status: 0 } }]);
+    for (const opts of [{ block: { on: true } }, { leaving: { on: true } }]) {
+        const y = policy({ storage: page().sessionStorage, ...opts });
+        y.p.mediaGiveUp();
+        assert.deepEqual(y.cards, [], JSON.stringify(opts));
+    }
+});
+
+// A file rescued from nginx-vod's refused stream (fallbackToTranscoder) stays
+// rescued: the embed's restart carries vod_codecs, or it would land back on
+// nginx-vod. Another file's restart does not.
+test('restart in an embed of a file rescued from nginx-vod: vod_codecs again', async () => {
+    const { markVodRescue } = await import('./decode-declaration.js');
+    const win = page({ url: 'https://webtor.io/embed?id=e1' });
+    win._embedSettings = { magnet: 'x' };
+    const posted = [];
+    win.HTMLFormElement.prototype.submit = function () { posted.push(Object.fromEntries(new win.FormData(this))); };
+    markVodRescue(win, { resourceId: 'res1', itemId: 'item1' });
+    const p = player(win, { decode: 'hevc8,aac51', onElement: true });
+    restartStream({ win, doc: win.document, video: p.v, root: p.root });
+    assert.equal(posted[0]['decode-fallback'], 'vod_codecs');
+    assert.equal(posted[0]['decode-class'], 'vod');
+    assert.equal(posted[0].decode, 'hevc8,aac51');
+    const q = player(win, { iid: 'item2', onElement: true });
+    restartStream({ win, doc: win.document, video: q.v, root: q.root });
+    assert.equal(posted[1]['decode-fallback'], undefined, 'another file');
+});

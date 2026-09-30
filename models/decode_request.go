@@ -119,6 +119,7 @@ var fallbackReasons = map[string]bool{
 	"no_frames":       true, // time moved, no picture
 	"user":            true, // the viewer chose the compatible mode
 	"fragment_loop":   true, // the same fragment loaded again and again (web-ui fragment-loop.js)
+	"vod_codecs":      true, // nginx-vod's stream refused by the browser (web-ui vod-guard.js)
 }
 
 // ParseFallbackReason is the "decode-fallback" field of a restart, or "".

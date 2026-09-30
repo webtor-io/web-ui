@@ -160,9 +160,25 @@ func (sc *StreamContent) Passthrough() bool {
 // PlayerRestarts: the player may give this file up to a restart of its own
 // -- a passthrough, or a start that declared multichannel audio on any
 // route (lib/player/passthrough.js) -- and needs the file's item id for it
-// (data-item-id). A start that declared nothing never restarts itself.
+// (data-item-id). A start that declared nothing restarts itself only off
+// nginx-vod.
 func (sc *StreamContent) PlayerRestarts() bool {
-	return sc.Passthrough() || (sc.VideoStreamUserData != nil && sc.VideoStreamUserData.DeclaresAudio())
+	return sc.Passthrough() || (sc.VideoStreamUserData != nil && sc.VideoStreamUserData.DeclaresAudio()) || sc.vodStream()
+}
+
+// vodStream: the player's source is nginx-vod's (rest-api's ~vod URL), which
+// the player gives up to a restart where the browser refuses its codecs
+// (lib/player/vod-guard.js).
+func (sc *StreamContent) vodStream() bool {
+	if sc.ExportTag == nil {
+		return false
+	}
+	for _, src := range sc.ExportTag.Sources {
+		if strings.Contains(src.Src, "~vod/") {
+			return true
+		}
+	}
+	return false
 }
 
 const (
@@ -794,25 +810,33 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			}
 		}
 	}
-	if probeErr != nil {
-		if seMeta.Transcode {
-			return errors.Wrap(probeErr, "failed to get probe data")
+	if probeErr != nil && seMeta.Transcode {
+		return errors.Wrap(probeErr, "failed to get probe data")
+	}
+	// An MP4 nginx-vod would serve and the browser cannot play goes to the
+	// transcoder (vod_route.go) -- decided without a probe too: a restart
+	// after the browser refused nginx-vod's stream must not land back on it
+	// because the probe failed (the transcoder probes for itself).
+	if !transcode && vsud != nil && exportResponse.Source.MediaFormat == ra.Video {
+		var probed *api.MediaProbe
+		if probeErr == nil {
+			probed = mp
 		}
+		if why := vodReroute(probed, vsud.DecodeRequest); why != "" {
+			if u, uerr := transcodeURLFromVOD(streamURL); uerr == nil {
+				transcode, streamURL = true, u
+				metrics.VODReroute(why)
+				log.WithFields(log.Fields{"reason": why, "decode": vsud.DecodeRequest.Decode}).Info("stream: MP4 sent to the transcoder instead of nginx-vod")
+			} else {
+				log.WithError(uerr).WithField("reason", why).Warn("stream: MP4 kept on nginx-vod, no transcoder URL for it")
+			}
+		}
+	}
+	if probeErr != nil {
 		log.WithError(probeErr).Warn("failed to get content probe")
 	} else {
 		sc.MediaProbe = mp
 		sc.CreditsAt = creditsFromChapters(mp)
-		if !transcode && vsud != nil && exportResponse.Source.MediaFormat == ra.Video {
-			if why := vodReroute(mp, vsud.DecodeRequest); why != "" {
-				if u, uerr := transcodeURLFromVOD(streamURL); uerr == nil {
-					transcode, streamURL = true, u
-					metrics.VODReroute(why)
-					log.WithFields(log.Fields{"reason": why, "decode": vsud.DecodeRequest.Decode}).Info("stream: MP4 sent to the transcoder instead of nginx-vod")
-				} else {
-					log.WithError(uerr).WithField("reason", why).Warn("stream: MP4 kept on nginx-vod, no transcoder URL for it")
-				}
-			}
-		}
 		s.setStatusMarks(sc, c, mp, transcode)
 		log.Infof("got media probe %+v", mp)
 	}

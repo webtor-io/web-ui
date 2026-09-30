@@ -123,6 +123,24 @@ export const AUDIO_DROP_BY_CLASS = {
 };
 const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
 export const isAudioClass = (cls) => own(AUDIO_STRUCK_BY_CLASS, cls);
+
+// VOD_FALLBACK_CLASS is the class of a restart after nginx-vod's stream was
+// refused (vod-guard.js): nothing is charged to a decoder -- the codecs were
+// the source's, not a route's -- so the restart declares all it would have,
+// and the transcoder passes through or encodes by it.
+export const VOD_FALLBACK_CLASS = 'vod';
+// VOD_FALLBACK_REASON: its decode-fallback (models.ParseFallbackReason).
+export const VOD_FALLBACK_REASON = 'vod_codecs';
+
+// markVodRescue / vodRescueFor: a file this page restarted to the transcoder
+// after nginx-vod's stream was refused (passthrough.js fallbackToTranscoder).
+// Every later start of it on this page -- the stream restart after its
+// session died, the card's button -- carries decode-fallback=vod_codecs
+// again (applyDeclaration; stream-restart.js for an embed): the server's
+// rules could not tell the file apart the first time, and without it the
+// restart would land back on nginx-vod's refused stream. For the page's
+// life, not stored: a new page gives nginx-vod one more try, and the player
+// gives it up again.
 // The tokens a strike against cls takes out, null for no class.
 const struckBy = (cls) => (own(STRUCK_BY_CLASS, cls) ? STRUCK_BY_CLASS[cls]
     : own(AUDIO_STRUCK_BY_CLASS, cls) ? AUDIO_STRUCK_BY_CLASS[cls] : null);
@@ -529,7 +547,7 @@ export function declarationFor(win, { resourceId, itemId } = {}, now = Date.now(
     const m = loadMemory(win, now);
     const src = sourceKey(resourceId, itemId);
     const pending = src ? pendingFor(win, src, now) : null;
-    if (src && (m.sources[src] || (pending && !isAudioClass(pending.cls)))) return null;
+    if (src && (m.sources[src] || (pending && !isAudioClass(pending.cls) && pending.cls !== VOD_FALLBACK_CLASS))) return null;
     const video = videoTokens(win, now);
     if (video === null) return UNKNOWN;
     const leftOut = new Set(struckTokens(m));
@@ -624,8 +642,23 @@ export function applyDeclaration(form, win, now = Date.now()) {
     const file = { resourceId: fieldValue(form, 'resource-id'), itemId: fieldValue(form, 'item-id') };
     setHidden(form, 'decode', declarationFor(win, file, now));
     const p = pendingFallbackFor(win, file, now);
-    setHidden(form, 'decode-fallback', p ? p.reason : null);
-    setHidden(form, 'decode-class', p ? p.cls : null);
+    const vod = !p && vodRescueFor(win, file);
+    setHidden(form, 'decode-fallback', p ? p.reason : (vod ? VOD_FALLBACK_REASON : null));
+    setHidden(form, 'decode-class', p ? p.cls : (vod ? VOD_FALLBACK_CLASS : null));
+}
+
+export function markVodRescue(win, { resourceId, itemId } = {}) {
+    const src = sourceKey(resourceId, itemId);
+    if (!src) return;
+    const s = state(win);
+    if (!s.vodRescued) s.vodRescued = {};
+    s.vodRescued[src] = true;
+}
+
+export function vodRescueFor(win, { resourceId, itemId } = {}) {
+    const src = sourceKey(resourceId, itemId);
+    const s = state(win);
+    return !!(src && s.vodRescued && s.vodRescued[src]);
 }
 
 // installSubmitHook: a capture listener on the document that (re)writes the

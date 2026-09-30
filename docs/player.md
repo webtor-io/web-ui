@@ -575,7 +575,7 @@ fields from the copy — before, the next episode's start carried `purge=true` p
 `player-recover-restart {reason: 404|403, status, via: load|error-nonfatal|seek, loader?}` for every
 automatic restart (`via`: `load` a fatal hls.js error, `error-nonfatal` an answer hls.js would have asked
 again, `seek` a session seek's POST; `loader`: `video|audio|subtitle|master`, hls.js's only);
-`player-recover-card-shown {reason: limit|network, status, cause?, via?}` (`cause`: the 404/403 behind a
+`player-recover-card-shown {reason: limit|network|media, status, cause?, via?}` (`cause`: the 404/403 behind a
 `limit`, `via` as above; sent when the card shows, not when it starts waiting for the buffer);
 `player-recover-card-click {reason, status}`. Read `player-recover-restart` against `stream-start`; after
 a transcoder rollout expect a burst of `via: error-nonfatal` (the first answer of most dead sessions).
@@ -737,13 +737,14 @@ presses stop and is flushed on teardown):
 | `player-label-lock-shown` | the status box's props, `location: player`, `source: status\|grace-answer` | the buffering label's lock drawn, once per player (see "Buffering label") |
 | `donate-player-label-shown` | the same | the lock opened the plan card |
 | `stream-start` | + `rate`, `subtitleDelay`, `route`, `reason`, `decl`, `audio` | what the stream started with (remembered settings make no change event); the transcoder session's route and reason and the declaration it was started with (`data-video-route`, `data-route-reason`, `data-decode`; `''` where the element has none) — the base the HEVC passthrough is measured against; `audio` the start's audio class, `none\|aac51\|dolby` (`startAudioClass`: `data-audio-class` where `data-decode` has an audio token, else `none`; since 2026-09-29) — the base the audio is measured against |
+| `vod-fallback` | `reason: vod_codecs`, `mime` | a stream nginx-vod served whose codecs the browser refused (hls.js's `bufferAddCodecError`/`manifestIncompatibleCodecsError`, fatal), given up to the transcoder (`vod-guard.js`; see "An MP4 whose audio nginx-vod cannot hand the browser"); `mime` the type the browser refused — since 2026-10-01 |
 | `hevc-fallback` | `reason`, `cls`, `path: mse\|native`, `audio` | a passthrough given up to the old route (see "Passthrough: errors and fallback"); `audio` the start's audio class, as in `stream-start` (since 2026-09-29): a failure of a Dolby session that nothing pinned on the audio is counted here |
 | `audio-fallback` | `reason`, `cls: dolby\|aac51`, `path: mse\|native`, `route`, `audio`, `by` | a file restarted without the multichannel audio its declaration made, on any route (see "Multichannel audio and the fallback"); never counted in `hevc-fallback`. `cls` is the class charged, `audio` the start's (they differ where the master names Dolby and the rendition in play is AAC 5.1); `by` what blamed the audio: `buffer` (its SourceBuffer's own append failed), `codec` (its codec refused), `message` (the element's MediaError message), `native` (the old route's native-HLS rule, nothing named) — since 2026-09-29 |
 | `player-dead` | `why: quiet\|error\|recovering`, `path: hlsjs\|native\|direct\|blob\|none`, `hls: on\|off\|none`, `route`, `audio`, `err`, `rs`, `ns`, `inflight`, `got: none\|playlist\|frags`, `recoveries`, `waited_s` | asked to play and not started 30 s on: nothing moving, an element error held, or a recovery loop (see "A player that never starts"); once per player |
 | `fragment-loop` | `type: main\|audio`, `sn`, `level`, `loads`, `fallback`, `route`, `cls`, `audio` | the same fragment loaded 6 times within 60 s (see "A fragment loaded again and again"); once per hls.js instance; `fallback` whether it gave a passthrough up to the old route — since 2026-09-30 |
 | `player-revived` | `path`, `route`, `audio`, `waited_s` (since the play request), `recoveries` | it played after a `player-dead`: the rule's error, count it against `player-dead`. `audio` on both is the start's audio class, as in `stream-start` (since 2026-09-30) |
 | `player-recover-restart` | `reason: 404\|403`, `status`, `via: load\|error-nonfatal\|seek`, `loader: video\|audio\|subtitle\|master` (hls.js only) | the stream restarted by itself after its transcoder session (or token) was gone; `error-nonfatal`: an answer hls.js would have asked again (see "Network errors and the stream restart") |
-| `player-recover-card-shown` | `reason: limit\|network`, `status`, `cause` (404/403, for `limit`), `via` (for `limit`) | the card instead: the automatic restart spent within 5 min, another 4xx, or the backoff run out; sent when it shows (it waits while the film plays from its buffer) |
+| `player-recover-card-shown` | `reason: limit\|network\|media`, `status`, `cause` (404/403, for `limit`), `via` (for `limit`) | the card instead: the automatic restart spent within 5 min, another 4xx, or the backoff run out; sent when it shows (it waits while the film plays from its buffer) |
 | `player-recover-card-click` | `reason`, `status` | its "Continue watching" |
 
 Read them as shares of `stream-start` sessions; mobile share for `player-tap-seek`. The browser is the
@@ -1165,6 +1166,8 @@ What nginx-vod serves (nginx-vod-module `26f06877`, the one the image builds):
   fed to the AC-3 parser. E-AC-3 in TS plays nowhere.
 
 | `a1` (the first audio track nginx-vod counts) | goes to the transcoder | `webui_vod_reroute_total{reason}` |
+| — (any, a start with a fallback reason) | always | `fallback` |
+| — (the video: HEVC the declaration does not cover) | see below | `hevc` |
 |---|---|---|
 | E-AC-3, container MPEG-TS (H.264, or no video nginx-vod serves) | always | `eac3_ts` |
 | E-AC-3, container fMP4 | where the start does not declare `ec3` | `eac3` |
@@ -1191,16 +1194,63 @@ What it costs:
 - every reroute is an FFmpeg run (the video copied, the audio encoded) where nginx-vod needed none. Hold a
   day of `webui_vod_reroute_total` against the transcoder's CPU after the rollout.
 
+The video is held to a declaration that answered (since 2026-10-01): HEVC goes to the transcoder where
+the start has no `hevc8` (`hevc`), and taller than 1080 or wider than 1920 — the transcoder's own 2160
+rule, by size, the probe having no level — where it has no `hevc8-2160`. A start whose check did not
+answer (`""`, `unknown`: a first visit, `?passthrough=off`, the memory of a failed passthrough) keeps
+nginx-vod — a 4K HEVC its browser plays would otherwise get the transcoder's refusal. A 10-bit HEVC in a
+browser that declares only 8-bit the probe cannot tell; nor any other combination the rules did not
+foresee. For those
+**the player gives nginx-vod's stream up** (`vod-guard.js`, in the old route's guard slot, before the
+audio guard): a fatal `bufferAddCodecError` or `manifestIncompatibleCodecsError` on a `~vod/` stream —
+recovering it cannot change what the browser decodes — stops loading and restarts the file once, as the
+passthrough's fallback does (`passthrough.js` `fallbackToTranscoder`: the start form, the embed's POST, or
+the deep link), with `decode-fallback=vod_codecs` and class `vod`: the whole declaration kept (the refusal
+may be the audio's, and a video the browser decodes keeps its passthrough), nothing remembered, nothing
+struck; Umami `vod-fallback`, not `hevc-fallback`. After it gives up the guard takes every fatal error, so
+nothing restarts the stream again; `player-dead` holds off meanwhile (`handled`). The server sends **any
+MP4 start with a fallback reason** to the transcoder (`fallback`), probe or not: a restart after the
+browser failed the file never lands back on nginx-vod. The page remembers the rescue for its life
+(`decode-declaration.js` `markVodRescue`): every later start of that file on it — the stream restart
+after the transcoder session died, the card's button — carries `vod_codecs` again (`applyDeclaration`;
+`stream-restart.js` for an embed), since the server's rules could not tell the file apart the first
+time. A new page gives nginx-vod one more try, and the player gives it up again. A refusal after
+`vod_codecs` reads the route's own word, not "this browser could not show this 4K HEVC video" — the file
+need not be HEVC (`bufferSessionHLS`). Known limit: an H.264 the browser refuses (High 10, 4:2:2 in an
+MP4) is copied as it is by the transcoder too, so the rescue ends on the media card. Every nginx-vod stream carries `data-item-id` for it
+(`StreamContent.PlayerRestarts`). `vod_codecs` has its own label in `webui_passthrough_fallback_total`,
+apart from `codecs_rejected`, whose count alerts as a build fault of the passthrough.
+
 The job key already carries the declaration, and its 10-minute bucket lets a render made before the change
-go. Not handled: a video codec the browser lacks on nginx-vod (an HEVC MP4 in a browser without HEVC) —
-unmeasured; the player's endless recovery of a fatal codec error on the old route (`hls-manager.js`) is
-left to `player-dead` to count.
+go.
+
+#### The old route's fatal media errors — `media-recovery.js`
+
+A fatal media error that no guard took used to be recovered every time, however many
+(`hls-manager.js`): where the browser cannot take the stream at all the recovery fails the same way at
+once, and the player recovered every ~110 ms for as long as the page was open, with no word to the viewer.
+Since 2026-10-01 it goes as hls.js advises (API.md, "Fatal Error Recovery"):
+
+1. `recoverMediaError()`;
+2. another within `MEDIA_RETRY_WINDOW_MS` (3 s) of that: `swapAudioCodec()` and `recoverMediaError()` — an
+   audio codec string that was wrong;
+3. another within the window of the swap: given up — `stopLoad()` and the stream restart's card
+   (`stream-restart.js` `mediaGiveUp`, reason `media`: the one message, whose button restarts the stream
+   at the viewer's place; not where a guard or `player-dead` owns the player, `blocked`).
+
+Each step's window counts from the step before, so a failure that comes back every 2.5 s is given up at
+the third, not recovered for ever; an error further than the window from the step before starts at 1
+again — an occasional failure mid-film is recovered as it always was. Given up, no error is recovered
+again, but each further one stops loading and asks for the card again (shown once): the stall watch or a
+seek under the card may have started loading, and a failure must never go by unsaid. A new source on the
+instance (`MANIFEST_LOADING`: a session seek, a restart) starts the ladder again. Network errors are
+`network-recovery.js`'s, unchanged.
 
 #### Passthrough: errors and fallback — `passthrough.js`
 
 Only where the session's route is `passthrough` (`data-video-route`); every other stream's error
-handling is what it was (`hls-manager.js`: every fatal media error recovers, network errors restart
-loading) — but for a start that declared multichannel audio, whose own guard is below ("Multichannel
+handling is the old route's (`hls-manager.js`: a fatal media error recovered as hls.js advises and
+then given up — "The old route's fatal media errors" below; network errors restart loading) — but for a start that declared multichannel audio, whose own guard is below ("Multichannel
 audio and the fallback"). The player makes a guard (`createPassthroughGuard`) that sees hls.js's
 errors first and listens to the element, and gives the file up **at most once per player**; where
 the failure is the audio's the class it is charged to is an audio one and the restart keeps the
@@ -1454,7 +1504,8 @@ apart — gave the file up, and on iOS the first element error did):
   is not playback) or **5 minutes passed** (`RELATED_MS`: a viewer who paused shows nothing either
   way); then it is a first failure again, recovered. A fatal media error nobody pinned on the audio —
   a video decoder, a segment that did not parse, a MediaError message naming no stream — is
-  `hls-manager.js`'s, which recovers it as on every old-route stream.
+  `hls-manager.js`'s, which recovers it as on every old-route stream (and gives it up after a
+  second recovery within the window: "The old route's fatal media errors").
 - **Native HLS** (iOS with `?mms=off` or without a ManagedMediaSource, before 17.1): nothing names a
   side — Safari's MediaError messages are empty and there is no
   SourceBuffer — and nothing recovers: an element in error stays dead (without a guard that is what

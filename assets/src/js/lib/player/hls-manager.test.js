@@ -104,6 +104,7 @@ test('counts differ: the exact match reads data-label, not the chip\'s decorated
 
 import { setupHlsEvents } from './hls-manager.js';
 import Hls from 'hls.js';
+import { MEDIA_RETRY_WINDOW_MS } from './media-recovery.js';
 
 function busHls() {
     const handlers = new Map();
@@ -116,8 +117,12 @@ function busHls() {
         on(ev, fn) { handlers.set(ev, [...(handlers.get(ev) || []), fn]); },
         off() {},
         trigger(ev, data) { for (const fn of handlers.get(ev) || []) fn(ev, data); },
+        swaps: 0,
+        stops: 0,
         recoverMediaError() { this.recovered++; },
+        swapAudioCodec() { this.swaps++; },
         startLoad() { this.startLoads++; },
+        stopLoad() { this.stops++; },
         destroy() {},
     };
 }
@@ -132,15 +137,51 @@ function netTimers() {
     };
 }
 
-// The old route is exactly what it was: every fatal media error recovers,
-// however many (the passthrough's "once" is its own).
-test('old route: three fatal media errors, three recoveries, nothing else', () => {
+// The old route recovers a fatal media error as hls.js advises, and no longer
+// for ever (media-recovery.js, 2026-10-01): recovered, then with the audio
+// codec swapped, then given up to the player's card. The passthrough's
+// "once" is its own.
+test('old route: a fatal media error is recovered, then with the audio codec swapped, then given up to the card', () => {
     const hls = busHls();
-    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} });
-    for (let i = 0; i < 3; i++) hls.trigger(Hls.Events.ERROR, fatalMedia);
-    assert.equal(hls.recovered, 3);
+    let t = 0;
+    const gaveUp = [];
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, null,
+        { now: () => t, onMediaGiveUp: (d) => gaveUp.push(d.details) });
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.deepEqual([hls.recovered, hls.swaps, hls.stops], [1, 0, 0], 'the first: recovered');
+    t += 100;
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.deepEqual([hls.recovered, hls.swaps, hls.stops], [2, 1, 0], 'the next within the window: the audio codec swapped, recovered');
+    t += 100;
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.deepEqual([hls.recovered, hls.swaps, hls.stops], [2, 1, 1], 'the third: given up, loading stopped');
+    assert.deepEqual(gaveUp, [Hls.ErrorDetails.BUFFER_APPEND_ERROR], 'the card, once');
+    for (let i = 0; i < 20; i++) { t += 100; hls.trigger(Hls.Events.ERROR, fatalMedia); }
+    assert.deepEqual([hls.recovered, hls.swaps], [2, 1], 'no recovery for ever');
+    assert.deepEqual([hls.stops, gaveUp.length], [21, 21], 'each further one stops loading and is said again (the card shows once)');
+    // A new source on the instance (a session seek) starts the ladder again.
+    hls.trigger(Hls.Events.MANIFEST_LOADING, {});
+    t += 100;
+    hls.trigger(Hls.Events.ERROR, fatalMedia);
+    assert.equal(hls.recovered, 3, 'recovered again after a new source');
+});
+
+// Errors further apart than the window each start again: an occasional
+// failure mid-film is recovered as it always was -- an incompatible codec
+// string too.
+test('old route: fatal media errors further apart than the window each recover, as ever', () => {
+    const hls = busHls();
+    let t = 0;
+    const gaveUp = [];
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, null,
+        { now: () => t, onMediaGiveUp: (d) => gaveUp.push(d) });
+    for (let i = 0; i < 3; i++) {
+        t += MEDIA_RETRY_WINDOW_MS + 1;
+        hls.trigger(Hls.Events.ERROR, fatalMedia);
+    }
+    t += MEDIA_RETRY_WINDOW_MS + 1;
     hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR, fatal: true });
-    assert.equal(hls.recovered, 4, 'an incompatible codec string recovers as ever');
+    assert.deepEqual([hls.recovered, hls.swaps, hls.stops, gaveUp.length], [4, 0, 0, 0]);
 });
 
 // A passthrough's guard sees an error first; what it handles goes no
@@ -175,7 +216,9 @@ test('no guard: the listeners are exactly today\'s', () => {
     const hls = { ...busHls(), on(ev) { names.push(ev); } };
     setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} });
     assert.deepEqual(names, ['hlsManifestParsed', 'hlsError', 'hlsError', 'hlsStallResolved', 'hlsManifestLoading', 'hlsMediaDetaching', 'hlsDestroying',
-        'hlsFragLoaded', 'hlsManifestLoading', 'hlsDestroying']);
+        'hlsFragLoaded', 'hlsManifestLoading', 'hlsDestroying',
+        // media-recovery.js: a new source starts the media errors' ladder again.
+        'hlsManifestLoading']);
     const withGuard = [];
     setupHlsEvents({ ...busHls(), on(ev) { withGuard.push(ev); } }, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, { onHlsError: () => false, onBufferCodecs() {} });
     assert.deepEqual(withGuard.filter((n) => !names.includes(n)), [Hls.Events.BUFFER_CODECS], 'a guard is told what audio hls.js buffers');
@@ -223,7 +266,7 @@ test('old route, multichannel audio declared: the guard recovers once and gives 
     assert.equal(hls.startLoads, 0);
 });
 
-test('old route, multichannel audio declared but stereo in play: every fatal media error recovers, as ever', () => {
+test('old route, multichannel audio declared but stereo in play: every fatal media error recovers, as ever (apart)', () => {
     const hls = busHls();
     const video = audioVideo({ decode: 'aac51', videoRoute: 'reencode' });
     let t = 0;
@@ -231,10 +274,12 @@ test('old route, multichannel audio declared but stereo in play: every fatal med
     const guard = createAudioGuard({ video, fallback: (...a) => fired.push(a), now: () => t, setTimer: () => 0, clearTimer: () => {} });
     guard.setHls(hls);
     const net = netTimers();
-    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard, net.opts);
+    setupHlsEvents(hls, { now: () => 0, setInterval: () => 0, clearInterval: () => {} }, guard, { ...net.opts, now: () => t });
     hls.trigger(Hls.Events.BUFFER_CODECS, { audio: { codec: 'mp4a.40.2', metadata: { channelCount: 2 } } });
+    // Further apart than the old route's retry window (media-recovery.js):
+    // each is recovered, as ever.
     for (let i = 0; i < 3; i++) {
-        t += SAME_INCIDENT_MS + 1;
+        t += Math.max(SAME_INCIDENT_MS, MEDIA_RETRY_WINDOW_MS) + 1;
         hls.trigger(Hls.Events.ERROR, fatalMedia);
     }
     assert.equal(hls.recovered, 3);
