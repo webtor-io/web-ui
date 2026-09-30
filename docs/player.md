@@ -637,8 +637,9 @@ that gap with telemetry only — no restart, the viewer sees nothing.
 Armed by `play` (the viewer or autoplay) — and, on a player with `autoplay` in its markup, at
 mount: autoplay fires `play` only once there is data (together with `playing`), so a player that
 never gets any, or whose element errors before any press (`play()` then rejects without a
-`play`), would never be watched. That arming lets go when the element has data and stays paused
-(autoplay refused, the resume prompt's hold); the viewer's Play arms it again. Off at the first
+`play`), would never be watched. That arming lets go when the element has data (metadata on: an iPhone refuses autoplay with
+sound and its ManagedMediaSource streams no further than that) and stays paused (autoplay refused,
+the resume prompt's hold); the viewer's Play arms it again. Off at the first
 `playing` on a playing element (the hold leaves a `playing` on a paused one) or the clock moving
 past where the request found it; a pause disarms (not one the element takes with an error: Chrome
 sets the error and pauses in the same moment on an append failure before metadata), a hidden tab
@@ -669,7 +670,7 @@ One `player-dead` per player, when any of three holds 30 s after the request:
 - **`why: recovering`** — 5 re-attachments (`emptied`) since the request and no start: on a muxed
   TS shape hls.js recovers ~1000 times a second.
 
-`player-dead` carries the state it died in (`path`, `hls`, `err`, `rs`, `ns`, `inflight`, `got`,
+`player-dead` carries the state it died in (`by: play|autoplay`, `paused`, `path`, `hls`, `err`, `rs`, `ns`, `inflight`, `got`,
 `recoveries`) and the start's audio class (`audio: none|aac51|dolby`, `passthrough.js`
 `startAudioClass`, as on `stream-start`: a multichannel start that dies without an error or a
 fallback has no other event to be counted per class by — see "Watching the audio after the

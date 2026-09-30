@@ -71,10 +71,10 @@ export const STARTED_ADVANCE_S = 0.5;
 // or a recovery that may work; five without a start is a loop.
 export const RECOVERY_STORM = 5;
 
-// HTMLMediaElement.NETWORK_LOADING and HAVE_FUTURE_DATA, spelled out for
+// HTMLMediaElement.NETWORK_LOADING and HAVE_METADATA, spelled out for
 // plain-object tests.
 const NETWORK_LOADING = 2;
-const HAVE_FUTURE_DATA = 3;
+const HAVE_METADATA = 1;
 
 const ELEMENT_ACTIVITY = ['progress'];
 
@@ -195,6 +195,10 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         const err = safe(() => (video.error ? video.error.code : 0), 0);
         return {
             why,
+            // What armed the watch, and whether the element was paused: an
+            // autoplay the browser refused is not a dead player.
+            by: armedBy || '',
+            paused: safe(() => video.paused, false) === true,
             path: sourceKind(video, on),
             hls: on ? 'on' : hls ? 'off' : 'none',
             route: safe(() => (video.dataset && video.dataset.videoRoute) || '', ''),
@@ -235,10 +239,14 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
         const t = now();
         if (advanced()) { started(); return; }
         if (doc.hidden) { quietSince = t; return; }
-        // Autoplay's arming: data in and still paused is autoplay refused or
-        // held, not a dead player. A Play arms it again.
+        // Autoplay's arming: data in (metadata and on) and still paused is
+        // autoplay refused or held, not a dead player. From metadata, not
+        // from enough to play: an iPhone refuses autoplay with sound, and its
+        // ManagedMediaSource then stops streaming at HAVE_METADATA (30 of 49
+        // player-dead of 2026-09-30's first 12 h were iOS, most paused at
+        // readyState 1). A Play arms it again.
         if (armedBy === 'autoplay' && safe(() => video.paused, true)
-            && safe(() => video.readyState, 0) >= HAVE_FUTURE_DATA) {
+            && safe(() => video.readyState, 0) >= HAVE_METADATA) {
             disarm();
             return;
         }

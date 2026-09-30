@@ -101,7 +101,7 @@ test('the 29.09 death: hls.js gone, a revoked blob, MediaError 4 -- one player-d
     s.advance(DEAD_AFTER_MS * 3);
     assert.equal(dead(s.events).length, 1);
     assert.deepEqual(dead(s.events)[0].data, {
-        why: 'quiet', path: 'blob', hls: 'none', route: '', audio: 'none', err: 4, rs: 0, ns: 3, inflight: 0, got: 'none', recoveries: 0, waited_s: 30,
+        why: 'quiet', by: 'play', paused: false, path: 'blob', hls: 'none', route: '', audio: 'none', err: 4, rs: 0, ns: 3, inflight: 0, got: 'none', recoveries: 0, waited_s: 30,
     });
 });
 
@@ -526,9 +526,9 @@ test('autoplay refused or held: data in and paused is not dead; the viewer\'s Pl
     video.autoplay = true;
     const s = setup({ video });
     s.advance(4000);
-    s.video.readyState = 4;
+    s.video.readyState = 1;
     s.advance(5 * 60000);
-    assert.equal(s.events.length, 0);
+    assert.equal(s.events.length, 0, 'metadata in, paused: an iPhone streams no more until Play');
     s.video.play();
     s.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
     assert.equal(dead(s.events).length, 1, 'played, nothing moved: a dead decoder');
@@ -555,4 +555,18 @@ test('an error and a pause in the same moment (Chrome, an append failure before 
     s.advance(DEAD_AFTER_MS + 2 * CHECK_EVERY_MS);
     assert.equal(dead(s.events).length, 1);
     assert.equal(dead(s.events)[0].data.err, 4);
+});
+
+test('player-dead says what armed it and whether the element was paused', () => {
+    const video = fakeVideo();
+    video.autoplay = true;
+    const s = setup({ video });
+    s.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
+    assert.equal(dead(s.events)[0].data.by, 'autoplay');
+    assert.equal(dead(s.events)[0].data.paused, true);
+    const p = setup();
+    p.video.play();
+    p.advance(DEAD_AFTER_MS + CHECK_EVERY_MS);
+    assert.equal(dead(p.events)[0].data.by, 'play');
+    assert.equal(dead(p.events)[0].data.paused, false);
 });
