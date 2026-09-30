@@ -16,7 +16,7 @@ import {
 
 // Why a passthrough was given up -- the same closed set the server accepts
 // (models.ParseFallbackReason).
-export const REASONS = ['codecs_rejected', 'decode_error', 'media_error', 'src_unsupported', 'no_frames', 'user'];
+export const REASONS = ['codecs_rejected', 'decode_error', 'media_error', 'src_unsupported', 'no_frames', 'user', 'fragment_loop'];
 
 // The failures that are the decoder's: they strike the class (two strikes
 // on different files within 7 days take it out of the declaration,
@@ -194,7 +194,9 @@ function bufferSide(data) {
 // audioFallbackClass is the audio class a failure is charged to, or null for
 // the rules the video has always had:
 //   - no audio the declaration changed (audio null), no picture while time
-//     ran (no_frames), the viewer's own choice (user) -> null;
+//     ran (no_frames), the viewer's own choice (user), a fragment loaded
+//     again and again (fragment_loop: a video fragment the browser dropped,
+//     fragment-loop.js) -> null;
 //   - the audio's failure, as far as there is evidence (fault 'audio': the
 //     audio SourceBuffer's own append failed or its codec was refused, or
 //     the element's MediaError message names the audio's decoder) -> its
@@ -220,7 +222,7 @@ function bufferSide(data) {
 //     token, dearer than a restart, and nothing marks AAC 5.1 as the likely
 //     failure.
 export function audioFallbackClass({ reason, fault = null, audio = null }) {
-    if (!isAudioClass(audio) || reason === 'no_frames' || reason === 'user') return null;
+    if (!isAudioClass(audio) || reason === 'no_frames' || reason === 'user' || reason === 'fragment_loop') return null;
     if (fault === 'audio') return audio;
     if (fault === null && audio === 'dolby') return 'dolby';
     return null;

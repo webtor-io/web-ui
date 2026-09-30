@@ -362,6 +362,8 @@ func TestPassthroughFallbackIsBounded(t *testing.T) {
 	// The audio classes (multichannel audio) are series of their own.
 	PassthroughFallback("decode_error", "dolby")
 	PassthroughFallback("media_error", "aac51")
+	// A fragment loaded again and again (web-ui fragment-loop.js).
+	PassthroughFallback("fragment_loop", "hevc10")
 	if got := testutil.ToFloat64(s.fallback.WithLabelValues("decode_error", "hevc10-2160")); got != 2 {
 		t.Errorf("decode_error/hevc10-2160 = %v, want 2", got)
 	}
@@ -374,7 +376,10 @@ func TestPassthroughFallbackIsBounded(t *testing.T) {
 	if got := testutil.ToFloat64(s.fallback.WithLabelValues("media_error", "aac51")); got != 1 {
 		t.Errorf("media_error/aac51 = %v, want 1", got)
 	}
-	if got := testutil.CollectAndCount(s.fallback); got != 5 {
-		t.Errorf("%d series, want 5", got)
+	if got := testutil.ToFloat64(s.fallback.WithLabelValues("fragment_loop", "hevc10")); got != 1 {
+		t.Errorf("fragment_loop/hevc10 = %v, want 1", got)
+	}
+	if got := testutil.CollectAndCount(s.fallback); got != 6 {
+		t.Errorf("%d series, want 6", got)
 	}
 }

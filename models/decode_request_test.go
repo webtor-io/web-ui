@@ -85,7 +85,7 @@ func TestParseDecodeRequest(t *testing.T) {
 			t.Errorf("(%q,%q,%q): %+v, want %+v", c.decode, c.fb, c.class, got, c.want)
 		}
 	}
-	for _, r := range []string{"codecs_rejected", "decode_error", "media_error", "src_unsupported", "no_frames", "user"} {
+	for _, r := range []string{"codecs_rejected", "decode_error", "media_error", "src_unsupported", "no_frames", "user", "fragment_loop"} {
 		if ParseFallbackReason(r) != r {
 			t.Errorf("reason %q is not allowed", r)
 		}

@@ -50,6 +50,7 @@ import { shareResource } from '../share/share';
 import '../../../styles/player.css';
 import { readStreamUrl } from './stream-url.js';
 import { createDeadPlayerWatch } from './dead-player.js';
+import { loopGivesUp } from './fragment-loop.js';
 import {
     createRecoveryPolicy, fileKey as restartKey, safeSessionStorage, takeNote, writeNote, restartStream, clearPurgeMarks, markNextStart,
 } from './stream-restart.js';
@@ -471,6 +472,26 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         };
     }
 
+    // The same fragment loaded again and again (fragment-loop.js): one
+    // Umami event with what looped, and a passthrough the old route plays
+    // given up to it (loopGivesUp; reason fragment_loop, striking nothing:
+    // the file's fault, not the decoder's). Anywhere else the event is all.
+    const loopRef = useRef(null);
+    if (!loopRef.current) {
+        loopRef.current = {
+            onLoop: ({ type, sn, level, loads }) => {
+                const fallback = !!passthroughGuardRef.current && loopGivesUp(videoEl);
+                track('fragment-loop', {
+                    type, sn, level, loads, fallback,
+                    route: videoEl.dataset.videoRoute || '',
+                    cls: videoEl.dataset.videoClass || '',
+                    audio: startAudioClass(videoEl),
+                });
+                if (fallback) passthroughGuardRef.current.fire('fragment_loop');
+            },
+        };
+    }
+
     // HLS hook
     const hlsRef = useHls(videoRef, sourceUrl, {
         passthrough: passthroughRoute
@@ -478,6 +499,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             : null,
         audioGuard: audioGuardRef.current,
         recovery: recoveryRef.current,
+        loop: loopRef.current,
     });
 
     // Re-assert the picker's answer on hls.js's own transitions.

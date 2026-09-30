@@ -7189,3 +7189,83 @@ test('the card up, the viewer moves on to the next file: its start carries neith
     assert.equal(document.querySelector('video.player').getAttribute('data-path'), 'ep2.mkv', 'fixture: the next file\'s player is up');
     assert.equal(document.querySelectorAll('input[data-stream-restart]').length, 0, 'the marks are gone from the page');
 });
+
+// ---- a fragment loaded again and again (fragment-loop.js) --------------------
+//
+// The player's answer to the watch: one fragment-loop event with what looped,
+// and a passthrough the old route plays given up to it -- the page's start
+// form again, decode-fallback=fragment_loop. Over 1080 the event is all: the
+// old route refuses those files.
+
+const { LOOP_LOADS } = await import('./fragment-loop.js');
+const passthroughSource = (page) => {
+    const src = document.createElement('source');
+    src.setAttribute('src', 'https://api.test/x/movie.mkv~hls/session/f1097e82/index.m3u8');
+    src.setAttribute('type', 'application/vnd.apple.mpegurl');
+    page.video.appendChild(src);
+};
+// A loaded fragment as hls.js's own FRAG_LOADED listeners need it (the ABR
+// controller reads its stats): one of theirs throwing ends the event before
+// the watch hears it -- hls.js's trigger catches and reports it as an
+// INTERNAL_EXCEPTION -- so the loads are counted as an error each.
+const loadedFragment = () => ({
+    frag: {
+        sn: 2, type: 'main', level: 0, duration: 4, start: 8,
+        stats: {
+            loading: { start: 0, first: 5, end: 10 }, parsing: { start: 10, end: 11 },
+            buffering: { start: 11, first: 11, end: 12 }, loaded: 1000, total: 1000, retry: 0, chunkCount: 1, bwEstimate: 0, aborted: false,
+        },
+    },
+    payload: new ArrayBuffer(8),
+});
+const loopFragment = (hls) => {
+    const internal = [];
+    const onError = (e, d) => { if (d.details === Hls.ErrorDetails.INTERNAL_EXCEPTION) internal.push(d.error); };
+    hls.on(Hls.Events.ERROR, onError);
+    for (let i = 0; i < LOOP_LOADS; i++) hls.trigger(Hls.Events.FRAG_LOADED, loadedFragment());
+    hls.off(Hls.Events.ERROR, onError);
+    assert.deepEqual(internal, [], 'fixture: hls.js took the fragment');
+};
+
+test('a fragment loop on a 1080 passthrough: the event, and the old route', async (t) => {
+    withHlsJs(t);
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        page.video.setAttribute('data-video-class', 'hevc10');
+        passthroughSource(page);
+        pageStartForm(page);
+    });
+    const hls = window.hlsPlayer;
+    assert.ok(hls instanceof Hls, 'the player runs hls.js');
+    loopFragment(hls);
+    await settle();
+    assert.deepEqual(p.events.filter((e) => e.name === 'fragment-loop').map((e) => e.data), [
+        { type: 'main', sn: 2, level: 0, loads: LOOP_LOADS, fallback: true, route: 'passthrough', cls: 'hevc10', audio: 'none' },
+    ]);
+    assert.deepEqual(p.events.filter((e) => e.name === 'hevc-fallback').map((e) => e.data.reason), ['fragment_loop']);
+    assert.equal(rec.got.length, 1, 'the restart on the old route');
+    assert.equal(rec.got[0]['decode-fallback'], 'fragment_loop');
+});
+
+test('a fragment loop on a 4K passthrough: the event only -- the old route refuses the file', async (t) => {
+    withHlsJs(t);
+    freshDecodeMemory();
+    const rec = recordSubmits();
+    t.after(() => { rec.stop(); destroyPlayer(); freshDecodeMemory(); });
+    const p = await mountPlayer((page) => {
+        passthroughPlayer(page);
+        passthroughSource(page);
+        pageStartForm(page);
+    });
+    loopFragment(window.hlsPlayer);
+    await settle();
+    const ev = p.events.filter((e) => e.name === 'fragment-loop');
+    assert.equal(ev.length, 1);
+    assert.equal(ev[0].data.fallback, false);
+    assert.equal(ev[0].data.cls, 'hevc10-2160');
+    assert.equal(p.events.find((e) => e.name === 'hevc-fallback'), undefined);
+    assert.equal(rec.got.length, 0, 'no restart');
+});

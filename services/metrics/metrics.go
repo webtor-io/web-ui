@@ -120,7 +120,7 @@ func newSet(r prometheus.Registerer) *set {
 		}, []string{"result"}),
 		fallback: f.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace, Name: "passthrough_fallback_total",
-			Help: "Stream starts that restart a file whose HEVC passthrough failed in the browser, by reason (codecs_rejected, decode_error, media_error, src_unsupported, no_frames, user; other = anything else) and the decoder class the stream needed (hevc8, hevc10, hevc8-2160, hevc10-2160; unknown) -- or whose multichannel audio failed (class dolby, aac51; on any route).",
+			Help: "Stream starts that restart a file whose HEVC passthrough failed in the browser, by reason (codecs_rejected, decode_error, media_error, src_unsupported, no_frames, user, fragment_loop; other = anything else) and the decoder class the stream needed (hevc8, hevc10, hevc8-2160, hevc10-2160; unknown) -- or whose multichannel audio failed (class dolby, aac51; on any route).",
 		}, []string{"reason", "class"}),
 	}
 }
@@ -269,7 +269,7 @@ func TranscoderCapabilityCheck(result string) {
 // form field (models.ParseDecodeRequest allowlists them already; this keeps
 // the series bounded whoever calls).
 var (
-	fallbackReasons = map[string]bool{"codecs_rejected": true, "decode_error": true, "media_error": true, "src_unsupported": true, "no_frames": true, "user": true}
+	fallbackReasons = map[string]bool{"codecs_rejected": true, "decode_error": true, "media_error": true, "src_unsupported": true, "no_frames": true, "user": true, "fragment_loop": true}
 	fallbackClasses = map[string]bool{"hevc8": true, "hevc10": true, "hevc8-2160": true, "hevc10-2160": true, "dolby": true, "aac51": true}
 )
 

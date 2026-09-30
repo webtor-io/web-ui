@@ -118,6 +118,7 @@ var fallbackReasons = map[string]bool{
 	"src_unsupported": true, // the element refused the source
 	"no_frames":       true, // time moved, no picture
 	"user":            true, // the viewer chose the compatible mode
+	"fragment_loop":   true, // the same fragment loaded again and again (web-ui fragment-loop.js)
 }
 
 // ParseFallbackReason is the "decode-fallback" field of a restart, or "".

@@ -15,7 +15,7 @@ import { createHls, initDefaultTracks, Hls } from '../hls-manager';
  * fragment of the film arrives (network-recovery.js); read when the instance
  * is created, so the player hands a stable object.
  */
-export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audioGuard = null, recovery = null } = {}) {
+export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audioGuard = null, recovery = null, loop = null } = {}) {
     const hlsRef = useRef(null);
     const tracksInitialized = useRef(false);
 
@@ -31,6 +31,7 @@ export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audio
             const opts = passthrough ? { passthrough: true, fragLoadMs: passthrough.fragLoadMs, guard: passthrough.guard }
                 : audioGuard ? { guard: audioGuard } : {};
             if (recovery) opts.recovery = recovery;
+            if (loop) opts.loop = loop;
             const hls = createHls(video, sourceUrl, () => {
                 if (onReady) onReady(hls);
             }, opts);

@@ -9,6 +9,7 @@ import { createLoaderRestart } from './loader-restart.js';
 import { passthroughHlsConfig } from './passthrough.js';
 import { iosPlaysHlsJs } from './decode-declaration.js';
 import { createNetworkRecovery } from './network-recovery.js';
+import { createFragmentLoopWatch } from './fragment-loop.js';
 
 // Exported for the tests (network-recovery.hls.test.js): the retry policy a
 // real instance runs with.
@@ -77,7 +78,7 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     hls.loadSource(sourceUrl);
     hls.attachMedia(videoEl);
 
-    setupHlsEvents(hls, undefined, opts.guard || null, opts.recovery || {});
+    setupHlsEvents(hls, undefined, opts.guard || null, opts.recovery || {}, opts.loop || null);
 
     if (onReady) {
         hls.on(Hls.Events.MANIFEST_PARSED, onReady);
@@ -97,7 +98,7 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
 // (network-recovery.js createNetworkRecovery: the player's onSessionGone,
 // onGiveUp and onFilmLoaded, and the timers for the tests); the returned
 // loader restart carries it as `.network`.
-export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}) {
+export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}, loopOpts = null) {
     hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         if (hls.levels.length > 1) {
             hls.startLevel = 1;
@@ -148,6 +149,10 @@ export function setupHlsEvents(hls, restartOpts, guard = null, recoveryOpts = {}
     const restart = createLoaderRestart(hls, Hls, restartOpts);
     network = createNetworkRecovery(hls, Hls, recoveryOpts);
     restart.network = network;
+    // The same fragment loaded again and again (fragment-loop.js): nothing
+    // errors, so neither the guard nor the recovery above sees it. loopOpts
+    // is the player's ({ onLoop }); without it, no watch.
+    if (loopOpts && typeof loopOpts.onLoop === 'function') restart.loop = createFragmentLoopWatch(hls, Hls, loopOpts);
     return restart;
 }
 

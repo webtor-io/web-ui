@@ -632,7 +632,8 @@ test('audioFallbackClass: the audio\'s only where it is blamed -- Dolby or not -
         assert.equal(audioFallbackClass({ reason, fault: 'video', audio: 'dolby' }), null, `${reason}: the video's`);
         assert.equal(audioFallbackClass({ reason, fault: 'audio', audio: null }), null, `${reason}: audio the declaration did not change`);
     }
-    for (const reason of ['no_frames', 'user']) {
+    // fragment_loop: a video fragment the browser dropped (fragment-loop.js).
+    for (const reason of ['no_frames', 'user', 'fragment_loop']) {
         assert.equal(audioFallbackClass({ reason, fault: 'audio', audio: 'dolby' }), null, reason);
     }
     assert.equal(audioFallbackClass({ reason: 'decode_error', fault: 'audio', audio: 'hevc10' }), null, 'not an audio class');

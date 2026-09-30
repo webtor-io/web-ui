@@ -682,6 +682,47 @@ here:** in Chrome 154 an append failure before metadata after a `play()` is foll
 the element, which disarms the watch — the `why: error` death on the production master shape is not
 reported (bench under "Multichannel audio and the fallback", "Known gap").
 
+## A fragment loaded again and again — `fragment-loop.js`
+
+hls.js loads a fragment, appends it, finds it is not in the buffer and loads it again — two
+neighbours, N and N+1, for as long as the page is open: ~2.7 requests a second each, answered by
+the browser's cache (the transcoder sees 304s; 6–8 sessions a day, up to 33k requests one, thp logs
+2026-09-30). Nothing errors, so neither the passthrough guard nor the network recovery sees it, and
+`player-dead` does not either — bytes keep arriving. The viewer sits on a frozen picture.
+
+**One cause is known** (2026-09-30, Chrome 154, a Playwright MSE bench): Chrome silently drops a whole
+passthrough fMP4 fragment in which a leading picture (RASL_N) shares the keyframe's (CRA's)
+timestamp — the append succeeds, `buffered` does not change. The same fragment with the duplicate's
+composition offset moved by one tick is taken whole. The duplicate is necessary, not sufficient: a
+fragment of another file with the same pattern is taken, and what else Chrome's rule needs is not
+known. The transcoder makes those timestamps unique. Other causes are not known: a loop on iOS
+(WebKit, `?mms` hls.js) was on the audio's first fragments, whose fMP4 is clean — most likely
+hls.js's audio controller reloading at a stall of the video.
+
+**The watch**, on every hls.js instance (`hls-manager.js` `setupHlsEvents`, the player's `onLoop`):
+the same fragment — `type`, `level`, `sn` — loaded `LOOP_LOADS` (6) times within `LOOP_WINDOW_MS`
+(60 s) is a loop, whatever the cause; the player is told once. A new manifest (`MANIFEST_LOADING`:
+a session seek, a restart) starts the count again — a new run numbers its fragments from 0. A
+viewer's seeks back, or a recovery's reload, are one or two loads of a fragment, well under it.
+hls.js's own `FRAG_LOADED` listeners run first; one of them throwing ends the event before the watch
+(hls.js reports an `INTERNAL_EXCEPTION`) — the wiring test hands a fragment as hls.js makes one.
+
+**The player's answer:**
+
+- Umami `fragment-loop {type, sn, level, loads, fallback, route, cls, audio}` — `type` `main` or
+  `audio` (which loader looped), `cls` the video class, `audio` the start's audio class;
+- on passthrough, where the old route plays the file (`loopGivesUp`: not the `-2160` classes), the
+  guard's fallback with reason `fragment_loop` — the same visible restart from the start as
+  "Compatibility mode" (see "Passthrough: errors and fallback"); it strikes no class (the file's
+  fault, not the decoder's) and charges no audio class. Over 1080 the old route refuses the file —
+  the viewer would read that the browser cannot show 4K HEVC, which is not so, and the memory would
+  keep the file refused for 7 days: a frozen picture the viewer can seek past is the lesser harm,
+  and the event is all;
+- anywhere else, the event is all.
+
+Not verified in a real browser: the watch against a live loop (the bench reproduced the drop, not
+hls.js's reloading of it); what WebKit does with the duplicate.
+
 ## Usage events — `player-telemetry.js`
 
 One Umami event per **decision**, not per press (`settled()` holds the last value until the
@@ -699,6 +740,7 @@ presses stop and is flushed on teardown):
 | `hevc-fallback` | `reason`, `cls`, `path: mse\|native`, `audio` | a passthrough given up to the old route (see "Passthrough: errors and fallback"); `audio` the start's audio class, as in `stream-start` (since 2026-09-29): a failure of a Dolby session that nothing pinned on the audio is counted here |
 | `audio-fallback` | `reason`, `cls: dolby\|aac51`, `path: mse\|native`, `route`, `audio`, `by` | a file restarted without the multichannel audio its declaration made, on any route (see "Multichannel audio and the fallback"); never counted in `hevc-fallback`. `cls` is the class charged, `audio` the start's (they differ where the master names Dolby and the rendition in play is AAC 5.1); `by` what blamed the audio: `buffer` (its SourceBuffer's own append failed), `codec` (its codec refused), `message` (the element's MediaError message), `native` (the old route's native-HLS rule, nothing named) — since 2026-09-29 |
 | `player-dead` | `why: quiet\|error\|recovering`, `path: hlsjs\|native\|direct\|blob\|none`, `hls: on\|off\|none`, `route`, `audio`, `err`, `rs`, `ns`, `inflight`, `got: none\|playlist\|frags`, `recoveries`, `waited_s` | asked to play and not started 30 s on: nothing moving, an element error held, or a recovery loop (see "A player that never starts"); once per player |
+| `fragment-loop` | `type: main\|audio`, `sn`, `level`, `loads`, `fallback`, `route`, `cls`, `audio` | the same fragment loaded 6 times within 60 s (see "A fragment loaded again and again"); once per hls.js instance; `fallback` whether it gave a passthrough up to the old route — since 2026-09-30 |
 | `player-revived` | `path`, `route`, `audio`, `waited_s` (since the play request), `recoveries` | it played after a `player-dead`: the rule's error, count it against `player-dead`. `audio` on both is the start's audio class, as in `stream-start` (since 2026-09-30) |
 | `player-recover-restart` | `reason: 404\|403`, `status`, `via: load\|error-nonfatal\|seek`, `loader: video\|audio\|subtitle\|master` (hls.js only) | the stream restarted by itself after its transcoder session (or token) was gone; `error-nonfatal`: an answer hls.js would have asked again (see "Network errors and the stream restart") |
 | `player-recover-card-shown` | `reason: limit\|network`, `status`, `cause` (404/403, for `limit`), `via` (for `limit`) | the card instead: the automatic restart spent within 5 min, another 4xx, or the backoff run out; sent when it shows (it waits while the film plays from its buffer) |
@@ -1115,6 +1157,7 @@ video's declaration (below):
 | — 4 (Safari may say it for a master that failed to load too; not verified) | `src_unsupported` | no |
 | the watchdog, native and hls.js: 10 s after the first `playing`, in a tab that stayed visible, time ran on by more than 2 s and there is no picture — `videoWidth` 0, or 0 decoded frames where this page has seen the counter count (Android Chrome's native player reads 0 while it plays) | `no_frames` | yes |
 | "Compatibility mode" (below) | `user` | no |
+| the same fragment loaded again and again, where the old route plays the file (see "A fragment loaded again and again") | `fragment_loop` | no |
 
 **One incident, or the next one at once** (`createIncidents`, since 2026-09-28). Before, a report
 within 1 s of the recovery was always taken for the first incident told twice — but hls.js stops
