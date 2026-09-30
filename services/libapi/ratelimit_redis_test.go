@@ -115,8 +115,10 @@ func TestWithoutRedisStaysLocal(t *testing.T) {
 // ever subtracts would lock a key out permanently after one burst.
 func TestRedisBucketRefills(t *testing.T) {
 	cl := newTestRedis(t)
-	// 100/s so a refill is observable without making the test slow.
-	l := NewRateLimiterWith(100, 1).WithRedis(cl, "rl:test")
+	// 5/s: a token every 200 ms. At 100/s the two takes below had to land
+	// within 10 ms of each other, and under a loaded test run they did not
+	// (the second got a fresh token: "allowed immediately").
+	l := NewRateLimiterWith(5, 1).WithRedis(cl, "rl:test")
 
 	if _, ok := l.Take("k"); !ok {
 		t.Fatal("first take refused")
@@ -124,7 +126,7 @@ func TestRedisBucketRefills(t *testing.T) {
 	if _, ok := l.Take("k"); ok {
 		t.Fatal("second take allowed immediately with a burst of one")
 	}
-	time.Sleep(50 * time.Millisecond) // 5 tokens' worth at 100/s
+	time.Sleep(500 * time.Millisecond) // 2.5 tokens' worth at 5/s
 	if _, ok := l.Take("k"); !ok {
 		t.Error("still refused after enough time for several tokens; the bucket does not refill")
 	}

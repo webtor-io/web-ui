@@ -20,9 +20,14 @@ async function embedPage(url, optin) {
         Object.defineProperty(globalThis, k, { value: k === 'window' ? w : w[k], configurable: true, writable: true });
     }
     w._id = 'e1';
-    // A fresh instance of the module for each page.
+    // A fresh instance of the module for each page. Its first lines run
+    // once the import resolves -- in a few ms, or far more in a loaded test
+    // run, where a fixed 50 ms wait failed: waited for, up to 5 s.
     import(`../../app/embed/check.js?page=${doms.length}`).catch(() => {});
-    await new Promise((r) => setTimeout(r, 50));
+    for (let waited = 0; !w.__wtDecode && waited < 5000; waited += 10) {
+        await new Promise((r) => setTimeout(r, 10));
+    }
+    await new Promise((r) => setTimeout(r, 10));
     return w;
 }
 
