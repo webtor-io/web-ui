@@ -13,12 +13,13 @@ import { createTapSeek } from './tap-seek';
 import { localSeekTarget, producedEnd, exactPlace } from './local-seek';
 import { bindMediaSession } from './media-session';
 import { readNext, advancePlan, atEnd, resumeAt, readStreak, writeStreak, countdown } from './next-item';
+import { createBackgroundRestart } from './background-restart.js';
 import { createNextItemGo, canMoveOn, takeFallbackNote } from './next-item-go';
 import { HAS_POPOVER, useDockedPopover } from './useAnchoredPopover';
 import { creditsStart, cuesOfLoadedTracks, parseVttTimings, timingSourceURL, creditsFromElement } from './credits';
 import { track, settled } from './player-telemetry';
 import { reportCodecSupport, whenPlaying, sourceCodec, playbackPath, watchPlaybackQuality } from './codec-support';
-import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, fallbackToTranscoder, startAudioClass } from './passthrough.js';
+import { createPassthroughGuard, createAudioGuard, fallbackToOldRoute, fallbackAudio, fallbackToTranscoder, restartFallback, startAudioClass } from './passthrough.js';
 import { clearPendingFallback, declaresAudio } from './decode-declaration.js';
 import { reportReleaseCheck } from '../discover/release-check.js';
 import { applySubtitleSelection, isEmbedded, readSelection, selectionHolds } from './subtitle-apply.js';
@@ -93,7 +94,7 @@ function loadCastSender() {
  * Main Player Preact component.
  * Wraps <video>/<audio>, renders custom controls, manages HLS + session seeking.
  */
-function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSize, trackContainer, trackHooks, awaitStart = false }) {
+function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSize, trackContainer, trackHooks, awaitStart = false, restartState = null }) {
     const containerRef = useRef(containerEl);
     const videoRef = useRef(videoEl);
     const [seekOffset, setSeekOffset] = useState(0);
@@ -134,6 +135,25 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const poster = videoEl.getAttribute('poster');
     const resourceID = videoEl.dataset.resourceId;
     const path = videoEl.dataset.path;
+
+    const restartNoteRef = useRef(undefined);
+    const autoplayHeldRef = useRef(false);
+    if (restartNoteRef.current === undefined) {
+        restartNoteRef.current = restartState || takeNote(safeSessionStorage(), resourceID, path);
+        if (restartNoteRef.current && restartNoteRef.current.grace && graceDurationSec) {
+            graceShownRef.current = true;
+            videoEl.dataset.graceCtaShown = '';
+            videoEl.dataset.graceCtaAnswered = restartNoteRef.current.grace;
+        }
+        if (restartNoteRef.current && ((restartState && restartNoteRef.current.at > 0) || !restartNoteRef.current.play) && videoEl.autoplay) {
+            videoEl.autoplay = false;
+            autoplayHeldRef.current = true;
+        }
+    }
+    const backgroundRestartRef = useRef(null);
+    const restartLate = useRef({ start: () => {} });
+    const [backgroundRestarting, setBackgroundRestarting] = useState(false);
+    useEffect(() => () => backgroundRestartRef.current?.dispose(), []);
 
     // The viewer's subtitle delay (cue-offset.js setTrackDelay): seconds,
     // positive = later, remembered per file. Element-backed tracks only --
@@ -263,7 +283,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     }, []);
 
     // Player state hook
-    const state = usePlayerState(videoRef, containerRef, { duration, seekOffset, seeking: sessionSeeking });
+    const state = usePlayerState(videoRef, containerRef, { duration, seekOffset, seeking: sessionSeeking, initialTime: restartNoteRef.current?.at || 0, mediaState: restartState?.media });
 
     // HEVC passthrough (passthrough.js, docs/player.md "Passthrough: errors
     // and fallback"): only where the transcoder passes this stream's video
@@ -276,7 +296,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // owner of what the viewer sees. A restart of ours on its way leaves the
     // guard's out: the page is being started again anyway.
     const recoverPolicyRef = useRef(null);
-    const ownRestart = () => !!(recoverPolicyRef.current && recoverPolicyRef.current.restarting);
+    const ownRestart = () => !!(recoverPolicyRef.current?.restarting || backgroundRestartRef.current?.engaged);
     const passthroughGuardRef = useRef(null);
     if (passthroughRoute && !passthroughGuardRef.current) {
         passthroughGuardRef.current = createPassthroughGuard({
@@ -286,8 +306,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // route and leaves that audio out.
             fallback: (reason, path, audio, by) => {
                 if (ownRestart()) return;
-                if (audio) fallbackAudio({ video: videoEl, reason, path, cls: audio, by });
-                else fallbackToOldRoute({ video: videoEl, reason, path });
+                if (audio) fallbackAudio({ video: videoEl, reason, path, cls: audio, by, restart: (fallback) => restartLate.current.start({ fallback }) });
+                else fallbackToOldRoute({ video: videoEl, reason, path, restart: (fallback) => restartLate.current.start({ fallback }) });
             },
         });
     }
@@ -300,8 +320,8 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     if (isVideo && !passthroughRoute && declaresAudio(videoEl.dataset.decode) && !audioGuardRef.current) {
         audioGuardRef.current = createAudioGuard({
             video: videoEl,
-            fallback: (reason, path, audio, by) => {
-                if (!ownRestart()) fallbackAudio({ video: videoEl, reason, path, cls: audio, by });
+            fallback: (reason, path, audio, by, place) => {
+                if (!ownRestart()) fallbackAudio({ video: videoEl, reason, path, cls: audio, by, restart: (fallback) => restartLate.current.start({ fallback, position: { at: place.at + seekOffsetRef.current, play: place.play }, fixedPosition: true }) });
             },
         });
     }
@@ -313,7 +333,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     if (isVideo && !passthroughRoute && isVodStream(renderedUrl) && !vodGuardRef.current) {
         vodGuardRef.current = createVodGuard({
             giveUp: (details, mime) => {
-                if (!ownRestart()) fallbackToTranscoder({ video: videoEl, mime });
+                if (!ownRestart()) fallbackToTranscoder({ video: videoEl, mime, restart: (fallback) => restartLate.current.start({ fallback }) });
             },
         });
     }
@@ -359,20 +379,6 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // (the effect below puts it back); the resume's seek lands paused
     // (session-seek.js landsPaused) and the exact place waits for that Play
     // (exactRestartPlace).
-    const restartNoteRef = useRef(undefined);
-    const autoplayHeldRef = useRef(false);
-    if (restartNoteRef.current === undefined) {
-        restartNoteRef.current = takeNote(safeSessionStorage(), resourceID, path);
-        if (restartNoteRef.current && restartNoteRef.current.grace && graceDurationSec) {
-            graceShownRef.current = true;
-            videoEl.dataset.graceCtaShown = '';
-            videoEl.dataset.graceCtaAnswered = restartNoteRef.current.grace;
-        }
-        if (restartNoteRef.current && !restartNoteRef.current.play && videoEl.autoplay) {
-            videoEl.autoplay = false;
-            autoplayHeldRef.current = true;
-        }
-    }
     // The viewer's Play: the element is as every other again (a later paused
     // session seek plays its new run by itself, as everywhere).
     useEffect(() => {
@@ -425,7 +431,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // its own, which a new session would not cure) -- until it plays
             // after all (player-revived). Then nothing of ours: no restart,
             // no card.
-            blocked: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
+            blocked: () => backgroundRestartRef.current?.engaged ? !backgroundRestartRef.current.failed : !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
                 || (audioGuardRef.current && audioGuardRef.current.done)
                 || (deadWatchRef.current && deadWatchRef.current.dead)),
             // The card waits while the film plays from its buffer.
@@ -761,9 +767,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     useEffect(() => stopRestartTarget, []);
 
     // Seek handler (session or direct)
-    const handleSeek = useCallback((time, { play = false } = {}) => {
+    const handleSeek = useCallback((time, { play = false, restore = false } = {}) => {
         if (sessionSeekingRef.current) return;
         stopRestartTarget();
+        audioGuardRef.current?.clearRestartPlace();
         // The target of an earlier seek that found the session gone is no
         // longer where the viewer is (stream-restart.js, the viewer's place):
         // this seek is -- a local one by moving the element, a session one
@@ -777,7 +784,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             const video = videoRef.current;
             const local = video ? localSeekTarget(time, seekOffsetRef.current, producedEnd(video, hlsRef.current)) : null;
             if (local !== null) {
-                state.setCurrentTime(time);
+                state.setCurrentTime(time, { restore });
                 video.currentTime = local;
                 if (play && video.paused) video.play().catch(() => {});
                 onDirectSeek();
@@ -786,7 +793,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             }
             countSeek('session');
             // Immediately show target position on timeline
-            state.setCurrentTime(time);
+            state.setCurrentTime(time, { restore });
             // Lazily create session seeker (works with HLS.js or native HLS)
             if (!sessionSeekerRef.current) {
                 sessionSeekerRef.current = createSessionSeeker({
@@ -1203,7 +1210,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             if (!dispatched) {
                 dispatched = true;
                 // Native HLS (iOS) starts at live edge — force start from beginning
-                if (!hlsRef.current && videoEl.currentTime > 1) {
+                if (!restartNoteRef.current && !hlsRef.current && videoEl.currentTime > 1) {
                     videoEl.currentTime = 0;
                 }
                 // Set container aspect-ratio from actual video dimensions
@@ -1277,9 +1284,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             // handleSeek a no-op, and the prompt is closed by now: the
             // answer is kept and carried out when that seek lets go.
             if (sessionSeekingRef.current) pendingResumeRef.current = resumePosition;
-            else handleSeek(resumePosition, { play });
+            else handleSeek(resumePosition, { play, restore: !!restartNoteRef.current });
         } else {
             video.currentTime = resumePosition;
+            state.setCurrentTime(resumePosition, { restore: !!restartNoteRef.current });
             if (play) playAfterPrompt();
         }
         // Save resumed position immediately
@@ -1542,32 +1550,49 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // restart itself -- the position to the server where it keeps one, the
     // note for the next player, then the stream job again.
     recoverLate.current.leaving = () => nextLoadingRef.current;
-    recoverLate.current.restart = ({ at, play }) => {
+    const restartStateNow = () => {
         const video = videoRef.current;
-        // The place is carried -- to the server and in the note -- only
-        // where the viewer is at one:
-        //   - past the resume question: the saved position fetched, and the
-        //     prompt answered where there is one (video only). Before that
-        //     the film stands at the run's start (0, or autoplay's fraction
-        //     of a second before the hold), not where the viewer will be.
-        //     A session found dead at mounting -- a replayed job's -- ends
-        //     here within a second: its note would make the next player
-        //     skip /watch/position, and its PUT would overwrite the saved
-        //     position with next to nothing;
-        //   - past 0: a note at 0 says nothing the next player would not do
-        //     anyway, except to skip the server's copy. (A prompt answered
-        //     "Continue" whose seek found the session gone is not at 0: the
-        //     policy's place is that seek's target -- stream-restart.js.)
-        // Without the note the next player asks as a fresh one does.
-        const settled = resumeReady && (resumeAnsweredRef.current || !(isVideo && resumePosition > 0));
-        if (settled && at > 0) {
-            const dur = duration > 0 ? duration : ((video && video.duration) || 0);
-            if (dur > 0) forceSendPosition(at, dur);
-            // The grace popup's answer rides along: asked once per film.
-            writeNote(safeSessionStorage(), { resourceID, path, at, play, grace: videoEl.dataset.graceCtaAnswered || '' });
+        return {
+            at: (video?.currentTime || 0) + seekOffsetRef.current,
+            play: !video?.paused,
+            settled: resumeReady && (resumeAnsweredRef.current || !(isVideo && resumePosition > 0)),
+            grace: videoEl.dataset.graceCtaAnswered || '',
+            media: { volume: videoEl.volume, muted: videoEl.muted, rate: videoEl.playbackRate },
+        };
+    };
+    const visibleRestart = (position, fallback) => {
+        const state = { ...restartStateNow(), ...position };
+        if (state.settled && state.at > 0) {
+            const dur = duration > 0 ? duration : (videoRef.current?.duration || 0);
+            if (dur > 0) forceSendPosition(state.at, dur);
+            writeNote(safeSessionStorage(), { resourceID, path, ...state });
+        }
+        if (fallback) {
+            restartFallback({ video: videoEl, ...fallback });
+            return;
         }
         restartStream({ win: window, doc: document, video: videoEl, root: trackContainer });
     };
+    if (!backgroundRestartRef.current) {
+        backgroundRestartRef.current = createBackgroundRestart({
+            video: videoEl, root: trackContainer, getStage: currentStage, getAspectRatio: currentAspectRatio,
+            initPlayer, destroyPlayer,
+            getState: () => restartLate.current.state(),
+            visible: (position, fallback) => restartLate.current.visible(position, fallback),
+            onLoading: setBackgroundRestarting,
+            onFailure: () => recoverPolicyRef.current.restartFailed(),
+        });
+    }
+    restartLate.current.state = restartStateNow;
+    restartLate.current.visible = visibleRestart;
+    restartLate.current.start = (opts = {}) => {
+        setRecoverCard(null);
+        backgroundRestartRef.current.start(opts);
+    };
+    recoverLate.current.restart = (position) => restartLate.current.start({
+        position,
+        fixedPosition: Math.abs(position.at - restartStateNow().at) > 1,
+    });
     const nextGoRef = useRef(null);
     const earlyGoneRef = useRef(false); // the credits countdown fires once
     const cardShownAtRef = useRef(null); // film time the card came up at (countdown)
@@ -1604,6 +1629,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // The grace popup's hold goes too: its answer, given while the next
         // file loads, must not start this one again.
         graceHoldRef.current.dispose();
+        backgroundRestartRef.current?.dispose();
         nextGoRef.current.go(how);
     }, []);
     // Any sign of a viewer ends the "is anyone there" streak.
@@ -1816,7 +1842,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setCapCardUp(capCardOpen());
         return onCapCard(setCapCardUp);
     }, []);
-    const bufferingShown = showControls && isVideo && !recoverCard && (sessionSeeking || preHolding || nextLoading || (awaitingStart && !state.playing) || (state.playing && state.loading));
+    const bufferingShown = showControls && isVideo && !recoverCard && (sessionSeeking || preHolding || nextLoading || (backgroundRestarting && (state.loading || !state.playing)) || (awaitingStart && !state.playing) || (state.playing && state.loading));
     // The grace popup is up, or comes up in this very render's effect (the
     // clock, a session seek's target included, has just crossed the window):
     // the frame before it must not draw the lock, nor count it seen.
@@ -2038,7 +2064,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             )}
 
             {/* Big play button — shown when paused, regardless of loading state */}
-            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && !awaitingStart && !nextLoading && !recoverCard && (
+            {showControls && isVideo && !state.playing && !sessionSeeking && !preHolding && !showResumePrompt && !awaitingStart && !nextLoading && !backgroundRestarting && !recoverCard && (
                 <div class="wt-player-overlay wt-player-overlay--play" onDblClick={(e) => e.stopPropagation()}>
                     <button type="button" class="wt-player-big-play" onClick={(e) => { e.stopPropagation(); togglePlay(); }} aria-label={t('player.play')}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16">
@@ -2302,7 +2328,7 @@ export async function initPlayer(target, opts = {}) {
 
     // Render Preact controls into the player container (after video)
     render(
-        <PlayerComponent videoEl={videoEl} settings={settings} containerEl={playerContainer} showControls={showControls} fixedSize={!!(fixedWidth || fixedHeight)} trackContainer={target} trackHooks={trackHooks} awaitStart={!!opts.awaitStart} />,
+        <PlayerComponent videoEl={videoEl} settings={settings} containerEl={playerContainer} showControls={showControls} fixedSize={!!(fixedWidth || fixedHeight)} trackContainer={target} trackHooks={trackHooks} awaitStart={!!opts.awaitStart} restartState={opts.restartState || null} />,
         playerContainer
     );
 

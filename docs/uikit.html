@@ -2684,7 +2684,10 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       <code>player.streamLost</code>, <code>player.resumeWatching</code> (&ldquo;Продолжить просмотр&rdquo;). In the audio
       player, which is its control bar, the card is one row. Events: <code>player-recover-card-shown</code>,
       <code>player-recover-card-click</code> (<code>reason</code>: <code>limit</code> | <code>network</code>; counted
-      when the card shows, not when it starts waiting).
+      when the card shows, not when it starts waiting). Stream recovery prepares the replacement
+      in the background on the same player stage: no second job log or page progress. The existing
+      buffering pill covers a stall; a failed background attempt uses this same card, whose button
+      retries in the background. The new controls keep the previous timeline while resuming.
     </div>
   </div>
 

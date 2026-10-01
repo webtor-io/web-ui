@@ -7,19 +7,28 @@ import { createStallWatch } from '../stall-watch';
  * Core player state hook.
  * Manages play/pause, currentTime, duration, volume, muted, fullscreen, loading.
  */
-export function usePlayerState(videoRef, containerRef, { duration: serverDuration, seekOffset, seeking }) {
+export function usePlayerState(videoRef, containerRef, { duration: serverDuration, seekOffset, seeking, initialTime = 0, mediaState }) {
     const [playing, setPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
+    const [currentTime, writeCurrentTime] = useState(initialTime);
+    const restoringTo = useRef(initialTime > 0 ? initialTime : null);
+    // Hold the old timeline through mounting and a quantized session seek.
+    // A viewer's own seek takes over immediately; the resume seek keeps it.
+    const setCurrentTime = useCallback((time, { restore = false } = {}) => {
+        restoringTo.current = restore ? time : null;
+        writeCurrentTime(time);
+    }, []);
     const [duration, setDuration] = useState(serverDuration > 0 ? serverDuration : 0);
     const [volume, setVolumeState] = useState(1);
     const [muted, setMutedState] = useState(false);
     const [rate, setRateState] = useState(1);
-    const [fullscreen, setFullscreen] = useState(false);
+    const [fullscreen, setFullscreen] = useState(() => !!(document.fullscreenElement || document.webkitFullscreenElement));
     const [loading, setLoading] = useState(true);
     const [buffered, setBuffered] = useState(0);
 
     const rafRef = useRef(null);
     const stalledRef = useRef(false);
+    const offsetRef = useRef(seekOffset);
+    offsetRef.current = seekOffset;
     const seekingRef = useRef(seeking);
     seekingRef.current = seeking;
 
@@ -50,7 +59,11 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
             }
             if (!seekingRef.current && video && !video.paused) {
                 const rawTime = video.currentTime || 0;
-                setCurrentTime(seekOffset + rawTime);
+                const time = seekOffset + rawTime;
+                if (restoringTo.current === null || time >= restoringTo.current - 0.5) {
+                    restoringTo.current = null;
+                    writeCurrentTime(time);
+                }
                 if (video.buffered && video.buffered.length > 0) {
                     setBuffered(seekOffset + video.buffered.end(video.buffered.length - 1));
                 }
@@ -69,6 +82,13 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
         const video = videoRef.current;
         if (!video) return;
 
+        const onSeeked = () => {
+            const time = offsetRef.current + (video.currentTime || 0);
+            if (restoringTo.current !== null && Math.abs(time - restoringTo.current) < 0.5) {
+                restoringTo.current = null;
+                writeCurrentTime(time);
+            }
+        };
         const onPlay = () => setPlaying(true);
         const onPause = () => setPlaying(false);
         // `stalledRef` is the watchdog's verdict (see the tick above): while
@@ -88,9 +108,10 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
         // reloads the source, and load() resets playbackRate to the default.
         // `muted` is restored only towards silence: a stream the page started
         // muted (autoplay policy) must not be unmuted by a stored "false".
-        const prefs = loadPrefs();
+        const prefs = mediaState || loadPrefs();
         video.volume = prefs.volume;
-        if (prefs.muted) video.muted = true;
+        if (mediaState) video.muted = prefs.muted;
+        else if (prefs.muted) video.muted = true;
         video.defaultPlaybackRate = prefs.rate;
         video.playbackRate = prefs.rate;
 
@@ -107,6 +128,7 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
         };
         const onEnded = () => setPlaying(false);
 
+        video.addEventListener('seeked', onSeeked);
         video.addEventListener('play', onPlay);
         video.addEventListener('pause', onPause);
         video.addEventListener('waiting', onWaiting);
@@ -123,6 +145,7 @@ export function usePlayerState(videoRef, containerRef, { duration: serverDuratio
         setRateState(video.playbackRate);
 
         return () => {
+            video.removeEventListener('seeked', onSeeked);
             video.removeEventListener('play', onPlay);
             video.removeEventListener('pause', onPause);
             video.removeEventListener('waiting', onWaiting);

@@ -121,3 +121,55 @@ test('an audio start is never declared', () => {
     window.localStorage.clear();
     delete window.__wtDecode;
 });
+
+test('only explicit fields of this restart survive declaration cleanup, including on an embed form', async () => {
+    const f = document.createElement('form');
+    f.action = 'https://x.test/embed';
+    let posted;
+    const doc = await fetchStreamRender(f, {
+        fields: { purge: 'true', decode: 'hevc10,aac51', 'decode-fallback': 'media_error', 'decode-class': 'dolby' },
+        fetchImpl: async (url, opts) => { posted = opts.body; return { ok: true, text: async () => jobLog }; },
+        EventSourceImpl: fakeEventSource([{ level: 'rendertemplate', body: '<video class="player"></video>' }]),
+    });
+    assert.ok(doc.querySelector('.player'));
+    assert.equal(posted.get('purge'), 'true');
+    assert.equal(posted.get('decode'), 'hevc10,aac51');
+    assert.equal(posted.get('decode-fallback'), 'media_error');
+    assert.equal(posted.get('decode-class'), 'dolby');
+});
+
+test('aborting closes the event stream and a late job result is ignored', async () => {
+    const controller = new AbortController(); let source;
+    const pending = fetchStreamRender(form(), {
+        fetchImpl, signal: controller.signal,
+        EventSourceImpl: class { constructor() { source = this; } close() { this.closed = true; } },
+    });
+    await new Promise((r) => setTimeout(r, 0));
+    controller.abort();
+    assert.equal(await pending, null);
+    assert.equal(source.closed, true);
+    source.onmessage({ data: JSON.stringify({ level: 'rendertemplate', body: '<video class="player"></video>' }) });
+});
+
+test('a cancelled POST never opens a job stream; only interaction requests a visible fallback', async () => {
+    const controller = new AbortController(); let opened = 0, visible = 0;
+    const ES = class { constructor() { opened++; } close() {} };
+    await fetchStreamRender(form(), {
+        signal: controller.signal, EventSourceImpl: ES,
+        fetchImpl: async (u, opts) => { assert.equal(opts.signal, controller.signal); controller.abort(); return { ok: true, text: async () => jobLog }; },
+    });
+    assert.equal(opened, 0);
+    await fetchStreamRender(form(), {
+        EventSourceImpl: ES, onVisibleRequired: () => visible++,
+        fetchImpl: async () => ({ ok: false }),
+    });
+    assert.equal(visible, 0, 'network failure stays inside the old player');
+    await fetchStreamRender(form(), {
+        onVisibleRequired: () => visible++, EventSourceImpl: fakeEventSource([{ level: 'custom', body: '<dialog>cap</dialog>' }]), fetchImpl,
+    });
+    assert.equal(visible, 1);
+    await fetchStreamRender(form(), {
+        onVisibleRequired: () => visible++, EventSourceImpl: fakeEventSource([{ level: 'error', message: 'no peers' }]), fetchImpl,
+    });
+    assert.equal(visible, 2, 'job errors retain their visible explanation');
+});

@@ -676,3 +676,19 @@ test('restart in an embed of a file rescued from nginx-vod: vod_codecs again', a
     restartStream({ win, doc: win.document, video: q.v, root: q.root });
     assert.equal(posted[1]['decode-fallback'], undefined, 'another file');
 });
+
+test('policy: a failed background attempt preserves the automatic budget and permits a manual retry', () => {
+    const storage = page().sessionStorage;
+    const x = policy({ storage });
+    x.p.sessionGone('404', 404);
+    assert.equal(x.restarts.length, 1);
+    x.p.restartFailed();
+    assert.equal(x.p.restarting, false);
+    assert.deepEqual(x.p.card, { reason: 'network', status: 0 });
+    x.p.sessionGone('404', 404);
+    assert.equal(x.restarts.length, 1, 'the failure did not reset the budget');
+    x.p.click();
+    assert.equal(x.restarts.length, 2, 'manual retry remains possible');
+    assert.equal(x.p.card, null);
+    assert.equal(x.p.restarting, true);
+});

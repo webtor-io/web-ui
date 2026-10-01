@@ -164,8 +164,8 @@ function field(form, name) {
 
 // itemOf: the file's item id -- on the element where the job put it for the
 // player's own restarts (data-item-id), else on its #subtitles dialog, which
-// every video render carries. '' for an audio render: the deep link then.
-function itemOf(video, root, doc) {
+// every video render carries. Legacy audio renders without an item id use the deep link.
+export function itemOf(video, root, doc) {
     const d = (video && video.dataset) || {};
     if (d.itemId) return d.itemId;
     const modal = (root && root.querySelector && root.querySelector('#subtitles')) || doc.querySelector('#subtitles');
@@ -193,8 +193,8 @@ function markedField(form, doc, name) {
 
 // startFormOf: the page's start form of this file -- its resource and item
 // -- or null (none on the page, another file's after a quiet move to the next
-// one, an audio render without an item id).
-function startFormOf(video, root, doc) {
+// one, a legacy audio render without an item id).
+export function startFormOf(video, root, doc) {
     const resourceId = ((video && video.dataset) || {}).resourceId || '';
     const itemId = itemOf(video, root, doc);
     if (!itemId) return null;
@@ -359,6 +359,7 @@ export function createRecoveryPolicy({
     };
     const go = (pos) => {
         restarting = true;
+        if (card) { card = null; hideCard(); }
         pending = null;
         stopWaiting();
         try { restart(pos); } catch (e) { /* the page goes on */ }
@@ -433,6 +434,14 @@ export function createRecoveryPolicy({
 
     return {
         sessionGone,
+        // A background attempt failed. Keep the spent automatic budget and
+        // offer the existing manual retry once the old buffer runs out.
+        restartFailed() {
+            if (disposed) return;
+            restarting = false;
+            card = null;
+            openCard('network', 0);
+        },
         giveUp(status) {
             if (disposed || restarting) return;
             if (isBlocked() || leaving()) return;

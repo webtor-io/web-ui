@@ -578,12 +578,12 @@ test('the guards say what blamed the audio: its buffer, its codec, the element\'
     x.g.onHlsError(hls, MEDIA());
     x.g.onHlsError(hls, APPENDING('audio'));
     x.g.onHlsError(hls, MEDIA());
-    assert.deepEqual(got.pop(), ['media_error', 'mse', 'aac51', 'buffer']);
+    assert.deepEqual(got.pop(), ['media_error', 'mse', 'aac51', 'buffer', { at: 0, play: false }]);
     win = page();
     p = avPlayer(win, { route: 'reencode', decode: 'aac51', audioClass: 'aac51' });
     x = capture((o) => createAudioGuard({ video: p.v, ...o }));
     p.failWith(4);
-    assert.deepEqual(got.pop(), ['src_unsupported', 'native', 'aac51', 'native']);
+    assert.deepEqual(got.pop(), ['src_unsupported', 'native', 'aac51', 'native', { at: 0, play: false }]);
     assert.equal(got.length, 0);
 });
 

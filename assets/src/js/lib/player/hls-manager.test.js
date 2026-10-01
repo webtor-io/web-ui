@@ -259,7 +259,7 @@ test('old route, multichannel audio declared: the guard recovers once and gives 
     hls.trigger(Hls.Events.ERROR, audioAppending);
     hls.trigger(Hls.Events.ERROR, fatalMedia);
     assert.equal(hls.recovered, 2, 'no further recovery');
-    assert.deepEqual(fired, [['media_error', 'mse', 'aac51', 'buffer']], 'with what blamed the audio: its buffer');
+    assert.deepEqual(fired, [['media_error', 'mse', 'aac51', 'buffer', { at: 0, play: true }]], 'with what blamed the audio: its buffer');
     // A network error still restarts loading, as on every route -- the page
     // is restarting, so the guard keeps it.
     hls.trigger(Hls.Events.ERROR, { type: Hls.ErrorTypes.NETWORK_ERROR, details: Hls.ErrorDetails.FRAG_LOAD_TIMEOUT, fatal: true });

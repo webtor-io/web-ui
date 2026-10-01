@@ -3,6 +3,7 @@
 <audio class="player"
        crossorigin="anonymous"
        preload="{{ .ExportTag.Preload }}"
+       data-item-id="{{ .VideoStreamUserData.ItemID }}"
        data-resource-id="{{ .VideoStreamUserData.ResourceID }}"
        {{/* The file that follows this one (jobs/scripts/next_item.go): absent =
             no "next" control, no autoplay. See docs/player.md. */}}

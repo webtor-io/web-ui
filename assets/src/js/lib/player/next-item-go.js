@@ -11,6 +11,7 @@
 // cannot be done quietly (an error card, a cap modal, a Turnstile checkbox)
 // falls back to opening the next file the ordinary, visible way.
 
+import { replacePlayerOnStage } from './player-stage.js';
 import { backgroundToken, fetchStreamRender } from './background-render.js';
 import { readCarry } from './next-item.js';
 import { persistTrackChoice } from './track-dialog.js';
@@ -195,67 +196,13 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
     // mountOnStage: the old player goes, its stage stays; everything else the
     // old render brought (the dialogs, the grace card, the logo) goes with it,
     // or the new render's #subtitles would be the second one in the document.
-    function mountOnStage(doc) {
-        const stage = getStage();
-        const aspectRatio = getAspectRatio(); // before the old player is gone
-        // The stage is empty between the two players, and an empty block has
-        // no height: the page below jumped up and back (owner). Hold the
-        // height it has now until the new player is ready, and say "loading"
-        // inside it meanwhile.
-        if (stage) {
-            stage.style.minHeight = `${stage.offsetHeight}px`;
-            // --switching holds the height; --empty is the spinner, and only
-            // for as long as there is no player in the stage to show its own.
-            stage.classList.add('wt-player-stage--switching', 'wt-player-stage--empty');
-            const release = () => {
-                window.removeEventListener('player_ready', release);
-                clearTimeout(timer);
-                stage.style.minHeight = '';
-                stage.classList.remove('wt-player-stage--switching', 'wt-player-stage--empty');
-            };
-            const timer = setTimeout(release, 15000);
-            window.addEventListener('player_ready', release);
-        }
-        destroyPlayer({ keepStage: true });
-        const host = stage ? stage.parentNode : root;
-        for (const child of [...host.children]) {
-            if (child !== stage) child.remove();
-        }
-        // Scripts in the render are inert when adopted this way, which is
-        // wanted: the player is initialised here, by hand, on the stage.
-        //
-        // What is adopted is the CONTENT of the render's own wrapper (the
-        // <div class="relative"> around the video and its dialogs), into the
-        // old wrapper that holds the stage: adopting the wrapper itself nested
-        // one more level on every move. The stylesheet and script that follow
-        // the wrapper in the render are already on the page.
-        const player = doc.querySelector('.player');
-        const from = player && player.parentNode ? player.parentNode : doc.body;
-        for (const node of [...from.childNodes]) {
-            if (node.nodeType === 1 && (node.tagName === 'SCRIPT' || node.tagName === 'LINK')) continue;
-            host.appendChild(document.importNode(node, true));
-        }
-        // No auto-resume note here (there was one in the first version): a
-        // next episode the viewer had already started asks "continue from
-        // ... / start over" like any other file -- it is their question, and
-        // answering it for them read as the position being ignored (owner,
-        // 2026-09-20).
-        // awaitStart: the new player is about to play by itself; until it does
-        // it shows a spinner, not the big Play button of a paused film.
-        return Promise.resolve(initPlayer(host, { stage, aspectRatio, awaitStart: true })).then(() => {
-            // From here on the player is up. What follows is housekeeping, and
-            // a throw in it must NOT read as "the mount failed": that sends
-            // the viewer into a page reload with a working player on screen
-            // (2026-09-20 -- the review's try/catch was drawn around all of
-            // this, and automatic moves turned into reloads).
-            try {
-                if (stage) stage.classList.remove('wt-player-stage--empty');
-                persistDefaults(host, resourceID, next.itemId);
-                window.dispatchEvent(new CustomEvent('player_replaced', { detail: { target: host } }));
-            } catch (e) {
-                console.error('next item: after-mount step failed', e);
-            }
+    async function mountOnStage(doc) {
+        const host = await replacePlayerOnStage(doc, {
+            stage: getStage(), root, aspectRatio: getAspectRatio(),
+            initPlayer, destroyPlayer, awaitStart: true,
         });
+        try { persistDefaults(host, resourceID, next.itemId); }
+        catch (e) { console.error('next item: after-mount step failed', e); }
     }
 
     return { prepare, go, isPrepared: () => !!freshPrepared() };

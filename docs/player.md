@@ -402,6 +402,31 @@ then 10 s apart — past 2 s, a round each, so the 5xx arithmetic above stands w
 429 storm with no fatal error at all (no subtitle track loading) is hls.js's alone: its playlist retries
 and its gap-skips, never counted.
 
+**Background preparation (2026-10-01)** — `background-restart.js`, `background-render.js`,
+`player-stage.js`. Session recovery, the recovery card's button, and video/audio/VOD codec
+fallbacks now start the job off-page with a detached form and `purge=true`. The same stage
+replacement as the next episode keeps DOM fullscreen and page geometry. The job may run for up
+to ten minutes (the server still owns its deadlines); its progress log never replaces the player.
+The old buffer keeps playing until the render is ready, with the existing buffering pill on a
+stall. At commit, the replacement receives the latest movie time, play/pause, volume, mute, speed
+and grace answer directly, without depending on storage for this handoff. A failed session seek
+retains its requested target; the audio guard captures its position before either recovery or final `detachMedia`
+clears it. A viewer seek discards that old attachment position. The new controls show that time on their first render and hold it until the media reaches
+it through the resume seek. A viewer's own seek releases the hold. A paused film disables
+`autoplay` before source attachment and stays paused.
+
+The playing file's resource/item identify the cloned form, including after Next while the page
+still has the previous file's form. Audio renders now carry `data-item-id` too. The current track
+choice uses the existing `carry-*` fields and saved selections; fallback class/reason and the
+codec declaration are explicit fields of this start, applied after ordinary background declaration
+cleanup. Next and preferred-language refreshes retain that cleanup. An embed posts its original
+settings through the same background flow. Leaving the file aborts POST/SSE and discards a late
+result. A failed fetch/job leaves the player mounted and offers the existing recovery card once
+the buffer runs out; its manual retry retains the codec fallback and automatic budget. A required
+Turnstile click, a cap/error render, or a failed mount takes the existing visible start path so the
+viewer can act. The old note/deep-link flow below describes that fallback. Native video fullscreen
+on iOS belongs to the media element, so its survival through element replacement is not guaranteed.
+
 **The restart** (`stream-restart.js`). A dead session cannot be revived from the browser —
 `POST /session/<id>/seek` answers 404 too — so it is a new start of the stream job, at the viewer's
 place in the film:
@@ -447,8 +472,8 @@ place in the film:
    no-peers or the slow-download modal, an error) leaves the viewer's next press of the button purged
    too, once. The deep link's fields are marked the same way (`app/resource/get.js`): before
    2026-09-30 they stayed on the form for good, and every later press on that page purged. When the
-   form is another file's (a quiet move to the next episode) or there is none (an audio render has
-   no dialog), the deep link
+   form is another file's (a quiet move to the next episode) or there is none (a legacy audio render has
+   no item id), the deep link
    `?file=<path>#action=stream&purge=true` is loaded (`passthrough.js loadDocument`). In an embed,
    its POST again (`postEmbedStart`) with the declaration it started with and `purge=true` — the
    embed POST reads `purge` since 2026-09-29 (`handlers/embed/post.go`);

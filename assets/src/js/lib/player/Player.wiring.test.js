@@ -170,7 +170,7 @@ function mount({ tracks = [], hlsTracks = [], tag = 'video' } = {}) {
     const calls = [];
     let respond = () => ({ ok: true, status: 200, headers: new dom.window.Headers() });
     globalThis.fetch = (url, params) => {
-        calls.push({ url, params, body: params && params.body ? JSON.parse(params.body) : null });
+        calls.push({ url, params, body: params && params.body ? (params.body instanceof dom.window.FormData ? Object.fromEntries(params.body) : JSON.parse(params.body)) : null });
         return Promise.resolve(respond(url, params, calls.length));
     };
     window.fetch = globalThis.fetch;
@@ -7402,4 +7402,117 @@ test('an nginx-vod stream the guard gave up on is not a dead player', async (t) 
         tickBy(t, 60000);
     });
     assert.equal(p.events.find((e) => e.name === 'player-dead'), undefined);
+});
+
+// Background recovery: exercise the actual POST -> job render -> Preact swap,
+// including the controls before the new stream has any media to display.
+test('background recovery keeps the stage and timeline through a fresh player mount, then follows the clock', async (t) => {
+    withHlsJs(t); cleanRestart();
+    const saved = { ES: window.EventSource, form: globalThis.FormData, parser: globalThis.DOMParser };
+    globalThis.FormData = dom.window.FormData; globalThis.DOMParser = dom.window.DOMParser;
+    let source;
+    window.EventSource = class { constructor() { source = this; } close() { this.closed = true; } };
+    t.after(() => { destroyPlayer(); cleanRestart(); window.EventSource = saved.ES; globalThis.FormData = saved.form; globalThis.DOMParser = saved.parser; window.dispatchEvent(new CustomEvent('player_ready')); });
+    const rec = recordSubmits(); t.after(() => rec.stop());
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page); pageStartForm(page, 'item');
+        page.video.dataset.itemId = 'item';
+        page.video.pause = () => { page.video.paused = true; page.video.dispatchEvent(new dom.window.Event('pause')); };
+        page.setResponse((url, params) => {
+            if (String(url).endsWith('/stream-video')) return { ok: true, text: async () => '<div data-async-progress-log="/job/recovery"></div>' };
+            return { ok: true, json: async () => ({ offset: 0 }), headers: new dom.window.Headers() };
+        });
+    });
+    const stage = p.container.querySelector('.wt-player-stage');
+    await playPast(p, 1397);
+    window.hlsPlayer.trigger(Hls.Events.ERROR, deadFragment());
+    await settle();
+    assert.equal(rec.got.length, 0, 'no visible form submit');
+    assert.equal(p.video.isConnected, true, 'buffer stays mounted during the job');
+    const post = p.calls.find((c) => String(c.url).endsWith('/stream-video'));
+    assert.equal(post.body.purge, 'true');
+    assert.equal(post.body['item-id'], 'item');
+    // The buffer advanced while the fresh session was being prepared.
+    p.video.currentTime = 1410;
+    source.onmessage({ data: JSON.stringify({ level: 'rendertemplate', body: '<div><video class="player" controls autoplay data-resource-id="res" data-item-id="item" data-path="movie.mkv" data-duration="3600"></video></div>' }) });
+    await settle(); await settle();
+    const next = p.container.querySelector('video.player');
+    assert.notEqual(next, p.video);
+    assert.equal(p.container.querySelector('.wt-player-stage'), stage);
+    assert.equal(p.container.querySelector('.wt-player-time span').textContent, '23:30');
+    assert.equal(next.currentTime, 1410, 'resume targets the latest position');
+    // Simulate source attachment briefly resetting the browser's media clock.
+    next.currentTime = 0; next.paused = false;
+    next.dispatchEvent(new dom.window.Event('play'));
+    await settle();
+    assert.equal(p.container.querySelector('.wt-player-time span').textContent, '23:30', 'never shows 0 during recovery');
+    next.currentTime = 1412;
+    await settle();
+    assert.equal(p.container.querySelector('.wt-player-time span').textContent, '23:32');
+    assert.equal(source.closed, true);
+    assert.equal(rec.got.length, 0);
+});
+
+test('a background restart mounted paused retains time and suppresses autoplay before HLS attaches, audio too', async (t) => {
+    cleanRestart(); t.after(() => { destroyPlayer(); cleanRestart(); });
+    for (const tag of ['video', 'audio']) {
+        const p = mount({ tag });
+        p.video.setAttribute('controls', ''); p.video.autoplay = true;
+        p.video.dataset.duration = '3600';
+        await initPlayer(p.container, { restartState: { at: 1397, play: false, settled: true } });
+        assert.equal(p.container.querySelector('.wt-player-time span').textContent, '23:17', 'time is retained on the very first render');
+        assert.equal(p.video.autoplay, false);
+        await settle(); await settle();
+        assert.equal(p.video.currentTime, 1397);
+        assert.equal(p.video.paused, true);
+        assert.equal(p.container.querySelector('.wt-player-time span').textContent, '23:17');
+        destroyPlayer();
+    }
+});
+
+test('failed background audio fallback offers an in-player retry with its original place and codec fields', async (t) => {
+    withHlsJs(t); cleanRestart(); freshDecodeMemory();
+    const saved = { ES: window.EventSource, form: globalThis.FormData, parser: globalThis.DOMParser };
+    globalThis.FormData = dom.window.FormData; globalThis.DOMParser = dom.window.DOMParser;
+    window.EventSource = class {
+        constructor() { setTimeout(() => this.onmessage?.({ data: JSON.stringify({ level: 'rendertemplate', body: '<div><video class="player" controls autoplay data-resource-id="res" data-item-id="item" data-path="movie.mkv" data-duration="3600"></video></div>' }) }), 0); }
+        close() {}
+    };
+    t.after(() => { destroyPlayer(); cleanRestart(); freshDecodeMemory(); window.EventSource = saved.ES; globalThis.FormData = saved.form; globalThis.DOMParser = saved.parser; window.dispatchEvent(new CustomEvent('player_ready')); });
+    let posts = 0;
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page); pageStartForm(page, 'item');
+        Object.assign(page.video.dataset, { itemId: 'item', decode: 'aac51', audioClass: 'aac51', videoRoute: 'reencode' });
+        page.video.pause = () => { page.video.paused = true; page.video.dispatchEvent(new dom.window.Event('pause')); };
+        page.setResponse((url) => {
+            if (String(url).endsWith('/stream-video')) {
+                posts++;
+                return posts === 1 ? { ok: false } : { ok: true, text: async () => '<div data-async-progress-log="/job/retry"></div>' };
+            }
+            return { ok: true, json: async () => ({ offset: 0 }), headers: new dom.window.Headers() };
+        });
+    });
+    await playPast(p, 1397);
+    const hls = window.hlsPlayer;
+    hls.detachMedia = () => { p.video.currentTime = 0; p.video.paused = true; };
+    hls.trigger(Hls.Events.BUFFER_CODECS, { audio: { codec: 'mp4a.40.2', metadata: { channelCount: 6 } } });
+    const appending = { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.BUFFER_APPENDING_ERROR, sourceBufferName: 'audio', fatal: false };
+    const media = { type: Hls.ErrorTypes.MEDIA_ERROR, details: Hls.ErrorDetails.BUFFER_APPEND_ERROR, fatal: true };
+    hls.trigger(Hls.Events.ERROR, appending); hls.trigger(Hls.Events.ERROR, media);
+    await settle();
+    hls.trigger(Hls.Events.ERROR, appending); hls.trigger(Hls.Events.ERROR, media);
+    await settle();
+    const card = p.container.querySelector('.wt-recover');
+    assert.ok(card, 'the guard ownership permits its failed background transport to show the card');
+    assert.equal(posts, 1);
+    click(card.querySelector('button'));
+    await settle(); await settle();
+    assert.equal(posts, 2);
+    const starts = p.calls.filter(c => String(c.url).endsWith('/stream-video'));
+    assert.equal(starts[1].body['decode-class'], 'aac51');
+    assert.equal(starts[1].body['decode-fallback'], starts[0].body['decode-fallback']);
+    assert.equal(starts[1].body.purge, 'true');
+    assert.equal(p.container.querySelector('.wt-player-time span').textContent, '23:17');
+    assert.equal(p.container.querySelector('video.player').currentTime, 1397);
+    assert.equal(p.events.filter(e => e.name === 'audio-fallback').length, 1, 'retry did not strike/count the class again');
 });

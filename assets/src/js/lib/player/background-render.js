@@ -63,18 +63,25 @@ export function progressText(step, status) {
     return step || status || '';
 }
 
-export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, token = '', timeoutMs = FRESH_RENDER_TIMEOUT_MS, onProgress = null } = {}) {
+export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, token = '', timeoutMs = FRESH_RENDER_TIMEOUT_MS, onProgress = null, fields = {}, signal, onVisibleRequired = null } = {}) {
     const doFetch = fetchImpl || fetch;
     const ES = EventSourceImpl || window.EventSource;
-    if (!form || !ES) return null;
-    const target = document.querySelector(form.getAttribute('data-async-target') || '');
+    if (!form || !ES || signal?.aborted) return null;
+    const selector = form.getAttribute('data-async-target');
+    const target = selector ? document.querySelector(selector) : null;
     let text = '';
     const body = new FormData(form);
     if (token) body.set('cf-turnstile-response', token);
     declare(body, form);
+    // Explicit fields belong to THIS restart, after the ordinary declaration.
+    for (const [name, value] of Object.entries(fields)) {
+        if (value === null || value === '') body.delete(name);
+        else body.set(name, value);
+    }
     try {
         const res = await doFetch(form.action, {
             method: 'POST',
+            signal,
             body,
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -89,6 +96,7 @@ export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, toke
     } catch (e) {
         return null;
     }
+    if (signal?.aborted) return null;
     const doc = new DOMParser().parseFromString(text, 'text/html');
     // The async wire format wraps the view in <template> blocks, whose
     // content DOMParser keeps in a separate fragment.
@@ -98,19 +106,30 @@ export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, toke
         host = tpl.content.querySelector('[data-async-progress-log]');
     }
     const url = host && host.getAttribute('data-async-progress-log');
-    if (!url) return null;
+    if (!url) {
+        if (onVisibleRequired) onVisibleRequired();
+        return null;
+    }
 
     return new Promise((resolve) => {
         const src = new ES(url, { withCredentials: true });
         let step = '';
+        let finished = false;
+        const aborted = () => finish(null);
         const finish = (value) => {
+            if (finished) return;
+            finished = true;
+            signal?.removeEventListener('abort', aborted);
             clearTimeout(timer);
             src.close();
             resolve(value);
         };
         const timer = setTimeout(() => finish(null), timeoutMs);
+        signal?.addEventListener('abort', aborted, { once: true });
+        if (signal?.aborted) { finish(null); return; }
         src.onerror = () => finish(null);
         src.onmessage = (ev) => {
+            if (finished) return;
             let data = null;
             try { data = JSON.parse(ev.data); } catch (e) { return; }
             if (onProgress) {
@@ -127,6 +146,7 @@ export async function fetchStreamRender(form, { fetchImpl, EventSourceImpl, toke
             if (data.level === 'rendertemplate') {
                 finish(new DOMParser().parseFromString(String(data.body || ''), 'text/html'));
             } else if (data.level === 'close' || data.level === 'custom' || data.level === 'error') {
+                if ((data.level === 'custom' || data.level === 'error') && onVisibleRequired) onVisibleRequired();
                 finish(null);
             }
         };

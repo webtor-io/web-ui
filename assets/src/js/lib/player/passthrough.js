@@ -584,7 +584,8 @@ function playedClock(video) {
 // has, and the element's errors are nobody's on the hls.js path (hls.js
 // learns of them at its next append, as on every old-route stream).
 //
-// fallback gets (reason, path, audio, by) as the passthrough guard's does,
+// fallback gets (reason, path, audio, by, place); place is captured before detach,
+// including a first recovery that already detached the failed attachment.
 // audio never null, by 'native' for the native rule. Returns { onHlsError,
 // onBufferCodecs, setHls, dispose }.
 export function createAudioGuard({ video, fallback, now = () => Date.now(),
@@ -599,11 +600,16 @@ export function createAudioGuard({ video, fallback, now = () => Date.now(),
     const clock = playedClock(video);
     let recoveredAt = -Infinity;
     let playedAtRecovery = 0;
+    let recoveredPlace = null;
 
     const fire = (reason) => {
         if (done) return false;
         done = true;
         dispose();
+        // recoverMediaError may itself have detached the failed attachment.
+        // Preserve its last real place when the immediate re-failure reads 0.
+        const rawPlace = { at: video.currentTime || 0, play: !video.paused };
+        const place = rawPlace.at === 0 && recoveredPlace?.at > 0 ? recoveredPlace : rawPlace;
         if (hlsRef) {
             // Nothing more to load or recover for this file: without this,
             // hls.js's own recovery of an ended MediaSource re-attaches and
@@ -613,12 +619,13 @@ export function createAudioGuard({ video, fallback, now = () => Date.now(),
         }
         // by: what blamed the audio; on native HLS nothing does -- the rule
         // before CLEAN_PLAY_S of playback.
-        try { fallback(reason, hlsRef ? 'mse' : 'native', side.audio(), side.by() || 'native'); } catch (e) { /* the page goes on */ }
+        try { fallback(reason, hlsRef ? 'mse' : 'native', side.audio(), side.by() || 'native', place); } catch (e) { /* the page goes on */ }
         return true;
     };
     const incidents = createIncidents({
         video, now, setTimer, clearTimer,
         onRecover: () => {
+            recoveredPlace = { at: video.currentTime || 0, play: !video.paused };
             side.forget();
             recoveredAt = now();
             playedAtRecovery = clock.played();
@@ -675,6 +682,7 @@ export function createAudioGuard({ video, fallback, now = () => Date.now(),
         onBufferCodecs: side.onBufferCodecs,
         setHls(h) { hlsRef = h; },
         dispose,
+        clearRestartPlace() { recoveredPlace = null; },
         get done() { return done; },
     };
 }
@@ -762,7 +770,8 @@ function restartEmbed(win, doc, reason, cls, decode = null) {
 // embed's POST, the page's start form, the deep link, or a reload. What it
 // declares is the declaration hook's (decode-declaration.js): nothing for a
 // video class, the declaration without the class's drop for an audio one.
-function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate }) {
+function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate, restart }) {
+    if (restart) { restart({ reason, cls }); return 'background'; }
     if (win._embedSettings) {
         let decode = null;
         if (isAudioClass(cls) || cls === VOD_FALLBACK_CLASS) {
@@ -789,6 +798,14 @@ function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate })
     return 'reload';
 }
 
+// Visible transport after an off-page start requires interaction or cannot mount.
+// The policy has already recorded the codec failure; do not strike/count twice.
+export function restartFallback({ video, reason, cls, win = window, doc = document }) {
+    const d = video.dataset || {};
+    return restartFile({ win, doc, d, resourceId: d.resourceId || '', itemId: d.itemId || '', reason, cls,
+        navigate: (url) => loadDocument(win.location, url) });
+}
+
 // fallbackToOldRoute gives this file up to the old route (the stage 3 spec's
 // machine, §6):
 //   1. the memory: this file, and a strike against its class where the
@@ -811,7 +828,7 @@ function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate })
 // Returns which restart it took.
 export function fallbackToOldRoute({ video, reason, path = 'mse', win = window, doc = document,
     track = (name, data) => { if (win.umami) win.umami.track(name, data); },
-    navigate = (u) => loadDocument(win.location, u) }) {
+    navigate = (u) => loadDocument(win.location, u), restart }) {
     const d = video.dataset || {};
     const resourceId = d.resourceId || '';
     const itemId = d.itemId || '';
@@ -820,7 +837,7 @@ export function fallbackToOldRoute({ video, reason, path = 'mse', win = window, 
         rememberFallback(win, { resourceId, itemId, cls, strike: STRIKING.has(reason) });
     } catch (e) { /* no memory: the restart still goes without a declaration */ }
     try { track('hevc-fallback', { reason, cls, path, audio: startAudioClass(video) }); } catch (e) { /* no telemetry */ }
-    return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate });
+    return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate, restart });
 }
 
 // VOD_REASON: why a stream nginx-vod served was given up (vod-guard.js) --
@@ -839,14 +856,14 @@ export const VOD_REASON = VOD_FALLBACK_REASON;
 // mime} -- not hevc-fallback, whose count is the passthrough's.
 export function fallbackToTranscoder({ video, mime = '', win = window, doc = document,
     track = (name, data) => { if (win.umami) win.umami.track(name, data); },
-    navigate = (u) => loadDocument(win.location, u) }) {
+    navigate = (u) => loadDocument(win.location, u), restart }) {
     const d = video.dataset || {};
     const file = { resourceId: d.resourceId || '', itemId: d.itemId || '' };
     try { track('vod-fallback', { reason: VOD_REASON, mime }); } catch (e) { /* no telemetry */ }
     // Every later start of this file on the page carries vod_codecs too
     // (decode-declaration.js markVodRescue).
     try { markVodRescue(win, file); } catch (e) { /* the restart still goes */ }
-    return restartFile({ win, doc, d, ...file, reason: VOD_REASON, cls: VOD_FALLBACK_CLASS, navigate });
+    return restartFile({ win, doc, d, ...file, reason: VOD_REASON, cls: VOD_FALLBACK_CLASS, navigate, restart });
 }
 
 // The audio failures that strike their class: the decoder's (MediaError 3)
@@ -876,8 +893,8 @@ export const AUDIO_STRIKING = new Set(['decode_error', 'media_error']);
 // Returns which restart it took.
 export function fallbackAudio({ video, reason, cls, path = 'mse', by = '', win = window, doc = document,
     track = (name, data) => { if (win.umami) win.umami.track(name, data); },
-    navigate = (u) => loadDocument(win.location, u) }) {
-    if (!isAudioClass(cls)) return fallbackToOldRoute({ video, reason, path, win, doc, track, navigate });
+    navigate = (u) => loadDocument(win.location, u), restart }) {
+    if (!isAudioClass(cls)) return fallbackToOldRoute({ video, reason, path, win, doc, track, navigate, restart });
     const d = video.dataset || {};
     const resourceId = d.resourceId || '';
     const itemId = d.itemId || '';
@@ -887,5 +904,5 @@ export function fallbackAudio({ video, reason, cls, path = 'mse', by = '', win =
     try {
         track('audio-fallback', { reason, cls, path, route: d.videoRoute || '', audio: startAudioClass(video), by: by || '' });
     } catch (e) { /* no telemetry */ }
-    return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate });
+    return restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate, restart });
 }
