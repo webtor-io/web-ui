@@ -2,7 +2,7 @@ package recommendations
 
 import (
 	"github.com/urfave/cli"
-	ac "github.com/webtor-io/web-ui/services/anthropic_client"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 )
 
 // CLI flag names. Kept as exported constants so that tests and handlers can
@@ -12,14 +12,14 @@ const (
 	// FlagModel is the legacy single-model knob. If set, both tiers use it
 	// unless overridden by the tier-specific flags below. Kept for backwards
 	// compatibility with the original Config.
-	FlagModel          = "ai-recommendations-model"
-	FlagFreeModel      = "ai-recommendations-free-model"
-	FlagPaidModel      = "ai-recommendations-paid-model"
-	FlagChipsModel     = "ai-recommendations-chips-model"
-	FlagFreeDailyQuota = "ai-recommendations-free-daily-quota"
-	FlagPaidDailyQuota = "ai-recommendations-paid-daily-quota"
-	FlagMaxQueryLength = "ai-recommendations-max-query-length"
-	FlagHistoryLimit   = "ai-recommendations-history-limit"
+	FlagModel                 = "ai-recommendations-model"
+	FlagFreeModel             = "ai-recommendations-free-model"
+	FlagPaidModel             = "ai-recommendations-paid-model"
+	FlagChipsModel            = "ai-recommendations-chips-model"
+	FlagFreeDailyQuota        = "ai-recommendations-free-daily-quota"
+	FlagPaidDailyQuota        = "ai-recommendations-paid-daily-quota"
+	FlagMaxQueryLength        = "ai-recommendations-max-query-length"
+	FlagHistoryLimit          = "ai-recommendations-history-limit"
 	FlagChipsTTL              = "ai-recommendations-chips-ttl-seconds"
 	FlagRecsTTL               = "ai-recommendations-recs-ttl-seconds"
 	FlagFreshReleasesMinYear  = "ai-recommendations-fresh-releases-min-year"
@@ -27,31 +27,27 @@ const (
 	FlagFreshReleasesCacheTTL = "ai-recommendations-fresh-releases-cache-ttl-seconds"
 )
 
-// DefaultModel is the Claude model we target out of the box. Haiku 4.5 has
-// the best cost/latency trade-off for a constrained recommendation task.
-const DefaultModel = "claude-haiku-4-5-20251001"
-
 // Config is the resolved configuration for the recommendations service.
 // Populated from CLI flags / env vars at wiring time.
 type Config struct {
-	Enabled         bool
-	AnthropicAPIKey string
+	Enabled  bool
+	Provider ac.Provider
 	// Model is the legacy single-model setting. When set, it acts as the
 	// fallback for both tiers if neither FreeModel nor PaidModel is given.
 	// New deployments should prefer FreeModel + PaidModel.
-	Model           string
-	FreeModel       string
-	PaidModel       string
-	ChipsModel      string
-	FreeDailyQuota  int
-	PaidDailyQuota  int
-	MaxQueryLength  int
-	HistoryLimit    int
-	ChipsTTLSeconds        int
-	RecsTTLSeconds         int
-	FreshReleasesMinYear   int
-	FreshReleasesLimit     int
-	FreshReleasesCacheTTL  int
+	Model                 string
+	FreeModel             string
+	PaidModel             string
+	ChipsModel            string
+	FreeDailyQuota        int
+	PaidDailyQuota        int
+	MaxQueryLength        int
+	HistoryLimit          int
+	ChipsTTLSeconds       int
+	RecsTTLSeconds        int
+	FreshReleasesMinYear  int
+	FreshReleasesLimit    int
+	FreshReleasesCacheTTL int
 }
 
 // RegisterFlags registers all CLI flags for the recommendations service.
@@ -65,23 +61,22 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:   FlagModel,
-			Usage:  "Claude model id (legacy — used as fallback for both tiers when free/paid overrides are unset)",
-			Value:  DefaultModel,
+			Usage:  "AI model id (used as fallback for both tiers; defaults to the configured provider's model)",
 			EnvVar: "AI_RECOMMENDATIONS_MODEL",
 		},
 		cli.StringFlag{
 			Name:   FlagFreeModel,
-			Usage:  "Claude model id for free-tier users (overrides --ai-recommendations-model)",
+			Usage:  "AI model id for free-tier users (overrides --ai-recommendations-model)",
 			EnvVar: "AI_RECOMMENDATIONS_FREE_MODEL",
 		},
 		cli.StringFlag{
 			Name:   FlagPaidModel,
-			Usage:  "Claude model id for paid-tier users (overrides --ai-recommendations-model)",
+			Usage:  "AI model id for paid-tier users (overrides --ai-recommendations-model)",
 			EnvVar: "AI_RECOMMENDATIONS_PAID_MODEL",
 		},
 		cli.StringFlag{
 			Name:   FlagChipsModel,
-			Usage:  "Claude model id for chip generation (defaults to free-tier model if unset — chips are lightweight and don't benefit from a smarter model)",
+			Usage:  "AI model id for chip generation (defaults to free-tier model if unset)",
 			EnvVar: "AI_RECOMMENDATIONS_CHIPS_MODEL",
 		},
 		cli.IntFlag{
@@ -144,16 +139,16 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 // ConfigFromCLI reads a Config struct from the urfave/cli context.
 func ConfigFromCLI(c *cli.Context) Config {
 	return Config{
-		Enabled:         c.Bool(FlagEnabled),
-		AnthropicAPIKey: c.String(ac.FlagAnthropicAPIKey),
-		Model:           c.String(FlagModel),
-		FreeModel:       c.String(FlagFreeModel),
-		PaidModel:       c.String(FlagPaidModel),
-		ChipsModel:      c.String(FlagChipsModel),
-		FreeDailyQuota:  c.Int(FlagFreeDailyQuota),
-		PaidDailyQuota:  c.Int(FlagPaidDailyQuota),
-		MaxQueryLength:  c.Int(FlagMaxQueryLength),
-		HistoryLimit:    c.Int(FlagHistoryLimit),
+		Enabled:               c.Bool(FlagEnabled),
+		Provider:              ac.ProviderFromCLI(c),
+		Model:                 c.String(FlagModel),
+		FreeModel:             c.String(FlagFreeModel),
+		PaidModel:             c.String(FlagPaidModel),
+		ChipsModel:            c.String(FlagChipsModel),
+		FreeDailyQuota:        c.Int(FlagFreeDailyQuota),
+		PaidDailyQuota:        c.Int(FlagPaidDailyQuota),
+		MaxQueryLength:        c.Int(FlagMaxQueryLength),
+		HistoryLimit:          c.Int(FlagHistoryLimit),
 		ChipsTTLSeconds:       c.Int(FlagChipsTTL),
 		RecsTTLSeconds:        c.Int(FlagRecsTTL),
 		FreshReleasesMinYear:  c.Int(FlagFreshReleasesMinYear),
@@ -162,8 +157,8 @@ func ConfigFromCLI(c *cli.Context) Config {
 	}
 }
 
-// ResolveChipsModel returns the Claude model id used for chip generation.
-// Override chain: ChipsModel → free-tier model → legacy Model → DefaultModel.
+// ResolveChipsModel returns the AI model id used for chip generation.
+// Override chain: ChipsModel → free-tier model → legacy Model → provider default.
 // Chips are lightweight (6 short labels) so the default intentionally
 // falls back to the free-tier model (Haiku), not the paid one.
 func (c Config) ResolveChipsModel() string {
@@ -173,8 +168,8 @@ func (c Config) ResolveChipsModel() string {
 	return c.ResolveModel(TierFree)
 }
 
-// ResolveModel returns the effective Claude model id for the given tier,
-// applying the override chain: tier-specific → legacy Model → DefaultModel.
+// ResolveModel returns the effective AI model id for the given tier,
+// applying the override chain: tier-specific → legacy Model → provider default.
 func (c Config) ResolveModel(tier Tier) string {
 	specific := c.FreeModel
 	if tier == TierPaid {
@@ -186,5 +181,5 @@ func (c Config) ResolveModel(tier Tier) string {
 	if c.Model != "" {
 		return c.Model
 	}
-	return DefaultModel
+	return ac.DefaultModel(c.Provider)
 }

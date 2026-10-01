@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webtor-io/web-ui/models"
-	ac "github.com/webtor-io/web-ui/services/anthropic_client"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 	"github.com/webtor-io/web-ui/services/api"
 	enr "github.com/webtor-io/web-ui/services/enrich"
 )

@@ -8,7 +8,7 @@ For some releases every mapper misses. The most common causes:
 - Release-group quirks that confuse the title parser (extra dot/underscore patterns, codec/audio tags glued to the title).
 - Films that exist in TMDB only under an obscure alternate title.
 
-The AI enrichment fallback asks Claude to **normalize** the parsed title — translate Latin transliterations back to the native script, suggest the canonical English title, expand abbreviations — and re-runs the same TMDB/OMDB/KPU mappers against each candidate. Claude does **not** identify the IMDB id directly: that would force it to recall facts past its training cutoff (newer films wouldn't be known). Pattern-recognising "Vot eto drama" as Russian transliteration of "Вот это драма" is on-the-other-hand cutoff-free.
+The AI enrichment fallback asks the configured AI provider (Anthropic or OpenAI) to **normalize** the parsed title — translate Latin transliterations back to the native script, suggest the canonical English title, expand abbreviations — and re-runs the same TMDB/OMDB/KPU mappers against each candidate. The model does **not** identify the IMDB id directly: that would force it to recall facts past its training cutoff (newer films wouldn't be known). Pattern-recognising "Vot eto drama" as Russian transliteration of "Вот это драма" is on-the-other-hand cutoff-free.
 
 ## Pipeline
 
@@ -18,7 +18,7 @@ mapMetadata(title, year, ct, pathHint)
   → OMDB.Map      (parsed title + year)           ── hit ─→ done   ← errors logged + skipped
   → KPU.Map       (parsed title + year)           ── hit ─→ done
   → tryAIFallback(pathHint, parsed title, year, ct)
-        → isAdultPath(pathHint) ── true ─→ nil (no Claude, no cache write)
+        → isAdultPath(pathHint) ── true ─→ nil (no AI call, no cache write)
         → AIResolver.SuggestCandidates → []TitleCandidate{title, year, language}
         → for each candidate:
               for each mapper (TMDB, OMDB, KPU):
@@ -122,17 +122,32 @@ What we'd lose in audit (which model resolved which torrent) is recoverable from
 
 ## Configuration
 
-All flags are off by default. Enabling requires `ANTHROPIC_API_KEY` (the same flag as AI recommendations).
+The feature is off by default. Enabling requires `ANTHROPIC_API_KEY` or
+`OPENAI_API_KEY` (shared with AI recommendations). Anthropic takes precedence
+when both keys are configured. Selection is configuration-only; API errors do
+not switch providers. See [AI provider selection](ai_recommendations.md#ai-provider-selection).
 
 | Flag                          | Env                          | Default                      | Meaning                                                  |
 | ----------------------------- | ---------------------------- | ---------------------------- | -------------------------------------------------------- |
 | `--ai-enrich-enabled`         | `AI_ENRICH_ENABLED`          | `false`                      | Master switch for the fallback                           |
-| `--ai-enrich-model`           | `AI_ENRICH_MODEL`            | `claude-haiku-4-5-20251001`  | Claude model id                                           |
+| `--ai-enrich-model`           | `AI_ENRICH_MODEL`            | (provider default)          | AI model id                                           |
 | `--ai-enrich-max-candidates`  | `AI_ENRICH_MAX_CANDIDATES`   | `3`                          | Cap on (title, year) suggestions per call                |
 | `--ai-enrich-timeout-seconds` | `AI_ENRICH_TIMEOUT_SECONDS`  | `30`                         | Per-call timeout                                         |
-| `--anthropic-api-key`         | `ANTHROPIC_API_KEY`          | (required)                   | Shared with AI recommendations                           |
+| `--anthropic-api-key`         | `ANTHROPIC_API_KEY`          | `""`                         | Shared Anthropic key                                     |
+| `--openai-api-key`            | `OPENAI_API_KEY`             | `""`                         | Shared OpenAI key                                        |
+| `--openai-base-url`           | `OPENAI_BASE_URL`            | `https://api.openai.com/v1`   | Responses API base URL                                   |
 
-The shared `*anthropic.Client` is constructed by `services/anthropic_client/`. AI recommendations and AI enrichment both consume the same client so the prompt-caching beta header lives in one place.
+The shared `ai_client.Client` is constructed by `services/ai_client.New`.
+Both recommendations and enrichment use it. Enrichment calls a forced tool
+(`return_candidates`), translated by the adapters into Anthropic `tool_use` or
+OpenAI Responses `function_call`. Candidate validation, mapper lookup and DB
+cache semantics stay shared. The default model is `claude-haiku-4-5-20251001`
+for Anthropic and `gpt-4.1-mini` for OpenAI; an explicit `AI_ENRICH_MODEL`
+overrides it and must belong to the chosen provider.
+
+Regression coverage: `services/enrich/ai_provider_test.go` exercises the OpenAI
+HTTP request, model resolution, native-script candidates and nullable years.
+The latency and token measurements below describe Anthropic, not OpenAI.
 
 ## Cost & latency
 
@@ -160,6 +175,6 @@ movie_metadata: "The Drama" / 2026 / poster / plot / rating 7.0
 
 ## Files of interest
 
-- `services/anthropic_client/anthropic_client.go` — shared SDK client constructor + API-key flag.
+- `services/ai_client/` — shared provider selection, API-key flags and SDK adapters.
 - `services/enrich/ai_resolver.go` — `AIResolver`, `RegisterFlags`, `New(c, client, _)`, `SuggestCandidates`, system prompt — all in one file (mirrors the pattern in `services/tmdb/api.go` and `services/kinopoisk_unofficial/api.go`).
 - `services/enrich/enrich.go` — `mapMetadata` is fault-tolerant (per-mapper errors → log + skip) and calls `tryAIFallback` after the loop. `tryAIFallback` iterates candidates through the mapper chain.

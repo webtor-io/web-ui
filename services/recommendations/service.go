@@ -11,7 +11,7 @@
 //
 // Claude is asked to return (title, year, reason) triples as plain-text
 // NDJSON (one JSON object per line) so the response can be streamed
-// token-by-token — see streamClaudeItemsText. The resolver validates each
+// token-by-token — see streamAIItemsText. The resolver validates each
 // triple against MetadataLookup and drops anything it cannot turn into a
 // real IMDB-keyed VideoMetadata entry, shielding the UI from hallucinated
 // titles.
@@ -164,7 +164,7 @@ type ChipsResponse struct {
 }
 
 // Service is the only surface handlers and tests need. Implementations are
-// wired in claude.go (production) and via fakes in tests.
+// wired in ai.go (production) and via fakes in tests.
 type Service interface {
 	// GenerateChips returns a list of recommendation chips tailored to the
 	// given user's history and the current moment in time. Results are
@@ -269,7 +269,7 @@ type UserHistoryLoader interface {
 	FilterWatchlistVideoIDs(ctx context.Context, userID uuid.UUID, videoIDs []string) ([]string, error)
 }
 
-// Quota guards spend against the Anthropic API. Implementations live in
+// Quota guards spend against the configured AI provider. Implementations live in
 // quota.go (Redis) and tests inject fakes.
 type Quota interface {
 	// Consume increments the user's daily counter and returns the remaining

@@ -53,7 +53,7 @@ import (
 	jj "github.com/webtor-io/web-ui/jobs"
 	as "github.com/webtor-io/web-ui/services/abuse_store"
 	at "github.com/webtor-io/web-ui/services/access_token"
-	ac "github.com/webtor-io/web-ui/services/anthropic_client"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 	ci "github.com/webtor-io/web-ui/services/cache_index"
 	"github.com/webtor-io/web-ui/services/common"
 	si18n "github.com/webtor-io/web-ui/services/i18n"
@@ -375,12 +375,12 @@ func serve(c *cli.Context) error {
 		r.Use(auth.OnlyAuthorized(onlyAuthorizedExempt()...))
 	}
 
-	// Setting shared Anthropic client (nil when ANTHROPIC_API_KEY is unset).
+	// Setting shared AI client (nil when no provider API key is configured).
 	// Consumed by both AI recommendations and AI enrichment.
-	anthropicCl := ac.New(c)
+	aiCl := ac.New(c)
 
 	// Setting Enricher
-	en := makeEnricher(c, cl, pg, sapi, anthropicCl)
+	en := makeEnricher(c, cl, pg, sapi, aiCl)
 
 	// Setting UserSubtitle service. Returns nil when the deployment is not
 	// configured with USER_SUBTITLE_S3_BUCKET; jobs and handlers then treat
@@ -568,7 +568,7 @@ func serve(c *cli.Context) error {
 	// Setting AI Recommendations (Discover)
 	//
 	// rec.New returns nil when the feature flag is off or
-	// ANTHROPIC_API_KEY is empty. In that case we skip handler
+	// no provider API key is configured. In that case we skip handler
 	// registration entirely — the routes simply don't exist.
 	//
 	// Built before Discover because the page has to be told: its chips
@@ -577,7 +577,7 @@ func serve(c *cli.Context) error {
 	// indistinguishable from a network blip. Left to infer, the section drew
 	// itself and then reported a failure on an instance that simply has no
 	// API key.
-	recSvc := rec.New(c, anthropicCl, pg, redis, en, en)
+	recSvc := rec.New(c, aiCl, pg, redis, en, en)
 	if recSvc != nil {
 		discover_ai.RegisterHandler(r, recSvc)
 	}

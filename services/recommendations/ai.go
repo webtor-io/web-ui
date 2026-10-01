@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/models"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 )
 
 const (
@@ -23,9 +23,9 @@ const (
 	// MaxTokens is generous enough for 15 items × ~80 tokens of reason
 	// plus JSON boilerplate, but not so big that a runaway response burns
 	// our budget. Bumping these requires re-measuring cost.
-	claudeMaxTokensRecommend = 2048
-	claudeMaxTokensChips     = 1024
-	claudeTimeout            = 45 * time.Second
+	aiMaxTokensRecommend = 2048
+	aiMaxTokensChips     = 1024
+	aiTimeout            = 45 * time.Second
 
 	// Range requested from Claude. We ask for more than we display so the
 	// watched-filter and the metadata resolver have buffer to drop items
@@ -46,11 +46,11 @@ const (
 	desiredChips = 6
 )
 
-// ClaudeService is the production implementation of Service. It wires the
-// Anthropic SDK, the context builder, the metadata resolver, the quota and
+// AIService is the production implementation of Service. It wires the
+// shared AI client, the context builder, the metadata resolver, the quota and
 // the distributed chips cache together.
 //
-// Caching strategy
+// # Caching strategy
 //
 // Chips are cached in Redis (via ChipsCache) because web-ui runs multiple
 // replicas behind a load balancer, and an in-process cache on pod A would
@@ -61,53 +61,53 @@ const (
 // call is unique per (query, history) anyway, and the daily quota is the
 // primary rate limiter. Not caching keeps the happy path trivial and
 // removes an entire class of double-consume races.
-type ClaudeService struct {
-	cfg            Config
-	client         *anthropic.Client
-	freeModel      anthropic.Model
-	paidModel      anthropic.Model
-	chipsModel     anthropic.Model
-	context        *UserContextBuilder
-	resolver       *Resolver
-	quota          Quota
-	chips          ChipsCache
-	freshReleases  FreshReleasesLoader
+type AIService struct {
+	cfg           Config
+	client        ac.Client
+	freeModel     string
+	paidModel     string
+	chipsModel    string
+	context       *UserContextBuilder
+	resolver      *Resolver
+	quota         Quota
+	chips         ChipsCache
+	freshReleases FreshReleasesLoader
 }
 
-// modelFor returns the Claude model id to use for a given tier. The two
+// modelFor returns the AI model id to use for a given tier. The two
 // tiers can be separately configured (Config.FreeModel / Config.PaidModel)
 // so paid users can be routed to a more expensive but smarter model
 // (e.g. Sonnet) while free users stay on Haiku for cost.
-func (s *ClaudeService) modelFor(tier Tier) anthropic.Model {
+func (s *AIService) modelFor(tier Tier) string {
 	if tier == TierPaid {
 		return s.paidModel
 	}
 	return s.freeModel
 }
 
-// NewClaudeService wires all collaborators. Returns nil (not an error) when
+// NewAIService wires all collaborators. Returns nil (not an error) when
 // the feature flag is off, the shared client is nil (no API key), or any
 // collaborator is missing — handlers treat a nil service as "feature
 // disabled" and hide the UI section.
 //
-// The *anthropic.Client is constructed by services/anthropic_client and
+// The AI client is constructed by services/ai_client and
 // passed in so that the prompt-caching beta header and any future
 // transport-level concerns live in exactly one place across the binary.
-func NewClaudeService(
+func NewAIService(
 	cfg Config,
-	client *anthropic.Client,
+	client ac.Client,
 	contextBuilder *UserContextBuilder,
 	resolver *Resolver,
 	quota Quota,
 	chips ChipsCache,
 	freshReleases FreshReleasesLoader,
-) *ClaudeService {
+) *AIService {
 	if !cfg.Enabled {
 		log.Info("ai_rec: feature flag off — recommendations service not started")
 		return nil
 	}
 	if client == nil {
-		log.Warn("ai_rec: enabled but anthropic client is nil (no API key) — service disabled")
+		log.Warn("ai_rec: enabled but AI client is nil (no API key) — service disabled")
 		return nil
 	}
 	if contextBuilder == nil || resolver == nil || quota == nil || chips == nil {
@@ -115,16 +115,17 @@ func NewClaudeService(
 		return nil
 	}
 
+	cfg.Provider = client.Provider()
 	freeModel := cfg.ResolveModel(TierFree)
 	paidModel := cfg.ResolveModel(TierPaid)
 	chipsModel := cfg.ResolveChipsModel()
 
-	s := &ClaudeService{
+	s := &AIService{
 		cfg:           cfg,
 		client:        client,
-		freeModel:     anthropic.Model(freeModel),
-		paidModel:     anthropic.Model(paidModel),
-		chipsModel:    anthropic.Model(chipsModel),
+		freeModel:     freeModel,
+		paidModel:     paidModel,
+		chipsModel:    chipsModel,
 		context:       contextBuilder,
 		resolver:      resolver,
 		quota:         quota,
@@ -132,10 +133,11 @@ func NewClaudeService(
 		freshReleases: freshReleases,
 	}
 	log.WithFields(log.Fields{
+		"provider":    client.Provider(),
 		"free_model":  freeModel,
 		"paid_model":  paidModel,
 		"chips_model": chipsModel,
-	}).Info("ai_rec: ClaudeService ready")
+	}).Info("ai_rec: AIService ready")
 	return s
 }
 
@@ -148,7 +150,7 @@ func NewClaudeService(
 // without consuming the daily quota. ForceRefresh, however, is what the
 // "↻" button in the UI calls, and it *does* consume one quota unit (see
 // handlers/discover_ai).
-func (s *ClaudeService) GenerateChips(ctx context.Context, req ChipsRequest) (*ChipsResponse, error) {
+func (s *AIService) GenerateChips(ctx context.Context, req ChipsRequest) (*ChipsResponse, error) {
 	uc, err := s.context.Build(ctx, req.UserID, req.Locale, req.Clock)
 	if err != nil {
 		// Non-fatal: Build still returns a usable UserContext even when the
@@ -206,7 +208,7 @@ func (s *ClaudeService) GenerateChips(ctx context.Context, req ChipsRequest) (*C
 	return fresh, nil
 }
 
-func (s *ClaudeService) generateChipsUncached(ctx context.Context, tier Tier, uc *UserContext) (*ChipsResponse, error) {
+func (s *AIService) generateChipsUncached(ctx context.Context, tier Tier, uc *UserContext) (*ChipsResponse, error) {
 	prompt := userPromptForChips(uc, desiredChips)
 
 	log.WithField("feature", "ai_rec").
@@ -215,7 +217,7 @@ func (s *ClaudeService) generateChipsUncached(ctx context.Context, tier Tier, uc
 		WithField("bucket", uc.TimeOfDay).
 		Debug("generating chips")
 
-	chips, err := s.callClaudeForChips(ctx, prompt, tier)
+	chips, err := s.callAIForChips(ctx, prompt, tier)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +237,7 @@ func (s *ClaudeService) generateChipsUncached(ctx context.Context, tier Tier, uc
 // first thing a user sees). ForceRefresh is the only path that costs — and
 // in that case the handler is expected to consume the unit before calling us,
 // same as the non-streaming GenerateChips contract.
-func (s *ClaudeService) GenerateChipsStream(ctx context.Context, req ChipsRequest, events chan<- StreamEvent) {
+func (s *AIService) GenerateChipsStream(ctx context.Context, req ChipsRequest, events chan<- StreamEvent) {
 	defer close(events)
 
 	send := func(t string, data any) bool {
@@ -318,7 +320,7 @@ func (s *ClaudeService) GenerateChipsStream(ctx context.Context, req ChipsReques
 	chipCh := make(chan Chip, desiredChips)
 	streamErr := make(chan error, 1)
 	go func() {
-		streamErr <- s.streamClaudeChipsText(ctx, userPromptForChipsNDJSON(uc, desiredChips), req.Tier, chipCh)
+		streamErr <- s.streamAIChipsText(ctx, userPromptForChipsNDJSON(uc, desiredChips), req.Tier, chipCh)
 	}()
 
 	collected := make([]Chip, 0, desiredChips)
@@ -363,20 +365,20 @@ func (s *ClaudeService) GenerateChipsStream(ctx context.Context, req ChipsReques
 
 // Remaining reports how many quota units the user has left today.
 // Non-mutating; safe for GET handlers.
-func (s *ClaudeService) Remaining(ctx context.Context, userID uuid.UUID, tier Tier) (int, error) {
+func (s *AIService) Remaining(ctx context.Context, userID uuid.UUID, tier Tier) (int, error) {
 	return s.quota.Remaining(ctx, userID, tier)
 }
 
 // ConsumeQuota atomically charges one unit. Returns ErrQuotaExceeded if
 // the user is already at their daily cap.
-func (s *ClaudeService) ConsumeQuota(ctx context.Context, userID uuid.UUID, tier Tier) (int, error) {
+func (s *AIService) ConsumeQuota(ctx context.Context, userID uuid.UUID, tier Tier) (int, error) {
 	return s.quota.Consume(ctx, userID, tier)
 }
 
 // DailyQuota returns the per-day request cap for the given tier — pure
 // config lookup, no I/O. The UI uses it to render the remaining counter
 // as "N / M" without a second round trip.
-func (s *ClaudeService) DailyQuota(tier Tier) int {
+func (s *AIService) DailyQuota(tier Tier) int {
 	if tier == TierPaid {
 		return s.cfg.PaidDailyQuota
 	}
@@ -387,7 +389,7 @@ func (s *ClaudeService) DailyQuota(tier Tier) int {
 // daily quota next rolls over. Delegates to the underlying Quota
 // implementation, which keeps the "midnight UTC vs rolling 24h" decision
 // in one place.
-func (s *ClaudeService) QuotaResetAt() int64 {
+func (s *AIService) QuotaResetAt() int64 {
 	return s.quota.ResetAt().Unix()
 }
 
@@ -402,7 +404,7 @@ func (s *ClaudeService) QuotaResetAt() int64 {
 // Closes `events` before returning. Cancellation: if the upstream ctx is
 // cancelled (client disconnect), in-flight goroutines exit and the channel
 // closes naturally — no extra wiring needed.
-func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendRequest, events chan<- StreamEvent) {
+func (s *AIService) RecommendStream(ctx context.Context, req RecommendRequest, events chan<- StreamEvent) {
 	defer close(events)
 
 	send := func(ev StreamEvent) bool {
@@ -473,8 +475,8 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 		"remaining": remaining,
 	}).Info("quota charged")
 
-	// Phase 1: Claude is thinking. The UI swaps from idle to a "Claude
-	// думает" indicator here. We stay in this phase until the FIRST
+	// Phase 1: the model is generating recommendations. The UI shows its
+	// generation indicator. We stay in this phase until the FIRST
 	// resolved item lands on recCh (not when the first delta arrives,
 	// because the resolver still needs to do its TMDB hop) — then we
 	// flip to "resolving" with the running counter.
@@ -491,12 +493,12 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 
 	// End-to-end streaming pipeline:
 	//
-	//   streamClaudeItems  →  claudeCh  →  ResolveStreamFromChannel  →  recCh  →  SSE events
+	//   streamClaudeItems  →  aiItemsCh  →  ResolveStreamFromChannel  →  recCh  →  SSE events
 	//
-	// The Claude streamer pushes a claudeItem onto claudeCh as soon as
+	// The Claude streamer pushes a recommendationItem onto aiItemsCh as soon as
 	// the model has finished generating a `{title, year, reason}` triple
 	// (typically every ~150-500ms depending on the model). The resolver
-	// reads from claudeCh and fans out a TMDB lookup for each item
+	// reads from aiItemsCh and fans out a TMDB lookup for each item
 	// concurrently — so item 1's TMDB roundtrip overlaps with Claude
 	// generating items 2..N. The first card lands on recCh ~500ms after
 	// the first Claude delta, instead of waiting for the whole batch.
@@ -508,18 +510,18 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 	// resolver hydrates streams through to the UI — there's no
 	// server-side cap on display count anymore. The frontend renders
 	// the first AI_RECS_INITIAL_VISIBLE behind a "Show more" button.
-	claudeCh := make(chan claudeItem, claudeChannelBuffer)
+	aiItemsCh := make(chan recommendationItem, aiChannelBuffer)
 	streamErrCh := make(chan error, 1)
 	go func() {
-		// streamClaudeItemsText (NDJSON / plain text) instead of the
+		// streamAIItemsText (NDJSON / plain text) instead of the
 		// tool_use streamClaudeItems — Anthropic buffers tool_use
 		// generation server-side, so the latter doesn't actually flow
 		// per-token. Plain text streams as it's generated.
-		streamErrCh <- s.streamClaudeItemsText(ctx, uc, prompt, req.History, req.Tier, claudeCh)
+		streamErrCh <- s.streamAIItemsText(ctx, uc, prompt, req.History, req.Tier, aiItemsCh)
 	}()
 
 	recCh := make(chan Recommendation, r2BufferSize)
-	go s.resolver.ResolveStreamFromChannel(ctx, claudeCh, models.ContentTypeMovie, req.Locale, recCh)
+	go s.resolver.ResolveStreamFromChannel(ctx, aiItemsCh, models.ContentTypeMovie, req.Locale, recCh)
 
 	sentResolving := false
 	sent := 0
@@ -558,7 +560,7 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 	// through. If we already showed N cards before things broke, the user
 	// would rather see those than a wholesale "something went wrong".
 	if err := <-streamErrCh; err != nil && sent == 0 {
-		log.WithError(err).WithField("feature", "ai_rec").Error("claude stream failed")
+		log.WithError(err).WithField("feature", "ai_rec").Error("ai stream failed")
 		sendError("claude_failed")
 		return
 	}
@@ -574,10 +576,10 @@ func (s *ClaudeService) RecommendStream(ctx context.Context, req RecommendReques
 	})
 }
 
-// claudeChannelBuffer is the buffer size for the streamClaudeItems → resolver
+// aiChannelBuffer is the buffer size for the streamClaudeItems → resolver
 // hand-off. Just big enough that Claude doesn't stall on a slow resolver
 // goroutine, small enough that cancel propagates quickly.
-const claudeChannelBuffer = 8
+const aiChannelBuffer = 8
 
 // r2BufferSize sets the buffer for the resolver→stream channel. Just big
 // enough to absorb a burst from a freshly-warmed TMDB cache without
@@ -589,7 +591,7 @@ const r2BufferSize = 4
 // pipeline to drop hallucinated duplicates Claude leaks past the prompt-side
 // exclusion. Soft-fails to "unknown" on DB error so a transient blip never
 // blocks a recommendation.
-func (s *ClaudeService) isAlreadyKnown(ctx context.Context, userID uuid.UUID, videoID string) bool {
+func (s *AIService) isAlreadyKnown(ctx context.Context, userID uuid.UUID, videoID string) bool {
 	hist := s.context.History()
 	watched, err := hist.FilterWatchedVideoIDs(ctx, userID, []string{videoID})
 	if err != nil {
@@ -605,26 +607,22 @@ func (s *ClaudeService) isAlreadyKnown(ctx context.Context, userID uuid.UUID, vi
 	return len(saved) > 0
 }
 
-// --- Claude wire-level ---
+// --- AI generation ---
 
-// buildHistoryMessages converts our internal Message history into the SDK's
-// MessageParam slice and appends the new user prompt as the final turn.
-func buildHistoryMessages(history []Message, userPrompt string) []anthropic.MessageParam {
-	messages := make([]anthropic.MessageParam, 0, len(history)+1)
+// buildHistoryMessages converts history into shared AI messages and appends
+// the new user prompt as the final turn.
+func buildHistoryMessages(history []Message, userPrompt string) []ac.Message {
+	messages := make([]ac.Message, 0, len(history)+1)
 	for _, m := range history {
-		switch m.Role {
-		case "user":
-			messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(m.Content)))
-		case "assistant":
-			messages = append(messages, anthropic.NewAssistantMessage(anthropic.NewTextBlock(m.Content)))
+		if m.Role == "user" || m.Role == "assistant" {
+			messages = append(messages, ac.Message{Role: m.Role, Content: m.Content})
 		}
 	}
-	messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)))
-	return messages
+	return append(messages, ac.Message{Role: "user", Content: userPrompt})
 }
 
-// streamClaudeItemsText is the streaming Claude flow used by RecommendStream.
-// It asks Claude for plain-text NDJSON output (one self-contained JSON
+// streamAIItemsText is the streaming AI flow used by RecommendStream.
+// It asks the model for plain-text NDJSON output (one self-contained JSON
 // object per film, separated by newlines) and parses each object as soon
 // as its closing brace lands.
 //
@@ -640,16 +638,17 @@ func buildHistoryMessages(history []Message, userPrompt string) []anthropic.Mess
 //     system prompt; the NDJSON scanner ignores anything before the first
 //     '{' so an occasional "Sure, here are…" preamble doesn't break it.
 //   - Format drift is possible. Each parsed object is still validated by
-//     json.Unmarshal into claudeItem; malformed entries get logged and
+//     json.Unmarshal into recommendationItem; malformed entries get logged and
 //     dropped, the rest survive.
+//
 // uc is passed for logging only — the prompt is already rendered by the
 // caller. HistorySize / WatchlistSize land on the completion log line so
 // spend can be attributed to cold-start vs personalised traffic without
 // joining two log lines by timestamp.
-func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, uc *UserContext, userPrompt string, history []Message, tier Tier, out chan<- claudeItem) error {
+func (s *AIService) streamAIItemsText(ctx context.Context, uc *UserContext, userPrompt string, history []Message, tier Tier, out chan<- recommendationItem) error {
 	defer close(out)
 
-	ctx, cancel := context.WithTimeout(ctx, claudeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, aiTimeout)
 	defer cancel()
 
 	// Messages: history (if any) + the new user prompt.
@@ -677,34 +676,30 @@ func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, uc *UserConte
 	// Block 2 (fresh releases from DB) changes every ~6h when the cron
 	// runs, but Anthropic caches each prefix independently, so block 1
 	// is always a cache hit even when block 2 refreshes.
-	systemBlocks := []anthropic.TextBlockParam{
+	systemBlocks := []ac.SystemBlock{
 		{
-			Text:         systemPromptNDJSON,
-			CacheControl: anthropic.NewCacheControlEphemeralParam(),
+			Text:  systemPromptNDJSON,
+			Cache: true,
 		},
 	}
 	if s.freshReleases != nil {
 		if block := s.freshReleases.LoadFreshReleases(ctx); block != "" {
-			systemBlocks = append(systemBlocks, anthropic.TextBlockParam{
-				Text:         block,
-				CacheControl: anthropic.NewCacheControlEphemeralParam(),
+			systemBlocks = append(systemBlocks, ac.SystemBlock{
+				Text:  block,
+				Cache: true,
 			})
 		}
 	}
 
-	stream := s.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:       s.modelFor(tier),
-		MaxTokens:   claudeMaxTokensRecommend,
-		System:      systemBlocks,
-		Messages:    messages,
-		Temperature: anthropic.Float(0.7),
-	})
-	defer stream.Close()
+	request := ac.Request{
+		Model: s.modelFor(tier), MaxTokens: aiMaxTokensRecommend,
+		System: systemBlocks, Messages: messages, Temperature: 0.7,
+	}
 
 	// The bracket-balance scanner emits each top-level JSON object as
 	// soon as the closing brace lands.
 	extractor := newNDJSONItemsExtractor(func(raw json.RawMessage) {
-		var item claudeItem
+		var item recommendationItem
 		if err := json.Unmarshal(raw, &item); err != nil {
 			log.WithError(err).
 				WithField("feature", "ai_rec").
@@ -717,97 +712,28 @@ func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, uc *UserConte
 		case <-ctx.Done():
 		}
 	})
-	var (
-		inputTokens       int64
-		outputTokens      int64
-		cacheCreateTokens int64
-		cacheReadTokens   int64
-		modelName         string
-		ttftLogged        bool
-		deltaCount        int
-	)
-
-	for stream.Next() {
-		event := stream.Current()
-		switch event.Type {
-		case "message_start":
-			// message_start carries the initial Usage snapshot. The cache
-			// fields here are sometimes already populated, sometimes not
-			// (Anthropic seems to send the final cumulative values via
-			// message_delta) — we read both and the message_delta loop
-			// below overwrites if it has a fresher value.
-			if event.Message.Usage.InputTokens > 0 {
-				inputTokens = event.Message.Usage.InputTokens
-			}
-			if event.Message.Usage.CacheCreationInputTokens > 0 {
-				cacheCreateTokens = event.Message.Usage.CacheCreationInputTokens
-			}
-			if event.Message.Usage.CacheReadInputTokens > 0 {
-				cacheReadTokens = event.Message.Usage.CacheReadInputTokens
-			}
-			modelName = string(event.Message.Model)
-		case "content_block_delta":
-			if event.Delta.Type == "text_delta" && event.Delta.Text != "" {
-				deltaCount++
-				if !ttftLogged {
-					ttftLogged = true
-					log.WithFields(log.Fields{
-						"feature":     "ai_rec",
-						"mode":        "text",
-						"ttft_ms":     time.Since(streamStart).Milliseconds(),
-						"cache_read":  cacheReadTokens,
-						"cache_write": cacheCreateTokens,
-					}).Info("claude first delta")
-				}
-				extractor.write(event.Delta.Text)
-			}
-		case "message_delta":
-			// message_delta carries the cumulative usage update — this is
-			// where the final cache_read / cache_write counts actually
-			// land. Earlier we were only reading from message_start and
-			// missing them entirely, which is why cache_read/write looked
-			// like 0 even when caching was working.
-			if event.Usage.OutputTokens > 0 {
-				outputTokens = event.Usage.OutputTokens
-			}
-			if event.Usage.InputTokens > 0 {
-				inputTokens = event.Usage.InputTokens
-			}
-			if event.Usage.CacheCreationInputTokens > 0 {
-				cacheCreateTokens = event.Usage.CacheCreationInputTokens
-			}
-			if event.Usage.CacheReadInputTokens > 0 {
-				cacheReadTokens = event.Usage.CacheReadInputTokens
-			}
-		}
-	}
-	if err := stream.Err(); err != nil {
+	usage, deltaCount, err := s.streamText(ctx, request, extractor.write, "recommend", streamStart)
+	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			log.WithField("feature", "ai_rec").Debug("claude stream cancelled")
 			return nil
 		}
-		return errors.Wrap(err, "claude stream failed")
+		return err
 	}
-
-	log.WithFields(log.Fields{
-		"feature":        "ai_rec",
-		"kind":           "recommend",
-		"mode":           "text",
-		"model":          modelName,
-		"input_tokens":   inputTokens,
-		"output_tokens":  outputTokens,
-		"cache_read":     cacheReadTokens,
-		"cache_write":    cacheCreateTokens,
-		"history_size":   uc.HistorySize,
-		"watchlist_size": uc.WatchlistSize,
-		"deltas":         deltaCount,
-		"total_ms":       time.Since(streamStart).Milliseconds(),
-	}).Info("claude stream complete")
+	fields := usageFields(usage)
+	fields["provider"] = s.client.Provider()
+	fields["feature"] = "ai_rec"
+	fields["kind"] = "recommend"
+	fields["mode"] = "text"
+	fields["history_size"] = uc.HistorySize
+	fields["watchlist_size"] = uc.WatchlistSize
+	fields["deltas"] = deltaCount
+	fields["total_ms"] = time.Since(streamStart).Milliseconds()
+	log.WithFields(fields).Info("ai stream complete")
 
 	return nil
 }
 
-// callClaudeForChips runs the chip-generation tool and returns the parsed
+// callAIForChips runs the chip-generation tool and returns the parsed
 // chip list. Chip IDs are derived deterministically from the label so cache
 // keys stay stable across regenerations of the same chip text. The tier
 // picks which Claude model handles this user.
@@ -819,70 +745,56 @@ func (s *ClaudeService) streamClaudeItemsText(ctx context.Context, uc *UserConte
 // >95% of chip requests anyway. If chips ever go on a hot path again
 // (refresh button, periodic regeneration, …), the right fix is to expand
 // systemPrompt past the 2048-token threshold AND add CacheControl on the
-// system block — see streamClaudeItemsText for the pattern.
-func (s *ClaudeService) callClaudeForChips(ctx context.Context, userPrompt string, tier Tier) ([]Chip, error) {
-	ctx, cancel := context.WithTimeout(ctx, claudeTimeout)
+// system block — see streamAIItemsText for the pattern.
+func (s *AIService) callAIForChips(ctx context.Context, userPrompt string, tier Tier) ([]Chip, error) {
+	ctx, cancel := context.WithTimeout(ctx, aiTimeout)
 	defer cancel()
 
-	tool := anthropic.ToolParam{
+	tool := ac.Tool{
 		Name:        chipsToolName,
-		Description: anthropic.String("Return a list of suggestion chips tailored to the user and the current moment."),
-		InputSchema: anthropic.ToolInputSchemaParam{
-			Properties: map[string]any{
-				"chips": map[string]any{
-					"type":     "array",
-					"minItems": 4,
-					"maxItems": 8,
-					"items": map[string]any{
-						"type":     "object",
-						"required": []string{"label", "query"},
-						"properties": map[string]any{
-							"label": map[string]any{
-								"type":        "string",
-								"maxLength":   60,
-								"description": "Short user-facing label, in the user's locale.",
-							},
-							"icon": map[string]any{
-								"type":        "string",
-								"maxLength":   4,
-								"description": "Single emoji that fits the label, or empty string.",
-							},
-							"query": map[string]any{
-								"type":        "string",
-								"maxLength":   300,
-								"description": "Full-sentence instruction that will be sent to the recommender when this chip is tapped.",
-							},
+		Description: "Return a list of suggestion chips tailored to the user and the current moment.",
+		Properties: map[string]any{
+			"chips": map[string]any{
+				"type":     "array",
+				"minItems": 4,
+				"maxItems": 8,
+				"items": map[string]any{
+					"type":     "object",
+					"required": []string{"label", "query"},
+					"properties": map[string]any{
+						"label": map[string]any{
+							"type":        "string",
+							"maxLength":   60,
+							"description": "Short user-facing label, in the user's locale.",
+						},
+						"icon": map[string]any{
+							"type":        "string",
+							"maxLength":   4,
+							"description": "Single emoji that fits the label, or empty string.",
+						},
+						"query": map[string]any{
+							"type":        "string",
+							"maxLength":   300,
+							"description": "Full-sentence instruction that will be sent to the recommender when this chip is tapped.",
 						},
 					},
 				},
 			},
-			Required: []string{"chips"},
 		},
+		Required: []string{"chips"},
 	}
 
-	resp, err := s.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     s.chipsModel,
-		MaxTokens: claudeMaxTokensChips,
-		System:    []anthropic.TextBlockParam{{Text: systemPrompt}},
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
-		},
-		Tools: []anthropic.ToolUnionParam{
-			{OfTool: &tool},
-		},
-		ToolChoice:  anthropic.ToolChoiceParamOfTool(chipsToolName),
-		Temperature: anthropic.Float(0.9),
-	})
+	resp, err := s.client.CallTool(ctx, ac.Request{
+		Model: s.chipsModel, MaxTokens: aiMaxTokensChips,
+		System:   []ac.SystemBlock{{Text: systemPrompt}},
+		Messages: []ac.Message{{Role: "user", Content: userPrompt}}, Temperature: 0.9,
+	}, tool)
 	if err != nil {
-		return nil, errors.Wrap(err, "claude chips call failed")
+		return nil, errors.Wrap(err, "AI chips call failed")
 	}
+	s.logUsage(resp.Usage, "chips")
+	input := resp.Input
 
-	s.logUsage(resp, "chips")
-
-	input, err := extractToolUseInput(resp.Content, chipsToolName)
-	if err != nil {
-		return nil, err
-	}
 	var payload struct {
 		Chips []struct {
 			Label string `json:"label"`
@@ -891,7 +803,7 @@ func (s *ClaudeService) callClaudeForChips(ctx context.Context, userPrompt strin
 		} `json:"chips"`
 	}
 	if err := json.Unmarshal(input, &payload); err != nil {
-		return nil, errors.Wrap(err, "claude chips: invalid tool input json")
+		return nil, errors.Wrap(err, "ai chips: invalid tool input json")
 	}
 
 	chips := make([]Chip, 0, len(payload.Chips))
@@ -914,35 +826,19 @@ func (s *ClaudeService) callClaudeForChips(ctx context.Context, userPrompt strin
 	return chips, nil
 }
 
-// extractToolUseInput walks the response content blocks and returns the raw
-// JSON input of the first tool_use block matching the expected tool name.
-// Claude may interleave explanatory text blocks before the tool call despite
-// the tool_choice forcing, so we cannot just index into Content[0].
-func extractToolUseInput(blocks []anthropic.ContentBlockUnion, toolName string) (json.RawMessage, error) {
-	for _, b := range blocks {
-		if b.Type == "tool_use" && b.Name == toolName {
-			if len(b.Input) == 0 {
-				return nil, errors.Errorf("claude returned empty tool input for %s", toolName)
-			}
-			return json.RawMessage(b.Input), nil
-		}
-	}
-	return nil, errors.Errorf("claude did not call tool %s (blocks=%d)", toolName, len(blocks))
-}
-
-// streamClaudeChipsText is the streaming Claude flow for chip generation.
-// Mirrors streamClaudeItemsText (NDJSON plain-text, no tools) but with the
+// streamAIChipsText is the streaming AI flow for chip generation.
+// Mirrors streamAIItemsText (NDJSON plain-text, no tools) but with the
 // shorter chips system prompt, chips model, and the smaller token budget.
 //
-// Why NDJSON instead of the tool_use path used by callClaudeForChips:
+// Why NDJSON instead of the tool_use path used by callAIForChips:
 // Anthropic buffers tool_use generation server-side, which defeats per-chip
 // streaming entirely. Plain text genuinely flows token-by-token, so the
 // first chip lands ~500ms after the first delta instead of waiting for the
 // whole batch to materialise.
-func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt string, tier Tier, out chan<- Chip) error {
+func (s *AIService) streamAIChipsText(ctx context.Context, userPrompt string, tier Tier, out chan<- Chip) error {
 	defer close(out)
 
-	ctx, cancel := context.WithTimeout(ctx, claudeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, aiTimeout)
 	defer cancel()
 
 	streamStart := time.Now()
@@ -954,21 +850,11 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 	// window. systemPromptChips is sized just above Haiku's 2048-token cache
 	// minimum on purpose; the user message stays short so it doesn't blow the
 	// cache key.
-	stream := s.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:     s.chipsModel,
-		MaxTokens: claudeMaxTokensChips,
-		System: []anthropic.TextBlockParam{
-			{
-				Text:         systemPromptChips,
-				CacheControl: anthropic.NewCacheControlEphemeralParam(),
-			},
-		},
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
-		},
-		Temperature: anthropic.Float(0.9),
-	})
-	defer stream.Close()
+	request := ac.Request{
+		Model: s.chipsModel, MaxTokens: aiMaxTokensChips,
+		System:   []ac.SystemBlock{{Text: systemPromptChips, Cache: true}},
+		Messages: []ac.Message{{Role: "user", Content: userPrompt}}, Temperature: 0.9,
+	}
 
 	extractor := newNDJSONItemsExtractor(func(raw json.RawMessage) {
 		var c struct {
@@ -1000,96 +886,54 @@ func (s *ClaudeService) streamClaudeChipsText(ctx context.Context, userPrompt st
 		}
 	})
 
-	var (
-		inputTokens       int64
-		outputTokens      int64
-		cacheCreateTokens int64
-		cacheReadTokens   int64
-		modelName         string
-		ttftLogged        bool
-		deltaCount        int
-	)
-
-	for stream.Next() {
-		event := stream.Current()
-		switch event.Type {
-		case "message_start":
-			if event.Message.Usage.InputTokens > 0 {
-				inputTokens = event.Message.Usage.InputTokens
-			}
-			if event.Message.Usage.CacheCreationInputTokens > 0 {
-				cacheCreateTokens = event.Message.Usage.CacheCreationInputTokens
-			}
-			if event.Message.Usage.CacheReadInputTokens > 0 {
-				cacheReadTokens = event.Message.Usage.CacheReadInputTokens
-			}
-			modelName = string(event.Message.Model)
-		case "content_block_delta":
-			if event.Delta.Type == "text_delta" && event.Delta.Text != "" {
-				deltaCount++
-				if !ttftLogged {
-					ttftLogged = true
-					log.WithFields(log.Fields{
-						"feature":     "ai_rec",
-						"kind":        "chips",
-						"mode":        "text",
-						"ttft_ms":     time.Since(streamStart).Milliseconds(),
-						"cache_read":  cacheReadTokens,
-						"cache_write": cacheCreateTokens,
-					}).Info("claude first chip delta")
-				}
-				extractor.write(event.Delta.Text)
-			}
-		case "message_delta":
-			if event.Usage.OutputTokens > 0 {
-				outputTokens = event.Usage.OutputTokens
-			}
-			if event.Usage.InputTokens > 0 {
-				inputTokens = event.Usage.InputTokens
-			}
-			if event.Usage.CacheCreationInputTokens > 0 {
-				cacheCreateTokens = event.Usage.CacheCreationInputTokens
-			}
-			if event.Usage.CacheReadInputTokens > 0 {
-				cacheReadTokens = event.Usage.CacheReadInputTokens
-			}
-		}
-	}
-	if err := stream.Err(); err != nil {
+	usage, deltaCount, err := s.streamText(ctx, request, extractor.write, "chips", streamStart)
+	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			log.WithField("feature", "ai_rec").Debug("chips stream cancelled")
 			return nil
 		}
-		return errors.Wrap(err, "chips stream failed")
+		return err
 	}
-
-	log.WithFields(log.Fields{
-		"feature":       "ai_rec",
-		"kind":          "chips",
-		"mode":          "text",
-		"model":         modelName,
-		"input_tokens":  inputTokens,
-		"output_tokens": outputTokens,
-		"cache_read":    cacheReadTokens,
-		"cache_write":   cacheCreateTokens,
-		"deltas":        deltaCount,
-		"total_ms":      time.Since(streamStart).Milliseconds(),
-	}).Info("claude chips stream complete")
-
+	fields := usageFields(usage)
+	fields["provider"] = s.client.Provider()
+	fields["feature"] = "ai_rec"
+	fields["kind"] = "chips"
+	fields["mode"] = "text"
+	fields["deltas"] = deltaCount
+	fields["total_ms"] = time.Since(streamStart).Milliseconds()
+	log.WithFields(fields).Info("ai chips stream complete")
 	return nil
 }
 
-// logUsage writes token usage at info level so we can aggregate costs in
-// Loki without a separate metrics pipeline.
-func (s *ClaudeService) logUsage(resp *anthropic.Message, kind string) {
-	log.WithFields(log.Fields{
-		"feature":       "ai_rec",
-		"kind":          kind,
-		"model":         resp.Model,
-		"input_tokens":  resp.Usage.InputTokens,
-		"output_tokens": resp.Usage.OutputTokens,
-		"stop_reason":   resp.StopReason,
-	}).Info("claude call complete")
+// streamText shares first-token timing while adapters retain final usage.
+func (s *AIService) streamText(ctx context.Context, req ac.Request, write func(string), kind string, start time.Time) (ac.Usage, int, error) {
+	deltas := 0
+	usage, err := s.client.StreamText(ctx, req, func(text string, usage ac.Usage) {
+		deltas++
+		if deltas == 1 {
+			log.WithFields(log.Fields{
+				"feature": "ai_rec", "provider": s.client.Provider(), "kind": kind, "mode": "text",
+				"ttft_ms":    time.Since(start).Milliseconds(),
+				"cache_read": usage.CacheReadTokens, "cache_write": usage.CacheCreateTokens,
+			}).Info("ai first delta")
+		}
+		write(text)
+	})
+	return usage, deltas, err
+}
+
+func usageFields(usage ac.Usage) log.Fields {
+	return log.Fields{
+		"model": usage.Model, "input_tokens": usage.InputTokens, "output_tokens": usage.OutputTokens,
+		"cache_read": usage.CacheReadTokens, "cache_write": usage.CacheCreateTokens, "stop_reason": usage.StopReason,
+	}
+}
+
+func (s *AIService) logUsage(usage ac.Usage, kind string) {
+	fields := usageFields(usage)
+	fields["feature"] = "ai_rec"
+	fields["kind"] = kind
+	fields["provider"] = s.client.Provider()
+	log.WithFields(fields).Info("ai call complete")
 }
 
 // --- cache keys ---

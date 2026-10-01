@@ -206,7 +206,7 @@ func NewUserContextBuilder(history UserHistoryLoader, limit int) *UserContextBui
 	}
 }
 
-// History returns the underlying history loader. Exposed so ClaudeService
+// History returns the underlying history loader. Exposed so AIService
 // can reuse the same DB handle for watched-filter queries without forcing
 // the wiring code to pass the loader twice.
 func (b *UserContextBuilder) History() UserHistoryLoader {

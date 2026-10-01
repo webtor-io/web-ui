@@ -1,8 +1,6 @@
 package recommendations
 
 import (
-	"strings"
-
 	"github.com/urfave/cli"
 )
 
@@ -25,11 +23,11 @@ func NewHelper(c *cli.Context) *Helper {
 }
 
 // AiEnabled mirrors the conditions under which rec.New returns a
-// non-nil Service: feature flag on AND ANTHROPIC_API_KEY present.
+// non-nil Service: feature flag on AND a provider API key present.
 // Templates use this to hide AI-related copy entirely when the feature
 // is disabled, so we don't advertise something the user can't try.
 func (h *Helper) AiEnabled() bool {
-	return h.cfg.Enabled && strings.TrimSpace(h.cfg.AnthropicAPIKey) != ""
+	return h.cfg.Enabled && h.cfg.Provider != ""
 }
 
 // AiFreeQuota returns the per-day request budget for free-tier users.

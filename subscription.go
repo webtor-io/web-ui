@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 
-	ac "github.com/webtor-io/web-ui/services/anthropic_client"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
@@ -98,8 +98,8 @@ func pollSubscriptions(c *cli.Context) error {
 	// never completes anything — the same guard Service.New applies, and
 	// the alternative is every season subscription of that deployment being
 	// closed as "finished" on its first poll.
-	anthropicCl := ac.New(c)
-	en := makeEnricher(c, cl, pg, sapi, anthropicCl)
+	aiCl := ac.New(c)
+	en := makeEnricher(c, cl, pg, sapi, aiCl)
 	var airing rss.AiringChecker
 	if en != nil && en.HasMappers() {
 		airing = en

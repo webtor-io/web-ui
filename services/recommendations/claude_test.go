@@ -2,14 +2,12 @@ package recommendations
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/redis/go-redis/v9"
 	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/models"
@@ -27,79 +25,6 @@ func TestMain(m *testing.M) {
 		i18n.New(os.DirFS("../../locales"))
 	}
 	os.Exit(m.Run())
-}
-
-// decodeBlocks parses raw JSON into a slice of ContentBlockUnion the way
-// the SDK does on the wire. Lets us build realistic fixtures without
-// instantiating the real HTTP client.
-func decodeBlocks(t *testing.T, raw string) []anthropic.ContentBlockUnion {
-	t.Helper()
-	var out []anthropic.ContentBlockUnion
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
-		t.Fatalf("decode blocks: %v", err)
-	}
-	return out
-}
-
-func TestExtractToolUseInput_HappyPath(t *testing.T) {
-	blocks := decodeBlocks(t, `[
-		{"type": "text", "text": "Okay, here you go:"},
-		{"type": "tool_use", "id": "toolu_1", "name": "return_recommendations",
-		 "input": {"items": [{"title": "Interstellar", "year": 2014, "reason": "because you liked Tenet"}]}}
-	]`)
-
-	raw, err := extractToolUseInput(blocks, "return_recommendations")
-	if err != nil {
-		t.Fatalf("extract: %v", err)
-	}
-
-	var payload struct {
-		Items []claudeItem `json:"items"`
-	}
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if len(payload.Items) != 1 || payload.Items[0].Title != "Interstellar" {
-		t.Fatalf("unexpected payload: %+v", payload)
-	}
-}
-
-func TestExtractToolUseInput_NoMatchingTool(t *testing.T) {
-	blocks := decodeBlocks(t, `[
-		{"type": "text", "text": "I cannot help with that."}
-	]`)
-	_, err := extractToolUseInput(blocks, "return_recommendations")
-	if err == nil {
-		t.Fatal("expected error when no tool_use block is present")
-	}
-}
-
-func TestExtractToolUseInput_WrongToolName(t *testing.T) {
-	blocks := decodeBlocks(t, `[
-		{"type": "tool_use", "id": "toolu_2", "name": "some_other_tool",
-		 "input": {"anything": "goes"}}
-	]`)
-	_, err := extractToolUseInput(blocks, "return_recommendations")
-	if err == nil {
-		t.Fatal("expected error when tool name mismatches")
-	}
-}
-
-func TestExtractToolUseInput_SkipsNonMatchingBlocks(t *testing.T) {
-	// Claude sometimes emits a thinking block or a leading text block even
-	// with tool_choice forced — make sure we keep scanning.
-	blocks := decodeBlocks(t, `[
-		{"type": "text", "text": "Thinking..."},
-		{"type": "tool_use", "id": "t1", "name": "return_chips",
-		 "input": {"chips": [{"label": "x", "query": "y"}]}}
-	]`)
-	raw, err := extractToolUseInput(blocks, "return_chips")
-	if err != nil {
-		t.Fatalf("extract: %v", err)
-	}
-	if !strings.Contains(string(raw), `"chips"`) {
-		t.Fatalf("unexpected content: %s", raw)
-	}
 }
 
 func TestChipsCacheKey_DeterministicAndTimeBucketed(t *testing.T) {

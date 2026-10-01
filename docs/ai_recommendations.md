@@ -1,6 +1,6 @@
 # AI Recommendations (Discover)
 
-Natural-language movie recommendations powered by Claude, surfaced as a
+Natural-language movie recommendations powered by Anthropic or OpenAI, surfaced as a
 dedicated section at the top of `/discover`. Users describe what they want
 (or tap a pre-generated suggestion chip) and get back a streaming grid of
 cards, each with a short personalized reason explaining why it fits.
@@ -8,6 +8,101 @@ cards, each with a short personalized reason explaining why it fits.
 > Status: opt-in via env flag (`AI_RECOMMENDATIONS_ENABLED=true`).
 > Paid users get a daily cap of 100 requests; free users get 1/day and see an
 > upgrade CTA once exhausted.
+
+## AI provider selection
+
+`services/ai_client.New(c)` selects the shared provider from configured credentials:
+
+| Credentials | Provider | Default model |
+|---|---|---|
+| `ANTHROPIC_API_KEY` only | Anthropic Messages API | `claude-haiku-4-5-20251001` |
+| `OPENAI_API_KEY` only | OpenAI Responses API | `gpt-4.1-mini` |
+| Both keys | Anthropic (preserves existing deployments; logged at startup) | `claude-haiku-4-5-20251001` |
+| Neither, or whitespace-only keys | No AI client; feature routes and UI are disabled | — |
+
+Selection uses configuration, never an API health probe. A failed request stays
+with its selected provider; there is no cross-provider retry. Feature flags still
+control whether recommendations and enrichment are enabled. The same client is
+used by `serve`, `enrich run`, `enrich popular`, and the subscription worker.
+
+Model overrides (`AI_RECOMMENDATIONS_MODEL`, `AI_RECOMMENDATIONS_FREE_MODEL`,
+`AI_RECOMMENDATIONS_PAID_MODEL`, `AI_RECOMMENDATIONS_CHIPS_MODEL`) must belong to
+the selected provider. If unset, defaults are resolved after provider selection.
+An explicitly configured Claude model is not silently rewritten to a GPT model.
+
+To use OpenAI with provider defaults, clear the Anthropic key and any old Claude
+model overrides, then configure:
+
+```dotenv
+OPENAI_API_KEY=<your-key>
+AI_RECOMMENDATIONS_ENABLED=true
+AI_ENRICH_ENABLED=true
+```
+
+For an explicit OpenAI model split without a reasoning stage:
+
+```dotenv
+AI_RECOMMENDATIONS_FREE_MODEL=gpt-4.1-mini
+AI_RECOMMENDATIONS_PAID_MODEL=gpt-4.1
+AI_RECOMMENDATIONS_CHIPS_MODEL=gpt-4.1-mini
+AI_ENRICH_MODEL=gpt-4.1-mini
+```
+
+This is an initial operating profile, not a measured quality equivalence to
+Haiku / Sonnet. If both keys remain configured, Anthropic still wins even when
+the model overrides name OpenAI models: clear the active Anthropic key when
+switching this profile.
+
+`OPENAI_BASE_URL` / `--openai-base-url` optionally changes the API base URL
+(default `https://api.openai.com/v1`); the endpoint must support Responses API,
+including function calls and SSE. OpenAI uses stateless requests with `store=false`
+and the model's default sampling; temperature is omitted because reasoning models
+reject it. The existing output-token limits also include reasoning tokens for
+OpenAI: choosing a reasoning model may require revisiting those limits and latency.
+
+Both providers use the same prompts, NDJSON parser, quota, metadata resolver,
+Redis cache and browser SSE protocol. Historical wire names `phase=claude` and
+`claude_failed` remain for compatibility; logs identify the actual `provider`.
+Anthropic retains its system-block cache breakpoints; OpenAI joins those blocks
+into `instructions` and reports automatic prefix-cache usage on completion.
+
+API contract references: [OpenAI text generation](https://developers.openai.com/api/docs/guides/text),
+[function calling](https://developers.openai.com/api/docs/guides/function-calling),
+[streaming responses](https://developers.openai.com/api/docs/guides/streaming-responses).
+
+Helm chart values: `anthropic.apiKey`, `openai.apiKey`, `openai.baseURL`; the
+private chart injects both keys when either AI feature is enabled. Leave its model
+settings empty to use provider defaults. Chart changes live in `infra/helmfile`.
+
+A successful OpenAI `GET /v1/models` validates authentication and lists models,
+but does not prove that generation is funded. Responses requests can still fail
+with HTTP 429 or a stream error containing `insufficient_quota` /
+`credit_balance_exhausted`. Check the API project's billing balance and limits;
+this is distinct from a temporary requests-per-minute limit. The selected
+provider stays unchanged. Verify a real Responses request before switching a
+working deployment to OpenAI.
+
+### Live adapter check (2026-10-01)
+
+Ten live scenarios passed: recommendations from GPT-4.1 Mini, GPT-4.1, Haiku 4.5
+and Sonnet 4.5; OpenAI chips via both tool calls and text streaming; two title
+normalizations each on OpenAI and Anthropic. OpenAI successfully returned final
+usage and complete recommendations before the stream ended.
+
+One Russian recommendation query per model, with synthetic history / watchlist:
+
+| Model | First parsed recommendation | Whole stream | Parsed recommendations |
+|---|---:|---:|---:|
+| `gpt-4.1-mini` | 2853 ms | 5125 ms | 7 |
+| `gpt-4.1` | 2499 ms | 4852 ms | 8 |
+| `claude-haiku-4-5-20251001` | 1533 ms | 4631 ms | 7 |
+| `claude-sonnet-4-5-20250929` | 2457 ms | 9090 ms | 8 |
+
+These are single-request observations, not percentiles or a quality benchmark.
+The check calls the production adapters and recommendation / chip / enrichment
+consumers. It does not run metadata resolution, database caches, the fresh-release
+prompt block, the browser SSE handler or the production proxy. First parsed
+recommendation timing therefore excludes card hydration and browser delivery.
 
 ## High-level flow
 
@@ -17,7 +112,7 @@ Discover mount
      └→ 6 chips appear
         │  • cold-start user (no history AND empty watchlist) → static set
         │    from default_chips.go
-        │  • everyone else                                    → Claude-
+        │  • everyone else                                    → AI-
         │    generated, then cached
         └→ user taps chip OR types custom query
            └→ EventSource: GET /discover/ai/recommend/stream
@@ -25,7 +120,7 @@ Discover mount
               ├→ load watch history (movie_status ⋈ movie_metadata)
               ├→ load watchlist     (movie_watchlist + series_watchlist
               │                      merged newest-first, capped at limit)
-              ├→ open Claude streaming Messages.NewStreaming
+              ├→ open shared AI client StreamText
               │  └→ stream NDJSON {title, year, reason} per token
               ├→ resolver fans out concurrent TMDB → OMDB → KP lookups
               │  └→ each resolved card emits an SSE 'item' event
@@ -38,7 +133,7 @@ Discover mount
 
 ## Why streaming?
 
-The pipeline (Claude generation + concurrent metadata lookups) takes 10-30
+The original Anthropic pipeline (AI generation + concurrent metadata lookups) took 10-30
 seconds end-to-end. Waiting that long for any first paint kills perceived
 responsiveness. Instead we stream:
 
@@ -56,24 +151,27 @@ token-by-token. The `ndjsonItemsExtractor` (a tiny brace-balance scanner
 in `partial_json.go`) emits each top-level object the moment its closing
 brace lands.
 
-Chips still use `tool_use` because they're a single-shot non-streaming
-call and we want Anthropic-side schema validation on the chip array shape.
+The non-streaming chips endpoint uses a forced tool call (`tool_use` on
+Anthropic, `function_call` on OpenAI). Streaming chips use NDJSON text
+through the same parser as recommendations.
 
 ## Backend architecture
 
 ### Services
 
+- **`services/ai_client/`** — credential selection, shared request/tool/usage types,
+  Anthropic Messages and OpenAI Responses SDK adapters.
 - **`services/recommendations/`** — the whole pipeline.
   - `config.go` — CLI flags, `Config` struct, per-tier model resolver.
   - `service.go` — public types (`Chip`, `Recommendation`, `Message`,
     `RecommendRequest`, `ChipsRequest`, `Tier`, `StreamEvent` and
     payloads) and the `Service` interface.
-  - `claude.go` — `ClaudeService` wiring Claude SDK, context builder,
+  - `ai.go` — `AIService` wiring the shared AI client, context builder,
     resolver, quota and chips cache. Hosts `RecommendStream`,
-    `streamClaudeItemsText`, `callClaudeForChips`.
+    `streamAIItemsText`, `callAIForChips`.
   - `prompt.go` — system prompts and per-mode user prompt builders.
   - `default_chips.go` — static chip sets for cold-start (zero-history)
-    users; bypasses Claude entirely.
+    users; bypasses the AI provider entirely.
   - `partial_json.go` — `ndjsonItemsExtractor` brace-balance scanner.
   - `context.go` — `ClientClock`, `UserContext`, `UserContextBuilder`,
     `DBUserHistoryLoader` and history rendering helpers.
@@ -121,7 +219,8 @@ path "0 items" is not an error — `RecommendStream` emits a normal
 ### Wiring (serve.go)
 
 ```go
-recSvc := rec.New(c, pg, redis, en)
+aiClient := ai_client.New(c)
+recSvc := rec.New(c, aiClient, pg, redis, en, en)
 if recSvc != nil {
     discover_ai.RegisterHandler(r, recSvc)
 }
@@ -130,11 +229,11 @@ if recSvc != nil {
 `rec.New` (in `services/recommendations/factory.go`) is the single
 production wiring entry point — it constructs the config, history
 loader, context builder, resolver, quota and chips cache, and hands
-them to `NewClaudeService`. Tests should keep calling `NewClaudeService`
+them to `NewAIService`. Tests should keep calling `NewAIService`
 directly with mocks.
 
 `rec.New` returns interface-nil when the feature flag is off or
-`ANTHROPIC_API_KEY` is empty. In that case `serve.go` skips registration
+neither provider API key is configured. In that case `serve.go` skips registration
 entirely — the routes don't exist, gin returns its default 404, and the
 Discover frontend reads that as "feature disabled" and hides the section.
 
@@ -271,7 +370,7 @@ signal.
   mode, Redis-cached on our side for 4h. Provider-side prompt caching
   is **intentionally NOT enabled** here: 250 tokens is below the
   caching minimum, and the Redis layer absorbs >95% of chip requests
-  anyway. See the comment block above `callClaudeForChips` for the
+  anyway. See the comment block above `callAIForChips` for the
   recipe to enable it later.
 
 ### Output format
@@ -279,9 +378,9 @@ signal.
 - **Recommend / refine** — plain-text NDJSON: one self-contained
   `{"title", "year", "reason"}` JSON object per line, no array wrapper.
   Parsed incrementally by `ndjsonItemsExtractor`. Final validity is
-  enforced by `json.Unmarshal` into `claudeItem`; malformed entries get
+  enforced by `json.Unmarshal` into `recommendationItem`; malformed entries get
   logged and dropped, the rest survive.
-- **Chips** — `tool_use` with the `return_chips` schema. Tool_use here
+- **Chips** — a forced tool call with the `return_chips` schema. A tool call here
   is fine because (a) chips are a single-shot non-streaming call,
   (b) we want schema validation on the chip array shape.
 
@@ -302,8 +401,8 @@ any commentary before the first `{`.
 
 ### Temperature
 
-- 0.7 for recommendations (enough variety without going off the rails)
-- 0.9 for chips (witty, unexpected)
+Anthropic receives 0.7 for recommendations and 0.9 for chips. OpenAI requests
+omit temperature and use the selected model's default sampling.
 
 ## Localization
 
@@ -373,15 +472,16 @@ yield fresh chips — no manual invalidation required.
 ## Streaming pipeline internals
 
 ```
-streamClaudeItemsText ──claudeCh──→ ResolveStreamFromChannel ──recCh──→ SSE handler ──→ wire
-   (Claude stream)                  (concurrent TMDB lookups)
+streamAIItemsText ──aiItemsCh──→ ResolveStreamFromChannel ──recCh──→ SSE handler ──→ wire
+   (AI stream)                      (concurrent TMDB lookups)
 ```
 
 Three goroutines per request:
 
-1. **Claude streamer** — reads SSE events from Anthropic, runs the
-   partial-JSON scanner, pushes complete `claudeItem`s onto `claudeCh`.
-2. **Resolver fan-out** — reads from `claudeCh`, kicks off a TMDB lookup
+1. **AI streamer** — receives text deltas from the shared provider adapter,
+   runs the partial-JSON scanner, and pushes complete `recommendationItem`s
+   onto `aiItemsCh`.
+2. **Resolver fan-out** — reads from `aiItemsCh`, kicks off a TMDB lookup
    for each item (semaphore-bounded at 10), pushes resolved
    `Recommendation`s onto `recCh`.
 3. **gin Stream callback** — reads from the service's `events` channel
@@ -393,24 +493,21 @@ output channel. The SSE handler only reads — it never closes anything.
 **Cancellation.** All goroutines descend from `c.Request.Context()`.
 On client disconnect:
 
-- The Claude HTTP stream is torn down (its derived ctx is cancelled).
+- The provider HTTP stream is torn down (its derived ctx is cancelled).
 - Resolver goroutines mid-flight exit via their `case <-ctx.Done()`
   branches.
 - The service does NOT `return` early on a failed `send()`; it keeps
   draining `recCh` so resolver goroutines that are mid-send don't block
   forever — they then self-exit on ctx.
 
-**Trade-off accepted on disconnect:** the final `message_delta` from
-Anthropic (which carries `cache_read` / `cache_write` counts) is lost.
-We considered detaching the Claude ctx from the request ctx to get those
-metrics back, but that creates orphan streams that keep burning tokens
-after the user is gone — net negative.
+**Trade-off accepted on disconnect:** final provider usage may be lost.
+Detaching the provider context would leave streams burning tokens after
+the user disconnects, so cancellation follows the request context.
 
-**No early Claude cancellation on "enough items".** We let the Claude
-stream run to natural completion specifically so the `message_delta`
-event arrives on the happy path, which is the only place final cache
-usage tokens land. Cancelling would save ~100 output tokens but break
-observability of caching.
+**No early AI cancellation on "enough items".** The adapter drains the stream
+to its terminal event and retains final token and cache usage. Anthropic
+merges `message_start` / `message_delta` usage; OpenAI receives final usage
+in `response.completed`.
 
 ## Metadata resolution
 
@@ -459,8 +556,8 @@ Defaults:
 
 `100` for paid is an anti-abuse cap, not a budget target.
 
-**Quota is consumed BEFORE the Claude call.** This means a transient
-Anthropic 5xx burns the user's slot. We considered refunding on
+**Quota is consumed BEFORE the AI call.** This means a transient
+provider 5xx burns the user's slot. We considered refunding on
 `internal` failures but rejected it for race-safety: the current
 ordering guarantees no quota state ambiguity. Free-tier users losing
 their single daily slot to an upstream failure is an accepted
@@ -478,21 +575,24 @@ trade-off.
   limiter. Skipping the cache removes a whole class of double-consume
   races and keeps the code trivial.
 - **Anthropic prompt caching** (provider side): enabled on the system
-  block of `streamClaudeItemsText` via `cache_control: ephemeral`. The
+  block of `streamAIItemsText` via `cache_control: ephemeral`. The
   system prompt is sized past the 1024/2048-token minimums so caching
   actually activates. **Not** enabled on the chips path — see
   Prompting strategy for the rationale.
 - **Metadata lookups:** already cached inside each mapper
   (`tmdb.query`, `omdb.info`, ...) — unchanged by this feature.
+- **OpenAI prefix caching:** automatic on the provider side. The adapter
+  reports cached input tokens from final response usage; it does not send
+  Anthropic cache controls.
 
 ## Observability & cost
 
-Two logrus lines carry per-call Anthropic usage, both with `feature=ai_rec`:
+Two logrus lines carry per-call AI usage, both with `feature=ai_rec` and `provider=anthropic|openai`:
 
 | Message | Emitted by | Key fields |
 |---|---|---|
-| `claude stream complete` | `streamClaudeItemsText` | `kind`, `model`, `input_tokens`, `output_tokens`, `cache_read`, `cache_write`, `history_size`, `watchlist_size`, `deltas`, `total_ms` |
-| `claude chips stream complete` | `streamClaudeChipsText` | same, minus the history/watchlist pair |
+| `ai stream complete` | `streamAIItemsText` | `kind`, `model`, `input_tokens`, `output_tokens`, `cache_read`, `cache_write`, `history_size`, `watchlist_size`, `deltas`, `total_ms` |
+| `ai chips stream complete` | `streamAIChipsText` | same, minus the history/watchlist pair |
 
 `history_size` + `watchlist_size` exist to attribute spend to cold-start vs
 personalised traffic: a call with both at zero is one where the prompt
@@ -503,7 +603,7 @@ Note `kind` is hardcoded to `recommend` on the completion line — refine
 calls are indistinguishable there. The `quota charged` line does
 distinguish them, so a refine ratio has to be derived from that.
 
-**Measured baseline (2026-07-29, 7-day window via Loki):**
+**Measured Anthropic baseline (2026-07-29, 7-day window via Loki):**
 
 | Path | Calls / week | ≈ $ / week | ≈ $ / call |
 |---|---|---|---|
@@ -525,8 +625,10 @@ prompt-size work has poor ROI relative to the regression risk in
 | Flag | Env | Default | Purpose |
 |---|---|---|---|
 | `--ai-recommendations-enabled` | `AI_RECOMMENDATIONS_ENABLED` | `false` | Master kill switch |
-| `--anthropic-api-key` | `ANTHROPIC_API_KEY` | `""` | Required when enabled |
-| `--ai-recommendations-model` | `AI_RECOMMENDATIONS_MODEL` | `claude-haiku-4-5-20251001` | Legacy single-model fallback |
+| `--anthropic-api-key` | `ANTHROPIC_API_KEY` | `""` | Shared Anthropic key; takes precedence |
+| `--openai-api-key` | `OPENAI_API_KEY` | `""` | Shared OpenAI key |
+| `--openai-base-url` | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Responses API base URL |
+| `--ai-recommendations-model` | `AI_RECOMMENDATIONS_MODEL` | (provider default) | Legacy single-model fallback |
 | `--ai-recommendations-free-model` | `AI_RECOMMENDATIONS_FREE_MODEL` | (inherits) | Free-tier override |
 | `--ai-recommendations-paid-model` | `AI_RECOMMENDATIONS_PAID_MODEL` | (inherits) | Paid-tier override (e.g. Sonnet) |
 | `--ai-recommendations-free-daily-quota` | `AI_RECOMMENDATIONS_FREE_DAILY_QUOTA` | `1` | Free tier cap |
@@ -593,7 +695,7 @@ The section uses the cyan theme (secondary actions):
 
 ## Privacy
 
-Claude receives: title, year, and rating signal for the user's most
+The configured AI provider receives title, year, and rating signal for the user's most
 recent watched/rated movies (default 40 entries). **No email, user id,
 watch position, or other PII is sent.** The user id is used only as a
 Redis key for quota / chip cache; it never leaves our infrastructure.
@@ -608,15 +710,15 @@ calling `RecommendStream`.
 ## Rollout plan
 
 1. Feature-flag the deploy (`AI_RECOMMENDATIONS_ENABLED=false`) on stage.
-2. Set `ANTHROPIC_API_KEY` and flip the flag on stage; smoke test
+2. Set a provider API key and flip the flag on stage; smoke test
    end-to-end **including the SSE streaming path through any HTTP proxy
    in front of you** (the buffering invariants are easy to break).
 3. Monitor Loki logs on `feature=ai_rec`: token usage, resolver drop
-   rate, Claude error rate, `cache_read` / `cache_write` ratios on the
+   rate, provider error rate, `cache_read` / `cache_write` ratios on the
    recommend path (the latter is how you confirm prompt caching is
    actually working).
 4. Flip on prod once stage metrics look sane.
-5. Watch daily Anthropic billing for the first week; if it trends high,
+5. Watch daily billing for the selected provider for the first week; if it trends high,
    lower `AI_RECOMMENDATIONS_PAID_DAILY_QUOTA` and/or downgrade the
    paid model.
 
@@ -643,10 +745,11 @@ calling `RecommendStream`.
   `cache_control` (verified empirically — Anthropic returns 0/0 for
   cache fields). Use `claude-sonnet-4-5-20250929` if caching matters
   for the paid-tier model. Re-test when Anthropic ships a fix.
-- **End-to-end streaming pipeline test.** `parser`, `resolver`, `quota`
-  and `context` all have unit tests, but the streaming `RecommendStream`
-  path is only exercised manually. A fake Anthropic SSE producer would
-  give us coverage on the goroutine choreography and cancel paths.
+- **Full HTTP/SSE pipeline coverage.** Local HTTP fixtures cover both SDK adapters,
+  incremental deltas, final usage, malformed/truncated streams, API errors and
+  cancellation. OpenAI consumer tests cover recommendation/chip parsing and
+  enrichment candidates. The complete handler → `RecommendStream` → concurrent
+  resolver path still needs an end-to-end test.
 - **Shared cold-start recommendation cache.** A user with empty history
   *and* empty watchlist who taps a default chip produces a fully
   deterministic request: the six English queries in `default_chips.go`,

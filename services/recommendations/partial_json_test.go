@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func collectNDJSON(t *testing.T, chunks ...string) []claudeItem {
+func collectNDJSON(t *testing.T, chunks ...string) []recommendationItem {
 	t.Helper()
-	var got []claudeItem
+	var got []recommendationItem
 	ex := newNDJSONItemsExtractor(func(raw json.RawMessage) {
-		var item claudeItem
+		var item recommendationItem
 		if err := json.Unmarshal(raw, &item); err != nil {
 			t.Errorf("invalid item JSON: %s — %v", raw, err)
 			return

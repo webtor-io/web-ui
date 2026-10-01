@@ -1,9 +1,9 @@
 package recommendations
 
 import (
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 )
 
 // resolverConcurrency caps how many TMDB lookups run in parallel during a
@@ -15,14 +15,13 @@ const resolverConcurrency = 10
 
 // New constructs the production Service with all collaborators wired from
 // a *cli.Context. It is the single entry point used by serve.go; tests
-// should call NewClaudeService directly with mocks for each collaborator.
+// should call NewAIService directly with mocks for each collaborator.
 //
 // Returns interface-nil when the feature flag is off or the shared
-// anthropic client is nil (API key missing) — call sites should treat a
+// AI client is nil (API key missing) — call sites should treat a
 // nil Service as "feature disabled" and skip handler registration
-// entirely. The shared *anthropic.Client is built by anthropic_client.New
-// and passed in so the prompt-caching beta header lives in one place.
-func New(c *cli.Context, client *anthropic.Client, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup, localizer ContentLocalizer) Service {
+// entirely. The shared client is built by ai_client.New and passed in.
+func New(c *cli.Context, client ac.Client, pg *cs.PG, redis *cs.RedisClient, lookup MetadataLookup, localizer ContentLocalizer) Service {
 	cfg := ConfigFromCLI(c)
 
 	historyLoader := NewDBUserHistoryLoader(pg)
@@ -32,10 +31,10 @@ func New(c *cli.Context, client *anthropic.Client, pg *cs.PG, redis *cs.RedisCli
 	chipsCache := NewRedisChipsCache(redis.Get())
 	freshReleases := NewDBFreshReleasesLoader(pg, int16(cfg.FreshReleasesMinYear), cfg.FreshReleasesLimit, cfg.FreshReleasesCacheTTL)
 
-	svc := NewClaudeService(cfg, client, contextBuilder, resolver, quota, chipsCache, freshReleases)
+	svc := NewAIService(cfg, client, contextBuilder, resolver, quota, chipsCache, freshReleases)
 	if svc == nil {
 		// Explicit interface-nil so callers can do `if svc != nil`.
-		// Without this, returning a typed (*ClaudeService)(nil) would
+		// Without this, returning a typed (*AIService)(nil) would
 		// wrap into a non-nil interface — classic Go gotcha.
 		return nil
 	}

@@ -47,7 +47,7 @@ func TestResolver_DropsNonImdbAndUnresolved(t *testing.T) {
 	}
 	r := NewResolver(f, nil,3)
 
-	items := []claudeItem{
+	items := []recommendationItem{
 		{Title: "Interstellar", Year: 2014, Reason: "you loved Tenet"},
 		{Title: "Made Up Movie", Year: 2099, Reason: "invented"},
 		{Title: "Arrival", Year: 2016, Reason: "more cerebral sci-fi"},
@@ -87,7 +87,7 @@ func TestResolver_SeriesType(t *testing.T) {
 	}
 	r := NewResolver(f, nil,1)
 
-	got := r.Resolve(context.Background(),[]claudeItem{{Title: "Breaking Bad", Year: 2008, Reason: "obvious"}}, models.ContentTypeSeries, "")
+	got := r.Resolve(context.Background(),[]recommendationItem{{Title: "Breaking Bad", Year: 2008, Reason: "obvious"}}, models.ContentTypeSeries, "")
 	if len(got) != 1 || got[0].Type != "series" {
 		t.Fatalf("expected series type, got %+v", got)
 	}
@@ -120,9 +120,9 @@ func TestResolver_ConcurrencyLimit(t *testing.T) {
 	}
 	r := NewResolver(f, nil,3)
 
-	items := make([]claudeItem, 10)
+	items := make([]recommendationItem, 10)
 	for i := range items {
-		items[i] = claudeItem{Title: "missing"}
+		items[i] = recommendationItem{Title: "missing"}
 	}
 
 	done := make(chan struct{})

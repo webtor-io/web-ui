@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	aem "github.com/webtor-io/web-ui/models/ai_enrich"
+	ac "github.com/webtor-io/web-ui/services/ai_client"
 )
 
 // CLI flag names. Private — callers go through RegisterFlags + New, like
@@ -26,12 +26,6 @@ const (
 	aiResolveMaxCandidates  = "ai-enrich-max-candidates"
 )
 
-// defaultAIResolveModel is what we ship out of the box. Haiku 4.5 is the
-// right cost/latency point for a "normalize this release name" task —
-// pattern recognition over Latin-transliterated foreign titles, not a
-// knowledge-cutoff-bound IMDB lookup.
-const defaultAIResolveModel = "claude-haiku-4-5-20251001"
-
 const (
 	aiResolveToolName = "return_candidates"
 	// Maximum prompt input length per filename. Filenames over this are a
@@ -43,8 +37,7 @@ const (
 )
 
 // RegisterFlags adds the AI-enrichment CLI flags to the given slice. The
-// shared anthropic-api-key flag is registered separately by
-// services/anthropic_client and is reused here.
+// shared provider API-key flags are registered separately by services/ai_client.
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
 		cli.BoolFlag{
@@ -54,8 +47,7 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:   aiResolveModelFlag,
-			Usage:  "Claude model id used by the AI enrichment fallback",
-			Value:  defaultAIResolveModel,
+			Usage:  "AI model id used by the enrichment fallback (defaults to the configured provider model)",
 			EnvVar: "AI_ENRICH_MODEL",
 		},
 		cli.IntFlag{
@@ -104,21 +96,21 @@ type AIResolver struct {
 	model         string
 	maxCandidates int
 	timeout       time.Duration
-	client        *anthropic.Client
+	client        ac.Client
 	pg            *cs.PG
 }
 
-// New wires the resolver from CLI flags and a shared anthropic client.
+// New wires the resolver from CLI flags and a shared AI client.
 // Returns nil (not an error) when the feature is disabled or the
 // client/db are missing — Enricher treats a nil resolver as "skip the AI
 // fallback entirely".
-func New(c *cli.Context, client *anthropic.Client, pg *cs.PG) *AIResolver {
+func New(c *cli.Context, client ac.Client, pg *cs.PG) *AIResolver {
 	if !c.Bool(aiResolveEnabledFlag) {
 		log.Info("ai_enrich: feature flag off — AI fallback disabled")
 		return nil
 	}
 	if client == nil {
-		log.Warn("ai_enrich: enabled but anthropic client is nil (no API key) — AI fallback disabled")
+		log.Warn("ai_enrich: enabled but AI client is nil (no API key) — AI fallback disabled")
 		return nil
 	}
 	if pg == nil {
@@ -127,7 +119,7 @@ func New(c *cli.Context, client *anthropic.Client, pg *cs.PG) *AIResolver {
 	}
 	model := c.String(aiResolveModelFlag)
 	if model == "" {
-		model = defaultAIResolveModel
+		model = ac.DefaultModel(client.Provider())
 	}
 	timeout := time.Duration(c.Int(aiResolveTimeoutSecFlag)) * time.Second
 	if timeout <= 0 {
@@ -138,6 +130,7 @@ func New(c *cli.Context, client *anthropic.Client, pg *cs.PG) *AIResolver {
 		maxCandidates = 3
 	}
 	log.WithFields(log.Fields{
+		"provider":       client.Provider(),
 		"model":          model,
 		"max_candidates": maxCandidates,
 		"timeout":        timeout,
@@ -176,7 +169,7 @@ func (r *AIResolver) SuggestCandidates(ctx context.Context, resourceID, pathStr,
 		log.Warn("ai_enrich: db unavailable, skipping cache")
 	} else if !force {
 		if cached, err := aem.GetQuery(ctx, db, parsedTitle, parsedYear, ctInt); err != nil {
-			log.WithError(err).Warn("ai_enrich: cache read failed, falling through to claude")
+			log.WithError(err).Warn("ai_enrich: cache read failed, falling through to AI")
 		} else if cached != nil {
 			log.WithFields(log.Fields{
 				"parsed_title": parsedTitle,
@@ -186,9 +179,9 @@ func (r *AIResolver) SuggestCandidates(ctx context.Context, resourceID, pathStr,
 		}
 	}
 
-	candidates, err := r.callClaude(ctx, pathStr, parsedTitle, parsedYear, ct)
+	candidates, err := r.callAI(ctx, pathStr, parsedTitle, parsedYear, ct)
 	if err != nil {
-		log.WithError(err).WithField("path", pathStr).Warn("ai_enrich: claude call failed")
+		log.WithError(err).WithField("path", pathStr).Warn("ai_enrich: AI call failed")
 		// Do NOT cache transient API errors — next request may succeed.
 		return nil
 	}
@@ -207,7 +200,7 @@ func (r *AIResolver) SuggestCandidates(ctx context.Context, resourceID, pathStr,
 	}
 
 	if len(candidates) == 0 {
-		log.WithField("path", pathStr).Info("ai_enrich: claude returned no usable candidates")
+		log.WithField("path", pathStr).Info("ai_enrich: AI returned no usable candidates")
 		return nil
 	}
 	for i, cand := range candidates {
@@ -221,7 +214,7 @@ func (r *AIResolver) SuggestCandidates(ctx context.Context, resourceID, pathStr,
 			"title":    cand.Title,
 			"year":     yr,
 			"language": cand.Language,
-		}).Info("ai_enrich: claude candidate")
+		}).Info("ai_enrich: AI candidate")
 	}
 	return candidates
 }
@@ -252,87 +245,65 @@ func contentTypeToInt(ct models.ContentType) int16 {
 	return 1
 }
 
-// callClaude runs the tool-use call and returns the raw candidates.
-func (r *AIResolver) callClaude(ctx context.Context, pathStr, parsedTitle string, parsedYear *int16, ct models.ContentType) ([]TitleCandidate, error) {
+// callAI runs the provider tool call and returns the raw candidates.
+func (r *AIResolver) callAI(ctx context.Context, pathStr, parsedTitle string, parsedYear *int16, ct models.ContentType) ([]TitleCandidate, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
-	tool := anthropic.ToolParam{
+	tool := ac.Tool{
 		Name:        aiResolveToolName,
-		Description: anthropic.String("Return up to 3 alternative (title, year) tuples that real metadata DBs (TMDB, IMDB, Kinopoisk) would index this torrent's content under. Empty array means no useful normalization is possible."),
-		InputSchema: anthropic.ToolInputSchemaParam{
-			Properties: map[string]any{
-				"candidates": map[string]any{
-					"type":     "array",
-					"maxItems": 3,
-					"items": map[string]any{
-						"type":     "object",
-						"required": []string{"title"},
-						"properties": map[string]any{
-							"title": map[string]any{
-								"type":        "string",
-								"maxLength":   200,
-								"description": "Canonical title in its native script — e.g. 'Вот это драма', 'The Drama', '오징어 게임'. Do NOT include release tags, codec markers, or year.",
-							},
-							"year": map[string]any{
-								"type":        []string{"integer", "null"},
-								"description": "Best-guess release year. Use null when unsure — searching without a year filter is preferred over a wrong year.",
-							},
-							"language": map[string]any{
-								"type":        "string",
-								"maxLength":   3,
-								"description": "ISO-639-1 language code of `title` (e.g. 'ru', 'en', 'ko'). Optional, informational.",
-							},
+		Description: "Return up to 3 alternative (title, year) tuples that real metadata DBs (TMDB, IMDB, Kinopoisk) would index this torrent's content under. Empty array means no useful normalization is possible.",
+		Properties: map[string]any{
+			"candidates": map[string]any{
+				"type":     "array",
+				"maxItems": 3,
+				"items": map[string]any{
+					"type":     "object",
+					"required": []string{"title"},
+					"properties": map[string]any{
+						"title": map[string]any{
+							"type":        "string",
+							"maxLength":   200,
+							"description": "Canonical title in its native script — e.g. 'Вот это драма', 'The Drama', '오징어 게임'. Do NOT include release tags, codec markers, or year.",
+						},
+						"year": map[string]any{
+							"type":        []string{"integer", "null"},
+							"description": "Best-guess release year. Use null when unsure — searching without a year filter is preferred over a wrong year.",
+						},
+						"language": map[string]any{
+							"type":        "string",
+							"maxLength":   3,
+							"description": "ISO-639-1 language code of `title` (e.g. 'ru', 'en', 'ko'). Optional, informational.",
 						},
 					},
 				},
-				"reasoning": map[string]any{
-					"type":        "string",
-					"maxLength":   200,
-					"description": "One short sentence on what transformation you applied (transliteration → Cyrillic, expanded abbreviation, etc). Empty when no candidates.",
-				},
 			},
-			Required: []string{"candidates"},
+			"reasoning": map[string]any{
+				"type":        "string",
+				"maxLength":   200,
+				"description": "One short sentence on what transformation you applied (transliteration → Cyrillic, expanded abbreviation, etc). Empty when no candidates.",
+			},
 		},
+		Required: []string{"candidates"},
 	}
 
 	userPrompt := r.buildUserPrompt(pathStr, parsedTitle, parsedYear, ct)
-	resp, err := r.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(r.model),
-		MaxTokens: aiResolveMaxTokens,
-		// Prompt caching deliberately NOT enabled here. Empirical probing
-		// against Haiku 4.5 (2026-05-11) shows the cache minimum is well
-		// above this prompt's ~2.2k token system block — cache_control on
-		// blocks under ~5k tokens is silently ignored (cache_creation_input_tokens=0).
-		// Padding the prompt with filler just to cross the threshold would
-		// hurt prompt quality without a real win: the ai_enrich.query
-		// table already absorbs ~95% of duplicate parsed-titles, so the
-		// remaining un-cached Claude calls are infrequent enough that
-		// per-call savings don't justify a bloated prompt.
-		System: []anthropic.TextBlockParam{{Text: aiResolveSystemPrompt}},
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
-		},
-		Tools:       []anthropic.ToolUnionParam{{OfTool: &tool}},
-		ToolChoice:  anthropic.ToolChoiceParamOfTool(aiResolveToolName),
-		Temperature: anthropic.Float(0.0),
-	})
+	// Keep this short prompt uncached on Anthropic; the DB cache already
+	// absorbs repeated parsed titles. OpenAI caches prefixes automatically.
+	resp, err := r.client.CallTool(ctx, ac.Request{
+		Model: r.model, MaxTokens: aiResolveMaxTokens,
+		System:   []ac.SystemBlock{{Text: aiResolveSystemPrompt}},
+		Messages: []ac.Message{{Role: "user", Content: userPrompt}}, Temperature: 0,
+	}, tool)
 	if err != nil {
-		return nil, errors.Wrap(err, "anthropic messages.new")
+		return nil, errors.Wrap(err, "AI enrichment call")
 	}
-
 	log.WithFields(log.Fields{
-		"feature":       "ai_enrich",
-		"model":         resp.Model,
-		"input_tokens":  resp.Usage.InputTokens,
-		"output_tokens": resp.Usage.OutputTokens,
-		"stop_reason":   resp.StopReason,
-	}).Info("ai_enrich: claude call complete")
-
-	raw, err := extractAIResolveToolUse(resp.Content)
-	if err != nil {
-		return nil, err
-	}
+		"feature": "ai_enrich", "provider": r.client.Provider(), "model": resp.Usage.Model,
+		"input_tokens": resp.Usage.InputTokens, "output_tokens": resp.Usage.OutputTokens,
+		"stop_reason": resp.Usage.StopReason,
+	}).Info("ai_enrich: AI call complete")
+	raw := resp.Input
 
 	var payload struct {
 		Candidates []struct {
@@ -347,7 +318,7 @@ func (r *AIResolver) callClaude(ctx context.Context, pathStr, parsedTitle string
 	}
 
 	if payload.Reasoning != "" {
-		log.WithField("reasoning", payload.Reasoning).Debug("ai_enrich: claude reasoning")
+		log.WithField("reasoning", payload.Reasoning).Debug("ai_enrich: AI reasoning")
 	}
 
 	out := make([]TitleCandidate, 0, len(payload.Candidates))
@@ -386,18 +357,6 @@ func (r *AIResolver) buildUserPrompt(pathStr, parsedTitle string, parsedYear *in
 		"\nParsed title: " + parsedTitle +
 		year +
 		"\nMedia type hint (from heuristic, may be wrong): " + hint
-}
-
-func extractAIResolveToolUse(blocks []anthropic.ContentBlockUnion) (json.RawMessage, error) {
-	for _, b := range blocks {
-		if b.Type == "tool_use" && b.Name == aiResolveToolName {
-			if len(b.Input) == 0 {
-				return nil, errors.Errorf("ai_enrich: empty tool input")
-			}
-			return json.RawMessage(b.Input), nil
-		}
-	}
-	return nil, errors.Errorf("ai_enrich: tool %s not called (blocks=%d)", aiResolveToolName, len(blocks))
 }
 
 // dedupeCandidates removes duplicates and any candidate that exactly

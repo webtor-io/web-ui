@@ -12,10 +12,10 @@ import (
 	"github.com/webtor-io/web-ui/models"
 )
 
-// claudeItem is what Claude actually returns via tool use, before we turn it
-// into a real Recommendation. Public to the package so claude.go and the
+// recommendationItem is the model output parsed from NDJSON, before we turn it
+// into a real Recommendation. Public to the package so ai.go and the
 // resolver can share the shape without going through JSON twice.
-type claudeItem struct {
+type recommendationItem struct {
 	Title  string `json:"title"`
 	Year   int    `json:"year,omitempty"`
 	Reason string `json:"reason"`
@@ -24,7 +24,7 @@ type claudeItem struct {
 // Resolver turns Claude's (title, year, reason) tuples into rendered
 // Recommendation cards. It is intentionally thin:
 //
-//  1. For each claudeItem, call MetadataLookup.LookupByTitleYear once. In
+//  1. For each recommendationItem, call MetadataLookup.LookupByTitleYear once. In
 //     production this hits TMDB → OMDB → Kinopoisk via the enricher, but the
 //     resolver stays agnostic about that ordering.
 //
@@ -55,11 +55,11 @@ func NewResolver(lookup MetadataLookup, localizer ContentLocalizer, concurrency 
 	return &Resolver{lookup: lookup, localizer: localizer, concurrency: concurrency}
 }
 
-// Resolve turns a slice of claudeItems into Recommendation cards, preserving
+// Resolve turns a slice of recommendationItems into Recommendation cards, preserving
 // input order and silently dropping unresolvable entries. Never returns an
 // error — a failure to resolve a single item is logged and treated as "not
 // that title", not as a hard failure of the whole batch.
-func (r *Resolver) Resolve(ctx context.Context, items []claudeItem, ct models.ContentType, lang string) []Recommendation {
+func (r *Resolver) Resolve(ctx context.Context, items []recommendationItem, ct models.ContentType, lang string) []Recommendation {
 	if len(items) == 0 {
 		return nil
 	}
@@ -138,7 +138,7 @@ func (r *Resolver) Resolve(ctx context.Context, items []claudeItem, ct models.Co
 // abort their TMDB calls (which respect ctx) and exit. Callers MUST drain
 // `out` until it closes, otherwise the goroutines block forever waiting
 // to push their result.
-func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct models.ContentType, lang string, out chan<- Recommendation) {
+func (r *Resolver) ResolveStream(ctx context.Context, items []recommendationItem, ct models.ContentType, lang string, out chan<- Recommendation) {
 	defer close(out)
 	if len(items) == 0 {
 		return
@@ -201,7 +201,7 @@ func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct mod
 // recommendations land on `out` as soon as their TMDB lookup finishes.
 //
 // This is the bridge between the streaming Claude pipeline (which
-// produces claudeItems token-by-token as the model generates them) and
+// produces recommendationItems token-by-token as the model generates them) and
 // the SSE handler (which wants Recommendations as soon as possible). The
 // resolver no longer waits for Claude to finish before kicking off
 // lookups — the moment Claude emits the first complete `{title, year,
@@ -212,7 +212,7 @@ func (r *Resolver) ResolveStream(ctx context.Context, items []claudeItem, ct mod
 // finished. Cancellation: if ctx is cancelled, in-flight goroutines bail
 // (their TMDB calls inherit the context), and the method drains `in` so
 // upstream producers don't block forever waiting to push their next item.
-func (r *Resolver) ResolveStreamFromChannel(ctx context.Context, in <-chan claudeItem, ct models.ContentType, lang string, out chan<- Recommendation) {
+func (r *Resolver) ResolveStreamFromChannel(ctx context.Context, in <-chan recommendationItem, ct models.ContentType, lang string, out chan<- Recommendation) {
 	defer close(out)
 
 	start := time.Now()
@@ -289,7 +289,7 @@ func (r *Resolver) logFinished(mode string, itemsIn int, sent int64, peakPar int
 // Recommendation. Returns nil if the item should be dropped. When lang is
 // non-empty and a ContentLocalizer is configured, title and plot are
 // translated before building the card.
-func (r *Resolver) resolveOne(ctx context.Context, item claudeItem, ct models.ContentType, lang string) *Recommendation {
+func (r *Resolver) resolveOne(ctx context.Context, item recommendationItem, ct models.ContentType, lang string) *Recommendation {
 	title := strings.TrimSpace(item.Title)
 	if title == "" {
 		return nil
