@@ -291,6 +291,16 @@ function policy({ storage, t = { now: 0 }, grace = { blocks: false }, leaving = 
     return { p, events, restarts, cards, stops: () => stops, hides: () => hides, starve, watching: () => watchers.size };
 }
 
+test('policy: a viewer seek during a pending restart also changes a later manual retry', () => {
+    const pos = { at: 50, play: true };
+    const x = policy({ storage: page().sessionStorage, pos });
+    x.p.sessionGone('404', 404, { at: 1500, play: true }, 'seek');
+    assert.equal(x.restarts[0].at, 1500);
+    x.p.seeking(); pos.at = 30;
+    x.p.restartFailed(); x.p.click();
+    assert.equal(x.restarts[1].at, 30);
+});
+
 test('policy: the session gone -> the restart at the viewer\'s place, once', () => {
     const storage = page().sessionStorage;
     const x = policy({ storage });

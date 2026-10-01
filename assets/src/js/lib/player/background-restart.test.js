@@ -45,6 +45,7 @@ test('restart re-addresses the current file after Next without changing the page
 
 test('a background restart retains stage, latest position and pause intent; no visible start or scripts', async (t) => {
     const p = page();
+    Object.defineProperty(p.video, 'paused', { configurable: true, writable: true, value: false });
     t.after(() => p.w.dispatchEvent(new p.w.CustomEvent('player_ready')));
     let resolve, request;
     const r = p.create({ fetchRender: (form, opts) => { request = { form, opts }; return new Promise((r) => resolve = r); } });
@@ -56,6 +57,7 @@ test('a background restart retains stage, latest position and pause intent; no v
     assert.equal(request.form.isConnected, false);
     assert.equal(p.video.isConnected, true, 'old buffer remains usable while fetching');
     p.setState({ at: 1410 });
+    p.video.paused = true;
     p.video.dispatchEvent(new p.w.Event('pause'));
     resolve(p.render());
     await Promise.all([first, duplicate]);
@@ -102,6 +104,49 @@ test('a fixed seek/decoder position survives detach and a failed retry; play int
     await r.start({ position: { at: 0, play: true } });
     assert.equal(p.mounted[0].opts.restartState.at, 1397);
     assert.equal(p.mounted[0].opts.restartState.play, true);
+});
+
+test('a queued technical pause keeps recovery playing, but a later viewer pause still wins', async (t) => {
+    for (const pauseAgain of [false, true]) await t.test(`viewer pauses=${pauseAgain}`, async (t) => {
+        const p = page(); t.after(() => p.w.dispatchEvent(new p.w.CustomEvent('player_ready')));
+        Object.defineProperty(p.video, 'paused', { configurable: true, writable: true, value: true });
+        let resolve;
+        const r = p.create({ fetchRender: () => new Promise(r => { resolve = r; }) });
+        const pending = r.start({ position: { at: 1397, play: true }, fixedPosition: true });
+        await Promise.resolve();
+        // The seek already paused the element before it found the dead
+        // session. Browsers dispatch that pause event in a later task.
+        p.video.dispatchEvent(new p.w.Event('pause'));
+        if (pauseAgain) {
+            p.video.paused = false; p.video.dispatchEvent(new p.w.Event('play'));
+            p.video.paused = true; p.video.dispatchEvent(new p.w.Event('pause'));
+        }
+        resolve(p.render()); await pending;
+        assert.equal(p.mounted[0].opts.restartState.play, !pauseAgain);
+    });
+});
+
+test('a viewer seek releases the fixed recovery target and the replacement reads the advancing clock', async (t) => {
+    const p = page(); t.after(() => p.w.dispatchEvent(new p.w.CustomEvent('player_ready')));
+    let resolve;
+    const r = p.create({ fetchRender: () => new Promise(r => { resolve = r; }) });
+    const pending = r.start({ position: { at: 1500, play: true }, fixedPosition: true });
+    await Promise.resolve();
+    r.seeking(); p.setState({ at: 30 });
+    p.setState({ at: 37 }); // the viewer's new buffer played while the job ran
+    resolve(p.render()); await pending;
+    assert.equal(p.mounted[0].opts.restartState.at, 37);
+});
+
+test('a new failed seek during recovery replaces its target, including a manual retry after decoder fallback', async (t) => {
+    const p = page(); t.after(() => p.w.dispatchEvent(new p.w.CustomEvent('player_ready')));
+    let attempts = 0;
+    const r = p.create({ fetchRender: async () => ++attempts === 1 ? null : p.render() });
+    p.setState({ at: 0 });
+    await r.start({ position: { at: 1397, play: true }, fixedPosition: true, fallback: { reason: 'decode_error', cls: 'aac51' } });
+    r.seeking(); r.seekFailed(600);
+    await r.start({ position: { at: 600, play: true } });
+    assert.equal(p.mounted[0].opts.restartState.at, 600);
 });
 
 test('explicit fallback fields keep the codec policy; the Dolby drop keeps video and AAC, restart is purged', () => {

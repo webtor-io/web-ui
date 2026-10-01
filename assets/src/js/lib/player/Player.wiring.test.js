@@ -7516,3 +7516,113 @@ test('failed background audio fallback offers an in-player retry with its origin
     assert.equal(p.container.querySelector('video.player').currentTime, 1397);
     assert.equal(p.events.filter(e => e.name === 'audio-fallback').length, 1, 'retry did not strike/count the class again');
 });
+
+test('a viewer seek during background recovery overrides the failed seek target', async (t) => {
+    withHlsJs(t); cleanRestart();
+    const handlers = {};
+    const saved = { ES: window.EventSource, form: globalThis.FormData, parser: globalThis.DOMParser, media: Object.getOwnPropertyDescriptor(navigator, 'mediaSession') };
+    Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { setActionHandler: (a, fn) => { handlers[a] = fn; } } });
+    globalThis.FormData = dom.window.FormData; globalThis.DOMParser = dom.window.DOMParser;
+    let source;
+    window.EventSource = class { constructor() { source = this; } close() {} };
+    t.after(() => {
+        destroyPlayer(); cleanRestart(); window.EventSource = saved.ES; globalThis.FormData = saved.form; globalThis.DOMParser = saved.parser;
+        if (saved.media) Object.defineProperty(navigator, 'mediaSession', saved.media); else delete navigator.mediaSession;
+        window.dispatchEvent(new CustomEvent('player_ready'));
+    });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page); pageStartForm(page, 'item'); page.video.dataset.itemId = 'item';
+        page.video.pause = () => { page.video.paused = true; page.video.dispatchEvent(new dom.window.Event('pause')); };
+        page.setResponse((url) => {
+            if (String(url).includes('/seek?')) return deadSeek();
+            if (String(url).endsWith('/stream-video')) return { ok: true, text: async () => '<div data-async-progress-log="/job/recovery"></div>' };
+            return { ok: true, json: async () => ({ offset: 0 }), headers: new dom.window.Headers() };
+        });
+    });
+    await playPast(p, 50);
+    handlers.seekto({ seekTime: 1500 }); await settle(); await settle();
+    assert.ok(source, 'background restart has begun after the failed session seek');
+    assert.equal(p.video.isConnected, true, 'the old buffer is still available');
+    produced(p.video, 100);
+    handlers.seekto({ seekTime: 30 }); await settle();
+    assert.equal(p.video.currentTime, 30, 'the viewer successfully sought to a different place while recovery was pending');
+    source.onmessage({ data: JSON.stringify({ level: 'rendertemplate', body: '<div><video class="player" controls autoplay data-resource-id="res" data-item-id="item" data-path="movie.mkv" data-duration="3600"></video></div>' }) });
+    await settle(); await settle();
+    const video = p.container.querySelector('video.player');
+    assert.equal(video.currentTime, 30);
+});
+
+test('a second failed seek during background recovery becomes the replacement position', async (t) => {
+    withHlsJs(t); cleanRestart();
+    const saved = { ES: window.EventSource, form: globalThis.FormData, parser: globalThis.DOMParser };
+    globalThis.FormData = dom.window.FormData; globalThis.DOMParser = dom.window.DOMParser;
+    let source;
+    window.EventSource = class { constructor() { source = this; } close() {} };
+    t.after(() => { destroyPlayer(); cleanRestart(); window.EventSource = saved.ES; globalThis.FormData = saved.form; globalThis.DOMParser = saved.parser; window.dispatchEvent(new CustomEvent('player_ready')); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page); pageStartForm(page, 'item'); page.video.dataset.itemId = 'item';
+        page.video.pause = () => { page.video.paused = true; page.video.dispatchEvent(new dom.window.Event('pause')); };
+        page.setResponse((url) => {
+            if (String(url).includes('/seek?')) return deadSeek();
+            if (String(url).endsWith('/stream-video')) return { ok: true, text: async () => '<div data-async-progress-log="/job/recovery"></div>' };
+            return { ok: true, json: async () => ({ offset: 0 }), headers: new dom.window.Headers() };
+        });
+    });
+    await playPast(p, 50);
+    keydown('ArrowRight'); await settle();
+    assert.ok(source);
+    keydown('ArrowRight'); await settle();
+    assert.equal(seekPosts(p).length, 2);
+    assert.match(String(seekPosts(p)[1].url), /t=80$/);
+    source.onmessage({ data: JSON.stringify({ level: 'rendertemplate', body: '<div><video class="player" controls autoplay data-resource-id="res" data-item-id="item" data-path="movie.mkv" data-duration="3600"></video></div>' }) });
+    await settle(); await settle();
+    assert.equal(p.container.querySelector('video.player').currentTime, 80);
+});
+
+test('leaving a player cancels its pending Next job and a late result leaves the new player and URL alone', async (t) => {
+    const { streams, deliver } = await mountWithNext(t);
+    t.after(() => { for (const source of streams) source.onerror?.(); });
+    keydown('n'); await settle();
+    assert.equal(streams.length, 1);
+    let closed = 0;
+    streams[0].close = () => closed++;
+    destroyPlayer();
+    assert.equal(closed, 1, 'unmount aborts SSE before its result arrives');
+    const p = await mountPlayer();
+    const url = window.location.href;
+    await deliver();
+    assert.equal(closed, 1, 'unmount aborts SSE');
+    assert.equal(document.querySelector('video.player'), p.video);
+    assert.equal(window.location.href, url);
+});
+
+test('a transition whose stage disappears during initialization does not register a detached player', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount();
+    const stage = document.createElement('div'); p.container.append(stage);
+    const pending = initPlayer(p.container, { stage });
+    stage.remove(); await pending;
+    assert.equal(p.video.parentNode, p.container);
+    assert.equal(stage.children.length, 0);
+});
+
+test('a paused direct-file seek updates the displayed position', async (t) => {
+    cleanRestart();
+    const handlers = {};
+    const saved = Object.getOwnPropertyDescriptor(navigator, 'mediaSession');
+    Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { setActionHandler: (a, fn) => { handlers[a] = fn; } } });
+    t.after(() => {
+        destroyPlayer(); cleanRestart();
+        if (saved) Object.defineProperty(navigator, 'mediaSession', saved); else delete navigator.mediaSession;
+    });
+    const p = await mountPlayer((page) => {
+        page.video.setAttribute('controls', ''); page.video.dataset.duration = '3600';
+        page.video.pause = () => { page.video.paused = true; page.video.dispatchEvent(new dom.window.Event('pause')); };
+    });
+    await playPast(p, 50); p.video.pause(); await settle();
+    handlers.seekto({ seekTime: 120 });
+    p.video.dispatchEvent(new dom.window.Event('seeked')); await settle();
+    assert.equal(p.video.currentTime, 120);
+    const shown = p.container.querySelector('.wt-player-time span').textContent;
+    assert.equal(shown, '2:00');
+});

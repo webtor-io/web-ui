@@ -104,37 +104,58 @@ export function nextURL(href, path) {
 export function createNextItemGo({ next, resourceID, root, getStage, getAspectRatio = () => '', initPlayer, destroyPlayer, onEvent = () => {},
     fetchRender = fetchStreamRender, getToken = backgroundToken, now = () => Date.now(),
     navigate = (u) => window.location.assign(u) }) {
-    let prepared = null;   // { doc, at }
-    let preparing = null;  // Promise
+    let prepared = null;   // { doc, at, key }
+    let preparing = null;  // { controller, key, promise }
+    let disposed = false;
     let going = false;
     let whyNot = ''; // why the last quiet attempt produced no player
 
-    const fetchNext = async () => {
-        const modal = document.getElementById('subtitles');
-        const form = nextStartForm(next, readCarry(modal || document));
+    const active = () => !disposed && root.isConnected;
+    const choices = () => {
+        const modal = root.querySelector('#subtitles');
+        const carry = readCarry(modal);
+        return { carry, key: JSON.stringify([carry, modal?.getAttribute('data-preferred-lang') || '']) };
+    };
+    const freshPrepared = () => (active() && prepared && now() - prepared.at <= PREPARED_MAX_AGE_MS
+        && prepared.key === choices().key ? prepared.doc : null);
+
+    const fetchNext = async (carry, signal) => {
+        const form = nextStartForm(next, carry);
         if (!form) { whyNot = 'no-start-form'; return null; }
         const token = await getToken();
+        if (signal.aborted || !active()) return null;
         if (token === null) { whyNot = 'turnstile-needs-a-click'; return null; } // not quietly
         // The log of the next file's start, for the viewer who is waiting on
         // it (Player.jsx shows the latest line on the card).
-        return fetchRender(form, { token, timeoutMs: NEXT_RENDER_TIMEOUT_MS, onProgress: (text) => onEvent('progress', { text }) });
+        return fetchRender(form, { token, signal, timeoutMs: NEXT_RENDER_TIMEOUT_MS,
+            onProgress: (text) => { if (!signal.aborted && active()) onEvent('progress', { text }); } });
     };
 
     const prepare = () => {
-        if (preparing || prepared) return preparing;
-        preparing = fetchNext().then((doc) => {
+        if (!active()) return Promise.resolve(null);
+        const fresh = freshPrepared();
+        if (fresh) return Promise.resolve(fresh);
+        const { carry, key } = choices();
+        if (preparing?.key === key) return preparing.promise;
+        preparing?.controller.abort();
+        prepared = null;
+        const job = { key, controller: new AbortController() };
+        preparing = job;
+        job.promise = fetchNext(carry, job.controller.signal).catch(() => null).then((doc) => {
+            if (job.controller.signal.aborted || !active()) return null;
             preparing = null;
+            // A choice can change while either the token or the job is out.
+            // Such a render must not mount or start an obsolete translation.
+            if (key !== choices().key) return null;
             if (doc) {
-                prepared = { doc, at: now() };
+                prepared = { doc, at: now(), key };
                 kickTranslation(doc);
             }
             onEvent('prepared', { ok: !!doc });
             return doc;
-        }).catch(() => { preparing = null; return null; });
-        return preparing;
+        });
+        return job.promise;
     };
-
-    const freshPrepared = () => (prepared && now() - prepared.at <= PREPARED_MAX_AGE_MS ? prepared.doc : null);
 
     // The ordinary way in, for everything that cannot be done quietly.
     //
@@ -149,19 +170,27 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
     };
 
     const go = async (how) => {
-        if (going) return;
+        if (going || !active()) return;
         going = true;
+        const stage = getStage();
+        const stillHere = () => active() && getStage() === stage;
         const startedAt = now();
         const prewarmed = !!freshPrepared();
         let doc = freshPrepared();
         if (!doc) {
-            prepared = null;
             // Not ready: this is a stream start like any other and can take
             // its minute. The player shows it (Player.jsx nextLoading).
             onEvent('loading', { on: true });
-            doc = await (preparing || prepare());
+            do {
+                const key = choices().key;
+                await prepare();
+                if (!stillHere()) return;
+                doc = freshPrepared();
+                if (!doc && !preparing && key === choices().key) break;
+            } while (!doc);
             onEvent('loading', { on: false });
         }
+        if (!stillHere()) return;
         if (!doc || !doc.querySelector('.player')) {
             const reason = doc ? 'render-is-not-a-player' : (whyNot || 'no-render');
             onEvent('go', { how, prewarmed, fallback: true, reason, wait_ms: now() - startedAt });
@@ -172,16 +201,20 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
         const fullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
         const url = nextURL(window.location.href, next.path);
         try {
-            await mountOnStage(doc);
+            // This swap itself disposes the old component. After it begins,
+            // the preserved stage identifies the transition we may finish.
+            await mountOnStage(doc, stage);
         } catch (e) {
             // The old player is already gone at this point: a half-built
             // page is the one outcome worse than a reload.
+            if (!root.isConnected || (stage && (!stage.isConnected || (getStage() && getStage() !== stage)))) return;
             const reason = `mount-failed: ${e && e.message ? e.message : e}`;
             console.error('next item:', reason, e);
             onEvent('go', { how, prewarmed, fallback: true, reason, wait_ms: now() - startedAt });
             visibleFallback(reason);
             return;
         }
+        if (!root.isConnected || (stage && (!stage.isConnected || getStage() !== stage))) return;
         const title = doc.querySelector('.player').getAttribute('data-resource-title');
         if (title) document.title = `${title} | Webtor.io`;
         const main = document.querySelector('main[data-async-layout]');
@@ -196,25 +229,33 @@ export function createNextItemGo({ next, resourceID, root, getStage, getAspectRa
     // mountOnStage: the old player goes, its stage stays; everything else the
     // old render brought (the dialogs, the grace card, the logo) goes with it,
     // or the new render's #subtitles would be the second one in the document.
-    async function mountOnStage(doc) {
+    async function mountOnStage(doc, stage) {
         const host = await replacePlayerOnStage(doc, {
-            stage: getStage(), root, aspectRatio: getAspectRatio(),
+            stage, root, aspectRatio: getAspectRatio(),
             initPlayer, destroyPlayer, awaitStart: true,
         });
+        if (!host.isConnected || (stage && (!stage.isConnected || getStage() !== stage))) return;
         try { persistDefaults(host, resourceID, next.itemId); }
         catch (e) { console.error('next item: after-mount step failed', e); }
     }
 
-    return { prepare, go, isPrepared: () => !!freshPrepared() };
+    return { prepare, go, isPrepared: () => !!freshPrepared(), dispose() {
+        disposed = true;
+        preparing?.controller.abort();
+        preparing = null;
+        prepared = null;
+    } };
 }
 
 // The carried choice arrives as this render's DEFAULT chips, and a default is
 // not a saved choice: the next plain start of this file -- a settings restart,
 // a reload -- would ask the ladder again and could flip the very thing the
 // viewer carried over (subtitles they had switched off coming back on). So
-// what the render chose is saved as theirs, the way a click on the chip is.
+// only an explicit subtitle choice (Saved, including a resolved carry) is
+// saved as theirs. Persisting the ladder's default withdraws its AI offer on
+// the next render. Audio continues to carry what plays.
 function persistDefaults(scope, resourceID, itemID) {
-    for (const [type, sel] of [['audio', '.audio[data-default="true"]'], ['subtitle', '.subtitle[data-default="true"]']]) {
+    for (const [type, sel] of [['audio', '.audio[data-default="true"]'], ['subtitle', '.subtitle[data-default="true"][data-saved="true"]']]) {
         const chip = scope.querySelector(sel);
         const id = chip && chip.getAttribute('data-id');
         if (id) persistTrackChoice(type, { id, resourceID, itemID });

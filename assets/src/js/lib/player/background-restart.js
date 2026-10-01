@@ -71,9 +71,8 @@ export function createBackgroundRestart({ video, root, getStage, getAspectRatio,
         failed = false;
         lastFallback = fallback;
         if (fixedPosition) fixedPlace = position.at;
-        if (fallback && fixedPlace !== null) {
+        if (fixedPlace !== null) {
             position = { ...position, at: fixedPlace };
-            fixedPosition = true;
         }
         const form = restartStartForm(video, root, win, doc);
         // Legacy/non-enhanced hosts can still use the ordinary start path.
@@ -82,12 +81,20 @@ export function createBackgroundRestart({ video, root, getStage, getAspectRatio,
         controller = new AbortController();
         const signal = controller.signal;
         let play = position?.play ?? !video.paused;
-        const changed = () => { play = !video.paused; };
+        let paused = video.paused;
+        const changed = () => {
+            // pause() changes the property synchronously, but queues its
+            // event. A seek's earlier technical pause can arrive after this
+            // listener attaches; only a new state change alters intent.
+            if (paused === video.paused) return;
+            paused = video.paused;
+            play = !paused;
+        };
         video.addEventListener('play', changed);
         video.addEventListener('pause', changed);
         const stateNow = () => {
             const live = getState();
-            return { ...live, ...(fixedPosition ? { at: position.at } : {}), play };
+            return { ...live, ...(fixedPlace !== null ? { at: fixedPlace } : {}), play };
         };
         onLoading(true);
         let visibleRequired = false;
@@ -132,6 +139,10 @@ export function createBackgroundRestart({ video, root, getStage, getAspectRatio,
     };
     return {
         start,
+        // Only viewer intent releases a failed seek/decoder's place; source
+        // attachment's own seeking events must not turn it into zero.
+        seeking() { fixedPlace = null; },
+        seekFailed(at) { if (engaged) fixedPlace = at; },
         dispose() { disposed = true; controller?.abort(); },
         get engaged() { return engaged; },
         get failed() { return failed; },

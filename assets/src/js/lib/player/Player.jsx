@@ -771,6 +771,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         if (sessionSeekingRef.current) return;
         stopRestartTarget();
         audioGuardRef.current?.clearRestartPlace();
+        backgroundRestartRef.current?.seeking();
         // The target of an earlier seek that found the session gone is no
         // longer where the viewer is (stream-restart.js, the viewer's place):
         // this seek is -- a local one by moving the element, a session one
@@ -820,7 +821,10 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                     holdPlayback: () => graceHoldRef.current.holds(),
                     // The POST found the session gone: the restart at the
                     // seek's target (stream-restart.js).
-                    onSessionGone: (reason, status, pos) => recoverPolicyRef.current.sessionGone(reason, status, pos, 'seek'),
+                    onSessionGone: (reason, status, pos) => {
+                        backgroundRestartRef.current?.seekFailed(pos.at);
+                        recoverPolicyRef.current.sessionGone(reason, status, pos, 'seek');
+                    },
                 });
             }
             if (sessionSeekerRef.current) {
@@ -830,7 +834,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             const video = videoRef.current;
             if (video) {
                 const maxTime = video.duration && isFinite(video.duration) ? video.duration : time;
-                video.currentTime = Math.min(time, maxTime);
+                const target = Math.min(time, maxTime);
+                state.setCurrentTime(target, { restore });
+                video.currentTime = target;
                 // The same seek treatment a session gets, minus the
                 // transcoder round-trip: the poll is kicked with the new
                 // position and the hold window opens now — a direct seek
@@ -1594,6 +1600,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         fixedPosition: Math.abs(position.at - restartStateNow().at) > 1,
     });
     const nextGoRef = useRef(null);
+    useEffect(() => () => nextGoRef.current?.dispose(), []);
     const earlyGoneRef = useRef(false); // the credits countdown fires once
     const cardShownAtRef = useRef(null); // film time the card came up at (countdown)
     if (next && !nextGoRef.current) {
@@ -2267,6 +2274,9 @@ export async function initPlayer(target, opts = {}) {
 
     // Load player translations before rendering (sync t() reads from cached instance)
     await initI18n();
+    // A transition may have lost its stage while translations were loading.
+    // It must not register a detached player over the one opened meanwhile.
+    if (opts.stage && !opts.stage.isConnected) return;
 
     let settings = {};
     if (videoEl.dataset.settings) {

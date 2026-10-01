@@ -469,7 +469,7 @@ export function createRecoveryPolicy({
             go({ ...place(), play: true });
         },
         seeking() {
-            if (disposed || restarting) return;
+            if (disposed) return;
             asked = null;
         },
         resumed() {

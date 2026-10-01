@@ -411,7 +411,15 @@ The old buffer keeps playing until the render is ready, with the existing buffer
 stall. At commit, the replacement receives the latest movie time, play/pause, volume, mute, speed
 and grace answer directly, without depending on storage for this handoff. A failed session seek
 retains its requested target; the audio guard captures its position before either recovery or final `detachMedia`
-clears it. A viewer seek discards that old attachment position. The new controls show that time on their first render and hold it until the media reaches
+clears it. A viewer seek discards that old attachment position in both the audio guard and the
+pending background restart (`seeking()`), so a local seek followed by more buffered playback
+hands off the latest clock. If that new seek also finds the session gone, `seekFailed(at)` replaces
+the pending target with the new request. The recovery policy clears its old target even while a
+restart is pending, so a failed job's later manual retry uses the same updated intent.
+Play/pause intent follows changes to the media element's paused state. The technical pause made
+by a failed seek can dispatch its event after recovery has begun; that queued event alone must
+not turn a playing recovery into a paused one. A later viewer pause still takes effect.
+The new controls show that time on their first render and hold it until the media reaches
 it through the resume seek. A viewer's own seek releases the hold. A paused film disables
 `autoplay` before source attachment and stays paused.
 
@@ -1895,6 +1903,17 @@ what plays.
   player into its new log container, then swaps. A carried AI translation is kicked with one HEAD
   to the track so its first lines are ready. What cannot be done quietly (an error card, a cap
   modal, a Turnstile checkbox) falls back to opening the next file the visible way.
+- The request belongs to its player: unmount calls `dispose()`, aborting POST/SSE and discarding
+  prepared results. A late token, progress callback or render cannot start a request, mount a
+  player or navigate away. Before the swap, both the host and the captured stage must still be
+  current. The swap itself disposes the old component; after it, the preserved stage identifies
+  the transition allowed to finish saving choices and updating history. Losing the stage while
+  `initPlayer` awaits translations also cancels initialization.
+- A prepared render is valid for its **carry choices and confirmed preferred language**, as well
+  as its eight-minute lifetime. `prepare()` reuses only a matching result/request and aborts a
+  superseded request. Next checks again after waiting: a subtitle/audio choice made during a cold
+  start gets a new render. An obsolete result cannot start its AI translation. This preserves the
+  fast path when choices have not changed.
 - A next file the viewer had already started asks "continue from … / start over" like any other
   file. The first version answered it silently (the settings-restart note, `markAutoResume`); that
   read as the saved position being ignored, and the question is the viewer's to answer.
@@ -1937,6 +1956,11 @@ what plays.
 - **The carried choice is saved** once the new player is up (`persistDefaults` → the same PUT a chip
   click makes): a default is not a saved choice, and the next plain start of that file — a settings
   restart, a reload — would have asked the ladder again and could flip what the viewer carried over.
+  Subtitle persistence requires `data-saved="true"`, including explicit Off and resolved carries.
+  Automatically selected English and automatic None remain automatic, so another render still
+  evaluates the ladder and its AI offer. Audio continues to persist what plays.
+  Existing saved track IDs are preserved: an automatic default persisted by an older player
+  cannot be distinguished from a genuine manual choice.
 - A failed mount falls back to the visible way in: the old player is already gone by then, and a
   half-built page is the one outcome worse than a reload. A page without the start form or
   `#content` has no "next" at all (`canMoveOn`).
@@ -2022,6 +2046,11 @@ in and left, and "Continue from 0:12?" is a question about nothing. Exactly 0 st
 that is "Start over" resetting a real position. A file the server calls `watched` (90%, or past the
 credits — `models.IsWatched`) is not offered for resume either.
 
+Direct seeks (including MP4 and nginx-vod without a transcoder session) update player state with
+the clamped target immediately, even on pause: the animation-frame clock deliberately ignores
+paused media. The viewer's seek also releases a restart's visual position hold; a resume seek
+retains that hold through attachment by passing `{ restore: true }`.
+
 ## Seeking inside a transcoder run — `local-seek.js`
 
 A session plays a **run**: FFmpeg started at `seekOffset` (film time) and writes segments as fast as
@@ -2040,3 +2069,16 @@ and the translation's timeline stay put; the rest is what a direct seek does (`o
 
 Event `player-seek {local, session}` — counts, sent once the seeking stops (a held arrow key is
 thirty seeks a second).
+
+## Regression coverage for transition and recovery intent
+
+`next-item-go.lifecycle.test.js` uses the committed server-rendered picker fixture to check
+explicit versus automatic subtitle persistence, disposal at the token and render stages,
+stale results after navigation, ownership during mounting, and choices changed before or during
+preparation. It also checks successful transitions whose own swap disposes the old player.
+
+`Player.wiring.test.js` exercises the actual mounted player: unmount closes a pending Next SSE
+before any result arrives; a viewer seek during background recovery replaces the prior target;
+a second failed seek retains its new target; a direct seek on pause updates the clock.
+`background-restart.test.js` and `stream-restart.test.js` cover the matching manual-retry behavior
+and an old buffer that continues advancing after the new seek.
