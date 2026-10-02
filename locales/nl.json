@@ -469,6 +469,7 @@
     "resource.status.chain.saved": "opgeslagen",
     "resource.status.chain.vaultWaiting": "wacht op seeders",
     "resource.status.chain.vaultRetrying": "opnieuw proberen",
+    "resource.status.chain.noTransfer": "geen overdracht",
     "resource.status.chain.paused": "gepauzeerd",
     "resource.status.chain.cap": "limiet",
     "resource.status.chain.fewSeeders": "weinig seeders",

@@ -552,9 +552,8 @@ test('"vaulted" no longer ends the stream: the viewer\'s link keeps changing', (
 // It sends the view with them at their last reading next to it, and while
 // the page's own player plays that is what both blocks draw: no fall to the
 // badge in every gap, the same nodes. Paused with the buffer full, nobody
-// speaks for them: the server's view, at once -- the buffer as it was at
-// the pause, not before the film started, is what "still buffering" is
-// measured from. Paused and still fetching ahead: on the chain.
+// speaks for them: the page keeps the viewer with an explicit pause label,
+// even if the buffer continues growing behind the paused picture.
 test('the page\'s player playing through an HLS gap keeps the viewer on the chain', () => {
     // Before the film: an empty buffer, as a paused element reads it.
     buffered(0);
@@ -574,28 +573,26 @@ test('the page\'s player playing through an HLS gap keeps the viewer on the chai
     assert.equal(events.at(-1).moving, true, 'the sticky bar stays');
     const now = Array.from(card().querySelectorAll('*'));
     assert.ok(now.length === nodes.length && now.every((el, i) => el === nodes[i]), 'the same nodes');
-    // Paused, the buffer full: the badge at once, not ten seconds (or a
-    // minute) later.
+    // Pause retains the viewer, including while the buffer keeps growing.
     setVideo({ paused: true });
     fire('pause');
     for (const block of [card(), sticky()]) {
-        assert.equal(block.getAttribute('data-mode'), 'badge');
-        assert.equal(block.getAttribute('data-key'), 'cached');
-        assert.equal(block.querySelectorAll('[data-tx-node]')[2].hidden, true);
+        assert.equal(block.getAttribute('data-mode'), 'chain');
+        assert.equal(block.querySelectorAll('[data-tx-node]')[2].hidden, false);
+        assert.equal(block.querySelectorAll('[data-tx-seg]')[1].querySelector('.tx-spd').textContent, 'пауза');
     }
-    assert.equal(events.at(-1).moving, false);
-    // Paused and still fetching ahead: the stream, on the chain.
+    assert.equal(events.at(-1).moving, true);
     buffered(48);
     source.ping();
-    assert.equal(card().getAttribute('data-mode'), 'chain');
-    assert.equal(card().getAttribute('data-key'), 'cached_flow');
+    assert.equal(card().querySelectorAll('[data-tx-seg]')[1].querySelector('.tx-spd').textContent, 'пауза');
     // Playing again: back on the chain.
     setVideo({ paused: false });
     fire('playing');
     assert.equal(card().getAttribute('data-key'), 'cached_flow');
-    // No alternative from the server: its view, player or not.
+    // Before any measured segment, playback still owns viewer presence.
     source.message(S.cached);
-    assert.equal(card().getAttribute('data-mode'), 'badge');
+    assert.equal(card().getAttribute('data-mode'), 'chain');
+    assert.equal(card().querySelectorAll('[data-tx-seg]')[1].querySelector('.tx-spd').textContent, 'ждём данные');
     setVideo({ paused: true, ended: true, buffered: { length: 0, end: () => 0 } });
     fire('ended');
 });
@@ -951,6 +948,85 @@ test('another file picked: the player\'s label keeps following the page\'s playe
     fire('playing');
     source.ping();
     assert.equal(window._txPlayerLabel, null, 'inside the new file\'s grace window: plain');
+});
+
+
+test('preparation and pause keep the same actors through alternating proxy presence', () => {
+    freshVideo();
+    const job = document.createElement('div');
+    job.dataset.transferPreparing = '';
+    document.getElementById('content').append(job);
+    document.dispatchEvent(new CustomEvent('transfer-activity'));
+    for (const fixture of ['caching_only', 'active', 'caching_gap', 'caching_only', 'vaulting_only', 'vaulting_gap']) {
+        source.message(S[fixture]);
+        for (const block of [card(), sticky()]) {
+            assert.equal([...block.querySelectorAll('[data-tx-node]')].filter(n => !n.hidden).length, 3, fixture);
+            const seg = block.querySelectorAll('[data-tx-seg]')[1];
+            assert.equal(seg.querySelector('.tx-spd').textContent, 'ждём данные');
+            assert.equal(seg.hasAttribute('data-moving'), false);
+        }
+    }
+    job.remove();
+    setVideo({ paused: false, readyState: 4 }); fire('playing');
+    setVideo({ paused: true }); fire('pause');
+    for (const fixture of ['active', 'caching_only', 'vaulting_gap', 'vaulting_only']) {
+        source.message(S[fixture]);
+        for (const block of [card(), sticky()]) {
+            const seg = block.querySelectorAll('[data-tx-seg]')[1];
+            assert.equal(seg.querySelector('.tx-spd').textContent, 'пауза');
+            assert.equal(seg.getAttribute('data-tone'), 'pause');
+            assert.equal(seg.hasAttribute('data-moving'), false);
+            assert.equal(block.querySelectorAll('[data-tx-node]')[2].hidden, false);
+        }
+    }
+    setVideo({ paused: false }); fire('playing');
+    source.message(S.active);
+    assert.notEqual(card().querySelectorAll('[data-tx-seg]')[1].querySelector('.tx-spd').textContent, 'пауза');
+    freshVideo();
+});
+
+test('probe traffic after cancelled preparation cannot latch a download', () => {
+    video.remove();
+    const job = document.createElement('div'); job.dataset.transferPreparing = '';
+    document.getElementById('file').append(job);
+    source.message(S.active);
+    job.remove();
+    document.dispatchEvent(new CustomEvent('transfer-activity'));
+    source.message(S.active); // delayed sample after the card/error was closed
+    source.message(S.caching_only);
+    assert.equal(card().querySelectorAll('[data-tx-node]')[2].hidden, true);
+    document.getElementById('file').append(video);
+    freshVideo();
+});
+
+test('a stopped download keeps You with no transfer until a different file is picked', () => {
+    video.remove();
+    source.message(S.caching_only);
+    assert.equal(card().querySelectorAll('[data-tx-node]')[2].hidden, true, 'nothing downloaded yet');
+    const link = document.createElement('a');
+    link.dataset.transferDownload = '';
+    document.getElementById('file').append(link);
+    link.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    link.remove();
+    source.message(S.active);
+    for (const state of [S.caching_only, S.paused, S.cached]) {
+        source.message(state);
+        for (const block of [card(), sticky()]) {
+            assert.equal(block.querySelectorAll('[data-tx-node]')[2].hidden, false);
+            const seg = block.querySelectorAll('[data-tx-seg]')[1];
+            assert.equal(seg.querySelector('.tx-spd').textContent, 'нет передачи');
+            assert.equal(seg.hasAttribute('data-moving'), false);
+        }
+    }
+    source.message(S.active);
+    assert.equal(card().querySelectorAll('[data-tx-seg]')[1].hasAttribute('data-moving'), true, 'resumed download');
+    document.getElementById('file').dataset.statusFile = '/Sintel/other.mkv';
+    window.dispatchEvent(new CustomEvent('async', { detail: { target: document.getElementById('content') } }));
+    source = sources.at(-1);
+    source.message(S.cached);
+    assert.equal(card().querySelectorAll('[data-tx-node]')[2].hidden, true, 'new file has no remembered download');
+    document.getElementById('file').append(video);
+    freshVideo();
 });
 
 // The server's last word (a vaulted torrent whose viewer's link cannot be

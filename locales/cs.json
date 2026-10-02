@@ -475,6 +475,7 @@
     "resource.status.chain.saved": "uloženo",
     "resource.status.chain.vaultWaiting": "čeká na seedery",
     "resource.status.chain.vaultRetrying": "zkoušíme znovu",
+    "resource.status.chain.noTransfer": "žádný přenos",
     "resource.status.chain.paused": "pozastaveno",
     "resource.status.chain.cap": "strop",
     "resource.status.chain.fewSeeders": "málo seederů",

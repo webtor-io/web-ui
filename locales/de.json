@@ -468,6 +468,7 @@
     "resource.status.chain.saved": "gespeichert",
     "resource.status.chain.vaultWaiting": "wartet auf Seeder",
     "resource.status.chain.vaultRetrying": "neuer Versuch",
+    "resource.status.chain.noTransfer": "keine Übertragung",
     "resource.status.chain.paused": "pausiert",
     "resource.status.chain.cap": "Limit",
     "resource.status.chain.fewSeeders": "wenige Seeder",

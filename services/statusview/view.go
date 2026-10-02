@@ -147,6 +147,12 @@ type View struct {
 	// viewer's session (api.GraceClaims), so thp counts them like any other
 	// request of theirs (docs/grace_token.md "Session").
 	Playing *View `json:"playing,omitempty"`
+	// Page-owned phases: the proxy cannot observe preparation or a player
+	// pause, or remember a started download. One shared resting route plus
+	// localized phase labels avoids sending three near-identical views.
+	Resting        *View  `json:"resting,omitempty"`
+	PausedLabel    string `json:"pausedLabel,omitempty"`
+	PreparingLabel string `json:"preparingLabel,omitempty"`
 }
 
 // Badge is the badge of the page before the chain (git 5d55b26e
@@ -394,6 +400,24 @@ type Input struct {
 // Build is the view for in. It never fails: a missing input degrades what is
 // said, never whether the page gets a view.
 func Build(in Input) *View {
+	v := build(in)
+	if l := in.LastViewer; in.Viewer.Known && !takesPart(in.Viewer) && takesPart(l) && (l.Mbps > 0 || l.Limited || l.PlanBox) {
+		alt := in
+		alt.Viewer = l
+		v.Playing = build(alt)
+	}
+	alt := in
+	alt.Viewer = Viewer{Known: true, Present: true, CapMbps: in.Viewer.CapMbps}
+	v.Resting = build(alt)
+	v.Resting.Segs[1] = Seg{Show: true, Kind: "viewer", Tone: "off", Speed: i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.noTransfer")}
+	v.Resting.Details.Rows[2].Value = v.Resting.Segs[1].Speed
+	v.PreparingLabel = i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.waitingData")
+	v.PausedLabel = i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.paused")
+	return v
+}
+
+// build produces one presentation, never nested alternatives.
+func build(in Input) *View {
 	// The proxy's word on their requests says whether the viewer takes
 	// part (Viewer.Present), never the speed: a viewer thp saw no request
 	// of is a known absence -- nobody downloading -- whatever number the
@@ -422,15 +446,7 @@ func Build(in Input) *View {
 	if in.Offers != nil {
 		b.promo = in.Offers.Promo()
 	}
-	v := b.build()
-	// Gone by the proxy's count, and seen with a number before: the view
-	// with them still there, for the page's own player (View.Playing).
-	if l := in.LastViewer; in.Viewer.Known && !takesPart(in.Viewer) && takesPart(l) && (l.Mbps > 0 || l.Limited || l.PlanBox) {
-		alt := in
-		alt.Viewer, alt.LastViewer = l, Viewer{}
-		v.Playing = Build(alt)
-	}
-	return v
+	return b.build()
 }
 
 // SwarmMoving: the swarm sends the torrent to the cache -- caching it, or

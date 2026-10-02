@@ -1,7 +1,7 @@
 import av from '../../lib/av';
 import {
     NAVBAR_H, applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
-    paintBar, playerCause, playerLabel, playing, present, upsellElsewhere,
+    paintBar, playerCause, playerLabel, forPhase, present, upsellElsewhere,
 } from '../../lib/transferStatus';
 import { hide } from '../../lib/inPlace';
 import { createPlayerActivity } from '../../lib/playerActivity';
@@ -121,13 +121,12 @@ av(async function() {
             upsellElsewhere: upsellElsewhere(document) || activity.graceOfferDue(),
             offerAnswered: activity.offerAnswered(),
         };
-        // While it streams, the viewer stays on the chain through the gaps
-        // between its HLS segments, where the proxy counts no request of
-        // theirs open: the server's view with them at their last reading
-        // (playing). Inside the grace window too: grace segments carry the
-        // viewer's session and are counted like any other request of theirs.
-        const streaming = activity.streaming();
-        const shown = (status) => (streaming ? playing(status.view) : status.view);
+        // Preparation, player pause and a stopped download keep the viewer
+        // on the route without borrowing the proxy's last speed. Playback
+        // still bridges HLS request gaps using the existing playing view.
+        const phase = activity.phase();
+        const shown = (status) => forPhase(status.view,
+            phase === 'none' && container._statusDownloadSeen && !status.view.nodes[2].show ? 'idle' : phase);
         const now = Date.now();
         const held = isGap(last) && steady && steady.view && now - gapSince < GAP_HOLD_MS;
         // The plan box: what present() picks this second, folded into what
@@ -169,7 +168,7 @@ av(async function() {
         // (a paused buffer that stopped growing): drawn again every second
         // while there is one. A box kept up follows other offers coming and
         // going (its button) the same way.
-        const tick = !!last.view.plan || held || !!last.view.playing || !!mem.box;
+        const tick = phase !== 'none' || !!last.view.plan || held || !!last.view.playing || !!mem.box;
         if (tick && !ticker) ticker = setInterval(render, TICK_MS);
         if (!tick && ticker) {
             clearInterval(ticker);
@@ -177,6 +176,16 @@ av(async function() {
         }
     };
     const activity = createPlayerActivity(document, { onChange: render });
+    // Only an explicit download start retains the viewer afterwards. A final
+    // probe sample can arrive after a preparation error or a cancelled card;
+    // proxy traffic alone must not latch those as a download.
+    const onDownload = (e) => {
+        if (!e.target.closest('a[data-transfer-download]')) return;
+        container._statusDownloadSeen = true;
+        render();
+    };
+    document.addEventListener('click', onDownload, true);
+
 
     // Both copies of the box down, and the details' plan line with them,
     // where no message draws the block: the viewer's × before the first one,
@@ -250,6 +259,7 @@ av(async function() {
         detailsStops.forEach((stop) => stop());
         ctaWatch.stop();
         activity.stop();
+        document.removeEventListener('click', onDownload, true);
         if (ticker) {
             clearInterval(ticker);
             ticker = null;
@@ -345,6 +355,7 @@ av(async function() {
         const next = picked && picked.dataset.statusFile;
         if (!next || next === file) return;
         file = next;
+        container._statusDownloadSeen = false;
         swapped = true;
         mem.box = null;
         dropBoxes();

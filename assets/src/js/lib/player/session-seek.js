@@ -64,6 +64,10 @@ export function createSessionSeeker({ hls, videoEl, sessionSeekUrl, sourceUrl, o
 
     function setIsSeeking(val) {
         isSeeking = val;
+        if (videoEl.dataset) {
+            if (val) videoEl.dataset.transferSeeking = '';
+            else delete videoEl.dataset.transferSeeking;
+        }
         if (onSeekingChange) onSeekingChange(val);
     }
 

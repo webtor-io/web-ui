@@ -255,6 +255,26 @@ export function playing(view) {
     return { ...p, playing: null };
 }
 
+// Local lifecycle chooses a server-localized presentation. Old servers can
+// omit these alternatives during a rolling deployment.
+export function forPhase(view, phase) {
+    if (!view) return view;
+    if (phase === 'playing') {
+        const active = playing(view);
+        if (active.nodes[2].show) return active;
+        phase = 'preparing';
+    }
+    if (!['preparing', 'paused', 'idle'].includes(phase) || !view.resting) return view;
+    const resting = view.resting;
+    if (phase === 'idle') return resting;
+    const label = phase === 'paused' ? view.pausedLabel : view.preparingLabel;
+    return {
+        ...resting,
+        segs: [resting.segs[0], { ...resting.segs[1], speed: label, tone: phase === 'paused' ? 'pause' : 'off' }],
+        details: { ...resting.details, rows: resting.details.rows.map((row) => row.key === 'you' ? { ...row, value: label } : row) },
+    };
+}
+
 // Another offer is on screen (data-upsell-surface: the grace popup over the
 // player, the cap modal, the download nudge). A surface that is closed sits
 // under `.hidden` / [hidden] (the grace popup toggles the class; a closed

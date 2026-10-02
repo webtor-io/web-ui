@@ -28,7 +28,7 @@ Object.defineProperty(w.document, 'currentScript', { value: w.document.getElemen
 after(() => w.close());
 
 await import('../../app/action.js');
-const [, init] = w.av[0];
+const [, init, destroy] = w.av[0];
 
 // start: the view's init, then the job's render of the player.
 async function start() {
@@ -37,7 +37,7 @@ async function start() {
     progress.classList.remove('hidden');
     await init.call(host);
     const src = sources.at(-1);
-    src.onmessage({ data: JSON.stringify({ level: 'rendertemplate', tag: 'rendering action', body: '<div class="rendered-player"></div>' }) });
+    src.onmessage({ data: JSON.stringify({ level: 'rendertemplate', tag: 'rendering action', body: '<div class="rendered-player"><video></video></div>' }) });
     const el = Array.from(host.querySelectorAll('.rendered-player')).at(-1).parentElement;
     return { progress, el };
 }
@@ -61,4 +61,27 @@ test('a player with a card before its first frame is shown: the card, not the lo
     // more to do.
     w.dispatchEvent(new w.CustomEvent('player_ready'));
     assert.equal(el.classList.contains('hidden'), false);
+});
+
+
+test('preparation survives job close until media is ready, and ends on teardown', async () => {
+    const { progress } = await start();
+    assert.ok('transferPreparing' in progress.dataset);
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'close' }) });
+    assert.ok('transferPreparing' in progress.dataset, 'job done, player not ready yet');
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    assert.equal('transferPreparing' in progress.dataset, false);
+    await start();
+    destroy.call(w.document.getElementById('host'));
+    assert.equal('transferPreparing' in progress.dataset, false);
+});
+
+test('failed preparation does not latch viewer presence', async () => {
+    const host = w.document.getElementById('host');
+    await init.call(host);
+    const progress = host.querySelector('.progress-alert');
+    assert.ok('transferPreparing' in progress.dataset);
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'error', tag: 'load', message: 'failed' }) });
+    assert.equal('transferPreparing' in progress.dataset, false);
+    destroy.call(host);
 });

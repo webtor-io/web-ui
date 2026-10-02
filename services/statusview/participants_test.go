@@ -77,3 +77,27 @@ func TestBuild_SwarmStaysUntilSourceComplete(t *testing.T) {
 		}
 	}
 }
+
+func TestBuild_PageViewerPhasesIgnoreTransferNoise(t *testing.T) {
+	for _, source := range []string{"caching", "vaulting", "cached", "vaulted"} {
+		for _, reading := range []Viewer{zero, flowing(12), {Known: true, Present: true, Limited: true, PlanBox: true, Mbps: 5, CapMbps: 5}} {
+			v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: Torrent{State: source, Progress: 43}, Viewer: reading, LastViewer: flowing(12)})
+			alt := v.Resting
+			if alt == nil {
+				t.Fatal("missing resting view")
+			}
+			if alt.Mode != ModeChain || !alt.Nodes[2].Show || alt.Nodes[0].Show != (source == "caching" || source == "vaulting") {
+				t.Errorf("%s: route %+v", source, alt.Nodes)
+			}
+			if alt.Plan != nil || alt.Segs[1].On || alt.Segs[1].Note != "" || alt.Details.Rows[2].Sub != "" || alt.Details.Rows[2].Tag != "" {
+				t.Errorf("%s: invented traffic or cap: %+v", source, alt)
+			}
+			if alt.Segs[1].Speed != "нет передачи" || alt.Details.Rows[2].Value != "нет передачи" || v.PausedLabel != "пауза" || v.PreparingLabel != "ждём данные" {
+				t.Errorf("wrong phase labels: %+v", v)
+			}
+			if alt.Playing != nil || alt.Resting != nil {
+				t.Fatal("nested alternatives")
+			}
+		}
+	}
+}

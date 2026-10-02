@@ -575,3 +575,53 @@ test('stop() stops listening', () => {
     p.fire('waiting');
     assert.deepEqual(p.changes, []);
 });
+
+test('transfer phase keeps a paused viewer independently of traffic and the activity window', () => {
+    const p = setup();
+    assert.equal(p.activity.phase(), 'none');
+    playing(p);
+    assert.equal(p.activity.phase(), 'playing');
+    p.buffered(120);
+    p.activity.state();
+    p.set({ paused: true });
+    p.fire('pause');
+    p.buffered(150);
+    assert.equal(p.activity.phase(), 'paused', 'buffer growth must not disguise a user pause');
+    p.tick(10 * ACTIVE_WINDOW_MS);
+    assert.equal(p.activity.phase(), 'paused');
+    p.video.dataset.graceCtaHold = '';
+    assert.equal(p.activity.phase(), 'playing', 'grace hold is not a user pause');
+    delete p.video.dataset.graceCtaHold;
+    p.video.dataset.transferSeeking = '';
+    assert.equal(p.activity.phase(), 'preparing', 'source reload is not a user pause');
+    delete p.video.dataset.transferSeeking;
+    p.set({ paused: false }); p.fire('playing');
+    assert.equal(p.activity.phase(), 'playing');
+    p.set({ ended: true }); p.fire('ended');
+    assert.equal(p.activity.phase(), 'none');
+    p.video.remove();
+    assert.equal(p.activity.phase(), 'none');
+    p.activity.stop();
+});
+
+test('preparation owns the transfer phase, hidden prewarmed media does not', () => {
+    const p = setup();
+    const job = p.doc.createElement('div');
+    job.dataset.transferPreparing = '';
+    p.doc.body.append(job);
+    assert.equal(p.activity.phase(), 'preparing');
+    job.remove();
+    playing(p);
+    p.video.parentElement.classList.add('hidden');
+    assert.equal(p.activity.phase(), 'none');
+    p.activity.stop();
+});
+
+test('canplay while stalled does not count as playback for the cap verdict', () => {
+    const p = setup(); playing(p);
+    p.set({ readyState: 2 }); p.fire('waiting');
+    p.tick(STALL_MIN_MS); p.fire('canplay');
+    p.tick(STALL_WINDOW_MS + 1);
+    assert.equal(p.activity.state(), 'buffering', 'the clock has not moved');
+    p.activity.stop();
+});

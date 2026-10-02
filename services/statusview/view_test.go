@@ -1430,7 +1430,7 @@ func TestBuild_PlayingAlternative(t *testing.T) {
 	}
 	alt := in
 	alt.Viewer, alt.LastViewer = flowing(24), Viewer{}
-	if want := Build(alt); !reflect.DeepEqual(p, want) {
+	if want := build(alt); !reflect.DeepEqual(p, want) {
 		t.Errorf("the player's view is not the view of the last reading:\n got %+v\nwant %+v", p, want)
 	}
 	if p.Playing != nil {

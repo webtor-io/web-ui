@@ -97,7 +97,7 @@
             </a>
         </div>
         <a class="btn btn-sm btn-ghost text-w-muted closeable-close">{{ t $.Lang "action.download.cancel" }}</a>
-        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close" download href="{{ .Data.URL }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
+        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close" data-transfer-download download href="{{ .Data.URL }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
             </svg>

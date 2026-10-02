@@ -474,6 +474,7 @@
     "resource.status.chain.saved": "сохранено",
     "resource.status.chain.vaultWaiting": "ждём сидов",
     "resource.status.chain.vaultRetrying": "повторяем",
+    "resource.status.chain.noTransfer": "нет передачи",
     "resource.status.chain.paused": "пауза",
     "resource.status.chain.cap": "потолок",
     "resource.status.chain.fewSeeders": "мало сидов",

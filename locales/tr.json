@@ -469,6 +469,7 @@
     "resource.status.chain.saved": "kaydedildi",
     "resource.status.chain.vaultWaiting": "seeder bekleniyor",
     "resource.status.chain.vaultRetrying": "yeniden deneniyor",
+    "resource.status.chain.noTransfer": "aktarım yok",
     "resource.status.chain.paused": "duraklatıldı",
     "resource.status.chain.cap": "sınır",
     "resource.status.chain.fewSeeders": "az seeder",

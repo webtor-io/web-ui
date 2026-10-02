@@ -22,18 +22,12 @@
 //                  it (viewerPaused: the page's pause, not theirs).
 //   'none'      -- no player, an ended one, or one left alone for a minute.
 //
-// Apart from the verdict: streaming() -- a player is playing or waiting for
-// data right now, or paused and still filling its buffer, or held by the
-// grace popup. The transfer
-// status keeps the viewer on its chain while it is (lib/transferStatus.js
-// playing): HLS closes its request between two segments and the proxy then
-// honestly counts none. No minute after a pause there: the minute is the
-// plan box's question (what a cap means to them), not whether they are
-// taking part. And offerAnswered() -- the viewer answered an offer about the
-// cap (the grace popup, or "watch as is" on the slow-download modal before
-// playback) and the player has not stalled for real since: the plan box's
-// question again (they were just told of the cap; the next offer waits until
-// they hit it).
+// The chain uses phase(): preparation, playback, or a paused player. It
+// stays stable independently of measured bytes and of the minute-long cap
+// verdict above. streaming() still describes current playback/buffer work;
+// buffer growth during a user pause does not change phase() back to playing.
+// offerAnswered() is the cap question again: an answered offer stays spent
+// until the player really stalls.
 //
 // What is a stall. `waiting` is also what every (re)start of a source says:
 // the first play() of a stream, and a session seek, which does not set
@@ -218,14 +212,27 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
         sampleBuffers(t);
         return playerStreaming(media(), marks, t);
     };
+    // Page lifecycle, independent of the proxy's request cadence and the
+    // minute-long cap verdict. Hidden prewarm players do not own the page.
+    const phase = () => {
+        if (doc.querySelector('[data-transfer-preparing]')) return 'preparing';
+        const live = [...media()].filter((m) => !m.ended && !m.error && !m.closest('[hidden], .hidden'));
+        if (live.some((m) => !viewerPaused(m))) return 'playing';
+        if (live.some((m) => m.seeking || 'transferSeeking' in m.dataset)) return 'preparing';
+        if (live.some((m) => el(m).played || m.readyState >= 2)) return 'paused';
+        return 'none';
+    };
     let last = state();
     let lastStreaming = streaming();
+    let lastPhase = phase();
     const settle = () => {
         const s = state();
         const st = streaming();
-        if (s === last && st === lastStreaming) return;
+        const ph = phase();
+        if (s === last && st === lastStreaming && ph === lastPhase) return;
         last = s;
         lastStreaming = st;
+        lastPhase = ph;
         if (onChange) onChange(s);
     };
     // The stall under way ends: it counts if it lasted.
@@ -293,8 +300,12 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
         ['seeking', onIdle],
         ['pause', onIdle],
         ['ended', onIdle],
+        ['play', settle],
+        ['canplay', settle],
+        ['error', onIdle],
     ];
     for (const [name, fn] of listeners) doc.addEventListener(name, fn, true);
+    doc.addEventListener('transfer-activity', settle);
 
     const withData = (name) => {
         const own = stallEl && stallEl.isConnected && stallEl.dataset ? stallEl : null;
@@ -318,6 +329,7 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
     return {
         state,
         streaming,
+        phase,
         // The stream job's line for the player that stalled (or any player
         // that has one): "…, and this file needs 8 Mbps".
         stallSub() {
@@ -390,6 +402,7 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
             return false;
         },
         stop() {
+            doc.removeEventListener('transfer-activity', settle);
             for (const [name, fn] of listeners) doc.removeEventListener(name, fn, true);
         },
     };

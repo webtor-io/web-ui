@@ -475,6 +475,7 @@
     "resource.status.chain.saved": "zapisano",
     "resource.status.chain.vaultWaiting": "czeka na seedy",
     "resource.status.chain.vaultRetrying": "ponawiamy",
+    "resource.status.chain.noTransfer": "brak transferu",
     "resource.status.chain.paused": "pauza",
     "resource.status.chain.cap": "limit",
     "resource.status.chain.fewSeeders": "mało seedów",
