@@ -104,6 +104,46 @@ consumers. It does not run metadata resolution, database caches, the fresh-relea
 prompt block, the browser SSE handler or the production proxy. First parsed
 recommendation timing therefore excludes card hydration and browser delivery.
 
+### Prompt and model comparison (2026-10-02)
+
+Exploratory direct Responses API probe: 45 completed responses, plus two TLS
+failures retried once. Synthetic contexts only; production configuration and
+prompts were not changed. The raw answers, exact prompts and summary are kept
+outside the repository: they quote film titles.
+
+Chips: one six-chip response for each of the 11 locales, per variant. Cases
+include watchlist-only context and an instruction-injection attempt in a title.
+Both candidates retain the intended rules; the conservative candidate only
+removes the large full-example sets, retaining the original rules, bad/good
+pairs and composition guidance.
+
+| Chips prompt | Input tokens | Output tokens | Cost without cache discounts | Labels over 40 characters |
+| --- | ---: | ---: | ---: | ---: |
+| Current | 49,582 | 3,044 | $0.02470 | 18 / 66 |
+| Aggressive rewrite | 7,980 | 3,889 | $0.00941 | 34 / 66 |
+| Remove full-example sets | 27,197 | 3,040 | $0.01574 | 18 / 66 |
+
+All completed responses parse as NDJSON. Aggressive shortening regressed label
+length and naturalness: rejected. Conservative shortening reduced input by 45%
+and uncached-equivalent cost by 36%, but did not establish quality equivalence:
+watchlist references and structural-quota violations remain. It is an experiment
+candidate, not a replacement production prompt. Baseline also violates quotas.
+
+Recommendations: GPT-4.1 and mini each answered six identical scenarios with
+the unchanged recommendation prompt and a fixed eight-title recent-release
+fixture. Mini cost $0.01586 versus $0.08102, but violated explicit year bounds,
+returned watched titles (including a localized alias), and confused film credits.
+GPT-4.1 also made actor/genre mistakes; it is not a correctness oracle. Keep the
+paid model unchanged. Production's resolved-ID watched/watchlist filter can
+remove repeats, but cannot repair incorrect year/actor/genre reasoning.
+
+These are single samples, not a statistical quality benchmark. The fixture is
+not the production 200-film catalog. No metadata hydration, live availability,
+Go consumer, browser or end-to-end SSE checks were run. Sequential requests warm
+provider caches; compare uncached-equivalent costs above, not raw billed ratios.
+Reported usage across completed calls corresponds to about $0.139; failed streams
+may have consumed additional unreported tokens. No deployment followed this probe.
+
 ## High-level flow
 
 ```
