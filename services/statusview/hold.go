@@ -2,8 +2,8 @@ package statusview
 
 import "time"
 
-// HoldFor is how long a participant stays on the chain after it last took
-// part. The seeder verifies whole pieces: between two of them nothing moves
+// HoldFor is how long the swarm's last moving reading stays on the chain.
+// The seeder verifies whole pieces: between two of them nothing moves
 // for seconds while the transfer is fine, and a chain that fell back to the
 // badge in every such gap would blink. The viewer is not held by speed at
 // all (owner, 2026-09-25): they are on the chain while their requests are
@@ -12,12 +12,11 @@ import "time"
 // in the data -- a stream to thp lost and being reopened.
 const HoldFor = 10 * time.Second
 
-// Hold is the chain's memory for one status stream: the chain takes a
-// participant back the moment it moves, and gives it up only HoldFor after
-// it last did -- so the chain turns into the badge only after that long
-// without movement, and the badge into the chain at once. Through the hold
-// a participant is drawn as it last moved: its last speed, never a pause or
-// a dash (those are the badge's story, told once the hold is over). Pure:
+// Hold is the chain's memory for one status stream. Without a viewer, the
+// chain turns into the badge HoldFor after the swarm last moved. With a
+// viewer using an incomplete source, the swarm stays after that too, but
+// its arrow stops (participants owns the route). Through the hold it is
+// drawn as it last moved, with its last speed. Pure:
 // every call takes the time it happens at. Not safe for concurrent use; the
 // status loop owns it.
 type Hold struct {

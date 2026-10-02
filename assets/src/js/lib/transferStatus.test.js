@@ -1028,6 +1028,7 @@ test('player cause: the other cause the view names for a wait, none for the cap 
         // The viewer's bytes flow with no verdict on what binds them -- right
         // after the answer, exactly the gap before thp's verdict.
         active: '', cached_flow: '', vaulting: '', vaulted: '', hls_gap: '',
+        caching_gap: '', vaulting_gap: '', caching_hls_gap: '', vaulting_hls_gap: '',
         // No viewer on the chain, or no word at all.
         caching_only: '', caching_idle: '', paused: '', idle_torrent: '', cached: '', status_unknown: '',
         vaulting_only: '', vaulting_idle: '', vaulted_idle: '', vault_waiting: '', vault_failed: '',

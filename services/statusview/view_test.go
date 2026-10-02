@@ -476,8 +476,8 @@ func TestBuild_OnlyParticipants(t *testing.T) {
 			"Рой 14 сидов [flow+ 38 Мбит/с] Кэш 43%"},
 		{"from the cache: no swarm", Torrent{State: "cached", Seeders: 14, SwarmKnown: true}, flowing(24), KeyCachedFlow,
 			"Кэш (cached) [flow+ 24 Мбит/с] Вы"},
-		{"a paused swarm, the viewer reads what is cached: no swarm", Torrent{State: "caching", Progress: 43, Paused: true, Seeders: 14, SwarmKnown: true}, flowing(4), KeyActive,
-			"Кэш 43% [flow+ 4 Мбит/с] Вы"},
+		{"a paused swarm, the viewer reads an incomplete cache: the route stays", Torrent{State: "caching", Progress: 43, Paused: true, Seeders: 14, SwarmKnown: true}, flowing(4), KeyActive,
+			"Рой 14 сидов [pause пауза] Кэш 43% [flow+ 4 Мбит/с] Вы"},
 		{"from Vault at the cap: no swarm", Torrent{State: "vaulted", Seeders: 3, SwarmKnown: true}, atCap, KeyVaultedTier,
 			"Vault сохранено (vault) [plan+ 5 Мбит/с · потолок] Вы"},
 		{"the viewer waits on a still swarm: the swarm is on the chain", caching(43, 14, 0), stalled, KeyStalled,
@@ -1225,7 +1225,7 @@ func TestBuild_KeyPrecedence(t *testing.T) {
 		t.Errorf("no seeders at the cap: %s", noseed.Key)
 	}
 	pausedButReceiving := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: Torrent{State: "caching", Paused: true, Seeders: 14, SwarmKnown: true}, Viewer: flowing(4)})
-	if pausedButReceiving.Key != KeyActive || pausedButReceiving.Nodes[0].Show {
+	if pausedButReceiving.Key != KeyActive || !pausedButReceiving.Nodes[0].Show {
 		t.Errorf("paused swarm, viewer receiving: %s %s", pausedButReceiving.Key, chain(pausedButReceiving))
 	}
 	// Many seeders but slow: not "few seeders".
@@ -1393,7 +1393,7 @@ func TestBuild_PresenceNotSpeed(t *testing.T) {
 	}{
 		{cached, KeyCachedFlow, "Кэш (cached) [off — Мбит/с] Вы"},
 		{caching(43, 14, 38), KeyActive, "Рой 14 сидов [flow+ 38 Мбит/с] Кэш 43% [off — Мбит/с] Вы"},
-		{caching(43, 14, 0), KeyActive, "Кэш 43% [off — Мбит/с] Вы"},
+		{caching(43, 14, 0), KeyActive, "Рой 14 сидов [flow — Мбит/с] Кэш 43% [off — Мбит/с] Вы"},
 		{Torrent{State: "vaulted"}, KeyVaulted, "Vault сохранено (vault) [off — Мбит/с] Вы"},
 	} {
 		v := build(c.tr, conn)

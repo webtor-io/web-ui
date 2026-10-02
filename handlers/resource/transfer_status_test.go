@@ -144,6 +144,12 @@ func txStates(t *testing.T) []txState {
 		// view with them on the chain at their last reading (View.Playing:
 		// cached_flow) that the page draws while its own player plays.
 		{design: "hls_gap", torrent: statusview.Torrent{State: "cached", Progress: 100}, viewer: zero, last: flowing(24)},
+		// Long gaps after the swarm's hold expires: the incomplete source
+		// keeps the route, both for downloads and the player's HLS gaps.
+		{design: "caching_gap", torrent: caching(43.4, 14, 0), viewer: flowing(12)},
+		{design: "vaulting_gap", torrent: vaulting(0), viewer: flowing(12)},
+		{design: "caching_hls_gap", torrent: caching(43.4, 14, 0), viewer: zero, last: flowing(12)},
+		{design: "vaulting_hls_gap", torrent: vaulting(0), viewer: zero, last: flowing(12)},
 	}
 	out := make([]txState, 0, len(rows))
 	for _, r := range rows {

@@ -111,7 +111,8 @@ type View struct {
 	// source (the cache, or Vault), the viewer. Segs are the two links
 	// between them. The slots never change, only what is in them: Show
 	// false keeps a slot's element in place and hidden. Show is whether it
-	// takes part: the swarm while it sends (or the viewer waits for it),
+	// takes part: the swarm while it sends, or while the viewer uses a
+	// source still being filled (including gaps between pieces),
 	// the viewer while a request of theirs is open (Viewer.Present); the
 	// source always.
 	Nodes [3]Node `json:"nodes"`
@@ -447,8 +448,10 @@ func sendsSwarm(state string) bool { return state == "caching" || state == "vaul
 
 // participants are who the chain draws besides the source. The swarm, where
 // it sends anything at all (caching, or into Vault): while it moves or is
-// held through a gap, and while the viewer waits -- then it is what they
-// wait for; before anything is cached, only as the reason the viewer waits
+// held through a gap, and while the viewer is present. A gap between pieces
+// changes the link's motion, not the route of an incomplete source. Once
+// cached or vaulted, the source needs no swarm. Before anything is cached,
+// the swarm is drawn only as the reason the viewer waits
 // on pieces nobody has. The viewer: while a request of theirs is open
 // (Viewer.Present) -- bytes going to them, the plan's cap, a wait for data,
 // or no number yet. A viewer the proxy says nothing about is never drawn.
@@ -456,7 +459,7 @@ func participants(t Torrent, v Viewer, k string, swarmMoves bool) (swarm, you bo
 	you = takesPart(v)
 	switch {
 	case sendsSwarm(t.State):
-		swarm = swarmMoves || (v.Known && v.Stalled)
+		swarm = swarmMoves || you
 	case t.State == "idle":
 		swarm = k == KeyMissing
 	}

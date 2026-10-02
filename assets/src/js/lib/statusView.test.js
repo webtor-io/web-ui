@@ -121,6 +121,42 @@ test('a message is drawn into both blocks, and the sticky bar is told whether an
     assert.deepEqual(events.at(-1), { resourceId: RID, state: 'idle', moving: false });
 });
 
+test('long swarm gaps keep all three actors in the card and sticky chain while downloading or playing', (t) => {
+    t.after(() => {
+        setVideo({ paused: true, readyState: 0 });
+        source.message(S.idle_torrent);
+    });
+    for (const [moving, gap, hls, completed] of [
+        [S.active, S.caching_gap, S.caching_hls_gap, S.cached_flow],
+        [S.vaulting, S.vaulting_gap, S.vaulting_hls_gap, S.vaulted],
+    ]) {
+        setVideo({ paused: true });
+        fire('pause');
+        for (const status of [moving, gap, moving]) {
+            source.message(status);
+            for (const block of [card(), sticky()]) {
+                assert.equal(block.querySelectorAll('[data-tx-node]:not([hidden])').length, 3);
+                assert.equal(block.querySelector('[data-tx-seg]').hasAttribute('data-moving'), status === moving);
+            }
+        }
+        // The SSE update reads the player's current state. Avoid firing a
+        // playback event that would retain activity for the next minute
+        // in this shared fixture, after the test has restored the player.
+        setVideo({ paused: false, readyState: 4 });
+        source.message(hls);
+        for (const block of [card(), sticky()]) {
+            assert.equal(block.dataset.mode, 'chain');
+            assert.equal(block.querySelectorAll('[data-tx-node]:not([hidden])').length, 3);
+            assert.equal(block.querySelector('[data-tx-seg]').hasAttribute('data-moving'), false);
+        }
+        source.message(completed);
+        for (const block of [card(), sticky()]) {
+            assert.equal(block.querySelectorAll('[data-tx-node]:not([hidden])').length, 2);
+            assert.equal(block.querySelector('[data-tx-node]').hidden, true);
+        }
+    }
+});
+
 test('at the cap with no player: the download box, its props saying where it is', () => {
     source.message(S.tier_dl);
     for (const [block, location] of [[card(), 'card'], [sticky(), 'sticky']]) {

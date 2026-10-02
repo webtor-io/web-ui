@@ -3524,5 +3524,635 @@
    }
   },
   "ssr": "\u003cdiv class=\"tx\" data-tx data-key=\"cached\" data-mode=\"badge\"\u003e\n    \u003cdiv class=\"tx-head\"\u003e\n    \u003cbutton type=\"button\" class=\"tx-chain\" data-tx-toggle popovertarget=\"tx-details\" aria-expanded=\"false\" aria-label=\"Где узкое место\" aria-describedby=\"tx-bdesc\" title=\"Где узкое место\"\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"swarm\" data-tone=\"\" hidden\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-swarm\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eРой\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eрой\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"flow\" hidden\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"cache\" data-tone=\"cached\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-check\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eКэш\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eкэш\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"off\" hidden\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"you\" data-tone=\"\" hidden\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-user\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eВы\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eвы\u003c/span\u003e\u003c/span\u003e\n    \u003c/button\u003e\n\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"ok\" data-icon=\"check\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-check\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" id=\"tx-bdesc\" title=\"В кэше\"\u003e\u003cspan data-tx-blabel\u003eВ кэше\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cdiv class=\"tx-bar\" data-tx-bar data-mode=\"divider\" data-tone=\"\"\u003e\u003cdiv class=\"tx-pbar\" data-tx-cells role=\"img\"\u003e\u003c/div\u003e\u003cdiv class=\"tx-pdiv\"\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cp class=\"tx-hint\" data-tx-hint data-tone=\"\" hidden\u003e\u003cspan data-tx-htext\u003e\u003c/span\u003e\u003ca class=\"tx-vlink\" data-tx-vault href=\"/ru/login?from=vault\u0026return-url=%2fru%2f08ada5a7a6183aae1e09d831df6748d566095a10\" data-async-target=\"main\" data-umami-event=\"vault-clicked-anonymous\" data-umami-event-location=\"status\" hidden\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan\u003eСохранить в Vault — догрузит сам\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"cached\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"cached\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\n    \u003cdiv class=\"tx-details\" id=\"tx-details\" data-tx-details popover role=\"dialog\" aria-label=\"Где узкое место\"\u003e\n        \u003cdiv class=\"tx-dh\"\u003e\n            \u003cdiv class=\"tx-dt\"\u003eГде узкое место\u003c/div\u003e\n            \u003cbutton type=\"button\" class=\"tx-dx\" data-tx-close popovertarget=\"tx-details\" popovertargetaction=\"hide\" aria-label=\"Закрыть\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"swarm\" hidden\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eИз торрент-сети\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"source\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eКэш\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eчто уже скачано к нам\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e100%\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"you\" hidden\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eК вам\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"cap\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eБез подписки\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eна все загрузки одновременно\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003eдо 5 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-dplan\" data-tx-dplan hidden\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"cached\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"cached\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\u003c/div\u003e\n    \u003c/div\u003e\n\u003c/div\u003e"
+ },
+ {
+  "design": "caching_gap",
+  "player": "none",
+  "status": {
+   "state": "caching",
+   "progress": 43.4,
+   "seeders": 14,
+   "leechers": 0,
+   "peers": 0,
+   "label": "",
+   "swarm": "",
+   "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
+   "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
+   "pieces_total": 1024,
+   "pieces_label": "40 из 1024 кусков на сервере",
+   "view": {
+    "key": "active",
+    "mode": "chain",
+    "sticky": true,
+    "auth": "anon",
+    "tier": "free",
+    "nodes": [
+     {
+      "show": true,
+      "kind": "swarm",
+      "icon": "swarm",
+      "name": "Рой",
+      "caption": "рой",
+      "value": "14 сидов",
+      "short": "14"
+     },
+     {
+      "show": true,
+      "kind": "cache",
+      "icon": "cloud",
+      "name": "Кэш",
+      "caption": "кэш",
+      "value": "43%",
+      "short": "43%"
+     },
+     {
+      "show": true,
+      "kind": "you",
+      "icon": "user",
+      "name": "Вы",
+      "caption": "вы"
+     }
+    ],
+    "segs": [
+     {
+      "show": true,
+      "kind": "swarm",
+      "tone": "flow",
+      "speed": "— Мбит/с"
+     },
+     {
+      "show": true,
+      "kind": "viewer",
+      "tone": "flow",
+      "on": true,
+      "speed": "12 Мбит/с"
+     }
+    ],
+    "badge": {
+     "tone": "cyan",
+     "icon": "down",
+     "pulse": true,
+     "label": "Кэширование 43%",
+     "extra": "(14 сидов)"
+    },
+    "bar": {
+     "mode": "pieces",
+     "tone": "flow"
+    },
+    "details": {
+     "title": "Где узкое место",
+     "rows": [
+      {
+       "show": true,
+       "key": "swarm",
+       "label": "Из торрент-сети",
+       "sub": "14 сидов в раздаче",
+       "value": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "source",
+       "label": "Кэш",
+       "sub": "что уже скачано к нам",
+       "value": "43%"
+      },
+      {
+       "show": true,
+       "key": "you",
+       "label": "К вам",
+       "sub": "≈ 1,5 МБ/с — так же покажет загрузчик браузера",
+       "value": "12 Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "cap",
+       "label": "Без подписки",
+       "sub": "на все загрузки одновременно",
+       "value": "до 5 Мбит/с"
+      }
+     ]
+    }
+   }
+  },
+  "ssr": "\u003cdiv class=\"tx\" data-tx data-key=\"active\" data-mode=\"chain\" data-sticky\u003e\n    \u003cdiv class=\"tx-head\"\u003e\n    \u003cbutton type=\"button\" class=\"tx-chain\" data-tx-toggle popovertarget=\"tx-details\" aria-expanded=\"false\" aria-label=\"Где узкое место\" aria-describedby=\"tx-bdesc\" title=\"Где узкое место\"\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"swarm\" data-tone=\"\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-swarm\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eРой\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e14 сидов\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e14\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eрой\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"flow\"\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"cache\" data-tone=\"\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-cloud\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eКэш\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e43%\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e43%\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eкэш\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"flow\" data-moving\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e12 Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"you\" data-tone=\"\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-user\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eВы\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eвы\u003c/span\u003e\u003c/span\u003e\n    \u003c/button\u003e\n\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"cyan\" data-icon=\"down\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-down\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" id=\"tx-bdesc\" title=\"Кэширование 43% (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eКэширование 43%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cdiv class=\"tx-bar\" data-tx-bar data-mode=\"divider\" data-tone=\"flow\"\u003e\u003cdiv class=\"tx-pbar\" data-tx-cells role=\"img\"\u003e\u003c/div\u003e\u003cdiv class=\"tx-pdiv\"\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cp class=\"tx-hint\" data-tx-hint data-tone=\"\" hidden\u003e\u003cspan data-tx-htext\u003e\u003c/span\u003e\u003ca class=\"tx-vlink\" data-tx-vault href=\"/ru/login?from=vault\u0026return-url=%2fru%2f08ada5a7a6183aae1e09d831df6748d566095a10\" data-async-target=\"main\" data-umami-event=\"vault-clicked-anonymous\" data-umami-event-location=\"status\" hidden\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan\u003eСохранить в Vault — догрузит сам\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"active\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"active\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\n    \u003cdiv class=\"tx-details\" id=\"tx-details\" data-tx-details popover role=\"dialog\" aria-label=\"Где узкое место\"\u003e\n        \u003cdiv class=\"tx-dh\"\u003e\n            \u003cdiv class=\"tx-dt\"\u003eГде узкое место\u003c/div\u003e\n            \u003cbutton type=\"button\" class=\"tx-dx\" data-tx-close popovertarget=\"tx-details\" popovertargetaction=\"hide\" aria-label=\"Закрыть\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"swarm\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eИз торрент-сети\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e14 сидов в раздаче\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"source\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eКэш\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eчто уже скачано к нам\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e43%\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"you\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eК вам\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e≈ 1,5 МБ/с — так же покажет загрузчик браузера\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e12 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"cap\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eБез подписки\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eна все загрузки одновременно\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003eдо 5 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-dplan\" data-tx-dplan hidden\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"active\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"active\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\u003c/div\u003e\n    \u003c/div\u003e\n\u003c/div\u003e"
+ },
+ {
+  "design": "vaulting_gap",
+  "player": "none",
+  "status": {
+   "state": "vaulting",
+   "progress": 64,
+   "seeders": 9,
+   "leechers": 0,
+   "peers": 0,
+   "label": "",
+   "swarm": "",
+   "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
+   "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
+   "pieces_total": 1024,
+   "pieces_label": "40 из 1024 кусков на сервере",
+   "view": {
+    "key": "vaulting",
+    "mode": "chain",
+    "sticky": true,
+    "auth": "anon",
+    "tier": "free",
+    "nodes": [
+     {
+      "show": true,
+      "kind": "swarm",
+      "icon": "swarm",
+      "name": "Рой",
+      "caption": "рой",
+      "value": "9 сидов",
+      "short": "9"
+     },
+     {
+      "show": true,
+      "kind": "vault",
+      "icon": "vault",
+      "name": "Vault",
+      "caption": "Vault",
+      "value": "64%",
+      "short": "64%",
+      "tone": "vault"
+     },
+     {
+      "show": true,
+      "kind": "you",
+      "icon": "user",
+      "name": "Вы",
+      "caption": "вы"
+     }
+    ],
+    "segs": [
+     {
+      "show": true,
+      "kind": "swarm",
+      "tone": "vault",
+      "speed": "— Мбит/с"
+     },
+     {
+      "show": true,
+      "kind": "viewer",
+      "tone": "flow",
+      "on": true,
+      "speed": "12 Мбит/с"
+     }
+    ],
+    "badge": {
+     "tone": "vault",
+     "icon": "up",
+     "pulse": true,
+     "label": "Сохраняется 64%",
+     "extra": "(9 сидов)"
+    },
+    "bar": {
+     "mode": "pieces",
+     "tone": "vault"
+    },
+    "hint": "Раздача сохраняется в Vault — потом будет доступна и без сидов.",
+    "details": {
+     "title": "Где узкое место",
+     "rows": [
+      {
+       "show": true,
+       "key": "swarm",
+       "label": "Из торрент-сети",
+       "sub": "9 сидов в раздаче",
+       "value": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "source",
+       "label": "Vault",
+       "sub": "что уже сохранено в Vault",
+       "value": "64%"
+      },
+      {
+       "show": true,
+       "key": "you",
+       "label": "К вам",
+       "sub": "≈ 1,5 МБ/с — так же покажет загрузчик браузера",
+       "value": "12 Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "cap",
+       "label": "Без подписки",
+       "sub": "на все загрузки одновременно",
+       "value": "до 5 Мбит/с"
+      }
+     ]
+    }
+   }
+  },
+  "ssr": "\u003cdiv class=\"tx\" data-tx data-key=\"vaulting\" data-mode=\"chain\" data-sticky\u003e\n    \u003cdiv class=\"tx-head\"\u003e\n    \u003cbutton type=\"button\" class=\"tx-chain\" data-tx-toggle popovertarget=\"tx-details\" aria-expanded=\"false\" aria-label=\"Где узкое место\" aria-describedby=\"tx-bdesc\" title=\"Где узкое место\"\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"swarm\" data-tone=\"\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-swarm\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eРой\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e9 сидов\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e9\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eрой\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"vault\"\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"vault\" data-tone=\"vault\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eVault\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e64%\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e64%\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eVault\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"flow\" data-moving\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e12 Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"you\" data-tone=\"\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-user\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eВы\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eвы\u003c/span\u003e\u003c/span\u003e\n    \u003c/button\u003e\n\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"up\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-up\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" id=\"tx-bdesc\" title=\"Сохраняется 64% (9 сидов)\"\u003e\u003cspan data-tx-blabel\u003eСохраняется 64%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(9 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cdiv class=\"tx-bar\" data-tx-bar data-mode=\"divider\" data-tone=\"vault\"\u003e\u003cdiv class=\"tx-pbar\" data-tx-cells role=\"img\"\u003e\u003c/div\u003e\u003cdiv class=\"tx-pdiv\"\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cp class=\"tx-hint\" data-tx-hint data-tone=\"\"\u003e\u003cspan data-tx-htext\u003eРаздача сохраняется в Vault — потом будет доступна и без сидов.\u003c/span\u003e\u003ca class=\"tx-vlink\" data-tx-vault href=\"/ru/login?from=vault\u0026return-url=%2fru%2f08ada5a7a6183aae1e09d831df6748d566095a10\" data-async-target=\"main\" data-umami-event=\"vault-clicked-anonymous\" data-umami-event-location=\"status\" hidden\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan\u003eСохранить в Vault — догрузит сам\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\n    \u003cdiv class=\"tx-details\" id=\"tx-details\" data-tx-details popover role=\"dialog\" aria-label=\"Где узкое место\"\u003e\n        \u003cdiv class=\"tx-dh\"\u003e\n            \u003cdiv class=\"tx-dt\"\u003eГде узкое место\u003c/div\u003e\n            \u003cbutton type=\"button\" class=\"tx-dx\" data-tx-close popovertarget=\"tx-details\" popovertargetaction=\"hide\" aria-label=\"Закрыть\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"swarm\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eИз торрент-сети\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e9 сидов в раздаче\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"source\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eVault\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eчто уже сохранено в Vault\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e64%\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"you\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eК вам\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e≈ 1,5 МБ/с — так же покажет загрузчик браузера\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e12 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"cap\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eБез подписки\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eна все загрузки одновременно\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003eдо 5 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-dplan\" data-tx-dplan hidden\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\u003c/div\u003e\n    \u003c/div\u003e\n\u003c/div\u003e"
+ },
+ {
+  "design": "caching_hls_gap",
+  "player": "none",
+  "status": {
+   "state": "caching",
+   "progress": 43.4,
+   "seeders": 14,
+   "leechers": 0,
+   "peers": 0,
+   "label": "",
+   "swarm": "",
+   "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
+   "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
+   "pieces_total": 1024,
+   "pieces_label": "40 из 1024 кусков на сервере",
+   "view": {
+    "key": "caching_idle",
+    "mode": "badge",
+    "sticky": false,
+    "auth": "anon",
+    "tier": "free",
+    "nodes": [
+     {
+      "show": false,
+      "kind": "swarm",
+      "icon": "swarm",
+      "name": "Рой",
+      "caption": "рой",
+      "value": "14 сидов",
+      "short": "14"
+     },
+     {
+      "show": true,
+      "kind": "cache",
+      "icon": "cloud",
+      "name": "Кэш",
+      "caption": "кэш",
+      "value": "43%",
+      "short": "43%"
+     },
+     {
+      "show": false,
+      "kind": "you",
+      "icon": "user",
+      "name": "Вы",
+      "caption": "вы"
+     }
+    ],
+    "segs": [
+     {
+      "show": false,
+      "kind": "swarm",
+      "tone": "flow",
+      "speed": "— Мбит/с"
+     },
+     {
+      "show": false,
+      "kind": "viewer",
+      "tone": "off",
+      "speed": "— Мбит/с"
+     }
+    ],
+    "badge": {
+     "tone": "cyan",
+     "icon": "down",
+     "pulse": true,
+     "label": "Кэширование 43%",
+     "extra": "(14 сидов)"
+    },
+    "bar": {
+     "mode": "pieces",
+     "tone": "flow"
+    },
+    "details": {
+     "title": "Где узкое место",
+     "rows": [
+      {
+       "show": false,
+       "key": "swarm",
+       "label": "Из торрент-сети",
+       "value": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "source",
+       "label": "Кэш",
+       "sub": "что уже скачано к нам",
+       "value": "43%"
+      },
+      {
+       "show": false,
+       "key": "you",
+       "label": "К вам",
+       "value": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "cap",
+       "label": "Без подписки",
+       "sub": "на все загрузки одновременно",
+       "value": "до 5 Мбит/с"
+      }
+     ]
+    },
+    "playing": {
+     "key": "active",
+     "mode": "chain",
+     "sticky": true,
+     "auth": "anon",
+     "tier": "free",
+     "nodes": [
+      {
+       "show": true,
+       "kind": "swarm",
+       "icon": "swarm",
+       "name": "Рой",
+       "caption": "рой",
+       "value": "14 сидов",
+       "short": "14"
+      },
+      {
+       "show": true,
+       "kind": "cache",
+       "icon": "cloud",
+       "name": "Кэш",
+       "caption": "кэш",
+       "value": "43%",
+       "short": "43%"
+      },
+      {
+       "show": true,
+       "kind": "you",
+       "icon": "user",
+       "name": "Вы",
+       "caption": "вы"
+      }
+     ],
+     "segs": [
+      {
+       "show": true,
+       "kind": "swarm",
+       "tone": "flow",
+       "speed": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "kind": "viewer",
+       "tone": "flow",
+       "on": true,
+       "speed": "12 Мбит/с"
+      }
+     ],
+     "badge": {
+      "tone": "cyan",
+      "icon": "down",
+      "pulse": true,
+      "label": "Кэширование 43%",
+      "extra": "(14 сидов)"
+     },
+     "bar": {
+      "mode": "pieces",
+      "tone": "flow"
+     },
+     "details": {
+      "title": "Где узкое место",
+      "rows": [
+       {
+        "show": true,
+        "key": "swarm",
+        "label": "Из торрент-сети",
+        "sub": "14 сидов в раздаче",
+        "value": "— Мбит/с"
+       },
+       {
+        "show": true,
+        "key": "source",
+        "label": "Кэш",
+        "sub": "что уже скачано к нам",
+        "value": "43%"
+       },
+       {
+        "show": true,
+        "key": "you",
+        "label": "К вам",
+        "sub": "≈ 1,5 МБ/с — так же покажет загрузчик браузера",
+        "value": "12 Мбит/с"
+       },
+       {
+        "show": true,
+        "key": "cap",
+        "label": "Без подписки",
+        "sub": "на все загрузки одновременно",
+        "value": "до 5 Мбит/с"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ssr": "\u003cdiv class=\"tx\" data-tx data-key=\"caching_idle\" data-mode=\"badge\"\u003e\n    \u003cdiv class=\"tx-head\"\u003e\n    \u003cbutton type=\"button\" class=\"tx-chain\" data-tx-toggle popovertarget=\"tx-details\" aria-expanded=\"false\" aria-label=\"Где узкое место\" aria-describedby=\"tx-bdesc\" title=\"Где узкое место\"\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"swarm\" data-tone=\"\" hidden\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-swarm\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eРой\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e14 сидов\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e14\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eрой\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"flow\" hidden\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"cache\" data-tone=\"\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-cloud\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eКэш\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e43%\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e43%\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eкэш\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"off\" hidden\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"you\" data-tone=\"\" hidden\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-user\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eВы\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eвы\u003c/span\u003e\u003c/span\u003e\n    \u003c/button\u003e\n\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"cyan\" data-icon=\"down\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-down\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" id=\"tx-bdesc\" title=\"Кэширование 43% (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eКэширование 43%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cdiv class=\"tx-bar\" data-tx-bar data-mode=\"divider\" data-tone=\"flow\"\u003e\u003cdiv class=\"tx-pbar\" data-tx-cells role=\"img\"\u003e\u003c/div\u003e\u003cdiv class=\"tx-pdiv\"\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cp class=\"tx-hint\" data-tx-hint data-tone=\"\" hidden\u003e\u003cspan data-tx-htext\u003e\u003c/span\u003e\u003ca class=\"tx-vlink\" data-tx-vault href=\"/ru/login?from=vault\u0026return-url=%2fru%2f08ada5a7a6183aae1e09d831df6748d566095a10\" data-async-target=\"main\" data-umami-event=\"vault-clicked-anonymous\" data-umami-event-location=\"status\" hidden\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan\u003eСохранить в Vault — догрузит сам\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"caching_idle\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"caching_idle\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\n    \u003cdiv class=\"tx-details\" id=\"tx-details\" data-tx-details popover role=\"dialog\" aria-label=\"Где узкое место\"\u003e\n        \u003cdiv class=\"tx-dh\"\u003e\n            \u003cdiv class=\"tx-dt\"\u003eГде узкое место\u003c/div\u003e\n            \u003cbutton type=\"button\" class=\"tx-dx\" data-tx-close popovertarget=\"tx-details\" popovertargetaction=\"hide\" aria-label=\"Закрыть\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"swarm\" hidden\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eИз торрент-сети\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"source\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eКэш\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eчто уже скачано к нам\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e43%\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"you\" hidden\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eК вам\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"cap\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eБез подписки\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eна все загрузки одновременно\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003eдо 5 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-dplan\" data-tx-dplan hidden\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"caching_idle\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"caching_idle\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\u003c/div\u003e\n    \u003c/div\u003e\n\u003c/div\u003e"
+ },
+ {
+  "design": "vaulting_hls_gap",
+  "player": "none",
+  "status": {
+   "state": "vaulting",
+   "progress": 64,
+   "seeders": 9,
+   "leechers": 0,
+   "peers": 0,
+   "label": "",
+   "swarm": "",
+   "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
+   "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
+   "pieces_total": 1024,
+   "pieces_label": "40 из 1024 кусков на сервере",
+   "view": {
+    "key": "vaulting_idle",
+    "mode": "badge",
+    "sticky": false,
+    "auth": "anon",
+    "tier": "free",
+    "nodes": [
+     {
+      "show": false,
+      "kind": "swarm",
+      "icon": "swarm",
+      "name": "Рой",
+      "caption": "рой",
+      "value": "9 сидов",
+      "short": "9"
+     },
+     {
+      "show": true,
+      "kind": "vault",
+      "icon": "vault",
+      "name": "Vault",
+      "caption": "Vault",
+      "value": "64%",
+      "short": "64%",
+      "tone": "vault"
+     },
+     {
+      "show": false,
+      "kind": "you",
+      "icon": "user",
+      "name": "Вы",
+      "caption": "вы"
+     }
+    ],
+    "segs": [
+     {
+      "show": false,
+      "kind": "swarm",
+      "tone": "vault",
+      "speed": "— Мбит/с"
+     },
+     {
+      "show": false,
+      "kind": "viewer",
+      "tone": "off",
+      "speed": "— Мбит/с"
+     }
+    ],
+    "badge": {
+     "tone": "vault",
+     "icon": "up",
+     "pulse": true,
+     "label": "Сохраняется 64%",
+     "extra": "(9 сидов)"
+    },
+    "bar": {
+     "mode": "pieces",
+     "tone": "vault"
+    },
+    "hint": "Раздача сохраняется в Vault — потом будет доступна и без сидов.",
+    "details": {
+     "title": "Где узкое место",
+     "rows": [
+      {
+       "show": false,
+       "key": "swarm",
+       "label": "Из торрент-сети",
+       "value": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "source",
+       "label": "Vault",
+       "sub": "что уже сохранено в Vault",
+       "value": "64%"
+      },
+      {
+       "show": false,
+       "key": "you",
+       "label": "К вам",
+       "value": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "key": "cap",
+       "label": "Без подписки",
+       "sub": "на все загрузки одновременно",
+       "value": "до 5 Мбит/с"
+      }
+     ]
+    },
+    "playing": {
+     "key": "vaulting",
+     "mode": "chain",
+     "sticky": true,
+     "auth": "anon",
+     "tier": "free",
+     "nodes": [
+      {
+       "show": true,
+       "kind": "swarm",
+       "icon": "swarm",
+       "name": "Рой",
+       "caption": "рой",
+       "value": "9 сидов",
+       "short": "9"
+      },
+      {
+       "show": true,
+       "kind": "vault",
+       "icon": "vault",
+       "name": "Vault",
+       "caption": "Vault",
+       "value": "64%",
+       "short": "64%",
+       "tone": "vault"
+      },
+      {
+       "show": true,
+       "kind": "you",
+       "icon": "user",
+       "name": "Вы",
+       "caption": "вы"
+      }
+     ],
+     "segs": [
+      {
+       "show": true,
+       "kind": "swarm",
+       "tone": "vault",
+       "speed": "— Мбит/с"
+      },
+      {
+       "show": true,
+       "kind": "viewer",
+       "tone": "flow",
+       "on": true,
+       "speed": "12 Мбит/с"
+      }
+     ],
+     "badge": {
+      "tone": "vault",
+      "icon": "up",
+      "pulse": true,
+      "label": "Сохраняется 64%",
+      "extra": "(9 сидов)"
+     },
+     "bar": {
+      "mode": "pieces",
+      "tone": "vault"
+     },
+     "hint": "Раздача сохраняется в Vault — потом будет доступна и без сидов.",
+     "details": {
+      "title": "Где узкое место",
+      "rows": [
+       {
+        "show": true,
+        "key": "swarm",
+        "label": "Из торрент-сети",
+        "sub": "9 сидов в раздаче",
+        "value": "— Мбит/с"
+       },
+       {
+        "show": true,
+        "key": "source",
+        "label": "Vault",
+        "sub": "что уже сохранено в Vault",
+        "value": "64%"
+       },
+       {
+        "show": true,
+        "key": "you",
+        "label": "К вам",
+        "sub": "≈ 1,5 МБ/с — так же покажет загрузчик браузера",
+        "value": "12 Мбит/с"
+       },
+       {
+        "show": true,
+        "key": "cap",
+        "label": "Без подписки",
+        "sub": "на все загрузки одновременно",
+        "value": "до 5 Мбит/с"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "ssr": "\u003cdiv class=\"tx\" data-tx data-key=\"vaulting_idle\" data-mode=\"badge\"\u003e\n    \u003cdiv class=\"tx-head\"\u003e\n    \u003cbutton type=\"button\" class=\"tx-chain\" data-tx-toggle popovertarget=\"tx-details\" aria-expanded=\"false\" aria-label=\"Где узкое место\" aria-describedby=\"tx-bdesc\" title=\"Где узкое место\"\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"swarm\" data-tone=\"\" hidden\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-swarm\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eРой\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e9 сидов\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e9\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eрой\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"vault\" hidden\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"vault\" data-tone=\"vault\"\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eVault\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e64%\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e64%\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eVault\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-seg\" data-tx-seg data-tone=\"off\" hidden\u003e\u003cspan class=\"tx-trk\"\u003e\u003cspan class=\"tx-ln\"\u003e\u003c/span\u003e\u003cspan class=\"tx-sp\"\u003e\u003csvg class=\"tx-pz\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-dots\" aria-hidden=\"true\"\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003ci\u003e\u003c/i\u003e\u003c/span\u003e\u003cspan class=\"tx-spd\"\u003e— Мбит/с\u003c/span\u003e\u003ci class=\"tx-note\"\u003e\u003c/i\u003e\u003c/span\u003e\u003csvg class=\"tx-hd\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-head\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/span\u003e\u003c/span\u003e\n\u003cspan class=\"tx-node\" data-tx-node data-kind=\"you\" data-tone=\"\" hidden\u003e\u003cspan class=\"tx-pill\"\u003e\u003csvg class=\"tx-ic\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-user\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cb class=\"tx-nm\"\u003eВы\u003c/b\u003e\u003cspan class=\"tx-val\"\u003e\u003c/span\u003e\u003cspan class=\"tx-short\"\u003e\u003c/span\u003e\u003c/span\u003e\u003cspan class=\"tx-cap\"\u003eвы\u003c/span\u003e\u003c/span\u003e\n    \u003c/button\u003e\n\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"up\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-up\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" id=\"tx-bdesc\" title=\"Сохраняется 64% (9 сидов)\"\u003e\u003cspan data-tx-blabel\u003eСохраняется 64%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(9 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cdiv class=\"tx-bar\" data-tx-bar data-mode=\"divider\" data-tone=\"vault\"\u003e\u003cdiv class=\"tx-pbar\" data-tx-cells role=\"img\"\u003e\u003c/div\u003e\u003cdiv class=\"tx-pdiv\"\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cp class=\"tx-hint\" data-tx-hint data-tone=\"\"\u003e\u003cspan data-tx-htext\u003eРаздача сохраняется в Vault — потом будет доступна и без сидов.\u003c/span\u003e\u003ca class=\"tx-vlink\" data-tx-vault href=\"/ru/login?from=vault\u0026return-url=%2fru%2f08ada5a7a6183aae1e09d831df6748d566095a10\" data-async-target=\"main\" data-umami-event=\"vault-clicked-anonymous\" data-umami-event-location=\"status\" hidden\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan\u003eСохранить в Vault — догрузит сам\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting_idle\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting_idle\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\n    \u003cdiv class=\"tx-details\" id=\"tx-details\" data-tx-details popover role=\"dialog\" aria-label=\"Где узкое место\"\u003e\n        \u003cdiv class=\"tx-dh\"\u003e\n            \u003cdiv class=\"tx-dt\"\u003eГде узкое место\u003c/div\u003e\n            \u003cbutton type=\"button\" class=\"tx-dx\" data-tx-close popovertarget=\"tx-details\" popovertargetaction=\"hide\" aria-label=\"Закрыть\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"swarm\" hidden\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eИз торрент-сети\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"source\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eVault\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eчто уже сохранено в Vault\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e64%\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"you\" hidden\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eК вам\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003e\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003e— Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-row\" data-tx-row data-key=\"cap\"\u003e\n            \u003cdiv class=\"tx-rl\"\u003e\u003cdiv class=\"tx-rlabel\"\u003e\u003cspan data-tx-rlabel\u003eБез подписки\u003c/span\u003e\u003cspan class=\"tx-tag\" data-tx-rtag hidden\u003e\u003c/span\u003e\u003c/div\u003e\u003cdiv class=\"tx-rsub\" data-tx-rsub\u003eна все загрузки одновременно\u003c/div\u003e\u003c/div\u003e\n            \u003cdiv class=\"tx-rv\" data-tx-rv\u003eдо 5 Мбит/с\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv class=\"tx-dplan\" data-tx-dplan hidden\u003e\n\u003cdiv class=\"tx-pbox\" data-tx-pbox hidden\u003e\n    \u003cdiv class=\"tx-pl\"\u003e\u003csvg class=\"tx-bolt\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cdiv class=\"min-w-0\"\u003e\u003cdiv class=\"tx-pt\" data-tx-pt\u003e\u003c/div\u003e\u003cdiv class=\"tx-ps\" data-tx-ps\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\n    \u003cdiv class=\"tx-pr\"\u003e\n        \u003ca class=\"tx-sbtn\" data-tx-cta target=\"_blank\" rel=\"noopener\"\n           data-umami-event=\"donate-status-bar\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n           data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting_idle\" data-umami-event-tier=\"free\"\n           data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-bolt\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan data-tx-cta-label\u003e\u003c/span\u003e\u003c/a\u003e\n        \u003cspan class=\"tx-pn\" data-tx-pn\u003e\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cbutton type=\"button\" class=\"tx-px\" data-tx-pclose aria-label=\"Закрыть\"\n            data-umami-event=\"donate-status-bar-dismiss\" data-umami-event-ctx=\"download\" data-umami-event-location=\"card\"\n            data-umami-event-auth=\"anon\" data-umami-event-state=\"vaulting_idle\" data-umami-event-tier=\"free\"\n            data-umami-event-target=\"\"\u003e\u003csvg aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-i-close\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003c/button\u003e\n\u003c/div\u003e\u003c/div\u003e\n    \u003c/div\u003e\n\u003c/div\u003e"
  }
 ]
