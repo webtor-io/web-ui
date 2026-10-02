@@ -699,3 +699,42 @@ func TestStatusStream_VaultedEndsWhenTheViewerCannotBeFollowed(t *testing.T) {
 		})
 	}
 }
+
+// A queued pledge on a torrent nobody streams gets cold frames: no "waiting
+// for seeders" then, nor in the first noSeedersAfter after the frames turn
+// live (Vault's first read loaded the torrent, the swarm is still being
+// found); an empty live swarm reads it after that, until the frames go cold
+// again (the seeder unloaded the torrent).
+func TestStatusStream_VaultWaitingNeedsLiveSwarm(t *testing.T) {
+	t.Parallel()
+	cold := strings.Replace(statsFrameJSON(8, 0, 0, 0, ""), `"live":true`, `"live":false`, 1)
+	const liveAt = 5 * time.Second
+	coldAt := liveAt + noSeedersAfter + 3*time.Second
+	node := newFakeNode(t, nil, func(n *fakeNode) {
+		n.stats = []statFrame{{0, cold}, {liveAt, statsFrameJSON(8, 0, 0, 0, "")}, {coldAt, cold}}
+	})
+	h := &Handler{api: testAPI(t, node.srv), offers: liveOffers(), statusVault: fakeStatusVault{res: &vaultModels.Resource{Funded: true}}}
+	srv := statusServer(t, h, "free", "5M")
+	ctx, cancel := context.WithTimeout(context.Background(), coldAt+5*time.Second)
+	defer cancel()
+	start := time.Now()
+	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok")
+	var waitingAt, backAt time.Duration
+	for m := range msgs {
+		switch {
+		case waitingAt == 0 && m["state"] == "vault_waiting":
+			waitingAt = time.Since(start)
+		case waitingAt != 0 && m["state"] == "vaulting":
+			backAt = time.Since(start)
+		}
+		if backAt != 0 {
+			break
+		}
+	}
+	if waitingAt < liveAt+noSeedersAfter-time.Second {
+		t.Errorf("vault_waiting at %v (0: never), want once the swarm has been live and empty for %v from %v", waitingAt, noSeedersAfter, liveAt)
+	}
+	if backAt == 0 {
+		t.Errorf("still vault_waiting after the frames went cold at %v", coldAt)
+	}
+}

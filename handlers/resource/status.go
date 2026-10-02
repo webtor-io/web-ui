@@ -243,6 +243,10 @@ type TorrentStatsData struct {
 	// Live is false for a cold reply: the seeder read the numbers from
 	// disk and did not join the swarm, so an empty swarm means nothing.
 	Live bool
+	// LiveFor is how long this status stream has received live frames when
+	// the status is resolved (statusLoop sets it every tick; zero while cold
+	// or while the stream is down).
+	LiveFor time.Duration
 	// Holes is the bucketed bitset of pieces nobody connected has
 	// (pieceMap.holes), nil when there are none or the seeder does not know;
 	// the rest is the seeder's availability as the last frame said it
@@ -459,11 +463,21 @@ func resolveStatusRaw(dbResource *vaultModels.Resource, apiResource *vault.Resou
 		vaultState.withSwarm(stats)
 		// Funded, nothing stored, and the seeder sees nobody: the transfer is
 		// not slow, it is waiting for a swarm that is not there. Saying so is
-		// the difference between "stuck at 0%" and "no seeders yet". Not for
+		// the difference between "stuck at 0%" and "no seeders yet". Only
+		// once this stream has seen the swarm live, and empty, for
+		// noSeedersAfter (a page open or a reconnect starts over): a cold
+		// reply (nobody streams the torrent and Vault has not started on it
+		// -- a pledge still in Vault's queue) has no swarm by design, and
+		// read as one it told the user who had just paid "no seeders online,
+		// points returned"; a swarm just come live (Vault's first read loaded
+		// the torrent, and the stream turns live by itself: torrent-web-seeder
+		// Stat.StatStream peeks every tick) is empty for tens of seconds
+		// while the seeder reaches trackers and the DHT -- the caching
+		// badge's verdict waits as long. Not for
 		// content whole in the cache: Vault takes it from there, no swarm
 		// needed (a cached torrent's stats are the synthetic "cached" ones,
 		// with nobody in them).
-		if vaultState.State == "vaulting" && vaultState.Progress == 0 && stats != nil && stats.Seeders == 0 && stats.Peers == 0 && !stats.whole() {
+		if vaultState.State == "vaulting" && vaultState.Progress == 0 && stats != nil && stats.LiveFor >= noSeedersAfter && stats.Seeders == 0 && stats.Peers == 0 && !stats.whole() {
 			vaultState.State = "vault_waiting"
 		}
 		return vaultState
@@ -1020,6 +1034,8 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	// lastProgressAt is zero until Completed first grows on this stream;
 	// firstStatsAt starts the observation window.
 	var lastProgressAt, firstStatsAt time.Time
+	// liveSince is when this stream's frames turned live (zero while cold).
+	var liveSince time.Time
 	// statsStale: the stream closed and a reconnect is pending. The last
 	// known status keeps being shown (a frozen 51% beats a false "idle"),
 	// without speed and without the paused/no-seeders verdicts — we do not
@@ -1074,6 +1090,14 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	}
 
 	sendStatus := func() bool {
+		if lastStats != nil {
+			// Zero over a closed stream too: we do not know, as for the
+			// caching verdicts below.
+			lastStats.LiveFor = 0
+			if !liveSince.IsZero() && !statsStale {
+				lastStats.LiveFor = time.Since(liveSince)
+			}
+		}
 		status := resolveStatus(lastDBResource, lastAPIResource, lastStats)
 		if status.State == "idle" && statsUnavailable {
 			status.State = "unknown"
@@ -1156,6 +1180,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			// If export says content is cached (no torrent_client_stat), mark as cached
 			if res.ch != nil {
 				statsStale = false
+				liveSince = time.Time{}
 			}
 			if res.msg == "cached" {
 				lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
@@ -1221,8 +1246,14 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 					lastCompleted = ev.Completed
 					lastProgressAt = now
 				}
+				live := ev.Live == nil || *ev.Live
+				if !live {
+					liveSince = time.Time{}
+				} else if liveSince.IsZero() {
+					liveSince = now
+				}
 				lastStats = &TorrentStatsData{
-					Live:              ev.Live == nil || *ev.Live,
+					Live:              live,
 					Rate:              rps,
 					Total:             ev.Total,
 					Completed:         ev.Completed,

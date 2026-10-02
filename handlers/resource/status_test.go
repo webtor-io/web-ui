@@ -136,12 +136,26 @@ func TestResolveStatus_VaultFailed(t *testing.T) {
 func TestResolveStatus_VaultWaitingForSeeders(t *testing.T) {
 	db := &vaultModels.Resource{Funded: true}
 	queued := &vault.Resource{Status: vault.StatusQueued}
-	// Nothing stored, seeder sees nobody → waiting for seeders.
-	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 0, Peers: 0}); st.State != "vault_waiting" {
-		t.Errorf("queued + empty swarm must read vault_waiting, got %+v", st)
+	// Nothing stored, seeder in the swarm and sees nobody for the whole
+	// noSeedersAfter → waiting for seeders.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 0, Peers: 0, Live: true, LiveFor: noSeedersAfter}); st.State != "vault_waiting" {
+		t.Errorf("queued + empty live swarm must read vault_waiting, got %+v", st)
+	}
+	// The same swarm just come live (Vault's first read loaded the torrent):
+	// the seeder has not reached trackers and the DHT yet, an empty swarm
+	// says nothing.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 0, Peers: 0, Live: true, LiveFor: noSeedersAfter - time.Second}); st.State != "vaulting" || st.Progress != 0 {
+		t.Errorf("queued + swarm live for less than noSeedersAfter must read vaulting 0%%, got %+v", st)
+	}
+	// The same empty swarm from a cold reply: the seeder read the numbers
+	// from disk and did not join the swarm -- nobody streams the torrent and
+	// Vault has not started on it. Nothing is known about seeders, so no
+	// "no seeders online, points returned" to someone who has just paid.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 0, Peers: 0}); st.State != "vaulting" || st.Progress != 0 {
+		t.Errorf("queued + cold reply must read vaulting 0%%, got %+v", st)
 	}
 	// Peers around → plain vaulting.
-	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 2, Peers: 3}); st.State != "vaulting" || st.Seeders != 2 {
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Seeders: 2, Peers: 3, Live: true, LiveFor: noSeedersAfter}); st.State != "vaulting" || st.Seeders != 2 {
 		t.Errorf("queued + peers must stay vaulting with the swarm, got %+v", st)
 	}
 	// No stats at all → we do not know, so no claim.
@@ -149,18 +163,27 @@ func TestResolveStatus_VaultWaitingForSeeders(t *testing.T) {
 		t.Errorf("queued without stats must stay vaulting, got %+v", st)
 	}
 	// Progress already made → not waiting even if the swarm emptied.
-	if st := resolveStatus(db, &vault.Resource{Status: vault.StatusProcessing, StoredSize: 50, TotalSize: 100}, &TorrentStatsData{Total: 100}); st.State != "vaulting" {
+	if st := resolveStatus(db, &vault.Resource{Status: vault.StatusProcessing, StoredSize: 50, TotalSize: 100}, &TorrentStatsData{Total: 100, Live: true, LiveFor: noSeedersAfter}); st.State != "vaulting" {
 		t.Errorf("progress > 0 must stay vaulting, got %+v", st)
 	}
 	// The whole file in the cache → Vault takes it from there: not "no
 	// seeders online". Those are the stats the loop sets for cached
-	// content (the export has no stat item), with nobody in them.
+	// content (the export has no stat item), with nobody in them; and the
+	// last live frame of a torrent the seeder holds complete, before it
+	// closes the stream.
 	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}); st.State != "vaulting" || st.Progress != 0 {
 		t.Errorf("queued, cached: must read vaulting 0%%, got %+v", st)
 	}
-	// Some of it cached, nobody around: still waiting for seeders.
-	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Completed: 40}); st.State != "vault_waiting" {
-		t.Errorf("queued, partly cached, empty swarm: got %+v", st)
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Completed: 100, Live: true, LiveFor: noSeedersAfter}); st.State != "vaulting" || st.Progress != 0 {
+		t.Errorf("queued, complete in a live seeder: must read vaulting 0%%, got %+v", st)
+	}
+	// Some of it cached, nobody around: still waiting for seeders -- when
+	// the seeder is in the swarm to see that.
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Completed: 40, Live: true, LiveFor: noSeedersAfter}); st.State != "vault_waiting" {
+		t.Errorf("queued, partly cached, empty live swarm: got %+v", st)
+	}
+	if st := resolveStatus(db, queued, &TorrentStatsData{Total: 100, Completed: 40}); st.State != "vaulting" {
+		t.Errorf("queued, partly cached, cold reply: must read vaulting, got %+v", st)
 	}
 }
 
@@ -438,7 +461,7 @@ func TestBarPolicy(t *testing.T) {
 	db := &vaultModels.Resource{Funded: true}
 	// Vault waiting for seeders: the purple bar over what the cache holds,
 	// as the approved design (2026-09-25) draws it.
-	waiting := resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{255, 0}, Active: []byte{0}})
+	waiting := resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{255, 0}, Active: []byte{0}, Live: true, LiveFor: noSeedersAfter})
 	if waiting.State != "vault_waiting" || waiting.Pieces == "" {
 		t.Errorf("waiting for seeders draws the cache's pieces: %+v", waiting)
 	}
