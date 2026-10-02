@@ -323,9 +323,16 @@ with two more gates:
   get the `Translated` item in phase 2 — a third-party page has no `/donate` to send a locked
   viewer to, and the cost would be charged to a viewer web-ui cannot identify.
 
-Enabling the flag with no `ANTHROPIC_API_KEY` on the `subtitle-translate` service is not silent:
+Enabling the flag with neither `ANTHROPIC_API_KEY` nor `OPENAI_API_KEY` on the
+`subtitle-translate` service is not silent:
 the service answers `501 translation is not configured` and the player surfaces it through
 `subtitle-translate-error`.
+
+The service chooses Anthropic when its key is configured, otherwise OpenAI.
+When both keys exist Anthropic wins; API errors do not change providers.
+`SUBTITLE_TRANSLATE_MODEL` is configured on that service (defaults: Claude Haiku
+4.5 for Anthropic, GPT-4.1 Mini for OpenAI), independently of web-ui models.
+See `subtitle-translate/README.md`, “AI provider selection”.
 
 ## The Translated item
 
