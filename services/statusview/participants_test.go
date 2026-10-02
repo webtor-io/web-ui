@@ -101,3 +101,25 @@ func TestBuild_PageViewerPhasesIgnoreTransferNoise(t *testing.T) {
 		}
 	}
 }
+
+// Before the first piece, the page already has a viewer waiting for the
+// action. Its route needs a swarm even before stats reach "caching".
+func TestBuild_PageViewerWaitsForInitialSwarm(t *testing.T) {
+	for _, tr := range []Torrent{
+		{State: "idle", Seeders: 14, SwarmKnown: true},
+		{State: "idle", Pending: true},
+		{State: "unknown"},
+	} {
+		v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: tr, Viewer: zero})
+		if v.Nodes[0].Show || v.Nodes[2].Show || v.Mode != ModeBadge {
+			t.Fatalf("ordinary idle page changed: %+v", v)
+		}
+		r := v.Resting
+		if !r.Nodes[0].Show || !r.Segs[0].Show || !r.Details.Rows[0].Show || !r.Nodes[2].Show {
+			t.Errorf("%+v: incomplete page route: %+v", tr, r.Nodes)
+		}
+		if r.Segs[0].Speed != "ждём данные" || r.Segs[0].On || r.Segs[0].Dots || r.Segs[0].Note != "" || r.Details.Rows[0].Value != r.Segs[0].Speed {
+			t.Errorf("%+v: expected waiting without invented speed: %+v", tr, r.Segs[0])
+		}
+	}
+}

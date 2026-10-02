@@ -951,19 +951,30 @@ test('another file picked: the player\'s label keeps following the page\'s playe
 });
 
 
-test('preparation and pause keep the same actors through alternating proxy presence', () => {
+test('preparation and pause keep the same actors through alternating proxy presence', async (t) => {
     freshVideo();
+    // Begin a fresh page's status stream, without the sticky bar's previous
+    // transfer reading held through an initial unknown status.
+    destroy.call(target);
+    await init.call(target);
+    source = sources.at(-1);
     const job = document.createElement('div');
+    t.after(() => { job.remove(); freshVideo(); });
     job.dataset.transferPreparing = '';
     document.getElementById('content').append(job);
     document.dispatchEvent(new CustomEvent('transfer-activity'));
-    for (const fixture of ['caching_only', 'active', 'caching_gap', 'caching_only', 'vaulting_only', 'vaulting_gap']) {
+    for (const fixture of ['status_unknown', 'idle_torrent', 'caching_only', 'active', 'caching_gap', 'caching_only', 'vaulting_only', 'vaulting_gap']) {
         source.message(S[fixture]);
         for (const block of [card(), sticky()]) {
             assert.equal([...block.querySelectorAll('[data-tx-node]')].filter(n => !n.hidden).length, 3, fixture);
             const seg = block.querySelectorAll('[data-tx-seg]')[1];
             assert.equal(seg.querySelector('.tx-spd').textContent, 'ждём данные');
             assert.equal(seg.hasAttribute('data-moving'), false);
+            if (fixture === 'idle_torrent' || fixture === 'status_unknown') {
+                const swarm = block.querySelectorAll('[data-tx-seg]')[0];
+                assert.equal(swarm.querySelector('.tx-spd').textContent, 'ждём данные');
+                assert.equal(swarm.hasAttribute('data-moving'), false);
+            }
         }
     }
     job.remove();

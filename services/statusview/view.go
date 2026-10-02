@@ -413,6 +413,16 @@ func Build(in Input) *View {
 	v.Resting.Details.Rows[2].Value = v.Resting.Segs[1].Speed
 	v.PreparingLabel = i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.waitingData")
 	v.PausedLabel = i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.paused")
+	// A page-owned transfer can start before the first seeder status/piece.
+	// Until a complete source is known, its route still needs the swarm.
+	// Keep the ordinary idle page unchanged; only the local lifecycle uses
+	// this alternative, and no measured speed is implied by the waiting link.
+	if in.Torrent.State == "idle" || in.Torrent.State == "unknown" {
+		r := v.Resting
+		r.Nodes[0].Show = true
+		r.Segs[0] = Seg{Show: true, Kind: "swarm", Tone: "off", Speed: v.PreparingLabel}
+		r.Details.Rows[0].Show, r.Details.Rows[0].Value = true, v.PreparingLabel
+	}
 	return v
 }
 

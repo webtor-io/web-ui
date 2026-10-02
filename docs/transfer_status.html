@@ -204,6 +204,16 @@ a{color:#fd79a8}a:hover{color:#e84393}
     <!-- Stable route: only the swarm arrow changes during a long gap. -->
 <section class="ts-section" id="transfer-status-lifecycle">
 <h2>Preparation, pause and stopped downloads</h2>
+<div class="ts-row" data-phase-demo="cache-initial">
+<div><div class="ts-state">Начало подготовки</div><div class="ts-when">Данных ещё нет: обе стрелки ждут, все три участника уже на месте.</div></div>
+<div style="--bg: #0a0e1a"><div class="tx" data-mode="chain" style="--tx-bg:#0a0e1a"><div class="tx-head"><div class="tx-chain">
+<span class="tx-node" data-tx-node="" data-kind="swarm" data-tone=""><span class="tx-pill"><svg class="tx-ic" aria-hidden="true"><use href="#tx-i-swarm"></use></svg><b class="tx-nm">Рой</b><span class="tx-val">14 сидов</span><span class="tx-short">14</span></span><span class="tx-cap">рой</span></span>
+<span class="tx-seg" data-tx-seg="" data-tone="off"><span class="tx-trk"><span class="tx-ln"></span><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="tx-spd">ждём данные</span><i class="tx-note"></i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
+<span class="tx-node" data-tx-node="" data-kind="cache" data-tone=""><span class="tx-pill"><svg class="tx-ic" aria-hidden="true"><use href="#tx-i-cloud"></use></svg><b class="tx-nm">Кэш</b><span class="tx-val"></span><span class="tx-short"></span></span><span class="tx-cap">кэш</span></span>
+<span class="tx-seg" data-tx-seg="" data-tone="off"><span class="tx-trk"><span class="tx-ln"></span><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="tx-spd">ждём данные</span><i class="tx-note"></i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
+<span class="tx-node" data-tx-node="" data-kind="you" data-tone=""><span class="tx-pill"><svg class="tx-ic" aria-hidden="true"><use href="#tx-i-user"></use></svg><b class="tx-nm">Вы</b><span class="tx-val"></span><span class="tx-short"></span></span><span class="tx-cap">вы</span></span>
+    </div></div></div></div>
+</div>
 <div class="ts-row" data-phase-demo="cache-preparing">
 <div><div class="ts-state">Подготовка передачи</div><div class="ts-when">Прогресс-лог ещё работает; служебные запросы не меняют состав цепочки.</div></div>
 <div style="--bg: #0a0e1a"><div class="tx" data-mode="chain" style="--tx-bg:#0a0e1a"><div class="tx-head"><div class="tx-chain">

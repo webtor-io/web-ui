@@ -3297,7 +3297,7 @@
      "tier": "free",
      "nodes": [
       {
-       "show": false,
+       "show": true,
        "kind": "swarm",
        "icon": "swarm",
        "name": "Рой",
@@ -3322,10 +3322,10 @@
      ],
      "segs": [
       {
-       "show": false,
+       "show": true,
        "kind": "swarm",
        "tone": "off",
-       "speed": "— Мбит/с"
+       "speed": "ждём данные"
       },
       {
        "show": true,
@@ -3347,10 +3347,10 @@
       "title": "Где узкое место",
       "rows": [
        {
-        "show": false,
+        "show": true,
         "key": "swarm",
         "label": "Из торрент-сети",
-        "value": "— Мбит/с"
+        "value": "ждём данные"
        },
        {
         "show": true,
@@ -3672,7 +3672,7 @@
      "tier": "free",
      "nodes": [
       {
-       "show": false,
+       "show": true,
        "kind": "swarm",
        "icon": "swarm",
        "name": "Рой",
@@ -3701,10 +3701,10 @@
      ],
      "segs": [
       {
-       "show": false,
+       "show": true,
        "kind": "swarm",
        "tone": "off",
-       "speed": "— Мбит/с"
+       "speed": "ждём данные"
       },
       {
        "show": true,
@@ -3726,10 +3726,10 @@
       "title": "Где узкое место",
       "rows": [
        {
-        "show": false,
+        "show": true,
         "key": "swarm",
         "label": "Из торрент-сети",
-        "value": "— Мбит/с"
+        "value": "ждём данные"
        },
        {
         "show": true,
