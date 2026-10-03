@@ -256,11 +256,15 @@ export function playing(view) {
 }
 
 // Local lifecycle chooses a server-localized presentation. Old servers can
-// omit these alternatives during a rolling deployment.
+// omit these alternatives during a rolling deployment. A player stalled
+// right now ('buffering', lib/playerActivity.js phase) is not bridged with
+// its last reading: that number froze with its last segment, and the wave
+// ran on under the buffering pill. The server's own reading, if it has one
+// (bytes do flow), or the viewer waiting.
 export function forPhase(view, phase) {
     if (!view) return view;
-    if (phase === 'playing') {
-        const active = playing(view);
+    if (phase === 'playing' || phase === 'buffering') {
+        const active = phase === 'buffering' ? view : playing(view);
         if (active.nodes[2].show) return active;
         phase = 'preparing';
     }

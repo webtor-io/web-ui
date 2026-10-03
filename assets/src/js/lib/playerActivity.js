@@ -22,10 +22,13 @@
 //                  it (viewerPaused: the page's pause, not theirs).
 //   'none'      -- no player, an ended one, or one left alone for a minute.
 //
-// The chain uses phase(): preparation, playback, or a paused player. It
-// stays stable independently of measured bytes and of the minute-long cap
-// verdict above. streaming() still describes current playback/buffer work;
-// buffer growth during a user pause does not change phase() back to playing.
+// The chain uses phase(): preparation, playback (a real stall under way:
+// 'buffering'), or a paused player. It stays stable independently of
+// measured bytes and of the minute-long cap verdict above. The player's
+// label and cause use streaming() (app/resource/status.js): a player
+// playing, waiting for data or fetching ahead while paused keeps the viewer
+// at their last reading for the server's verdict; buffer growth during a
+// user pause does not change phase() back to playing.
 // offerAnswered() is the cap question again: an answered offer stays spent
 // until the player really stalls.
 //
@@ -214,10 +217,16 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
     };
     // Page lifecycle, independent of the proxy's request cadence and the
     // minute-long cap verdict. Hidden prewarm players do not own the page.
+    // 'buffering' is a player stalled for real right now (STALL_MIN_MS), not
+    // the minute after: its last reading froze with its last segment.
     const phase = () => {
         if (doc.querySelector('[data-transfer-preparing]')) return 'preparing';
         const live = [...media()].filter((m) => !m.ended && !m.error && !m.closest('[hidden], .hidden'));
-        if (live.some((m) => !viewerPaused(m))) return 'playing';
+        if (live.some((m) => !viewerPaused(m))) {
+            const t = now();
+            forgetGone();
+            return marks.stallingSince !== null && t - marks.stallingSince >= STALL_MIN_MS ? 'buffering' : 'playing';
+        }
         if (live.some((m) => m.seeking || 'transferSeeking' in m.dataset)) return 'preparing';
         if (live.some((m) => el(m).played || m.readyState >= 2)) return 'paused';
         return 'none';

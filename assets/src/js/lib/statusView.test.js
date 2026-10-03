@@ -608,6 +608,40 @@ test('the page\'s player playing through an HLS gap keeps the viewer on the chai
     fire('ended');
 });
 
+// The last reading bridges the gaps between HLS segments while the film
+// plays from its buffer. Not while it waits for data: the number froze at
+// the last segment, and "You 24 Mbps" with the wave running under a
+// buffering pill says bytes flow that do not (a transcoder holding its
+// segment answers nothing the proxy counts). The viewer waits.
+test('the page\'s player stalled: the viewer waits, not the last reading with its wave', (t) => {
+    // Before every later test's clock: a stall colours the minute after it.
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() - 3 * 60 * 60 * 1000 });
+    freshVideo();
+    t.after(() => {
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 4, currentTime: 300 });
+    fire('loadstart');
+    fire('playing');
+    source.message(S.hls_gap);
+    const seg = (block) => block.querySelectorAll('[data-tx-seg]')[1];
+    assert.equal(seg(card()).querySelector('.tx-spd').textContent, '24 Мбит/с', 'fixture: the last reading while it plays');
+    setVideo({ readyState: 1, currentTime: 300.2 });
+    fire('waiting');
+    t.mock.timers.tick(1500);
+    source.message(S.hls_gap);
+    for (const block of [card(), sticky()]) {
+        assert.equal(block.querySelectorAll('[data-tx-node]')[2].hidden, false, 'still on the chain');
+        assert.equal(seg(block).querySelector('.tx-spd').textContent, 'ждём данные');
+        assert.equal(seg(block).hasAttribute('data-moving'), false, 'no wave');
+    }
+    setVideo({ readyState: 4, currentTime: 300.6 });
+    fire('playing');
+    source.message(S.hls_gap);
+    assert.equal(seg(card()).querySelector('.tx-spd').textContent, '24 Мбит/с', 'playing again: the reading again');
+});
+
 // Nothing moves: the badge in both blocks, and the sticky bar is told there
 // is nothing to keep on screen.
 test('nothing moves: the badge, and the sticky bar stands down', () => {
