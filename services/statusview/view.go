@@ -571,7 +571,9 @@ func key(t Torrent, v Viewer, capMbps float64, swarmMoves bool) string {
 		// A few slow seeders and the viewer at the cap anyway: they read
 		// what is cached already, and the rest waits for the swarm with or
 		// without a plan -- selling one there quotes a wait it cannot keep.
-		case limited && !swarmBound(t, capMbps):
+		// Pieces nobody connected has, the same: the file does not finish
+		// with a plan either (the pink link still says the cap).
+		case limited && !swarmBound(t, capMbps) && !missingHere(t):
 			return KeyTier
 		// The viewer waits on a piece nobody connected has.
 		case waiting && t.ReaderMissing > 0 && missingHere(t):

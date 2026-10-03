@@ -798,12 +798,21 @@ func TestBuild_NoCTA(t *testing.T) {
 		"one seeder, the viewer at the cap":  base(caching(40, 1, 0.3), atCap),
 		"stall":                              base(caching(43, 14, 38), stalled),
 		"missing pieces":                     base(func() Torrent { t := holes("caching", 43); t.ReaderMissing = 1; return t }(), stalled),
-		"vault failed":                       base(Torrent{State: "vault_failed", Seeders: 3, SwarmKnown: true}, atCap),
-		"checking":                           base(Torrent{State: "caching", Checking: true}, atCap),
+		// Pieces nobody connected has, the viewer at the cap on what is
+		// here: the file cannot finish with a plan or without one, and an
+		// ETA for it would be sold on a wait it cannot keep.
+		"missing pieces, the viewer at the cap":                  base(holes("caching", 43), atCap),
+		"missing pieces under the reader, the viewer at the cap": base(func() Torrent { t := holes("caching", 43); t.ReaderMissing = 1; return t }(), atCap),
+		"vault failed": base(Torrent{State: "vault_failed", Seeders: 3, SwarmKnown: true}, atCap),
+		"checking":     base(Torrent{State: "caching", Checking: true}, atCap),
 	} {
 		if v := Build(in); v.Plan != nil {
 			t.Errorf("%s (%s): plan %+v", name, v.Key, v.Plan)
 		}
+	}
+	// Only the sale goes there: the viewer's link still says the cap.
+	if v := Build(base(holes("caching", 43), atCap)); v.Segs[1].Tone != "plan" {
+		t.Errorf("missing pieces at the cap: the viewer's link %+v", v.Segs[1])
 	}
 	// Plan-limited, but no box: the fact alone.
 	gold := base(caching(61, 31, 380), Viewer{Known: true, Present: true, Mbps: 100, Limited: true, PlanBox: true, CapMbps: 100})
