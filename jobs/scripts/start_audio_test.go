@@ -56,7 +56,7 @@ func TestStartAudio_IsThePickersDefault(t *testing.T) {
 		"carried English 5.1":         {AudioID: "mp-0", Carry: &models.TrackCarry{AudioLang: "en", AudioLabel: "Main (5.1)"}},
 		"carried French 5.1":          {Carry: &models.TrackCarry{AudioLang: "fr", AudioLabel: "Audio (5.1) #8"}},
 		"carried commentary":          {Carry: &models.TrackCarry{AudioLang: "EN", AudioLabel: "Commentary (stereo)"}},
-		"carried, no such language":   {AudioID: "mp-1", Carry: &models.TrackCarry{AudioLang: "fr"}},
+		"carried, no such language":   {AudioID: "mp-1", Carry: &models.TrackCarry{AudioLang: "de"}},
 		"carried, no language":        {AcceptLangTags: tags("pt-BR"), Carry: &models.TrackCarry{AudioLabel: "x"}},
 	}
 	h := action.NewHelper()
