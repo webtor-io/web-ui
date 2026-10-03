@@ -462,7 +462,6 @@
     },
     "resource.status.unknown": "Статус недоступен",
     "resource.status.unknownHint": "Не удалось получить статус торрента — о самой раздаче это ничего не говорит.",
-    "resource.status.rate": "{{.Speed}}/с",
     "resource.status.mbps": "{{.N}} Мбит/с",
     "resource.status.chain.swarm": "Рой",
     "resource.status.chain.swarmCaption": "рой",

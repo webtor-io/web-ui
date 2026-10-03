@@ -457,7 +457,6 @@
     },
     "resource.status.unknown": "Status niet beschikbaar",
     "resource.status.unknownHint": "De torrentstatus kon nu niet worden opgehaald — dat zegt niets over de torrent zelf.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Swarm",
     "resource.status.chain.swarmCaption": "swarm",

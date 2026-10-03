@@ -456,7 +456,6 @@
     },
     "resource.status.unknown": "Status nicht verfügbar",
     "resource.status.unknownHint": "Der Torrent-Status konnte gerade nicht abgerufen werden – über den Torrent selbst sagt das nichts.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Schwarm",
     "resource.status.chain.swarmCaption": "Schwarm",

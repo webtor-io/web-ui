@@ -457,7 +457,6 @@
     },
     "resource.status.unknown": "Stato non disponibile",
     "resource.status.unknownHint": "Impossibile ottenere lo stato del torrent al momento: non dice nulla sul torrent in sé.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Sciame",
     "resource.status.chain.swarmCaption": "sciame",

@@ -15,7 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	csrf "github.com/utrack/gin-csrf"
-	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	uclaims "github.com/webtor-io/web-ui/services/claims"
@@ -28,18 +27,18 @@ import (
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 )
 
-// TorrentStatus represents the current combined status of a torrent.
+// TorrentStatus represents the current combined status of a torrent. On the
+// wire (the status stream's message) it is only what the page and the Vault
+// dashboard read: state, progress, the piece bar, view or badge, final. The
+// rest is what the view is built from; sent too, it changed every second
+// with the smoothed rate and defeated the stream's dedup -- half the
+// messages of a moving download said nothing the page draws (2026-10-03).
 type TorrentStatus struct {
 	State    string  `json:"state"`    // idle, caching, cached, vaulting, vaulted, unknown
 	Progress float64 `json:"progress"` // 0-100 for caching/vaulting
-	Seeders  int     `json:"seeders"`  // seeders as the seeder reports them
-	Leechers int     `json:"leechers"` // leechers as the seeder reports them
-	Peers    int     `json:"peers"`    // combined peer count — the fallback when a seeder reports no split
-	Label    string  `json:"label"`    // translated state label
-	// Swarm is the translated "N seeders · M leechers" (or "N peers") suffix,
-	// empty when nothing is known. Formatted server-side so the JS renderer
-	// never has to carry locale strings.
-	Swarm string `json:"swarm"`
+	Seeders  int     `json:"-"`        // seeders as the seeder reports them
+	Leechers int     `json:"-"`        // leechers as the seeder reports them
+	Peers    int     `json:"-"`        // combined peer count — the fallback when a seeder reports no split
 	// Pieces is the piece bar: PieceBuckets bytes, base64, one per bucket,
 	// 0..255 = share of the bucket's pieces the seeder holds. Active is a
 	// base64 bitset of buckets with pieces the seeder is fetching right now.
@@ -51,31 +50,27 @@ type TorrentStatus struct {
 	// (pieceMap.holes). Only once the seeder knows (availability_known), and
 	// only while the bar is drawn.
 	Missing     string `json:"missing,omitempty"`
-	PiecesDone  int    `json:"pieces_done,omitempty"`
-	PiecesTotal int    `json:"pieces_total,omitempty"`
+	PiecesDone  int    `json:"-"`
+	PiecesTotal int    `json:"-"`
 	PiecesLabel string `json:"pieces_label,omitempty"`
 	// Rate is the swarm's useful download throughput in bytes per second,
-	// smoothed (services/ratemeter) from the seeder's Completed counter;
-	// RateLabel is it formatted ("2.3 MB/s"). Zero/empty when unknown or
-	// when nothing is moving.
-	Rate      float64 `json:"rate,omitempty"`
-	RateLabel string  `json:"rate_label,omitempty"`
+	// smoothed (services/ratemeter) from the seeder's Completed counter.
+	// Zero when unknown or when nothing is moving.
+	Rate float64 `json:"-"`
 	// Paused: caching, but nothing is being fetched — no verified bytes
 	// arrived for pausedAfter and no piece is queued. The seeder downloads
 	// on demand, so this means "nobody is streaming this right now", not
 	// "stuck"; the badge turns amber with a pause glyph to say so.
-	Paused     bool   `json:"paused,omitempty"`
-	PausedHint string `json:"paused_hint,omitempty"`
+	Paused bool `json:"-"`
 	// NoSeeders: caching, and the seeder sees nobody at all — the download
 	// cannot progress until a seeder shows up. Takes precedence over Paused
 	// in the badge: an empty swarm is the fact that matters.
-	NoSeeders     bool   `json:"no_seeders,omitempty"`
-	NoSeedersHint string `json:"no_seeders_hint,omitempty"`
+	NoSeeders bool `json:"-"`
 	// Checking: caching with partial content, but we have watched the swarm
 	// for less than the settle window and seen no activity yet — too early to
 	// call it caching, paused or dead. The badge stays neutral until the
 	// verdict is earned.
-	Checking bool `json:"checking,omitempty"`
+	Checking bool `json:"-"`
 	// View is the transfer status as the resource page draws it — the
 	// chain "swarm ▸ cache ▸ you", the bar's mode, the hint or the plan
 	// box, the details popover — built by services/statusview and already
@@ -601,20 +596,19 @@ func (s *Handler) status(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache,no-store,no-transform")
 	c.Header("Connection", "keep-alive")
-	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("X-Accel-Buffering", "no")
 
 	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
 	// Channel for status updates from background goroutine
-	statusCh := make(chan *TorrentStatus, 10)
+	statusCh := make(chan statusMsg, 10)
 
 	if dbg := debugStatus(c, env); dbg != nil {
 		go func() {
 			defer close(statusCh)
 			select {
-			case statusCh <- dbg:
+			case statusCh <- encodeStatus(dbg, env):
 			case <-ctx.Done():
 			}
 			<-ctx.Done()
@@ -629,29 +623,43 @@ func (s *Handler) status(c *gin.Context) {
 	// bring them all back at once).
 	draining := web.Draining(c.Request.Context())
 
+	// A ping after 5 s without a message: one ticker for the stream, put
+	// back to a full period by every message.
+	ping := time.NewTicker(5 * time.Second)
+	defer ping.Stop()
 	c.Stream(func(w io.Writer) bool {
-		ticker := time.NewTicker(5 * time.Second)
 		select {
 		case <-ctx.Done():
-			ticker.Stop()
 			return false
 		case <-draining:
-			ticker.Stop()
 			_, _ = fmt.Fprintf(w, "retry: %d\n\n", 1000+rand.IntN(4000))
 			return false
-		case <-ticker.C:
+		case <-ping.C:
 			c.SSEvent("ping", "")
 			return true
-		case status, ok := <-statusCh:
+		case msg, ok := <-statusCh:
 			if !ok {
 				return false
 			}
-			// Localized and built in the loop (present), so its dedup
-			// compares what the page would see.
-			c.SSEvent("message", status)
-			return !endsStream(status, env)
+			// The JSON the loop deduplicated on, sent as it is (a string is
+			// written, not encoded again).
+			c.SSEvent("message", msg.data)
+			ping.Reset(5 * time.Second)
+			return !msg.end
 		}
 	})
+}
+
+// statusMsg is one message of the stream: the status as it goes out, and
+// whether it is the last (endsStream).
+type statusMsg struct {
+	data string
+	end  bool
+}
+
+func encodeStatus(st *TorrentStatus, env *viewEnv) statusMsg {
+	data, _ := json.Marshal(st)
+	return statusMsg{data: string(data), end: endsStream(st, env)}
 }
 
 // maxFileParam bounds ?file: it is only forwarded to rest-api as a list path.
@@ -728,7 +736,7 @@ func (o sampleOffers) FasterOnSale(r float64) bool {
 	return (o.Offers != nil && o.Offers.FasterOnSale(r)) || r < 50
 }
 
-// present localizes a status and, for the resource page, builds its view
+// present labels a status's piece bar and, for the resource page, builds its view
 // from the viewer's reading as it is at now -- and last, their last reading
 // on the chain while they read gone (statusview.Meter.Last), for the view the
 // page's own player keeps (View.Playing). The loop calls it before
@@ -741,7 +749,9 @@ func (o sampleOffers) FasterOnSale(r float64) bool {
 // never followed for them. The swarm's hold is theirs too, so a row does not
 // blink "waiting for missing pieces" in the gaps between a transfer's pieces.
 func (e *viewEnv) present(st *TorrentStatus, viewer, last statusview.Viewer, sizeBytes int64, bitrateMbps float64, now time.Time) {
-	localizeStatus(e.loc, st)
+	if st.PiecesTotal > 0 {
+		st.PiecesLabel = i18n.TranslateWithLocalizerPlural(e.loc, "resource.status.pieces", st.PiecesTotal, map[string]any{"Done": st.PiecesDone, "Total": st.PiecesTotal})
+	}
 	vt := st.viewTorrent(false)
 	moving := 0.0
 	if statusview.SwarmMoving(vt) {
@@ -836,56 +846,6 @@ func (t *TorrentStatus) viewTorrent(pending bool) statusview.Torrent {
 		Settling:          t.settling,
 		CacheProgress:     t.cachePct,
 	}
-}
-
-// rateLabelFloor: the swarm rate gets a label from 1 KB/s.
-const rateLabelFloor = 1024
-
-// localizeStatus fills the translated labels the Vault dashboard's rows and
-// the page's older readers use.
-func localizeStatus(loc *goi18n.Localizer, status *TorrentStatus) {
-	status.Label = i18n.TranslateWithLocalizer(loc, "resource.status."+status.State)
-	if status.Paused {
-		status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPaused")
-		status.PausedHint = i18n.TranslateWithLocalizer(loc, "resource.status.cachingPausedHint")
-	}
-	if status.NoSeeders {
-		status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.noSeeders")
-		status.NoSeedersHint = i18n.TranslateWithLocalizer(loc, "resource.status.noSeedersHint")
-	}
-	if status.Checking {
-		status.Label = i18n.TranslateWithLocalizer(loc, "resource.status.checking")
-	}
-	status.Swarm = swarmLabel(loc, status)
-	if status.Checking {
-		// No claims while checking: no swarm suffix either.
-		status.Swarm = ""
-	}
-	if status.PiecesTotal > 0 {
-		status.PiecesLabel = i18n.TranslateWithLocalizerPlural(loc, "resource.status.pieces", status.PiecesTotal, map[string]any{"Done": status.PiecesDone, "Total": status.PiecesTotal})
-	}
-	if status.Rate >= rateLabelFloor {
-		status.RateLabel = i18n.TranslateWithLocalizerData(loc, "resource.status.rate", map[string]any{"Speed": helpers.Bytes(uint64(status.Rate))})
-	}
-}
-
-// swarmLabel is the badge suffix: seeders and leechers when the seeder splits
-// them, the combined peer count otherwise, nothing when nothing is known.
-// Terminal states carry no swarm — a cached or vaulted torrent plays
-// regardless of who is around.
-func swarmLabel(loc *goi18n.Localizer, st *TorrentStatus) string {
-	if st.State == "cached" || st.State == "vaulted" || st.State == "unknown" || st.State == "vault_waiting" {
-		return ""
-	}
-	switch {
-	case st.Seeders > 0 || st.Leechers > 0:
-		// Each count declined on its own: "2 сида · 5 личей".
-		return i18n.TranslateWithLocalizerPlural(loc, "resource.status.seeders", st.Seeders, nil) + " · " +
-			i18n.TranslateWithLocalizerPlural(loc, "resource.status.leechers", st.Leechers, nil)
-	case st.Peers > 0:
-		return i18n.TranslateWithLocalizerPlural(loc, "resource.status.peers", st.Peers, nil)
-	}
-	return ""
 }
 
 // debugStatus is the dev-only override for the status: with
@@ -1092,7 +1052,7 @@ func (s *Handler) readVault(ctx context.Context, resourceID string, db *vaultMod
 // statusLoop runs in a background goroutine, computing status updates and sending them to the channel.
 // For the resource page (env.withView) it also follows the viewer's own thp
 // session stream and puts the view on every status.
-func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID string, out chan<- *TorrentStatus, env *viewEnv) {
+func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID string, out chan<- statusMsg, env *viewEnv) {
 	defer close(out)
 
 	stats := newStatsWatch(resourceID, func(ctx context.Context) statsConn {
@@ -1138,18 +1098,17 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		if env.withView && status.State == "vaulted" && sess.dead() {
 			status.Final = true
 		}
-		data, _ := json.Marshal(status)
-		jsonStr := string(data)
-		if jsonStr == lastJSON {
+		msg := encodeStatus(status, env)
+		if msg.data == lastJSON {
 			return true
 		}
-		lastJSON = jsonStr
+		lastJSON = msg.data
 		select {
-		case out <- status:
+		case out <- msg:
 		case <-ctx.Done():
 			return false
 		}
-		return !endsStream(status, env)
+		return !msg.end
 	}
 
 	// Fetch vault state before first send to avoid idle→vaulted flicker

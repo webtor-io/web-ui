@@ -514,7 +514,7 @@ func TestStatusStream_NoSessionStreamUnlessAsked(t *testing.T) {
 	defer cancel()
 	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok")
 	m := until(t, msgs, 5*time.Second, "the first status", func(m map[string]any) bool { return m["state"] == "cached" })
-	if m["view"] != nil || m["label"] != "Cached" {
+	if m["view"] != nil || get(m, "badge", "label") != "Cached" {
 		t.Errorf("dashboard message: %v", m)
 	}
 	// The first status is out; a session stream would be dialled now.

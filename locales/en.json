@@ -497,7 +497,6 @@
     },
     "resource.status.unknown": "Status unavailable",
     "resource.status.unknownHint": "Could not reach the torrent status right now — this says nothing about the torrent itself.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Swarm",
     "@resource.status.chain.swarm": "Transfer chain on the resource page (swarm ▸ cache ▸ you): the name of the first node, the BitTorrent swarm the file comes from. A noun, capitalised as a label.",

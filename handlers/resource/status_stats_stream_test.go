@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -338,5 +339,51 @@ func TestStatusStream_FirstMessageWaitIsCapped(t *testing.T) {
 	until(t, msgs, firstStatusWait+2*time.Second, "the first message", func(map[string]any) bool { return true })
 	if at := time.Since(start); at < firstStatusWait-500*time.Millisecond {
 		t.Errorf("first message after %v, before the wait was over", at.Round(time.Millisecond))
+	}
+}
+
+// wireKeys is everything a status message may carry: what the page
+// (transferStatus.js, status.js) and the Vault dashboard (vault/progress.js)
+// read.
+var wireKeys = map[string]bool{"state": true, "progress": true, "pieces": true, "active": true, "missing": true, "pieces_label": true, "view": true, "badge": true, "final": true}
+
+// A download moving at a piece a second, then still: every message says
+// something the page or the dashboard draws. With the smoothed rate, its
+// label and the swarm's counters on the wire, half the messages of a moving
+// download differed only in those, and the dedup let them through.
+func TestStatusStream_EveryMessageSaysSomethingNew(t *testing.T) {
+	const n = 512
+	frames := []statFrame{{0, statsFrameJSON(n, 40, 12, 4, "")}}
+	for i := 1; i <= 6; i++ {
+		frames = append(frames, statFrame{time.Duration(i) * time.Second, fmt.Sprintf(
+			`{"total":%d,"completed":%d,"peers":12,"seeders":4,"live":true,"pieces":[{"position":%d,"complete":true,"priority":0}]}`,
+			n<<20, (40+4*i)<<20, 40+i)})
+	}
+	for _, q := range []string{"&session=1", ""} {
+		t.Run("query"+q, func(t *testing.T) {
+			node := newFakeNode(t, nil, func(f *fakeNode) { f.stats = frames })
+			h := &Handler{api: testAPI(t, node.srv), offers: liveOffers()}
+			srv := statusServer(t, h, "free", "5M")
+			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+			defer cancel()
+			msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok"+q)
+			var prev map[string]any
+			count := 0
+			for m := range msgs {
+				count++
+				for k := range m {
+					if !wireKeys[k] {
+						t.Errorf("message %d carries %q, which nothing reads", count, k)
+					}
+				}
+				if reflect.DeepEqual(prev, m) {
+					t.Errorf("message %d says nothing new", count)
+				}
+				prev = m
+			}
+			if count < 3 {
+				t.Errorf("%d messages", count)
+			}
+		})
 	}
 }

@@ -463,7 +463,6 @@
     },
     "resource.status.unknown": "Stav nedostupný",
     "resource.status.unknownHint": "Stav torrentu se teď nepodařilo získat — o samotném torrentu to nic neříká.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Roj",
     "resource.status.chain.swarmCaption": "roj",

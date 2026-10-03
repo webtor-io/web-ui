@@ -5,14 +5,8 @@
   "status": {
    "state": "caching",
    "progress": 43.4,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "active",
@@ -211,14 +205,8 @@
   "status": {
    "state": "caching",
    "progress": 61,
-   "seeders": 31,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "tier",
@@ -451,14 +439,8 @@
   "status": {
    "state": "caching",
    "progress": 61,
-   "seeders": 31,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "tier",
@@ -691,14 +673,8 @@
   "status": {
    "state": "caching",
    "progress": 61,
-   "seeders": 31,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "tier",
@@ -932,14 +908,8 @@
   "status": {
    "state": "caching",
    "progress": 61,
-   "seeders": 31,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "tier",
@@ -1171,14 +1141,8 @@
   "status": {
    "state": "caching",
    "progress": 8,
-   "seeders": 2,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "swarm",
@@ -1381,14 +1345,8 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "stalled",
@@ -1587,15 +1545,9 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 12,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
    "missing": "AAAAAAAAAAAAAAAAAAAA/////w8AAAAA/////wEAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "missing",
@@ -1791,14 +1743,8 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "caching_only",
@@ -1995,11 +1941,6 @@
   "status": {
    "state": "cached",
    "progress": 100,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "cached_flow",
     "mode": "chain",
@@ -2181,11 +2122,6 @@
   "status": {
    "state": "cached",
    "progress": 100,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "cached_tier",
     "mode": "chain",
@@ -2401,14 +2337,8 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "checking",
@@ -2596,14 +2526,8 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "paused",
@@ -2797,14 +2721,8 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "noseed",
@@ -2997,15 +2915,9 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 12,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
    "missing": "AAAAAAAAAAAAAAAAAAAA/////w8AAAAA/////wEAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "missing_idle",
@@ -3200,11 +3112,6 @@
   "status": {
    "state": "idle",
    "progress": 0,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "idle_torrent",
     "mode": "badge",
@@ -3386,11 +3293,6 @@
   "status": {
    "state": "cached",
    "progress": 100,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "cached",
     "mode": "badge",
@@ -3570,11 +3472,6 @@
   "status": {
    "state": "unknown",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "status_unknown",
     "mode": "badge",
@@ -3766,14 +3663,8 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "caching_idle",
@@ -3967,14 +3858,8 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vaulting",
@@ -4177,14 +4062,8 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vaulting_only",
@@ -4385,11 +4264,6 @@
   "status": {
    "state": "vaulted",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "vaulted",
     "mode": "chain",
@@ -4573,11 +4447,6 @@
   "status": {
    "state": "vaulted",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "vaulted_tier",
     "mode": "chain",
@@ -4795,11 +4664,6 @@
   "status": {
    "state": "vaulted",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "vaulted_idle",
     "mode": "badge",
@@ -4981,14 +4845,8 @@
   "status": {
    "state": "vault_waiting",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vault_waiting",
@@ -5184,15 +5042,9 @@
   "status": {
    "state": "vaulting",
    "progress": 58,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 12,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
    "missing": "AAAAAAAAAAAAAAAAAAAA/////w8AAAAA/////wEAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vault_missing",
@@ -5389,14 +5241,8 @@
   "status": {
    "state": "vault_failed",
    "progress": 37,
-   "seeders": 3,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vault_failed",
@@ -5589,14 +5435,8 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vaulting_idle",
@@ -5794,14 +5634,8 @@
   "status": {
    "state": "caching",
    "progress": 61,
-   "seeders": 31,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "tier",
@@ -6011,11 +5845,6 @@
   "status": {
    "state": "cached",
    "progress": 100,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "view": {
     "key": "cached",
     "mode": "badge",
@@ -6281,14 +6110,8 @@
   "status": {
    "state": "caching",
    "progress": 43.4,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "active",
@@ -6485,14 +6308,8 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vaulting",
@@ -6693,14 +6510,8 @@
   "status": {
    "state": "caching",
    "progress": 43.4,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "caching_idle",
@@ -6987,14 +6798,8 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "",
-   "swarm": "",
    "pieces": "////////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/79/Pv6+fj39vX08/Lx8PAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////////w==",
    "active": "AAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAA=",
-   "pieces_total": 1024,
    "pieces_label": "40 из 1024 кусков на сервере",
    "view": {
     "key": "vaulting_idle",

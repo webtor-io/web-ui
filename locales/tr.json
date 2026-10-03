@@ -457,7 +457,6 @@
     },
     "resource.status.unknown": "Durum alınamıyor",
     "resource.status.unknownHint": "Torrent durumu şu anda alınamadı — bu, torrentin kendisi hakkında bir şey söylemez.",
-    "resource.status.rate": "{{.Speed}}/sn",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Sürü",
     "resource.status.chain.swarmCaption": "sürü",

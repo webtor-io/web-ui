@@ -95,8 +95,8 @@ func TestPresent_DashboardCarriesTheBadge(t *testing.T) {
 			if d.Badge == nil || *d.Badge != p.View.Badge {
 				t.Errorf("badge %+v, the page's %+v", d.Badge, p.View.Badge)
 			}
-			if d.Label == "" || d.State != p.State || d.Progress != p.Progress {
-				t.Errorf("the old contract: state %q progress %v label %q", d.State, d.Progress, d.Label)
+			if d.State != p.State || d.Progress != p.Progress {
+				t.Errorf("state %q progress %v, the page's %q %v", d.State, d.Progress, p.State, p.Progress)
 			}
 		})
 	}
@@ -159,8 +159,10 @@ func TestStatusStream_DashboardCarriesTheBadge(t *testing.T) {
 	defer cancel()
 	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok")
 	m := until(t, msgs, 5*time.Second, "the first status", func(m map[string]any) bool { return m["state"] == "cached" })
-	if m["view"] != nil || m["label"] != "Cached" {
-		t.Errorf("the old contract: %v", m)
+	// The dashboard reads state, progress and badge; nothing else of the
+	// status goes out (TorrentStatus).
+	if m["view"] != nil || len(m) != 3 || m["progress"] != 100.0 {
+		t.Errorf("the dashboard's message: %v", m)
 	}
 	want := map[string]any{"tone": "ok", "icon": "check", "label": "Cached"}
 	if !reflect.DeepEqual(m["badge"], want) {

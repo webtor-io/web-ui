@@ -3,13 +3,11 @@ package resource
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/i18n"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	vault "github.com/webtor-io/web-ui/services/vault"
@@ -330,26 +328,6 @@ func TestResolveStatus_CarriesSeedersLeechersPeers(t *testing.T) {
 	st := resolveStatus(nil, nil, &TorrentStatsData{Total: 100, Completed: 10, Seeders: 4, Leechers: 9, Peers: 13})
 	if st.State != "caching" || st.Seeders != 4 || st.Leechers != 9 || st.Peers != 13 {
 		t.Errorf("swarm counters must ride on the status: %+v", st)
-	}
-}
-
-func TestSwarmLabel(t *testing.T) {
-	loc := i18n.New(os.DirFS("../../locales")).Localizer("en")
-	cases := []struct {
-		st   TorrentStatus
-		want string
-	}{
-		{TorrentStatus{State: "caching", Seeders: 4, Leechers: 9, Peers: 13}, "4 seeders · 9 leechers"},
-		{TorrentStatus{State: "idle", Peers: 3}, "3 peers"},
-		{TorrentStatus{State: "idle"}, ""},
-		// Terminal states play regardless of who is around.
-		{TorrentStatus{State: "cached", Seeders: 4}, ""},
-		{TorrentStatus{State: "unknown", Peers: 3}, ""},
-	}
-	for _, c := range cases {
-		if got := swarmLabel(loc, &c.st); got != c.want {
-			t.Errorf("%+v: got %q, want %q", c.st, got, c.want)
-		}
 	}
 }
 

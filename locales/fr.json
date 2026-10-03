@@ -457,7 +457,6 @@
     },
     "resource.status.unknown": "État indisponible",
     "resource.status.unknownHint": "Impossible d’obtenir l’état du torrent pour le moment — cela ne dit rien du torrent lui-même.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Essaim",
     "resource.status.chain.swarmCaption": "essaim",

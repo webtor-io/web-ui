@@ -463,7 +463,6 @@
     },
     "resource.status.unknown": "Status niedostępny",
     "resource.status.unknownHint": "Nie udało się pobrać statusu torrenta — nie mówi to nic o samym torrencie.",
-    "resource.status.rate": "{{.Speed}}/s",
     "resource.status.mbps": "{{.N}} Mbps",
     "resource.status.chain.swarm": "Rój",
     "resource.status.chain.swarmCaption": "rój",

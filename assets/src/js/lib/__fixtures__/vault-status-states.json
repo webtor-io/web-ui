@@ -4,13 +4,6 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Сохраняется",
-   "swarm": "9 сидов · 0 личей",
-   "rate": 2883584,
-   "rate_label": "2.8 MB/с",
    "badge": {
     "tone": "vault",
     "icon": "up",
@@ -26,11 +19,6 @@
   "status": {
    "state": "vaulting",
    "progress": 64,
-   "seeders": 9,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Сохраняется",
-   "swarm": "9 сидов · 0 личей",
    "badge": {
     "tone": "vault",
     "icon": "up",
@@ -46,11 +34,6 @@
   "status": {
    "state": "vaulting",
    "progress": 58,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 12,
-   "label": "Сохраняется",
-   "swarm": "12 пиров",
    "badge": {
     "tone": "vault",
     "icon": "clock",
@@ -65,11 +48,6 @@
   "status": {
    "state": "vault_waiting",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Ждём сидов",
-   "swarm": "",
    "badge": {
     "tone": "vault",
     "icon": "clock",
@@ -84,11 +62,6 @@
   "status": {
    "state": "vault_failed",
    "progress": 37,
-   "seeders": 3,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Перенос не удался, повторяем",
-   "swarm": "3 сида · 0 личей",
    "badge": {
     "tone": "warn",
     "icon": "warn",
@@ -103,11 +76,6 @@
   "status": {
    "state": "vaulted",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "В Vault",
-   "swarm": "",
    "badge": {
     "tone": "vault",
     "icon": "vault",
@@ -121,13 +89,6 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Кэширование",
-   "swarm": "14 сидов · 0 личей",
-   "rate": 4980736,
-   "rate_label": "4.8 MB/с",
    "badge": {
     "tone": "cyan",
     "icon": "down",
@@ -143,12 +104,6 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Проверяем активность…",
-   "swarm": "",
-   "checking": true,
    "badge": {
     "tone": "cyan",
     "icon": "dots",
@@ -162,13 +117,6 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Кэширование на паузе",
-   "swarm": "14 сидов · 0 личей",
-   "paused": true,
-   "paused_hint": "Сейчас это никто не скачивает — кэширование продолжится, как только кто-нибудь начнёт смотреть.",
    "badge": {
     "tone": "warn",
     "icon": "pause",
@@ -183,13 +131,6 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Нет сидов",
-   "swarm": "",
-   "no_seeders": true,
-   "no_seeders_hint": "Сейчас этот торрент никто не раздаёт; кэширование продолжится, как только появится сид.",
    "badge": {
     "tone": "err",
     "icon": "noseed",
@@ -203,11 +144,6 @@
   "status": {
    "state": "caching",
    "progress": 43,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 12,
-   "label": "Кэширование",
-   "swarm": "12 пиров",
    "badge": {
     "tone": "warn",
     "icon": "warn",
@@ -222,11 +158,6 @@
   "status": {
    "state": "cached",
    "progress": 100,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "В кэше",
-   "swarm": "",
    "badge": {
     "tone": "ok",
     "icon": "check",
@@ -240,11 +171,6 @@
   "status": {
    "state": "idle",
    "progress": 0,
-   "seeders": 14,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Ожидает",
-   "swarm": "14 сидов · 0 личей",
    "badge": {
     "tone": "muted",
     "icon": "idle",
@@ -259,11 +185,6 @@
   "status": {
    "state": "unknown",
    "progress": 0,
-   "seeders": 0,
-   "leechers": 0,
-   "peers": 0,
-   "label": "Статус недоступен",
-   "swarm": "",
    "badge": {
     "tone": "muted",
     "icon": "unknown",
