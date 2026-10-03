@@ -179,19 +179,26 @@ func judgeSwarm(state string, observed time.Duration, activity bool, live bool, 
 }
 
 // recentActivity is how fresh the last progress must be for a closed stream
-// to count as "a download interrupted", not "a torrent the seeder unloaded".
+// that died young to count as "a download interrupted".
 const recentActivity = 60 * time.Second
 
-// shouldReconnect decides whether a closed stats stream is worth reopening:
-// only while a download was actually in progress — something stored, not all
-// of it, and bytes moving within recentActivity — and only a few times. The
-// seeder unloads idle torrents on its own; a stream that closes after a quiet
-// spell is that, and reopening it would start a seeder pod nobody asked for
-// just to draw a badge. Such a torrent falls back to idle, as it always did
-// -- unless it is complete: the seeder closes the stream at 100% too, and
-// that one stays cached (statusLoop).
+// statsRetries bounds the reopen attempts per failure run (about 2, 4, 8,
+// 16, 32 s); statsLived: a stream that stayed open this long ended as
+// planned (statsWatch.closed), and the next run gets the whole budget.
+const (
+	statsRetries = 5
+	statsLived   = 60 * time.Second
+)
+
+// shouldReconnect decides whether a stats stream that died young (before
+// statsLived) is worth reopening: only while a download was actually in
+// progress — something stored, not all of it, and bytes moving within
+// recentActivity — and only a few times. One that lived is reopened
+// whatever the progress (statsWatch.reopenable). A complete torrent is not
+// reopened: the seeder closes the stream at 100%, and that one stays cached
+// (statsWatch.closed).
 func shouldReconnect(stats *TorrentStatsData, attempts int, sinceProgress time.Duration) bool {
-	if stats == nil || attempts >= 5 {
+	if stats == nil || attempts >= statsRetries {
 		return false
 	}
 	if stats.Completed <= 0 || int64(stats.Completed) >= stats.Total {

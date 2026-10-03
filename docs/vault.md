@@ -712,12 +712,21 @@ boundary cannot flicker a live download into "paused". Review:
 `caching` with zero seeders and zero peers renders "No seeders · N%" (red,
 `noseed`; the swarm node red where a waiting viewer puts it on the chain) —
 the swarm is empty, nothing can progress; it wins over "paused". A stats
-stream that closes mid-download (seeder pods are rotated on every deploy,
-closing every stream they held) is now reopened with backoff (2…32 s, five
-attempts, `shouldReconnect`) — but only while something was stored, not all
-of it, and bytes moved within the last minute: the seeder unloads idle
-torrents itself, and a stream that closes after a quiet spell is that, not an
-interruption — it falls back to idle instead of waking a pod for a status. A
+stream that closes (seeder pods are rotated on every deploy, closing every
+stream they held; and the seeder ends every stats stream at 30 minutes,
+torrent-web-seeder `Stat.StatStream`) is reopened with jittered backoff
+(about 2…32 s, five attempts, `statsWatch`). A stream that lived at least a
+minute (`statsLived`) ended as planned: the budget starts over, and it is
+reopened whatever the progress, for any torrent not yet whole — the seeder's
+stream only peeks and never loads the torrent, so this costs an export and a
+stream. It used to be a failure like any other: each half-hour close spent
+an attempt that never came back, and only a download with bytes in the last
+minute was reopened, so a paused download read "idle" from its first
+half-hour close and an active one from its sixth, for as long as the tab
+stayed open (`TestStatsWatch_PlannedClosesKeepTheStatus`). A stream that dies
+younger is reopened only while something was stored, not all of it, and
+bytes moved within the last minute (`shouldReconnect`). The planned close is
+logged at Info, an early one at Warn. A
 stream that closes with the torrent **complete** is neither: the seeder
 closes it once the last piece is in, and the status stays `cached` ("In
 cache", the cache node's check) — it used to forget the stats and read

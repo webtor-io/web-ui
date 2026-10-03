@@ -47,6 +47,12 @@ type statsWatch struct {
 	// they held; the download continues on the new pod.
 	stale      bool
 	reconnects int
+	// openedAt is when the stream now open connected. planned: the stream
+	// that closed last had lived statsLived -- the seeder's 30-minute cap
+	// or its pod going away, not a download that broke -- and its
+	// reopening is not judged by progress (reopenable).
+	openedAt time.Time
+	planned  bool
 	// unavailable: the stats connection failed for a reason other than
 	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
 	// a dead torrent; "unknown" says what we actually know — nothing.
@@ -77,12 +83,13 @@ func (w *statsWatch) result(ctx context.Context, res statsConn, now time.Time) {
 	if res.ch != nil {
 		w.stale = false
 		w.liveSince = time.Time{}
+		w.openedAt = now
 	}
 	// If export says content is cached (no torrent_client_stat), mark as cached
 	if res.msg == "cached" {
 		w.last = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
 	} else if res.ch == nil {
-		if w.stale && shouldReconnect(w.last, w.reconnects, sinceProgress(w.lastProgressAt, now)) {
+		if w.stale && w.reopenable(now) {
 			w.reconnect(ctx)
 		} else {
 			w.unavailable = true
@@ -152,23 +159,53 @@ func (w *statsWatch) frame(ev api.EventData, now time.Time) bool {
 // closed: the stream ended — seeder gone or connection dropped. The last
 // status stays on screen while a reconnect is due; it is forgotten only
 // when there is nothing worth reconnecting for.
+//
+// A stream that lived statsLived ended as the seeder ends every one at 30
+// minutes (torrent-web-seeder Stat.StatStream), or with its pod: the budget
+// starts over, and it is reopened whatever the progress. Reopening is
+// cheap -- the seeder's stream only peeks, it never loads the torrent -- and
+// not reopening left a paused download "idle" for as long as the tab
+// stayed open, and an active one after its fifth half hour.
 func (w *statsWatch) closed(ctx context.Context, now time.Time) {
-	log.WithField("resourceID", w.rid).Warn("status: stats channel closed")
 	w.ch = nil
+	w.planned = !w.openedAt.IsZero() && now.Sub(w.openedAt) >= statsLived
+	l := log.WithField("resourceID", w.rid).WithField("lived", now.Sub(w.openedAt).Round(time.Second))
+	w.openedAt = time.Time{}
+	if w.planned {
+		w.reconnects = 0
+	}
 	switch {
-	case shouldReconnect(w.last, w.reconnects, sinceProgress(w.lastProgressAt, now)):
-		w.stale = true
-		w.reconnect(ctx)
 	case w.last != nil && w.last.whole():
 		// The seeder closes the stream once the torrent is complete:
 		// nothing is left to reconnect for, and nothing to forget either
 		// -- the torrent is in the cache. Forgotten, it read "idle"
 		// ("Webtor ожидает" on 5461f58a…, 2026-09-25). Nothing moves on
 		// it any more.
+		l.Info("status: stats stream ended, torrent complete")
 		w.last.Rate, w.last.Active = 0, nil
+	case w.reopenable(now):
+		if w.planned {
+			l.Info("status: stats stream ended")
+		} else {
+			l.Warn("status: stats channel closed")
+		}
+		w.stale = true
+		w.reconnect(ctx)
 	default:
+		l.Warn("status: stats channel closed")
 		w.last = nil
 	}
+}
+
+// reopenable: a closed stream (or a failed reopen) is worth another try --
+// within the budget, for a torrent not yet whole; after a stream that
+// lived, whatever the progress, otherwise only for a download in progress
+// (shouldReconnect).
+func (w *statsWatch) reopenable(now time.Time) bool {
+	if w.planned {
+		return w.last != nil && !w.last.whole() && w.reconnects < statsRetries
+	}
+	return shouldReconnect(w.last, w.reconnects, sinceProgress(w.lastProgressAt, now))
 }
 
 // reconnect schedules the next connection with backoff (retryDelay: a
@@ -177,7 +214,7 @@ func (w *statsWatch) closed(ctx context.Context, now time.Time) {
 func (w *statsWatch) reconnect(ctx context.Context) {
 	w.reconnects++
 	delay := retryDelay(w.reconnects, w.jitter())
-	log.WithField("resourceID", w.rid).WithField("attempt", w.reconnects).WithField("in", delay).Info("status: stats stream closed mid-download, reconnecting")
+	log.WithField("resourceID", w.rid).WithField("attempt", w.reconnects).WithField("in", delay).WithField("planned", w.planned).Info("status: stats stream closed, reconnecting")
 	w.stopRetry = w.after(delay, func() {
 		if ctx.Err() == nil {
 			w.dial(ctx)
