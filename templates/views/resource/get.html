@@ -50,13 +50,11 @@
           rgba(10,14,26,.9) with backdrop-blur-xl): the two bars touch, and a
           denser one below read as a second, opaque strip (owner). */}}
      class="fixed inset-x-0 top-[72px] z-sticky px-3 sm:px-6 pt-3 pb-3.5 bg-w-bg/90 backdrop-blur-xl border-b border-w-line
-            transition-transform duration-200 -translate-y-full motion-reduce:transition-none"
-     {{/* aria-live is switched OFF explicitly: role="status" implies
-          "polite", and the block is updated by every SSE message (the speeds
-          change each second) -- a live region would read that out for as
-          long as the bar is up. The card's block it mirrors is not live
-          either. */}}
-     role="status" aria-live="off">
+            transition-transform duration-200 -translate-y-full motion-reduce:transition-none">
+    {{/* No role, not live: the block is updated by every SSE message (the
+         speeds change each second), and a live region would read that out
+         for as long as the bar is up. What matters is said once, by the
+         card's block ([data-tx-announce], outside the .tx this clones). */}}
     <div class="max-w-[900px] mx-auto" data-status-mirror-for="{{ .Data.Resource.ID }}"></div>
 </div>
 {{ end }}

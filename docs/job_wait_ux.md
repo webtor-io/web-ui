@@ -59,7 +59,8 @@ the bar carries the whole box (owner, 2026-09-25).
   reloads itself when its token expires).
 - It slides out (`SLIDE_MS`) before `hidden` lands; state is tracked in a variable, not
   read back from `bar.hidden`.
-- `aria-live="off"`: the block is updated every second.
+- No role and not live: the block is updated every second (what matters is said once by
+  the card's `[data-tx-announce]`, docs/transfer_status.html).
 - The player has `isolation: isolate` (`player.css`) so its internal z-indexes (up to 41)
   do not compete with `z-navbar` (30) and `z-sticky` (20).
 - Browser automation cannot verify it: a hidden tab runs neither IO nor rAF.

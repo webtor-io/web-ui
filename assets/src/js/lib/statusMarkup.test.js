@@ -184,3 +184,17 @@ test('without JS "Checking activity…" stands still: its dots are the reduced-m
     }
     assert.equal(doc.querySelectorAll('.tx noscript').length, 0, 'outside .tx: the sticky bar clones .tx');
 });
+
+test('the sticky bar is not a status region: no empty role around buttons, nothing live', () => {
+    // role="status" switched off by aria-live="off" was a role with no
+    // purpose over interactive content; what matters is said once, by the
+    // card block's own region outside the .tx the bar clones.
+    const doc = new JSDOM(PAGE).window.document;
+    const bar = doc.getElementById('torrent-status-sticky');
+    assert.ok(bar, 'the sticky bar in the page');
+    assert.equal(bar.getAttribute('role'), null);
+    assert.equal(bar.getAttribute('aria-live'), null);
+    const said = doc.querySelectorAll('[data-tx-announce]');
+    assert.equal(said.length, 1, 'one region says it');
+    assert.equal(said[0].closest('.tx, #torrent-status-sticky'), null);
+});
