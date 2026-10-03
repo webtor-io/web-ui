@@ -566,8 +566,12 @@ under the piece bar.
   (2026-10-03). "Needs" is the
   bitrate of what the player pulls, not the file's (`jobs/scripts`
   `playedBitrate`): one video track and one audio track — the transcoder
-  copies H.264 and serves each dub as its own stereo AAC rendition (139.6
-  kbps at 48 kHz), nginx-vod repackages an mp4's first tracks as they are —
+  copies H.264 and serves the dub the player starts on (the picker's
+  default, not the first: `startAudio`) with its audio as the start's
+  declaration has it made (`audioOut`: AAC 5.1 at 384 kbit/s under
+  aac51; AAC 5.1 or Dolby copied where declared, Dolby on a passthrough
+  only; else stereo AAC, 139.6 kbit/s at 48 kHz), nginx-vod repackages an
+  mp4's first tracks as they are —
   while the file's rate counts every dub, commentary and lossless track (24 h
   of transcoder probes, 2026-09-26: of 202 H.264 files over a 5M cap by the
   file's rate, 36 are under it as a stream — a false box while they played
@@ -575,7 +579,11 @@ under the piece bar.
   re-encodes (the rate is the encoder's choice), no number for the video
   (Matroska: mkvmerge's `BPS` tag) and not every audio track numbered
   either, or statistics tags a later remux left stale (the tracks adding up
-  to more than 1.05 of the file).
+  to more than 1.05 of the file). Never over, then; but it can still be
+  marked fits by a ceiling (`playedBitrateRouted`): the file's rate for
+  tracks served as they are plus an audio encode, and for a re-encode the
+  transcoder's `-maxrate` (1.3× its rate for the height,
+  `encodedVideoCeiling`) plus the audio — under a 5M cap up to ~550p.
   "Buffering" (`lib/playerActivity.js`) is a real stall in the last 60 s: a
   `waiting` (or a `stalled` short of data) once the element has played since
   its source last (re)started, not while seeking, lasting at least 1.5 s. The
