@@ -511,6 +511,7 @@
     "resource.status.vaultLink": "Uložit do Vaultu — zbytek stáhne sám",
     "resource.status.capFree": "Bez předplatného — až {{.Rate}} Mbps",
     "resource.status.capPaid": "Vaše předplatné — až {{.Rate}} Mbps",
+    "resource.status.dismissBox": "Skrýt tuto nabídku na den u všech torrentů",
     "resource.status.streamSmooth": "{{.Cap}}. Video běží bez zastavení.",
     "resource.status.streamStallTitle": "Video se načítá pomaleji, než se přehrává",
     "resource.status.streamNeeds": "{{.Cap}}, a tento soubor potřebuje {{.Need}}",

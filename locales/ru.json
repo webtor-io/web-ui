@@ -510,6 +510,7 @@
     "resource.status.vaultLink": "Сохранить в Vault — догрузит сам",
     "resource.status.capFree": "Без подписки — до {{.Rate}} Мбит/с",
     "resource.status.capPaid": "Ваша подписка — до {{.Rate}} Мбит/с",
+    "resource.status.dismissBox": "Скрыть предложение на сутки на всех раздачах",
     "resource.status.streamSmooth": "{{.Cap}}. Видео идёт без остановок.",
     "resource.status.streamStallTitle": "Видео подгружается медленнее, чем играет",
     "resource.status.streamNeeds": "{{.Cap}}, а файлу нужно {{.Need}}",

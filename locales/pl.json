@@ -511,6 +511,7 @@
     "resource.status.vaultLink": "Zapisz w Vault — sam dociągnie resztę",
     "resource.status.capFree": "Bez subskrypcji — do {{.Rate}} Mbps",
     "resource.status.capPaid": "Twoja subskrypcja — do {{.Rate}} Mbps",
+    "resource.status.dismissBox": "Ukryj tę ofertę na dobę na wszystkich torrentach",
     "resource.status.streamSmooth": "{{.Cap}}. Wideo leci bez zatrzymań.",
     "resource.status.streamStallTitle": "Wideo ładuje się wolniej, niż się odtwarza",
     "resource.status.streamNeeds": "{{.Cap}}, a ten plik potrzebuje {{.Need}}",

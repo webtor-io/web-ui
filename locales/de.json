@@ -496,6 +496,7 @@
     "resource.status.vaultLink": "Im Vault speichern – es lädt den Rest selbst nach",
     "resource.status.capFree": "Ohne Abo – bis zu {{.Rate}} Mbps",
     "resource.status.capPaid": "Dein Abo – bis zu {{.Rate}} Mbps",
+    "resource.status.dismissBox": "Angebot einen Tag lang auf allen Torrents ausblenden",
     "resource.status.streamSmooth": "{{.Cap}}. Das Video läuft ohne Unterbrechung.",
     "resource.status.streamStallTitle": "Das Video lädt langsamer, als es läuft",
     "resource.status.streamNeeds": "{{.Cap}}, die Datei braucht aber {{.Need}}",

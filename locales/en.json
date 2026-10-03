@@ -555,6 +555,8 @@
     "@resource.status.vaultLink": "Link at the end of the missing-pieces hint: saving the torrent to Vault, which fetches the missing pieces by itself once someone has them. Vault is a brand name.",
     "resource.status.capFree": "Without a subscription — up to {{.Rate}} Mbps",
     "resource.status.capPaid": "Your subscription — up to {{.Rate}} Mbps",
+    "resource.status.dismissBox": "Hide this offer for a day, on every torrent",
+    "@resource.status.dismissBox": "Screen-reader name of the × on the transfer status's plan box (the speed offer under the piece bar). Pressing it hides the box for 24 hours in this browser on every torrent page, not just this one -- unlike the plain 'Close' of the details popover next to it.",
     "resource.status.streamSmooth": "{{.Cap}}. The video plays without stopping.",
     "resource.status.streamStallTitle": "The video loads slower than it plays",
     "resource.status.streamNeeds": "{{.Cap}}, and this file needs {{.Need}}",

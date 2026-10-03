@@ -1064,7 +1064,9 @@ under the piece bar.
   viewer's ×: gone from the card and the sticky bar, none for 24 h in this
   browser on any torrent (`localStorage["status-plan-box-dismissed"]`, a
   timestamp; this page view remembers it where storage fails), Umami
-  `donate-status-bar-dismiss` with the box's props. The ×, like the rest of
+  `donate-status-bar-dismiss` with the box's props. Its accessible name says
+  so (`resource.status.dismissBox`, "Hide this offer for a day, on every
+  torrent"; 2026-10-03), not the details popover's plain "Close". The ×, like the rest of
   the page's memory, touches only the box: the pink cap on the chain, the
   grace popup and the player's lock stay. One offer at a time (the grace
   popup or its way up, the cap modal, the download nudge): no box comes up

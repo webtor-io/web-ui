@@ -497,6 +497,7 @@
     "resource.status.vaultLink": "Opslaan in Vault — het haalt de rest zelf binnen",
     "resource.status.capFree": "Zonder abonnement — tot {{.Rate}} Mbps",
     "resource.status.capPaid": "Je abonnement — tot {{.Rate}} Mbps",
+    "resource.status.dismissBox": "Dit aanbod een dag verbergen bij alle torrents",
     "resource.status.streamSmooth": "{{.Cap}}. De video speelt zonder haperen.",
     "resource.status.streamStallTitle": "De video laadt trager dan hij speelt",
     "resource.status.streamNeeds": "{{.Cap}}, en dit bestand heeft {{.Need}} nodig",

@@ -157,3 +157,11 @@ test('the details\' × is a finger\'s size on a touch screen, as the box\'s', ()
     assert.equal(coarse.width, '44px');
     assert.equal(coarse.height, '44px');
 });
+
+test('the box\'s × says what it does: the offer goes for a day, on every torrent', () => {
+    const doc = new JSDOM(PAGE).window.document;
+    const ru = JSON.parse(read('../../../../locales/ru.json'));
+    const x = doc.querySelector('[data-tx-pclose]');
+    assert.equal(x.getAttribute('aria-label'), ru['resource.status.dismissBox']);
+    assert.notEqual(x.getAttribute('aria-label'), doc.querySelector('[data-tx-close]').getAttribute('aria-label'), 'not the popover\'s "Close"');
+});

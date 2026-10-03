@@ -136,7 +136,8 @@
      keepBox; owner, 2026-09-27). The clicks are Umami's own
      (data-umami-event: the button's, the ×'s dismiss, the same props); the
      impression is counted by the script when the button has been at least
-     half on screen for a second. */}}
+     half on screen for a second. The ×'s name says what it does -- the box
+     goes for a day on every torrent -- not the popover's plain "Close". */}}
 {{ define "resource/status_pbox" }}
 {{- $v := .Data }}{{ $box := false }}
 {{- with $v.Plan }}{{ with .Download.Box }}{{ $box = . }}{{ end }}{{ end }}
@@ -150,7 +151,7 @@
            data-umami-event-target="{{ if $box }}{{ $box.CTA.Target }}{{ end }}"><svg aria-hidden="true"><use href="#tx-i-bolt"></use></svg><span data-tx-cta-label>{{ if $box }}{{ $box.CTA.Label }}{{ end }}</span></a>
         <span class="tx-pn" data-tx-pn>{{ if $box }}{{ $box.CTA.Note }}{{ end }}</span>
     </div>
-    <button type="button" class="tx-px" data-tx-pclose aria-label="{{ t .Ctx.Lang "resource.close" }}"
+    <button type="button" class="tx-px" data-tx-pclose aria-label="{{ t .Ctx.Lang "resource.status.dismissBox" }}"
             data-umami-event="donate-status-bar-dismiss" data-umami-event-ctx="download" data-umami-event-location="card"
             data-umami-event-auth="{{ $v.Auth }}" data-umami-event-state="{{ $key }}" data-umami-event-tier="{{ $v.Tier }}"
             data-umami-event-target="{{ if $box }}{{ $box.CTA.Target }}{{ end }}"><svg aria-hidden="true"><use href="#tx-i-close"></use></svg></button>

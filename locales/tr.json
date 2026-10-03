@@ -497,6 +497,7 @@
     "resource.status.vaultLink": "Vault'a kaydet — gerisini kendisi indirir",
     "resource.status.capFree": "Abonelik olmadan — {{.Rate}} Mbps'ye kadar",
     "resource.status.capPaid": "Aboneliğiniz — {{.Rate}} Mbps'ye kadar",
+    "resource.status.dismissBox": "Bu teklifi tüm torrentlerde bir günlüğüne gizle",
     "resource.status.streamSmooth": "{{.Cap}}. Video kesintisiz oynuyor.",
     "resource.status.streamStallTitle": "Video, oynatıldığından daha yavaş yükleniyor",
     "resource.status.streamNeeds": "{{.Cap}}, bu dosyanın ise {{.Need}} hıza ihtiyacı var",
