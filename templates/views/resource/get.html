@@ -225,7 +225,7 @@
                     <form method="dialog"><button class="btn btn-sm btn-ghost">{{ t $.Lang "resource.close" }}</button></form>
                 </div>
             </div>
-            <form method="dialog" class="modal-backdrop"><button>close</button></form>
+            <form method="dialog" class="modal-backdrop"><button tabindex="-1" aria-hidden="true">close</button></form>
         </dialog>
         {{/* Poster | the column; the status block between the column's top
              (title .. description) and its actions (owner, 2026-09-24). On a
@@ -323,7 +323,7 @@
                     <form method="dialog"><button class="btn btn-sm btn-ghost">{{ t $.Lang "resource.close" }}</button></form>
                 </div>
             </div>
-            <form method="dialog" class="modal-backdrop"><button>close</button></form>
+            <form method="dialog" class="modal-backdrop"><button tabindex="-1" aria-hidden="true">close</button></form>
         </dialog>
         {{/* The same grid as the enriched header's: the status block between
              the title and the actions, under the poster row on a phone. */}}

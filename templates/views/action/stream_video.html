@@ -425,7 +425,7 @@
              (templates/partials/onboarding_checklist.html): the button is
              visually hidden but focusable, and a translated one makes a
              screen reader announce "Close" twice. */}}
-        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+        <form method="dialog" class="modal-backdrop"><button tabindex="-1" aria-hidden="true">close</button></form>
     </dialog>
     {{/* Same reasoning as #subtitles above — must show over the fullscreen player. */}}
     <dialog class="modal" id="embed">
@@ -442,7 +442,7 @@
             </div>
         </div>
         {{/* Same backdrop as #subtitles above. */}}
-        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+        <form method="dialog" class="modal-backdrop"><button tabindex="-1" aria-hidden="true">close</button></form>
     </dialog>
     {{ if .GraceDurationSec }}
     {{/* data-upsell-surface: one offer on screen at a time -- the resource

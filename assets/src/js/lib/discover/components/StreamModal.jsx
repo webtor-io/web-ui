@@ -68,7 +68,7 @@ export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, on
                 </div>
             </div>
             <form method="dialog" class="modal-backdrop">
-                <button>close</button>
+                <button tabindex="-1" aria-hidden="true">close</button>
             </form>
         </dialog>
     );

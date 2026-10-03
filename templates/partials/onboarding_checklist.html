@@ -159,7 +159,7 @@
          hidden but focusable, and translating it makes a screen reader announce
          "Close" twice in a row. */}}
     <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button tabindex="-1" aria-hidden="true">close</button>
     </form>
 </dialog>
 {{/* Opens the dialog and closes it again when a step link is followed: async
