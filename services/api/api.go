@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
@@ -1254,13 +1255,22 @@ func GetClaimsFromContext(c *gin.Context) *Claims {
 // GenerateSessionID derives the session identity that goes into the signed
 // claims sent upstream.
 //
-// The anonymous branch hashes the session cookie rather than returning it.
-// It used to return the cookie verbatim, so the value travelled inside a JWT
-// that is embedded in the player URL — and any job log carrying that URL
-// therefore carried a replayable session cookie, along with the IP and
-// User-Agent alongside it in the same claims. Hashing keeps the identity
-// stable and unique per visitor, which is all any consumer needs, while
-// making the value useless to whoever reads it.
+// The anonymous branch hashes the session rather than returning it. It used
+// to return the cookie verbatim, so the value travelled inside a JWT that is
+// embedded in the player URL — and any job log carrying that URL therefore
+// carried a replayable session cookie, along with the IP and User-Agent
+// alongside it in the same claims. Hashing makes the value useless to
+// whoever reads it.
+//
+// What is hashed is the session's id in its store (Redis): the same across
+// saves. The cookie is not -- the store encodes it anew, with the time, on
+// every save (a track pick, a language), so its hash changed under a viewer
+// mid-episode: the status stream, reopened after an autoplay's save, looked
+// for thp's counters under another id than the player's tokens carried, and
+// the viewer's link stayed empty (2026-10-03). The embed without cookies
+// hands that id in raw (X-Session-ID, _sessionID; handlers/session), which
+// no store decodes: it is hashed as it is, and comes out the same. The
+// cookie store keeps no id: its cookie is hashed, as before.
 func GenerateSessionID(c *gin.Context) string {
 	u := auth.GetUserFromContext(c)
 	if u.Email != "" {
@@ -1270,9 +1280,28 @@ func GenerateSessionID(c *gin.Context) string {
 	if sess == "" {
 		return ""
 	}
+	id := sess
+	if !sessionHandedIn(c, sess) {
+		if s, ok := c.Get(sessions.DefaultKey); ok {
+			if sid := s.(sessions.Session).ID(); sid != "" {
+				id = sid
+			}
+		}
+	}
 	h := sha1.New()
-	h.Write([]byte(sess))
+	h.Write([]byte(id))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// sessionHandedIn: the session cookie is the id the embed handed in
+// (handlers/session puts X-Session-ID or _sessionID in as the cookie when
+// the browser sends none) -- raw, not a cookie a store decodes.
+func sessionHandedIn(c *gin.Context, sess string) bool {
+	if h := c.GetHeader("X-Session-ID"); h != "" {
+		return h == sess
+	}
+	f, _ := c.GetPostForm("_sessionID")
+	return f != "" && f == sess
 }
 
 func GenerateSessionIDFromUser(u *auth.User) string {

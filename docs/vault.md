@@ -1096,11 +1096,18 @@ under the piece bar.
   when one of them closes; it used to be final (about 1.7k refusals a day,
   logged at Debug), and is now retried and logged at Info. Either way the
   viewer's link is simply not drawn.
-- **Known gaps.** An anonymous viewer's session id is a
-  hash of the session cookie, which the store re-encodes on every save: a
-  download started after one carries another id until the status stream
-  reconnects. Whether a paying viewer's traffic through the premium edge is
-  counted on the standard-domain node the stream reads is not verified.
+- **Anonymous session id.** It is the hash of the session's id in the store
+  (Redis), the same across saves (`api.GenerateSessionID`). It was the hash
+  of the session cookie, which the store re-encodes with the time on every
+  save — a track pick, a language — so after an autoplay's save the status
+  stream reopened under another id than the player's tokens carried, and the
+  viewer's link stayed empty for the rest of the episode. The embed without
+  cookies hands the same id in raw (`X-Session-ID`, `_sessionID`) and gets
+  the same hash; the cookie store (no id) keeps hashing the cookie. The
+  switch changed every anonymous viewer's id once (render caches keyed by
+  it, thp's limiter buckets and session counters started over).
+- **Known gaps.** Whether a paying viewer's traffic through the premium edge
+  is counted on the standard-domain node the stream reads is not verified.
 - **Rollout order.** thp with `/session-stats` first. A deployed thp without
   the route answers 4xx, which web-ui treats as final: the viewer's link is
   not drawn, the rest of the chain works. Grace tokens with the session
