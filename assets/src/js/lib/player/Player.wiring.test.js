@@ -4341,6 +4341,32 @@ test('the spinner is a pill that says Buffering, with the spinner\'s visibility'
     assert.equal(bufferingPill(p), null, 'playing again: gone');
 });
 
+// A live region created together with its words is not read out by most
+// screen readers: the pill's own role=status came and went with the pill,
+// and the lock (a button) said nothing at all. One region stands in the
+// player from the start, empty while nothing waits: the wait is said, and
+// at the cap the lock's reason.
+test('the buffering label is said: one live region, there before its words', async (t) => {
+    const { p, clock } = await mountLabelled(t);
+    const live = () => p.container.querySelector('[data-buffering-live]');
+    const region = live();
+    assert.ok(region, 'there from the start');
+    assert.equal(region.getAttribute('role'), 'status');
+    assert.equal(region.textContent, '', 'empty while nothing waits');
+    await filmPlays(p, clock);
+    await filmStalls(p, clock);
+    assert.equal(live(), region, 'the same element');
+    assert.equal(region.textContent, 'player.buffering');
+    assert.equal(bufferingPill(p).hasAttribute('role'), false, 'said once: the pill is not a region of its own');
+    publishPlayerLabel(CAP_LABEL);
+    await settle();
+    assert.ok(lockButton(p), 'fixture: the lock');
+    assert.equal(region.textContent, lockButton(p).getAttribute('aria-label'), 'at the cap: the lock\'s reason');
+    await filmResumes(p, clock);
+    assert.equal(live(), region);
+    assert.equal(region.textContent, '', 'playing again: nothing to say');
+});
+
 test('the lock only with the status\'s word on the cap, and only where the pill is', async (t) => {
     const { p, clock, log } = await mountLabelled(t);
     await filmPlays(p, clock);
@@ -4431,7 +4457,13 @@ test('the lock opens the status\'s stream plan card in a modal dialog, with the 
     assert.equal(a.getAttribute('data-umami-event-location'), 'player');
     assert.equal(a.getAttribute('data-umami-event-state'), 'stream_stall');
     assert.equal(a.getAttribute('data-umami-event-target'), 'trial');
-    assert.ok(dialog.querySelector('form[method="dialog"].modal-backdrop button'), 'the backdrop, as #subtitles has');
+    const backdrop = dialog.querySelector('form[method="dialog"].modal-backdrop button');
+    assert.ok(backdrop, 'the backdrop, as #subtitles has');
+    // A click beside the card, not a stop for Tab or a word for a screen
+    // reader: an invisible screen-sized button saying "close" in English
+    // in every locale (the × and Esc are the keyboard's ways out).
+    assert.equal(backdrop.getAttribute('tabindex'), '-1', 'not in the Tab order');
+    assert.equal(backdrop.getAttribute('aria-hidden'), 'true', 'not read out');
     assert.equal(lockButton(p).getAttribute('aria-expanded'), 'true');
     assert.equal(lockButton(p).querySelector('.wt-buffering-chev'), null, 'open: the chevron goes');
     assert.deepEqual(p.events.filter((e) => e.name === 'donate-player-label-shown').map((e) => e.data), [CAP_LABEL.props]);

@@ -2056,7 +2056,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
 
             {/* The buffering label, where the spinner was (a stall of the
                 playing film, a start, a seek, a hold); at the plan's cap the
-                lock (capLock above). */}
+                lock (capLock above). Said by a live region of its own that is
+                there before its words: one created with them -- the pill's
+                role=status, mounted with the pill -- is not read out by most
+                screen readers, and the lock, a button, said nothing. */}
+            <span class="sr-only" role="status" data-buffering-live>
+                {bufferingShown ? (lock ? tf('player.bufferingCap', lock.rate) : t('player.buffering')) : ''}
+            </span>
             {bufferingShown && (
                 <div class={`wt-player-overlay wt-buffering${lock ? ' wt-buffering--cap' : ''}`}>
                     <BufferingPill label={lock} open={!!lock && capCardUp} onToggle={toggleCapCard} />

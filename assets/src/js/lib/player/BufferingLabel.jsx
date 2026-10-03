@@ -65,11 +65,12 @@ const stop = (e) => e.stopPropagation();
 // BufferingPill: without a label, "Buffering" -- a status line the picture
 // takes the clicks through, as it did through the spinner. With one, the
 // lock: a button with the viewer's cap that opens the card; the chevron says
-// there is more, and goes while the card, the more, is open.
+// there is more, and goes while the card, the more, is open. Not a live
+// region itself: the player says it (Player.jsx data-buffering-live).
 export function BufferingPill({ label, open = false, onToggle }) {
     if (!label) {
         return (
-            <span class="wt-buffering-pill" role="status">
+            <span class="wt-buffering-pill">
                 <Spinner />
                 {t('player.buffering')}
             </span>
@@ -184,10 +185,12 @@ export function CapCard({ label, onClose }) {
             </div>
             {/* A click beside the card closes it (#subtitles' backdrop: a form
                 behind the box across the dialog). Closed here rather than by
-                the form's submit, which jsdom does not do. Literal label, as
-                every modal's in this codebase. */}
+                the form's submit, which jsdom does not do. The mouse's way
+                out only: an invisible screen-sized button was a Tab stop
+                after the card's button and read out as "close" in English in
+                every locale -- the × and Esc are the keyboard's. */}
             <form method="dialog" class="modal-backdrop">
-                <button onClick={(e) => { e.preventDefault(); close(); }}>close</button>
+                <button tabindex="-1" aria-hidden="true" onClick={(e) => { e.preventDefault(); close(); }}>close</button>
             </form>
         </dialog>
     );

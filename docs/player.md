@@ -96,8 +96,12 @@ Owner, 2026-09-26 (the canvas "Плеер: буферизация вместо �
 was, and exactly when it was shown (a stall of the playing film, a start, a session seek, the
 translation hold, the next file loading, a moved-to player before its first frame), the player
 shows a compact pill: a small spinner and `player.buffering` ("Buffering"; 32 px, 36 px on touch,
-40 px in fullscreen with a mouse). The plain pill is a status line (`role="status"`) and takes no
-clicks: they go through to the picture, as they went through the spinner.
+40 px in fullscreen with a mouse). The plain pill takes no clicks: they go through to the picture,
+as they went through the spinner. It is said by one live region of the player's
+(`data-buffering-live`, `sr-only`, `role="status"`), there from the mount and empty while nothing
+waits: "Buffering", or at the cap the lock's reason (`player.bufferingCap`). The pill's own
+`role="status"`, mounted together with its words, was not read out by most screen readers, and the
+lock, a button, said nothing (2026-10-03).
 
 **At the plan's cap the pill is the lock**: a button "Buffering | [lock] 5 Mbps ›" with the viewer's
 own cap (a paying viewer's own, "20 Mbps"), 44 px on touch. **Wherever the pill is shown** — the film
@@ -136,7 +140,9 @@ fullscreen stage as the grace popup is. The player on screen, whichever one it i
 for its lock's open state (on its first frame and on subscribing). It stops its clicks,
 double-clicks and keys from reaching the player (the shortcuts are on the document, where its keys
 would bubble). Focus starts on the box itself (`tabindex="-1"`, no ring on a button the viewer did
-not reach by keyboard); Tab reaches the ×, the button and the backdrop's close.
+not reach by keyboard); Tab reaches the × and the button. The backdrop's close is the mouse's way
+out only (`tabindex="-1"`, `aria-hidden`): an invisible screen-sized button, it was a Tab stop read
+out as "close" in English in every locale.
 
 **Only the viewer closes it**: its ×, Esc (`cancel`), a click beside it (the backdrop form, as
 `#subtitles` has), its button (the trial opens in a new tab), or the lock again where the card is
