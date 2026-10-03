@@ -380,6 +380,16 @@ html {
 .tx-seg[data-tone="pause"] .tx-pz {
   display: block;
 }
+/* The plan's cap as a shape, not only pink: the player's lock before the
+   speed, in the compact chain only -- the wide one says "· cap" in words,
+   the compact one has no note (WCAG 1.4.1; after the box's × a phone has
+   nothing else that says it). */
+.tx-lk {
+  display: none;
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
 .tx-dots {
   display: none;
   align-items: center;
@@ -919,6 +929,9 @@ html {
     padding: 0;
     background: none;
     font-size: 11px;
+  }
+  .tx-seg[data-tone="plan"] .tx-lk {
+    display: block;
   }
   /* The button full width under the words; the × clear of the title,
      beside it rather than beside the button. */

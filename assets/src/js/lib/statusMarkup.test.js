@@ -106,3 +106,16 @@ test('a pledge\'s "Expiring" says how long is left at 4.5:1 and 11px', () => {
     assert.ok(parseInt(cls.match(/text-\[(\d+)px\]/)[1], 10) >= 11, `${cls}: 11px or more`);
     readable('the time left', hex(W[cls.match(/text-w-(\w+)/)[1]]), VAULT_TABLE);
 });
+
+test('the cap on a phone is a lock as well as pink: the compact chain has no "· cap"', () => {
+    assert.equal(rule('.tx-note', ['@container']).display, 'none', 'what this guards: the word is gone there');
+    assert.equal(rule('.tx-lk').display, 'none', 'the wide chain says "· cap" in words');
+    assert.equal(rule('.tx-seg[data-tone="plan"] .tx-lk', ['@container']).display, 'block');
+    const doc = new JSDOM(PAGE).window.document;
+    assert.ok(doc.getElementById('tx-i-lock'), 'the lock in the block\'s sprite');
+    const segs = doc.querySelectorAll('.tx-seg');
+    assert.ok(segs.length > 0);
+    for (const s of segs) {
+        assert.equal(s.querySelector('.tx-lk use')?.getAttribute('href'), '#tx-i-lock', 'every segment has the lock (stable DOM: the tone shows it)');
+    }
+});

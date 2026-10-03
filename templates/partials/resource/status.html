@@ -43,6 +43,10 @@
     <symbol id="tx-i-pause" viewBox="0 0 12 12"><rect x="3" y="2" width="2" height="8" rx=".5" fill="currentColor"/><rect x="7" y="2" width="2" height="8" rx=".5" fill="currentColor"/></symbol>
     <symbol id="tx-i-head" viewBox="0 0 8 10"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M1.5 1.5L6 5l-4.5 3.5"/></symbol>
     <symbol id="tx-i-bolt" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z"/></symbol>
+    {{- /* The player's lock (BufferingLabel.jsx): the cap on a phone, where
+         the compact chain has no room for "· cap" and pink alone would say
+         it (style.css .tx-lk). */}}
+    <symbol id="tx-i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></g></symbol>
     <symbol id="tx-i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></symbol>
     {{- /* The badge's icons: the status badge's own (partials/status/badge.html),
          in this sprite so the page has them once. */}}
@@ -120,7 +124,7 @@
      The line, the label and the arrowhead are the animated parts; they are
      never replaced, only the segment's attributes change. */}}
 {{ define "resource/status_seg" }}
-<span class="tx-seg" data-tx-seg data-tone="{{ .Tone }}"{{ if .On }} data-moving{{ end }}{{ if .Dots }} data-dots{{ end }}{{ if not .Show }} hidden{{ end }}><span class="tx-trk"><span class="tx-ln"></span><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="tx-spd">{{ .Speed }}</span><i class="tx-note">{{ with .Note }}· {{ . }}{{ end }}</i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
+<span class="tx-seg" data-tx-seg data-tone="{{ .Tone }}"{{ if .On }} data-moving{{ end }}{{ if .Dots }} data-dots{{ end }}{{ if not .Show }} hidden{{ end }}><span class="tx-trk"><span class="tx-ln"></span><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><svg class="tx-lk" aria-hidden="true"><use href="#tx-i-lock"></use></svg><span class="tx-spd">{{ .Speed }}</span><i class="tx-note">{{ with .Note }}· {{ . }}{{ end }}</i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
 {{- end }}
 
 {{/* The plan box: bolt, title and ETA; the button and the trial note under

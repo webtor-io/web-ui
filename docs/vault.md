@@ -882,8 +882,10 @@ under the piece bar.
   bucket is per session across all torrents, so two downloads sharing the cap
   each read half of it and neither is called limited. Missing a true case is
   the safe side. What the verdict shows comes in two steps (owner,
-  2026-09-25): **the fact** — the pink "5 Mbps · cap" on the viewer's link,
-  the cap tag in the details (`Viewer.Limited`) — after 3 of thp's events in
+  2026-09-25): **the fact** — the pink "5 Mbps · cap" on the viewer's link
+  (the compact chain, which has no notes, puts the player's lock before the
+  speed instead: `.tx-lk`, 2026-10-03, so a phone does not say it in pink
+  alone), the cap tag in the details (`Viewer.Limited`) — after 3 of thp's events in
   a row (`planFactRun`), off at the verdict's first miss; **the plan box**
   (`Viewer.PlanBox`) after 8 s of it (`PlanBoxAfter`: the first event and 8
   after it) and, once up, until the verdict has been off for 10 s
