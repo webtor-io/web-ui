@@ -394,6 +394,8 @@ func TestPitchETA(t *testing.T) {
 		switch k {
 		case "action.download.eta":
 			return fmt.Sprintf("%v dauert etwa %v. Mit Abo etwa %v", d["Size"], d["Slow"], d["Fast"])
+		case "action.download.etaUpTo":
+			return fmt.Sprintf("%v dauert etwa %v. Mit Abo ab %v", d["Size"], d["Slow"], d["Fast"])
 		case "offer.eta.min":
 			return fmt.Sprintf("%v Min.", d["M"])
 		}
@@ -402,6 +404,10 @@ func TestPitchETA(t *testing.T) {
 	p := pitch(silver, 1288490189, 5, tr)
 	if p == nil || p.ETA != "1.2\u00a0GB dauert etwa 33 Min. Mit Abo etwa 3 Min." {
 		t.Fatalf("%+v", p)
+	}
+	// The plan's time as its best case, for a file the swarm still sends.
+	if p.ETAUpTo != "1.2\u00a0GB dauert etwa 33 Min. Mit Abo ab 3 Min." {
+		t.Errorf("up to: %q", p.ETAUpTo)
 	}
 	for in, want := range map[string]string{
 		"34 Min.. Mit":  "34 Min. Mit",

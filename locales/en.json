@@ -674,6 +674,7 @@
     "action.download.copied": "Copied!",
     "action.download.limitedTitle": "Download speed is capped at {{.Rate}} Mbps",
     "action.download.eta": "{{.Size}} takes about {{.Slow}}. With a subscription — about {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} takes about {{.Slow}}. With a subscription — as little as {{.Fast}}",
     "action.download.limitedSubUnlimited": "No speed cap with a subscription",
     "action.download.limitedSub": "Up to {{.Rate}} Mbps with a subscription",
     "action.noPeers.title": "This torrent has no active seeders right now",

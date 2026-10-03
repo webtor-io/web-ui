@@ -594,6 +594,7 @@
     "action.download.copied": "Kopyalandı!",
     "action.download.limitedTitle": "İndirme hızı {{.Rate}} Mbps ile sınırlı",
     "action.download.eta": "{{.Size}} yaklaşık {{.Slow}} sürer. Abonelikle yaklaşık {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} yaklaşık {{.Slow}} sürer. Abonelikle {{.Fast}} kadar kısa sürebilir",
     "action.download.limitedSubUnlimited": "Abonelikle hız sınırı yok",
     "action.download.limitedSub": "Abonelikle {{.Rate}} Mbps'ye kadar",
     "action.noPeers.title": "Bu torrentin şu an aktif seeder'i yok",

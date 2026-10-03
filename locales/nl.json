@@ -594,6 +594,7 @@
     "action.download.copied": "Gekopieerd!",
     "action.download.limitedTitle": "Downloadsnelheid beperkt tot {{.Rate}} Mbps",
     "action.download.eta": "{{.Size}} duurt ongeveer {{.Slow}}. Met een abonnement ongeveer {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} duurt ongeveer {{.Slow}}. Met een abonnement vanaf {{.Fast}}",
     "action.download.limitedSubUnlimited": "Geen snelheidslimiet met een abonnement",
     "action.download.limitedSub": "Tot {{.Rate}} Mbps met een abonnement",
     "action.noPeers.title": "Deze torrent heeft op dit moment geen actieve seeders",

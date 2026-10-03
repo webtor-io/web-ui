@@ -206,14 +206,14 @@ func TestBuild_EveryStateOfTheDesign(t *testing.T) {
 				if nb(b.Title) != "Скорость скачивания ограничена: 5 Мбит/с" {
 					t.Errorf("title %q", b.Title)
 				}
-				if nb(b.Sub) != eta(t) {
-					t.Errorf("sub %q, want %q", nb(b.Sub), eta(t))
-				}
-				// Literally, not only as the helper says: the design's
-				// "около 32 мин" priced 1.2e9 bytes at 10^6 bits a
-				// megabit; the cap's megabit is 2^20 (32.8 min), and sizes
-				// keep the site's one format (docs/i18n.md, helpers.Bytes).
-				if nb(b.Sub) != "1.2 GB — около 33 мин. С подпиской — около 3 мин" {
+				// Literally: the design's "около 32 мин" priced 1.2e9
+				// bytes at 10^6 bits a megabit; the cap's megabit is 2^20
+				// (32.8 min), and sizes keep the site's one format
+				// (docs/i18n.md, helpers.Bytes). The plan's time is its
+				// best case, "от": the swarm still sends the rest, and may
+				// be slower than the plan -- the button's "до" for the
+				// same reason.
+				if nb(b.Sub) != "1.2 GB — около 33 мин. С подпиской — от 3 мин" {
 					t.Errorf("sub %q", nb(b.Sub))
 				}
 				want := CTA{Label: "Скачать до 10 раз быстрее", URL: "/ru/trial?from=status-bar", Note: "7 дней бесплатно · отмена в любой момент", Target: "trial"}

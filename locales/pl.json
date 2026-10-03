@@ -612,6 +612,7 @@
     "action.download.copied": "Skopiowano!",
     "action.download.limitedTitle": "Prędkość pobierania ograniczona do {{.Rate}} Mbps",
     "action.download.eta": "{{.Size}} pobierze się w około {{.Slow}}. Z subskrypcją — w około {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} pobierze się w około {{.Slow}}. Z subskrypcją — nawet w {{.Fast}}",
     "action.download.limitedSubUnlimited": "Bez limitu prędkości z subskrypcją",
     "action.download.limitedSub": "Do {{.Rate}} Mbps z subskrypcją",
     "action.noPeers.title": "Ten torrent nie ma teraz aktywnych seederów",

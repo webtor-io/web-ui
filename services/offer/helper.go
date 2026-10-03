@@ -66,13 +66,17 @@ func speedUp(o *Offer, rateMbps int) int {
 // Pitch is the download nudge in numbers: this file at the user's cap and at
 // the promo plan's. ETA is the sentence (action.download.eta) in the
 // viewer's language, the one way both the nudge and the status's plan box
-// say it.
+// say it. ETAUpTo is the same with the plan's time as its best case
+// (action.download.etaUpTo, "With a subscription — as little as 3 min"):
+// for a file the swarm still sends, which may be slower than the plan --
+// the button's "up to N×" (offer.downloadUpTo) for the same reason.
 type Pitch struct {
 	Size     string
 	Slow     string
 	Fast     string
 	FastRate int
 	ETA      string
+	ETAUpTo  string
 }
 
 // DownloadPitch prices a download in time, for any file whose size is known:
@@ -113,7 +117,9 @@ func pitch(o *Offer, sizeBytes int64, rateMbps int, tr func(key string, data map
 		Fast:     format(transferSeconds(sizeBytes, o.RateMbps)),
 		FastRate: o.RateMbps,
 	}
-	p.ETA = oneStop(tr("action.download.eta", map[string]any{"Size": p.Size, "Slow": p.Slow, "Fast": p.Fast}))
+	data := map[string]any{"Size": p.Size, "Slow": p.Slow, "Fast": p.Fast}
+	p.ETA = oneStop(tr("action.download.eta", data))
+	p.ETAUpTo = oneStop(tr("action.download.etaUpTo", data))
 	return p
 }
 

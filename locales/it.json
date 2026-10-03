@@ -594,6 +594,7 @@
     "action.download.copied": "Copiato!",
     "action.download.limitedTitle": "Velocità di download limitata a {{.Rate}} Mbps",
     "action.download.eta": "{{.Size}} richiede circa {{.Slow}}. Con un abbonamento circa {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} richiede circa {{.Slow}}. Con un abbonamento a partire da {{.Fast}}",
     "action.download.limitedSubUnlimited": "Nessun limite di velocità con un abbonamento",
     "action.download.limitedSub": "Fino a {{.Rate}} Mbps con un abbonamento",
     "action.noPeers.title": "Questo torrent non ha seeder attivi al momento",

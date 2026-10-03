@@ -612,6 +612,7 @@
     "action.download.copied": "Скопировано!",
     "action.download.limitedTitle": "Скорость скачивания ограничена: {{.Rate}} Мбит/с",
     "action.download.eta": "{{.Size}} — около {{.Slow}}. С подпиской — около {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} — около {{.Slow}}. С подпиской — от {{.Fast}}",
     "action.download.limitedSubUnlimited": "С подпиской — без ограничения скорости",
     "action.download.limitedSub": "С подпиской — до {{.Rate}} Мбит/с",
     "action.noPeers.title": "У торрента сейчас нет активных сидеров",

@@ -1176,6 +1176,8 @@ func (b *builder) downloadLabel() string {
 // downloadSub prices this file's wait at the cap and with the promo plan
 // ("1.2 GB — about 32 min. With a subscription — about 3 min"), after what
 // is special about the source: whole in the cache, or served from Vault.
+// While the swarm still sends the file (KeyTier) the plan's time is its best
+// case ("— as little as 3 min"), as the button's "up to" is.
 func (b *builder) downloadSub() string {
 	prefix := ""
 	switch b.key {
@@ -1188,6 +1190,9 @@ func (b *builder) downloadSub() string {
 	if promo := b.promo; !b.paid() && promo != nil {
 		if pitch := offer.PitchWith(promo, b.in.SizeBytes, int(math.Round(b.cap)), func(key string, data map[string]any) string { return b.td(key, data) }); pitch != nil {
 			eta = pitch.ETA
+			if b.key == KeyTier {
+				eta = pitch.ETAUpTo
+			}
 		} else if promo.RateMbps > 0 {
 			eta = b.td("action.download.limitedSub", map[string]any{"Rate": promo.RateMbps})
 		} else {

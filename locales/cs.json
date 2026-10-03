@@ -612,6 +612,7 @@
     "action.download.copied": "Zkopírováno!",
     "action.download.limitedTitle": "Rychlost stahování omezena na {{.Rate}} Mbps",
     "action.download.eta": "{{.Size}} se stáhne asi za {{.Slow}}. S předplatným asi za {{.Fast}}",
+    "action.download.etaUpTo": "{{.Size}} se stáhne asi za {{.Slow}}. S předplatným už za {{.Fast}}",
     "action.download.limitedSubUnlimited": "S předplatným bez omezení rychlosti",
     "action.download.limitedSub": "S předplatným až {{.Rate}} Mbps",
     "action.noPeers.title": "Tento torrent teď nemá žádné aktivní seedery",
