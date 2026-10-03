@@ -776,6 +776,38 @@ func TestStatusStream_SlowVaultDoesNotHoldTheStream(t *testing.T) {
 	}
 }
 
+// slowDBVault is an exhausted pool in front of a Vault API that answers:
+// the database read waits for its context, the API's call answers at once
+// -- unless its context is over already.
+type slowDBVault struct{ api *vault.Resource }
+
+func (v slowDBVault) GetResource(ctx context.Context, _ string) (*vaultModels.Resource, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (v slowDBVault) GetVaultAPIResource(ctx context.Context, _ string) (*vault.Resource, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return v.api, nil
+}
+
+// The database spends the read's whole budget, and the API's call after it
+// fails at once: a transfer under way keeps the progress the last read
+// had, as it keeps the row. It read "Saving 0%" -- the /vault row's fill
+// reset -- for as long as the pool stayed exhausted (11 950 pool timeouts
+// in six hours on 2026-09-27).
+func TestReadVault_SlowDatabaseKeepsTheTransfer(t *testing.T) {
+	t.Parallel()
+	at64 := &vault.Resource{Status: vault.StatusProcessing, StoredSize: 64, TotalSize: 100}
+	h := &Handler{statusVault: slowDBVault{at64}}
+	db, res := h.readVault(context.Background(), "res", &vaultModels.Resource{Funded: true}, at64)
+	if st := resolveVaultState(db, res); st.State != "vaulting" || st.Progress != 64 {
+		t.Errorf("the database did not answer: %s %v%%, want vaulting 64%%", st.State, st.Progress)
+	}
+}
+
 // A torrent nobody has pledged, watched by a viewer who cannot pledge
 // (anonymous): Vault is asked every vaultIdlePollEvery, not every two
 // seconds: tabs stay open for hours (p99 4.3 h), and each one read the

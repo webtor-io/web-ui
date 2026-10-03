@@ -703,7 +703,10 @@ under the piece bar.
   were most of the status's load on the database's pool of five). Each read
   is bounded at 2 s (`vaultReadTimeout`), the database row and the Vault API
   together: the loop waits on it, and an unbounded read stopped the stream's
-  first message and every tick while the pool was exhausted.
+  first message and every tick while the pool was exhausted. A read that
+  fails keeps what the last one said, the row and the transfer's progress: a
+  database that spends the whole 2 s leaves the API's call an expired
+  context, and a transfer under way read "Saving 0%" for as long.
 - **Pod shutdown.** `http.Server.Shutdown` waits for every request up to
   `WEB_SHUTDOWN_TIMEOUT` (20 s) without cancelling it, so the status streams
   held every web-ui pod stop for the whole of it and were cut then anyway

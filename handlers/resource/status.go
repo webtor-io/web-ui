@@ -1017,9 +1017,12 @@ func vaultPollTicks(db *vaultModels.Resource, signedIn bool) int {
 }
 
 // readVault is Vault's word on the resource, bounded: the database row, and
-// the Vault API's transfer for a funded one. A failed read keeps the last
-// row (db) and drops the transfer's progress.
-func (s *Handler) readVault(ctx context.Context, resourceID string, db *vaultModels.Resource) (*vaultModels.Resource, *vault.Resource) {
+// the Vault API's transfer for a funded one. A failed read keeps what the
+// last one said, the row (db) and the transfer (last): a database that
+// spent the whole budget leaves the API's call an expired context, and a
+// transfer under way read "Saving 0%" for as long as the pool stayed
+// exhausted.
+func (s *Handler) readVault(ctx context.Context, resourceID string, db *vaultModels.Resource, last *vault.Resource) (*vaultModels.Resource, *vault.Resource) {
 	ctx, cancel := context.WithTimeout(ctx, vaultReadTimeout)
 	defer cancel()
 	dbRes, err := s.statusVault.GetResource(ctx, resourceID)
@@ -1034,6 +1037,7 @@ func (s *Handler) readVault(ctx context.Context, resourceID string, db *vaultMod
 	apiRes, err := s.statusVault.GetVaultAPIResource(ctx, resourceID)
 	if err != nil {
 		log.WithError(err).WithField("resourceID", resourceID).Warn("failed to get vault api resource for status")
+		return db, last
 	}
 	return db, apiRes
 }
@@ -1109,7 +1113,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	// Fetch vault state before first send to avoid idle→vaulted flicker
 	if s.statusVault != nil {
-		lastDBResource, lastAPIResource = s.readVault(ctx, resourceID, nil)
+		lastDBResource, lastAPIResource = s.readVault(ctx, resourceID, nil, nil)
 	}
 
 	for {
@@ -1154,7 +1158,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 			vaultTick++
 			if s.statusVault != nil && vaultTick%vaultPollTicks(lastDBResource, env.signedIn) == 0 {
-				lastDBResource, lastAPIResource = s.readVault(ctx, resourceID, lastDBResource)
+				lastDBResource, lastAPIResource = s.readVault(ctx, resourceID, lastDBResource, lastAPIResource)
 			}
 
 			stats.tick(time.Now())
