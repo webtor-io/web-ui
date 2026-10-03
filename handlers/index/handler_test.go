@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/webtor-io/web-ui/handlers/common"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -43,7 +44,7 @@ func newHomeRouter(t *testing.T) *gin.Engine {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(web.NoindexDefault(false))
+	r.Use(metrics.Middleware(), web.NoindexDefault(false))
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
@@ -114,6 +115,17 @@ func TestHomeErrorCarriesItsNumbers(t *testing.T) {
 		w := get(r, tc.target)
 		if !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s: body %q, want it to contain %q", tc.target, w.Body.String(), tc.want)
+		}
+	}
+}
+
+// The home page says where it spent its time before rendering, so a slow
+// load can be split in DevTools without the logs.
+func TestHomeReportsServerTiming(t *testing.T) {
+	st := get(newHomeRouter(t), "/").Header().Get("Server-Timing")
+	for _, part := range []string{"mw;dur=", "db;dur=", "ctx;dur="} {
+		if !strings.Contains(st, part) {
+			t.Errorf("Server-Timing %q lacks %q", st, part)
 		}
 	}
 }

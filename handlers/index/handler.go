@@ -1,13 +1,16 @@
 package index
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
@@ -76,6 +79,8 @@ func (s *Handler) index(c *gin.Context) {
 // caller from another package relies on RegisterHandler having run, the same
 // way handlers/resource's POST already does.
 func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status int, data *Data, errKey string, errArgs *web.ErrArgs) {
+	mw := metrics.Elapsed(c)
+	t := time.Now()
 	// Continue-watching is home-page only: tool pages are SEO landings and
 	// carry their own CTA.
 	if data.Tool == nil {
@@ -87,6 +92,8 @@ func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status
 		}
 	}
 
+	db := time.Since(t)
+	t = time.Now()
 	ctx := web.NewContext(c).WithData(data)
 	// The checklist is loaded by the onboarding middleware for every page (the
 	// navbar counter needs it); the home page just renders the full card from
@@ -99,5 +106,13 @@ func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status
 		ctx = ctx.WithErrKey(errKey).WithErrArgs(errArgs)
 	}
 
+	// Where a slow home page spent its time before rendering, in DevTools
+	// (Timing tab, next to Cloudflare's cfOrigin): the middlewares, the
+	// continue-watching queries, the page context. 2026-10-03 a signed-in
+	// home page took seconds now and then, with nothing in the logs to say
+	// which part.
+	c.Header("Server-Timing", fmt.Sprintf("mw;dur=%.1f, db;dur=%.1f, ctx;dur=%.1f", ms(mw), ms(db), ms(time.Since(t))))
 	tb.Build("index").HTML(status, ctx)
 }
+
+func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }

@@ -141,11 +141,24 @@ func Middleware() gin.HandlerFunc {
 	return std.middleware()
 }
 
+const startKey = "metrics.start"
+
+// Elapsed is the time since the request entered Middleware, which stands
+// first in the chain: called from a handler, it is what the middlewares
+// before it took (session, auth, claims, onboarding). 0 without Middleware.
+func Elapsed(c *gin.Context) time.Duration {
+	if t, ok := c.Get(startKey); ok {
+		return time.Since(t.(time.Time))
+	}
+	return 0
+}
+
 func (s *set) middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		s.inFlight.Inc()
 		defer s.inFlight.Dec()
 		start := time.Now()
+		c.Set(startKey, start)
 		c.Next()
 		route, method := RouteLabel(c), methodLabel(c.Request.Method)
 		s.requests.WithLabelValues(route, method, strconv.Itoa(c.Writer.Status())).Inc()
