@@ -699,8 +699,12 @@ badge says "Checking activity…" with the dots (`checking`) for those 5 s and
 then "Caching paused N%" (amber, pause glyph; the seeder downloads on
 demand, so nothing moving means nobody is streaming it), whoever is or is
 not around. Only a swarm that stayed empty (no seeders, no peers) for the
-whole of `noSeedersAfter` (30 s) turns it red: "No seeders · N%"
-(`noseed`). The long window exists because a freshly started seeder pod sees
+whole of `noSeedersAfter` (30 s) of the stats stream's live frames turns it
+red: "No seeders · N%" (`noseed`). A stats reconnect starts that window over
+(`TorrentStatsData.LiveFor`, as for `vault_waiting`): the pod it lands on
+after a seeder restart has an empty swarm at first like any other, and
+counting from the first stream's first frame called it "no seeders" six
+seconds after the reconnect, taking the plan's card with it. The long window exists because a freshly started seeder pod sees
 an empty swarm for tens of seconds while it reaches trackers and the DHT —
 16 s to the first peer on a real torrent (2026-09-03) — and an earlier
 version kept the spinner for that whole window, which read as stuck. A piece

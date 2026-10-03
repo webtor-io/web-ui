@@ -499,21 +499,26 @@ func TestJudgeSwarm(t *testing.T) {
 		{"settled and moving → caching", 60 * time.Second, true, 1, 1, verdictCaching},
 	}
 	for _, c := range cases {
-		if got := judgeSwarm("caching", c.observed, c.activity, true, c.seeders, c.peers); got != c.want {
+		if got := judgeSwarm("caching", c.observed, c.observed, c.activity, true, c.seeders, c.peers); got != c.want {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}
-	if judgeSwarm("vaulting", time.Minute, false, true, 0, 0) != verdictCaching || judgeSwarm("idle", time.Minute, false, true, 0, 0) != verdictCaching {
+	if judgeSwarm("vaulting", time.Minute, time.Minute, false, true, 0, 0) != verdictCaching || judgeSwarm("idle", time.Minute, time.Minute, false, true, 0, 0) != verdictCaching {
 		t.Error("only caching is judged")
 	}
 	// Cold replies: the seeder did not join the swarm, so an empty swarm
 	// is not evidence — paused at once, never "checking", never "no seeders".
 	for _, d := range []time.Duration{time.Second, 6 * time.Second, 31 * time.Second} {
-		if got := judgeSwarm("caching", d, false, false, 0, 0); got != verdictPaused {
+		if got := judgeSwarm("caching", d, 0, false, false, 0, 0); got != verdictPaused {
 			t.Errorf("cold, quiet, %v: got %v, want paused", d, got)
 		}
 	}
-	if judgeSwarm("caching", time.Second, true, false, 0, 0) != verdictCaching {
+	// A reconnect: watched for a minute, the new stream's swarm live for
+	// five seconds -- settled (no spinner again), not yet "no seeders".
+	if got := judgeSwarm("caching", time.Minute, 5*time.Second, false, true, 0, 0); got != verdictPaused {
+		t.Errorf("reconnected, empty for 5 s: got %v, want paused", got)
+	}
+	if judgeSwarm("caching", time.Second, 0, true, false, 0, 0) != verdictCaching {
 		t.Error("cold but moving must still read as caching")
 	}
 	if hasActive([]byte{0, 0}) || !hasActive([]byte{0, 4}) {

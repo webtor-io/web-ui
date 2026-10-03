@@ -152,14 +152,17 @@ const (
 )
 
 // judgeSwarm is the whole decision, pure so it can be tested. observed is how
-// long we have watched this stream; activity is progress within settleAfter
-// or a piece queued for fetching; seeders/peers are the seeder's counts.
+// long we have watched this status stream; liveFor how long the stats
+// stream now open has had live frames (TorrentStatsData.LiveFor: a
+// reconnect starts it over); activity is progress within settleAfter or a
+// piece queued for fetching; seeders/peers are the seeder's counts.
 //
 // Activity at any moment → caching. No activity: checking until settleAfter,
 // paused after — whoever is or is not around, nothing moves. Nobody around
-// for the whole of noSeedersAfter → no seeders: the swarm got its time to
-// appear before we say it is gone.
-func judgeSwarm(state string, observed time.Duration, activity bool, live bool, seeders, peers int) swarmVerdict {
+// for the whole of noSeedersAfter of live frames → no seeders: the swarm got
+// its time to appear before we say it is gone -- on a seeder pod reached
+// after a reconnect too, which starts with an empty swarm like any other.
+func judgeSwarm(state string, observed, liveFor time.Duration, activity bool, live bool, seeders, peers int) swarmVerdict {
 	if state != "caching" || activity {
 		return verdictCaching
 	}
@@ -172,7 +175,7 @@ func judgeSwarm(state string, observed time.Duration, activity bool, live bool, 
 	if observed < settleAfter {
 		return verdictChecking
 	}
-	if seeders == 0 && peers == 0 && observed >= noSeedersAfter {
+	if seeders == 0 && peers == 0 && liveFor >= noSeedersAfter {
 		return verdictNoSeeders
 	}
 	return verdictPaused

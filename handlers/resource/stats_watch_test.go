@@ -168,3 +168,33 @@ func TestStatsWatch_ShortStreamWithoutProgressIsNotReopened(t *testing.T) {
 		t.Errorf("complete torrent: pending %d", clk.pending())
 	}
 }
+
+// A seeder pod restarts mid-download: the stream closes and is reopened on
+// the new pod, whose swarm is empty for tens of seconds while it reaches
+// trackers and the DHT. "No seeders" waits noSeedersAfter of this stream's
+// live frames, as on a fresh page -- it fired six seconds after the
+// reconnect, the window counted from the first stream's first frame, and
+// took the plan's card with it (noseed is one of the states it goes on).
+func TestStatsWatch_ReconnectStartsTheNoSeedersWindowOver(t *testing.T) {
+	ctx := context.Background()
+	w, clk, _ := newTestStatsWatch()
+	w.dial(ctx)
+	t0 := time.Now()
+	w.result(ctx, recvStats(t, w), t0)
+	for i := 0; i <= 31; i++ {
+		w.frame(statsEvent(40+i, 3, 5), t0.Add(time.Duration(i)*time.Second))
+	}
+	w.closed(ctx, t0.Add(32*time.Second))
+	clk.fire()
+	back := t0.Add(34 * time.Second)
+	w.result(ctx, recvStats(t, w), back)
+	w.frame(statsEvent(71, 0, 0), back)
+	for _, after := range []time.Duration{6 * time.Second, 29 * time.Second} {
+		if st := w.status(nil, nil, back.Add(after)); st.NoSeeders || !st.Paused {
+			t.Errorf("%v after the reconnect: no_seeders %v paused %v, want paused", after, st.NoSeeders, st.Paused)
+		}
+	}
+	if st := w.status(nil, nil, back.Add(noSeedersAfter+time.Second)); !st.NoSeeders {
+		t.Errorf("an empty swarm for %v of the new stream: want no seeders", noSeedersAfter+time.Second)
+	}
+}

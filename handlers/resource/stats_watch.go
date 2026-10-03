@@ -251,7 +251,7 @@ func (w *statsWatch) status(db *vaultModels.Resource, apiRes *vault.Resource, no
 	}
 	if w.last != nil && !w.stale && !w.firstStatsAt.IsZero() {
 		activity := hasActive(w.last.Active) || (!w.lastProgressAt.IsZero() && now.Sub(w.lastProgressAt) < settleAfter)
-		switch judgeSwarm(status.State, now.Sub(w.firstStatsAt), activity, w.last.Live, w.last.Seeders, w.last.Peers) {
+		switch judgeSwarm(status.State, now.Sub(w.firstStatsAt), w.last.LiveFor, activity, w.last.Live, w.last.Seeders, w.last.Peers) {
 		case verdictChecking:
 			status.Checking = true
 		case verdictPaused:
