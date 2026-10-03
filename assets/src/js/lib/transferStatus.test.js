@@ -1277,7 +1277,7 @@ test('the ×: in the box, named, carrying the box\'s props for its dismiss event
     const x = under.querySelector('[data-tx-pclose]');
     assert.equal(x.tagName, 'BUTTON');
     assert.equal(x.getAttribute('type'), 'button');
-    assert.equal(x.getAttribute('aria-label'), 'Закрыть', 'the locale\'s close');
+    assert.equal(x.getAttribute('aria-label'), 'Скрыть предложение на сутки на всех раздачах', 'the ×\'s own name (resource.status.dismissBox), not the popover\'s Close');
     assert.equal(x.querySelector('use').getAttribute('href'), '#tx-i-close');
     assert.equal(x.getAttribute('data-umami-event'), 'donate-status-bar-dismiss');
     assert.deepEqual(ctaProps(x), ctaProps(under.querySelector('[data-tx-cta]')));
