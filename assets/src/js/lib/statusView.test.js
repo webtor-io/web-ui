@@ -95,6 +95,18 @@ const forgetBox = () => {
     source.message(S.noseed);
     assert.equal(card().querySelector('[data-tx-pbox]').hidden, true, 'fixture: no box up');
 };
+// The viewer pressed a download on this page (a[data-transfer-download],
+// views/action/download_file.html): the page transfers something itself,
+// and the download box is its. Until another file is picked -- or, here,
+// the test is over.
+const downloading = (t) => {
+    const link = document.createElement('a');
+    link.dataset.transferDownload = '';
+    document.getElementById('file').append(link);
+    link.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    link.remove();
+    t.after(() => { container._statusDownloadSeen = false; });
+};
 
 test('one stream, for the view and the viewer, on the file the page is on', () => {
     assert.equal(target.id, 'torrent-status');
@@ -168,8 +180,18 @@ test('long swarm gaps keep all three actors in the card and sticky chain while d
     }
 });
 
-test('at the cap with no player: the download box, its props saying where it is', () => {
+// The cap is the account's (thp's bucket is per session and rate): another
+// device or tab of it, or Stremio on a TV, holds this page's view at the cap
+// too. A page that transfers nothing itself says the cap and sells nothing.
+test('at the cap with no player: the download box once the viewer downloads here, its props saying where it is', (t) => {
     source.message(S.tier_dl);
+    for (const block of [card(), sticky()]) {
+        assert.equal(block.getAttribute('data-key'), 'tier_dl');
+        assert.equal(block.querySelector('[data-tx-pbox]').hidden, true, 'the account\'s traffic elsewhere: no box');
+        assert.equal(block.querySelector('[data-tx-hint]').hidden, true, 'and no line in its place');
+        assert.equal(block.querySelectorAll('[data-tx-seg]')[1].getAttribute('data-tone'), 'plan', 'the cap is said');
+    }
+    downloading(t);
     for (const [block, location] of [[card(), 'card'], [sticky(), 'sticky']]) {
         assert.equal(block.getAttribute('data-key'), 'tier_dl');
         const box = block.querySelector('[data-tx-pbox]');
@@ -468,7 +490,8 @@ test('one offer at a time: the grace popup up, the status keeps its button down 
 // server sends no box any more), a pause, the download done, a gap in the
 // data -- with its last words, in both blocks, the same nodes, never hidden.
 // It goes where the offer would be false: no seeders, Vault failing.
-test('the box stays once up: past the cap, in both blocks, with its last words; no seeders or a Vault failure take it', async () => {
+test('the box stays once up: past the cap, in both blocks, with its last words; no seeders or a Vault failure take it', async (t) => {
+    downloading(t);
     forgetBox();
     source.message(S.tier_dl);
     const blocks = [card(), sticky()];
@@ -508,6 +531,7 @@ test('the box stays once up: past the cap, in both blocks, with its last words; 
 // none comes for a day in this browser. Only the box: the pink cap on the
 // chain and the player's lock stay.
 test('the ×: gone from both blocks, none for a day; the pink cap and the player\'s lock stay', (t) => {
+    downloading(t);
     // A month back: run out for the tests after this one (their clocks
     // start at most three days back), in storage and in the page's memory.
     const t0 = Date.now() - 30 * DAY;
@@ -880,6 +904,7 @@ test('a session seek: the lock and the cause the server gave stay through its PO
 // block changes height, even with the card scrolled away: the page scrolls
 // by the difference itself there -- and leaves it to the engine elsewhere.
 test('scrolled away on an engine without anchoring: the page makes up for the block\'s height', (t) => {
+    downloading(t);
     // The × below is remembered for a day: stamped three days back, it has
     // run out for the tests after this one.
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() - 3 * DAY });
@@ -925,7 +950,8 @@ test('the plan boxes\' buttons are watched for their impression', () => {
 
 // Picking a file swaps #content only: the stream would keep pricing the
 // file the page opened on. Another file reopens it on that file -- once.
-test('picking another file reopens the stream on it, once', () => {
+test('picking another file reopens the stream on it, once', (t) => {
+    downloading(t);
     source.message(S.tier_dl);
     assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'fixture: a box up');
     const first = source;
@@ -959,7 +985,8 @@ test('picking another file reopens the stream on it, once', () => {
 // the old box back ("1.2 GB — около 33 мин") as this page view's, kept then
 // until the × or a reload. The box goes with the swap itself, the page's own
 // update, not with the new stream's first word a second later.
-test('another file picked at the cap: the old box goes with the swap, and nothing before the new stream\'s word brings it back', async () => {
+test('another file picked at the cap: the old box goes with the swap, and nothing before the new stream\'s word brings it back', async (t) => {
+    downloading(t);
     source.message(S.tier_dl);
     const boxes = () => [card(), sticky()].flatMap((b) => [b.querySelector('[data-tx-pbox]'), b.querySelector('[data-tx-dplan]')]);
     assert.ok(boxes().every((b) => !b.hidden), 'fixture: the box up, in both blocks and their details');

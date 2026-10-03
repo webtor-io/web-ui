@@ -131,6 +131,10 @@ av(async function() {
             inGrace: activity.inGrace(),
             upsellElsewhere: upsellElsewhere(document) || activity.graceOfferDue(),
             offerAnswered: activity.offerAnswered(),
+            // This page transfers something itself: its player, or a
+            // download pressed here (present: no download box for the
+            // account's traffic elsewhere).
+            ownTransfer: activity.phase() !== 'none' || !!container._statusDownloadSeen,
         };
         // Preparation, player pause and a stopped download keep the viewer
         // on the route without borrowing the proxy's last speed. Playback

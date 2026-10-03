@@ -683,8 +683,18 @@ test('a player playing: the box for a file over the cap, nothing for one under i
     p = keepBox(newBoxMemory(), present(view, { player: 'playing', overCap: true, stallSub }), view, { elsewhere: true });
     assert.equal(p.box, null);
     assert.equal(p.hint, '');
-    // No player: the download box, whatever the job said of the file.
-    assert.equal(present(view, { overCap: true }).key, 'tier_dl');
+    // No player, a download pressed on this page: the download box,
+    // whatever the job said of the file.
+    p = present(view, { overCap: true, ownTransfer: true });
+    assert.equal(p.key, 'tier_dl');
+    assert.ok(p.box, 'the download box');
+    // No player and nothing pressed here: the cap is the account's, and
+    // its traffic elsewhere (another device, Stremio on a TV) holds this
+    // page's view at it -- the pink link, nothing sold, no line.
+    p = present(view, { overCap: true, ownTransfer: false });
+    assert.equal(p.key, 'tier_dl');
+    assert.equal(p.box, null);
+    assert.equal(p.hint, '');
 });
 
 // The grace window is not the plan's cap: while the page's player is inside

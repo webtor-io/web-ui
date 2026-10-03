@@ -957,7 +957,12 @@ under the piece bar.
   no answer, and the box comes once due as above; playing a file of unknown bitrate →
   the fact line, no button; playing a file under the cap with room to spare
   (`statusview.FitsCap`, below) → nothing under the bar; otherwise the
-  download box with the file's ETA. "Needs" is the
+  download box with the file's ETA — only once a download was pressed on
+  this page (`a[data-transfer-download]`, until another file is picked): the
+  cap is the account's (thp's bucket per session and rate), and another
+  device or tab of it, or Stremio on a TV, holds a page that transfers
+  nothing at the cap too — there the pink link alone, nothing sold
+  (2026-10-03). "Needs" is the
   bitrate of what the player pulls, not the file's (`jobs/scripts`
   `playedBitrate`): one video track and one audio track — the transcoder
   copies H.264 and serves each dub as its own stereo AAC rendition (139.6

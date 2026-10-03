@@ -24,7 +24,7 @@
 // latter not once the viewer has answered the grace popup, until the
 // player's first real stall); the player playing anything else -> the fact
 // without a button, or nothing for a file under the cap with room to spare;
-// no player -> the download box.
+// no player -> the download box, if a download was pressed on this page.
 //
 // THE BOX STAYS (owner, 2026-09-27: "the rest of the page keeps jumping up
 // and down"). What present() picks is this second's; what the block draws of
@@ -86,6 +86,10 @@ export function safeHref(url) {
 //                   nothing is sold -- though the server's verdict can be on
 //                   there (hls.js fetches the segments past the window ahead,
 //                   at the cap)
+//   ownTransfer     this page transfers something itself: its player, or a
+//                   download pressed here (false: no download box -- the cap
+//                   is the account's, and its traffic elsewhere holds this
+//                   page at it too; undefined counts as true)
 //   offerAnswered   the viewer answered an offer about the cap (the grace
 //                   popup's "continue at N Mbps" or its close, the
 //                   slow-download modal's "watch as is") and the player has
@@ -142,6 +146,12 @@ export function present(view, env = {}) {
     let key = view.key === 'tier' ? 'tier_dl' : view.key;
     if (stream) key = stalled ? 'stream_stall' : 'stream_over';
     const ctx = stream ? 'stream' : 'download';
+    // The cap is the account's (thp's bucket is per session and rate), so
+    // another device or tab of it, Stremio on a TV, can hold this page's
+    // view at the cap. A page that transfers nothing itself -- no player,
+    // no download pressed here (ownTransfer false) -- sells no download: the
+    // pink link says the cap, nothing stands under the bar.
+    if (!stream && env.ownTransfer === false) return { ...out, key, ctx, hint: '' };
     const box = variant.box;
     // The cap has not held long enough for the box yet (the server sends
     // the variants only once it has, statusview.PlanBoxAfter): the pink link
