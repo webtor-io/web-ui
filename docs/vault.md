@@ -454,7 +454,11 @@ the swarm still sends the rest (that one is for `vaulted` only). Nothing
 cached yet (`idle_torrent`) with a request of the viewer's open: "Cache ▸
 You" with no word next to the cache — "waiting" there read as nobody being
 around, right next to "You", and a "0%" is not backed once the seeder's
-stats are gone (an unloaded torrent is idle too).
+stats are gone (an unloaded torrent is idle too). A wait for data there (a
+request open, nothing for 5 s) is the swarm's: before the first verified
+piece nothing cached could keep the viewer waiting, so it is `stalled` —
+"Swarm ▸ Cache ▸ You" and the stall's hint, as one piece in (a slow swarm's
+first 8 MiB piece at 1.2 Mbps takes ~53 s; `TestBuild_IdleWaitIsTheSwarms`).
 Phone caption "cache"; `Node.Kind` `cache`. When nothing moves the page shows the badge it had before the chain
 (git 5d55b26e: "Caching paused 43% (14 seeders)", "No seeders · 43%", "In
 cache"…; two as the approved design draws them: "checking" cyan, "In Vault"

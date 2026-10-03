@@ -492,8 +492,8 @@ func TestBuild_OnlyParticipants(t *testing.T) {
 			"Кэш 61% [flow+ 3 Мбит/с] Вы"},
 		{"nothing cached, the viewer waits on pieces nobody has: the swarm is why", func() Torrent { t := holes("idle", 0); t.ReaderMissing = 2; return t }(), stalled, KeyMissing,
 			"Рой 12 пиров · 0 сидов [swarm 0 Мбит/с · нет нужных кусков] Кэш 0% [swarm 0 Мбит/с · ждём данные] Вы"},
-		{"nothing cached, the viewer waits on something else: no swarm", Torrent{State: "idle", Seeders: 14, SwarmKnown: true}, stalled, KeyIdleTorrent,
-			"Кэш [swarm 0 Мбит/с · ждём данные] Вы"},
+		{"nothing cached, the viewer waits on the first piece: the swarm is why", Torrent{State: "idle", Seeders: 14, SwarmKnown: true}, stalled, KeyStalled,
+			"Рой 14 сидов [flow — Мбит/с] Кэш [swarm 0 Мбит/с · ждём данные] Вы"},
 		// Their request has just opened: they are there, and no word next
 		// to the cache says anyone is "waiting" for a viewer.
 		{"nothing cached, the viewer's request just opened", Torrent{State: "idle", Seeders: 14, SwarmKnown: true}, Viewer{Known: true, Present: true, CapMbps: 5}, KeyIdleTorrent,
@@ -510,6 +510,18 @@ func TestBuild_OnlyParticipants(t *testing.T) {
 		if v.Details.Rows[0].Show != v.Nodes[0].Show || v.Details.Rows[2].Show != v.Nodes[2].Show {
 			t.Errorf("%s: details rows %+v", c.name, v.Details.Rows)
 		}
+	}
+}
+
+// Nothing verified yet and the viewer's request waits: a cold start on a
+// slow swarm (the first 8 MiB piece at 1.2 Mbps is ~53 s). Nothing is
+// cached that could keep them waiting, so the wait is the swarm's, said as
+// one piece in -- the swarm on the chain, and the hint.
+func TestBuild_IdleWaitIsTheSwarms(t *testing.T) {
+	v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: Torrent{State: "idle", Seeders: 14, SwarmKnown: true}, Viewer: stalled, ClaimCapMbps: 5})
+	if v.Key != KeyStalled || v.Mode != ModeChain || chain(v) != "Рой 14 сидов [flow — Мбит/с] Кэш [swarm 0 Мбит/с · ждём данные] Вы" ||
+		nb(v.Hint) != "Ждём от раздающих нужный кусок файла." || !v.Details.Rows[0].Show {
+		t.Errorf("%s %s %s %q", v.Key, v.Mode, chain(v), nb(v.Hint))
 	}
 }
 

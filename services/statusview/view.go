@@ -477,17 +477,17 @@ func sendsSwarm(state string) bool { return state == "caching" || state == "vaul
 // held through a gap, and while the viewer is present. A gap between pieces
 // changes the link's motion, not the route of an incomplete source. Once
 // cached or vaulted, the source needs no swarm. Before anything is cached,
-// the swarm is drawn only as the reason the viewer waits
-// on pieces nobody has. The viewer: while a request of theirs is open
-// (Viewer.Present) -- bytes going to them, the plan's cap, a wait for data,
-// or no number yet. A viewer the proxy says nothing about is never drawn.
+// the swarm is drawn only as the reason the viewer waits -- on its first
+// piece, or on pieces nobody has. The viewer: while a request of theirs is
+// open (Viewer.Present) -- bytes going to them, the plan's cap, a wait for
+// data, or no number yet. A viewer the proxy says nothing about is never drawn.
 func participants(t Torrent, v Viewer, k string, swarmMoves bool) (swarm, you bool) {
 	you = takesPart(v)
 	switch {
 	case sendsSwarm(t.State):
 		swarm = swarmMoves || you
 	case t.State == "idle":
-		swarm = k == KeyMissing
+		swarm = k == KeyMissing || k == KeyStalled
 	}
 	return swarm, you
 }
@@ -614,6 +614,11 @@ func key(t Torrent, v Viewer, capMbps float64, swarmMoves bool) string {
 			return KeyMissing
 		case !present && missingHere(t) && !t.Settling:
 			return KeyMissingIdle
+		// Waiting before the first verified piece: nothing cached could
+		// keep them, the swarm does (a slow one's first piece takes a
+		// minute).
+		case waiting:
+			return KeyStalled
 		}
 	}
 	if t.Pending {
