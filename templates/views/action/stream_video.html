@@ -468,12 +468,7 @@
                 </svg>
             </button>
             <h4 id="grace-cta-title" class="font-semibold text-base sm:text-lg leading-snug text-base-content px-7">{{ t $.Lang "action.grace.title" }}</h4>
-            {{- /* A lent cap (an embed's domain owner's claims, CapLent) is not
-                 the viewer's to lift: no "upgrade", no offer -- the end of
-                 the free minutes and the cap's speed only. */}}
-            {{- if not .CapLent }}
             <p class="mt-1.5 text-sm leading-relaxed text-w-sub">{{ t $.Lang "action.grace.body" }}</p>
-            {{- end }}
             {{- /* Owner, 2026-09-26: "continue at N Mbps" first, the offer
                  under it, its trial note last -- the note closes the card
                  and sits with the button it qualifies. */}}
@@ -482,7 +477,7 @@
                         data-umami-event="grace-continue-slow" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}">
                     {{ if .GraceFreeRateMbps }}{{ tp $.Lang "action.grace.continueWithRate" "Rate" .GraceFreeRateMbps }}{{ else }}{{ t $.Lang "action.grace.continue" }}{{ end }}
                 </button>
-                {{- if not .CapLent }}{{- with promoOffer }}
+                {{- with promoOffer }}
                 <a class="btn btn-soft w-full h-auto min-h-11 py-2 px-3 text-[13px] sm:text-sm leading-snug" href="{{ or (trialURL $.Lang "grace" .) .URL (langPath $.Lang "/donate") }}" target="_blank" rel="noopener"
                    data-umami-event="donate-grace" data-umami-event-tier="{{ if $.User | hasAuth }}free{{ else }}anon{{ end }}"
                    data-umami-event-target="{{ if .TrialDays }}trial{{ else if .URL }}checkout{{ else }}donate{{ end }}">
@@ -494,7 +489,7 @@
                 {{- if .TrialDays }}
                 <span class="-mt-0.5 text-[11px] leading-tight text-w-muted">{{ tn $.Lang "offer.trialNote" .TrialDays }}</span>
                 {{- end }}
-                {{- end }}{{- end }}
+                {{- end }}
             </div>
         </div>
     </dialog>

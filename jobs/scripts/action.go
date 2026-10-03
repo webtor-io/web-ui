@@ -73,12 +73,6 @@ type StreamContent struct {
 	// ApiClaims.Rate (statusview.RateMbps). Shown on the "Continue at X Mbps" secondary CTA. Zero
 	// when the claim is missing/unparseable — template hides the line.
 	GraceFreeRateMbps int
-	// CapLent: the cap thp holds this stream to is not the viewer's own --
-	// an embed's registered domain lends its owner's claims to every
-	// visitor (handlers/embed, capLent) -- so a plan the viewer takes does
-	// not lift it. The grace popup then offers only "continue at N Mbps":
-	// no trial, no "upgrade" (stream_video.html).
-	CapLent bool
 	// SubtitleOpts carries the viewer-specific inputs of the subtitle
 	// ladder (preferred language, translate/paid gating, display names).
 	// Computed in a later task; the zero value keeps template calls to
@@ -578,7 +572,6 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		// it (setStatusMarks), and a passthrough's are made again before
 		// those fields are set.
 		VideoStreamUserData: vsud,
-		CapLent:             capLent(dsd),
 	}
 	// Dev-only short-circuit: render the slow_download / no_peers error
 	// modals without any rest-api work. Wired from the resource-page hash

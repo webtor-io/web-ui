@@ -1,7 +1,6 @@
 package scripts
 
 import (
-	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/statusview"
@@ -88,13 +87,4 @@ func (s *ActionScript) setCapCard(sc *StreamContent, c *web.Context, embed bool)
 		return
 	}
 	sc.CapCard = NewCapCard(s.i18n, c)
-}
-
-// capLent is StreamContent.CapLent: the stream runs on claims an embed's
-// registered domain lends its visitors, its owner's (handlers/embed post:
-// dsd.Claims replaces the visitor's), so its cap is not the visitor's to
-// lift. Read off the claims' source, not off "is an embed": an embed of a
-// domain nobody registered runs on the visitor's own.
-func capLent(dsd *embed.DomainSettingsData) bool {
-	return dsd != nil && dsd.Claims != nil
 }

@@ -8,8 +8,6 @@ import (
 
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/claims"
-	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/web"
@@ -87,24 +85,6 @@ func TestCapCard(t *testing.T) {
 		s.setCapCard(sc, ctx("5M", "", "ru"), c.embed)
 		if (sc.CapCard != nil) != c.want {
 			t.Errorf("%s: %+v", c.name, sc.CapCard)
-		}
-	}
-}
-
-// The cap is lent where an embed's domain lends its owner's claims: on the
-// site, and in an embed of a domain nobody registered, the visitor's own.
-func TestCapLent(t *testing.T) {
-	for _, c := range []struct {
-		name string
-		dsd  *embed.DomainSettingsData
-		want bool
-	}{
-		{"the site", nil, false},
-		{"an unregistered domain", &embed.DomainSettingsData{Ads: true}, false},
-		{"a registered domain", &embed.DomainSettingsData{Claims: &claims.Data{}}, true},
-	} {
-		if got := capLent(c.dsd); got != c.want {
-			t.Errorf("%s: %v, want %v", c.name, got, c.want)
 		}
 	}
 }
