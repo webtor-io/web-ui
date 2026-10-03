@@ -20,12 +20,14 @@
      draws them once, inside its own sprite (status/badge_symbols) or as
      status/badge_sprite.
 
-     The words never wrap: what does not fit ends in an ellipsis (style.css
-     .tx-badge .badge-text) -- a phone's Vault column cuts most states -- so
-     they carry their whole text as a title too, words and swarm as they
-     read. On the words, not the badge: the badge takes focus, and a title
-     there would be read out after the words it repeats; the words are read
-     by their content (the chain's aria-describedby included). */}}
+     The words never wrap on the resource page: what does not fit ends in an
+     ellipsis (style.css .tx-badge .badge-text) -- the row is as tall as the
+     chain -- so they carry their whole text as a title too, words and swarm
+     as they read. In the Vault table they wrap instead: a title is no help
+     on a touch screen. The title is on the words, not the badge: the badge
+     takes focus, and a title there would be read out after the words it
+     repeats; the words are read by their content (the chain's
+     aria-describedby included). */}}
 {{ define "status/badge" }}
 <span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="{{ .Tone }}" data-icon="{{ .Icon }}"{{ if .Pulse }} data-pulse{{ end }}><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-{{ .Icon }}"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text"{{ with .DescID }} id="{{ . }}"{{ end }} title="{{ .Label }}{{ with .Extra }} {{ . }}{{ end }}"><span data-tx-blabel>{{ .Label }}</span> <span class="tx-bx" data-tx-bextra>{{ .Extra }}</span></span></span>
 {{- end }}

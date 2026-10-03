@@ -125,3 +125,29 @@ test('keyboard focus does not scroll under the navbar', () => {
     assert.ok(nav, 'the navbar\'s height');
     assert.equal(rule('html')['scroll-padding-top'], `${nav[1]}px`);
 });
+
+test('a Vault row\'s badge wraps in its column instead of hiding the state in a title', () => {
+    assert.equal(rule('#vault-pledges .tx-badge .badge-text')['white-space'], 'normal');
+});
+
+test('the Vault status guide is a list of terms and their meanings', () => {
+    const doc = new JSDOM(VAULT).window.document;
+    const groups = doc.querySelectorAll('dl > div');
+    assert.ok(groups.length >= 3);
+    for (const g of groups) {
+        assert.equal(g.querySelectorAll(':scope > dt').length, 1, `a term: ${g.textContent.trim().slice(0, 40)}`);
+        assert.equal(g.querySelectorAll(':scope > dd').length, 1);
+    }
+});
+
+test('nothing of the status or the Vault rows moves for a viewer who asked for less motion', () => {
+    const still = new Set(STYLE
+        .filter((r) => r.at.some((a) => a.includes('prefers-reduced-motion')) && r.decls.animation === 'none')
+        .flatMap((r) => r.sel.split(',').map((s) => s.trim())));
+    const moving = STYLE.filter((r) => !r.at.some((a) => a.includes('prefers-reduced-motion') || a.startsWith('@keyframes'))
+        && /\.(tx|vault)-/.test(r.sel) && r.decls.animation && r.decls.animation !== 'none');
+    assert.ok(moving.length > 0);
+    for (const r of moving) {
+        for (const sel of r.sel.split(',').map((s) => s.trim())) assert.ok(still.has(sel), `${sel} keeps its animation`);
+    }
+});

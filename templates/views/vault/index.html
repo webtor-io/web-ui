@@ -13,10 +13,10 @@
       <col class="w-24">
       {{/* Status: the transfer status's badge (partials/status/badge.html),
            which says the percent and the swarm too ("Vaulting 64% (9
-           seeders)"). It never wraps: what does not fit ends in an ellipsis
-           (style.css .tx-badge), the whole text in its title, so the column
-           is as wide as the common labels need on a wide screen and no
-           wider than a phone allows -- where most states are cut. */}}
+           seeders)"). Here its words wrap (style.css #vault-pledges
+           .tx-badge): the column is as wide as the common labels need on a
+           wide screen and no wider than a phone allows, where most states
+           take two to five lines. */}}
       <col class="w-36 sm:w-60 md:w-72">
     </colgroup>
     <thead>
@@ -212,18 +212,18 @@
         <div class="collapse-content">
           <dl class="space-y-4 text-sm pt-2">
             <div class="flex items-start gap-3">
-              <span class="inline-flex items-center gap-1 text-w-cyan font-medium mt-0.5 shrink-0 whitespace-nowrap">
+              <dt class="inline-flex items-center gap-1 text-w-cyan font-medium mt-0.5 shrink-0 whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
                 VP
-              </span>
+              </dt>
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.frozenDesc" }}</dd>
             </div>
             <div class="flex items-start gap-3">
-              <span class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}</span>
+              <dt class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}</dt>
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.expiringDesc" }}</dd>
             </div>
             <div class="flex items-start gap-3">
-              <span class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "vault" "vault" (t $.Lang "vault.pledges.saved")) }}</span>
+              <dt class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "vault" "vault" (t $.Lang "vault.pledges.saved")) }}</dt>
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.claimableDesc" }}</dd>
             </div>
           </dl>

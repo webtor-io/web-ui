@@ -233,6 +233,17 @@ html {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The Vault table (views/vault/index.html): the words wrap in its status
+   column instead. On a phone the column leaves them 68px -- "Vaulting 64%
+   (9 seeders)" showed 41%, "Transfer failed, retrying" a quarter -- and the
+   title that carried the rest is no help on a touch screen. Hyphenated by
+   the page's lang; a word still wider than the column breaks anywhere
+   rather than runs out of it. */
+#vault-pledges .tx-badge .badge-text {
+  white-space: normal;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
 .tx-bi {
   flex: none;
   width: 12px;
@@ -1414,6 +1425,11 @@ html {
 
   .vault-pulse {
     animation: vault-pulse 1.8s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vault-pulse {
+      animation: none;
+    }
   }
 
   /* Progress row hosts an absolutely-positioned percent indicator that rides
