@@ -79,7 +79,7 @@ type set struct {
 
 func newSet(r prometheus.Registerer) *set {
 	f := promauto.With(r)
-	return &set{
+	s := &set{
 		requests: f.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace, Subsystem: "http", Name: "requests_total",
 			Help: "HTTP requests answered, by route template, method and status code.",
@@ -130,6 +130,17 @@ func newSet(r prometheus.Registerer) *set {
 			Help: "MP4 stream starts sent to the transcoder instead of nginx-vod because the browser cannot play their audio as nginx-vod serves it, by reason (eac3_ts: E-AC-3 in nginx-vod's MPEG-TS, which no hls.js plays; eac3, ac3: not declared; no_decoder: DTS; unserved_audio: audio nginx-vod serves none of; hevc: HEVC the declaration does not cover; fallback: a restart after the browser failed the file; other = anything else). jobs/scripts/vod_route.go.",
 		}, []string{"reason"}),
 	}
+	// A series that first appears at 1 has no earlier sample, and
+	// increase() loses that first click -- of every surface, on every
+	// restart (the player's label: 46 against 79 in the log over a week).
+	// The ones a link on the site makes exist at 0 from the start.
+	for _, target := range []string{TrialTargetCheckout, TrialTargetDonate} {
+		s.trial.WithLabelValues(target, "none", offer.TrialFromNone).Add(0)
+		for _, from := range offer.TrialFroms {
+			s.trial.WithLabelValues(target, "none", from).Add(0)
+		}
+	}
+	return s
 }
 
 var std = newSet(prometheus.DefaultRegisterer)

@@ -241,6 +241,7 @@ func TestMetricNames(t *testing.T) {
 		"webui_transcoder_capability_checks_total": dto.MetricType_COUNTER,
 		"webui_passthrough_fallback_total":         dto.MetricType_COUNTER,
 		"webui_vod_reroute_total":                  dto.MetricType_COUNTER,
+		"webui_trial_shortlink_total":              dto.MetricType_COUNTER,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]
@@ -266,6 +267,9 @@ func TestPaywallAndTrialLabelsAreBounded(t *testing.T) {
 	old := std
 	std = s
 	defer func() { std = old }()
+	// The series made up front (TestTrialSeriesExistBeforeTheFirstClick)
+	// are not what is counted here.
+	s.trial.Reset()
 
 	StremioPaywallVideo("ru", "GET")
 	StremioPaywallVideo("ru", "BREW")
@@ -310,6 +314,64 @@ func TestPaywallAndTrialLabelsAreBounded(t *testing.T) {
 	if got, want := testutil.CollectAndCount(s.trial), len(offer.TrialFroms)+2; got != want {
 		t.Errorf("client-chosen from values made %d series, want %d", got, want)
 	}
+}
+
+// A counter series that first appears at 1 has no earlier sample, and
+// increase() over a window that starts before it counts nothing for that
+// first click: every restart lost the first click of each surface (the
+// player's label read 46 against 79 in the log over a week). The series a
+// click on the site can make exist at 0 from the start.
+func TestTrialSeriesExistBeforeTheFirstClick(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	old := std
+	std = s
+	defer func() { std = old }()
+	froms := append([]string{offer.TrialFromNone}, offer.TrialFroms...)
+	for _, target := range []string{TrialTargetCheckout, TrialTargetDonate} {
+		for _, from := range froms {
+			if !hasSeries(t, reg, "webui_trial_shortlink_total", map[string]string{"target": target, "campaign": "none", "from": from}) {
+				t.Errorf("no series for %s from %s before its first click", target, from)
+			}
+		}
+	}
+	if got, want := testutil.CollectAndCount(s.trial), 2*len(froms); got != want {
+		t.Errorf("%d series up front, want %d", got, want)
+	}
+	TrialShortlink(TrialTargetCheckout, "", offer.FromPlayerLabel)
+	if got := testutil.ToFloat64(s.trial.WithLabelValues(TrialTargetCheckout, "none", offer.FromPlayerLabel)); got != 1 {
+		t.Errorf("the first click: %v", got)
+	}
+}
+
+// hasSeries: the registry holds a series of name with exactly these labels.
+func hasSeries(t *testing.T, reg *prometheus.Registry, name string, labels map[string]string) bool {
+	t.Helper()
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range families {
+		if f.GetName() != name {
+			continue
+		}
+		for _, m := range f.GetMetric() {
+			got := map[string]string{}
+			for _, p := range m.GetLabel() {
+				got[p.GetName()] = p.GetValue()
+			}
+			if len(got) == len(labels) {
+				same := true
+				for k, v := range labels {
+					same = same && got[k] == v
+				}
+				if same {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // The capability gauge is one-hot over a closed set of answers, and the
