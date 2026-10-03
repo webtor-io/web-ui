@@ -39,11 +39,21 @@ func (s *Redis) Pub(ctx context.Context, queue string, id string, l LogItem) (er
 		return err
 	}
 
-	cmd := s.cl.RPush(ctx, key, j)
-	if cmd.Err() != nil {
-		return cmd.Err()
+	n, err := s.cl.RPush(ctx, key, j).Result()
+	if err != nil {
+		return err
 	}
-	cmd = s.cl.Publish(ctx, key, string(j))
+	// The push that creates the list gives it the job's deadline, as subRaw
+	// does for a list it creates. A purged run (Drop, then no Sub; every
+	// restart of an errored job is one) creates it here, and such lists
+	// stayed forever: 43k of them, a third of dragonfly-ui, whose OOM failed
+	// every job on 2026-10-03.
+	if deadline, ok := ctx.Deadline(); ok && n == 1 {
+		if err = s.cl.ExpireAt(ctx, key, deadline).Err(); err != nil {
+			return err
+		}
+	}
+	cmd := s.cl.Publish(ctx, key, string(j))
 	if cmd.Err() != nil {
 		return cmd.Err()
 	}
