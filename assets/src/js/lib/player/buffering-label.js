@@ -1,3 +1,5 @@
+import { safeHref } from '../safeHref';
+
 // When the player's buffering label (BufferingLabel.jsx) is the lock -- the
 // button "Buffering | lock 5 Mbps >" that opens the stream plan card -- rather
 // than the plain "Buffering" (owner, 2026-09-26; docs/player.md "Buffering
@@ -82,19 +84,6 @@ export function statusSpoke(spoke, { label, answered = false, graceSec = 0, movi
 // Only a whole label: the lock says the rate, the card needs its link.
 const whole = (label) => !!(label && label.rate && label.cta && label.cta.url);
 
-// Only our own paths and https links become the card's href -- as the
-// status's safeHref (lib/transferStatus.js), not imported: that module would
-// bring the status view into the player's chunk.
-function ownHref(url) {
-    if (typeof url !== 'string' || !url) return '';
-    if (url.startsWith('/') && !url.startsWith('//')) return url;
-    try {
-        return new URL(url).protocol === 'https:' ? url : '';
-    } catch (e) {
-        return '';
-    }
-}
-
 // answerLabel is the label the stream job rendered on the player element for
 // the moment the viewer answers the grace popup (stream_video.html
 // data-cap-card-*, jobs/scripts CapCard): the status's stream box in the same
@@ -107,7 +96,8 @@ function ownHref(url) {
 export function answerLabel(el) {
     const d = el && el.dataset;
     if (!d) return null;
-    const url = ownHref(d.capCardUrl);
+    // Only our own paths and https links become the card's href.
+    const url = safeHref(d.capCardUrl);
     if (!url || !d.capCardRate || !d.capCardTitle || !d.capCardCta) return null;
     return {
         rate: d.capCardRate,

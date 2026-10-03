@@ -43,23 +43,13 @@
 import { impressionKey } from './impression';
 import { attr, hide, text } from './inPlace';
 import { applyBadge, bindBadge } from './statusBadge';
+import { safeHref } from './safeHref';
 // The fixed navbar over the page: what sits under it is not on screen.
 import { NAVBAR_H } from './stickyStatus';
 
 const HAVE_POPOVER_API = (el) => !!el && typeof el.showPopover === 'function';
 
-// Only our own paths and https links become an href. The URL is the server's
-// (a /trial or /donate path, or the plan's checkout from the catalog), but a
-// javascript: URL must never reach an anchor, whoever sent it.
-export function safeHref(url) {
-    if (typeof url !== 'string' || !url) return '';
-    if (url.startsWith('/') && !url.startsWith('//')) return url;
-    try {
-        return new URL(url).protocol === 'https:' ? url : '';
-    } catch (e) {
-        return '';
-    }
-}
+export { safeHref };
 
 // present is what the block shows of a view, given what the page knows and
 // the server does not:
