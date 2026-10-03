@@ -170,3 +170,17 @@ test('opening the details is counted', () => {
     const doc = new JSDOM(PAGE).window.document;
     assert.equal(doc.querySelector('.tx-chain').getAttribute('data-umami-event'), 'status-details');
 });
+
+test('without JS "Checking activity…" stands still: its dots are the reduced-motion ones', () => {
+    // The page's render is "checking" (statusview Pending) and only the
+    // stream moves it on: without JS the badge says so for good, and the
+    // running dots would claim a check that never comes.
+    const doc = new JSDOM(PAGE).window.document;
+    const flat = (s) => s.replace(/\s*([{}:;])\s*/g, '$1').replace(/\s+/g, ' ').trim();
+    const css = flat([...doc.querySelectorAll('noscript style')].map((s) => s.textContent).join(''));
+    for (const sel of ['.tx-badge[data-icon="dots"] .tx-bdots', '.tx-badge[data-icon="dots"] .tx-bi']) {
+        const d = rule(sel, ['prefers-reduced-motion']);
+        assert.ok(css.includes(`${sel}{display:${d.display}}`), `${sel} as under reduced motion (display: ${d.display}) in the block's noscript: ${css}`);
+    }
+    assert.equal(doc.querySelectorAll('.tx noscript').length, 0, 'outside .tx: the sticky bar clones .tx');
+});

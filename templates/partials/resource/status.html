@@ -52,6 +52,11 @@
          in this sprite so the page has them once. */}}
     {{- template "status/badge_symbols" }}
 </svg>
+{{- /* Without JS the page's "checking" is the last word: no stream moves it
+     on, and its running dots would promise a check that never comes. The
+     still dots instead, as under reduced motion (style.css). Outside .tx,
+     which the sticky bar clones. */}}
+<noscript><style>.tx-badge[data-icon="dots"] .tx-bdots{display:none}.tx-badge[data-icon="dots"] .tx-bi{display:inline-block}</style></noscript>
 {{- with .Data }}
 {{- /* The page's own pick, the download variant (see above): its key, and the
      plan's line as a hint when there is no button to go with it. */}}

@@ -323,6 +323,10 @@ an empty swarm for tens of seconds while it reaches trackers and the DHT —
 version kept the spinner for that whole window, which read as stuck. A piece
 boundary cannot flicker a live download into "paused". Review:
 `?debug_status=caching&progress=40&checking=1|paused=1|noseeders=1`.
+The page renders `checking` (statusview `Pending`) and only the stream
+moves it on, so without JS it is the status for good: a `<noscript>` style
+in `partials/resource/status.html` gives it the still dots of reduced
+motion, not the running ones (2026-10-03).
 
 ## No seeders / stream reconnect
 
