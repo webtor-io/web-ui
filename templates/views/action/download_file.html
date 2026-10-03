@@ -11,7 +11,9 @@
          line under the button removes the risk (the trial, cancel anytime).
          "Up to" unless the file is already whole on our side: then the cap is
          the only brake and the full speed-up is a fact, otherwise the swarm
-         may be slower than any plan. No promo plan — no nudge. */}}
+         may be slower than any plan -- and so the plan's time is its best
+         case ("as little as", Pitch.ETAUpTo), as the status's plan box says
+         it. No promo plan — no nudge. */}}
     {{- $offer := promoOffer }}
     {{- if and $offer (eq .Data.TierName "free") }}
     {{- $pitch := downloadPitch $.Lang .Data.SizeBytes .Data.RateMbps }}
@@ -29,7 +31,7 @@
                 <div class="text-sm font-semibold text-base-content leading-snug">{{ tp $.Lang "action.download.limitedTitle" "Rate" .Data.RateMbps }}</div>
                 {{- end }}
                 <div class="text-xs text-w-muted mt-0.5">
-                    {{- if $pitch }}{{ $pitch.ETA }}
+                    {{- if $pitch }}{{ if .Data.Cached }}{{ $pitch.ETA }}{{ else }}{{ $pitch.ETAUpTo }}{{ end }}
                     {{- else if $offer.RateMbps }}{{ tp $.Lang "action.download.limitedSub" "Rate" $offer.RateMbps }}
                     {{- else }}{{ t $.Lang "action.download.limitedSubUnlimited" }}{{ end -}}
                 </div>

@@ -179,9 +179,10 @@ should be felt on every download ("123 MB takes about 3 min. With a subscription
 20 s"). It returns nothing only when the size (a partial archive) or a rate is unknown,
 or the plan is not faster. Under a minute it counts seconds, never "1 min" — rounding up
 made a 10× plan read as 3×. Both are best cases: the plan's time is one only the swarm can
-deliver, so where the swarm still sends the file the status's plan box says it as a floor
-(`Pitch.ETAUpTo`, "With a subscription — as little as 3 min"; the button's "up to" for the
-same reason), and "about" only for a file whole in the cache or in Vault.
+deliver, so where the swarm still sends the file the status's plan box and the download
+nudge say it as a floor (`Pitch.ETAUpTo`, "With a subscription — as little as 3 min"; the
+button's "up to" for the same reason), and "about" only for a file whole in the cache or
+in Vault (the nudge: `FileDownload.Cached`).
 
 `speedUp` is how many times faster the plan is than the viewer's cap (rounded down,
 0 below 2×) — the number on the download button.

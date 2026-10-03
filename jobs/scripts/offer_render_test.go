@@ -113,21 +113,22 @@ func TestDownloadNudgeRenders(t *testing.T) {
 		want, banned  []string
 	}{
 		// The title names the limit, the button the outcome ("up to": the file
-		// is not whole on our side, the swarm may be slower than any plan),
-		// the line under the button the risk remover.
+		// is not whole on our side, the swarm may be slower than any plan) and
+		// the wait the plan's time as its best case for the same reason, the
+		// line under the button the risk remover.
 		{"free, movie", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
-			[]string{"Download speed is capped at 5\u00a0Mbps", "4.3\u00a0GB takes about 1\u00a0h 57\u00a0min. With a subscription — about 12\u00a0min",
+			[]string{"Download speed is capped at 5\u00a0Mbps", "4.3\u00a0GB takes about 1\u00a0h 57\u00a0min. With a subscription — as little as 12\u00a0min",
 				`href="/trial?from=download-nudge"`, "Download up to 10× faster", "7 days free · cancel anytime",
 				`data-umami-event="donate-download"`, `data-umami-event-target="trial"`, "donate-download-shown", "eta: 1"},
 			[]string{"ads", "action.", "offer.", "Try free", "checkout.example"}},
 		// Already whole on our side: the cap is the only brake, so the full
 		// speed-up is a fact, not a ceiling.
 		{"free, cached", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie, Cached: true},
-			[]string{"Download 10× faster"},
-			[]string{"up to 10×"}},
+			[]string{"Download 10× faster", "With a subscription — about 12\u00a0min"},
+			[]string{"up to 10×", "as little as"}},
 		// A 3-minute wait still shows the difference, the fast side in seconds.
 		{"free, small file", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: 123 << 20},
-			[]string{"123\u00a0MB takes about 3\u00a0min. With a subscription — about 20\u00a0s", "Download up to 10× faster", "eta: 1"},
+			[]string{"123\u00a0MB takes about 3\u00a0min. With a subscription — as little as 20\u00a0s", "Download up to 10× faster", "eta: 1"},
 			[]string{"Up to 50"}},
 		// Size unknown (a partial archive): the plan's speed instead of a clock.
 		{"free, size unknown", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5},
