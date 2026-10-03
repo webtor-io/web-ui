@@ -5,6 +5,9 @@ import (
 	"os"
 	"testing"
 
+	"golang.org/x/text/language"
+
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
@@ -168,7 +171,7 @@ func TestPlayedBitrate(t *testing.T) {
 		{"stereo AAC is copied as it is",
 			`{"format":{"bit_rate":"4300000"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"4000000"}},
 			{"codec_type":"audio","codec_name":"aac","channels":2,"sample_rate":"48000","tags":{"BPS":"256000"}}]}`, true, 4256000},
-		{"5.1 AAC is re-encoded to stereo",
+		{"5.1 AAC, no declaration: re-encoded to stereo",
 			`{"format":{"bit_rate":"4500000"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"4000000"}},
 			{"codec_type":"audio","codec_name":"aac","channels":6,"sample_rate":"48000","tags":{"BPS":"384000"}}]}`, true, 4000000 + aac48},
 		{"an mp4 through nginx-vod: the first tracks as they are, whatever the codec",
@@ -186,11 +189,11 @@ func TestPlayedBitrate(t *testing.T) {
 		{"no streams: not known", `{"format":{"bit_rate":"8000000"}}`, true, 0},
 	}
 	for _, c := range cases {
-		if got := playedBitrate(probeJSON(t, c.probe), c.transcoded); got != c.want {
+		if got := playedBitrate(probeJSON(t, c.probe), c.transcoded, nil); got != c.want {
 			t.Errorf("%s: %d, want %d", c.name, got, c.want)
 		}
 	}
-	if playedBitrate(nil, true) != 0 {
+	if playedBitrate(nil, true, nil) != 0 {
 		t.Error("no probe")
 	}
 }
@@ -217,13 +220,191 @@ func TestSetStatusMarks(t *testing.T) {
 		{"within the margin: The Knick, 4.34", probeKnick, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
 		{"heavy with dubs, the stream within the margin: 4.76", probeSevenDubs, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
 		{"no tags, the stream within the margin: 4.72", probeDerived, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
-		{"stale tags: unknown", probeStale, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
+		{"stale tags: not known, the file bounds it -- fits", probeStale, true, true, false, "Без подписки — до 5\u00a0Мбит/с"},
 		{"unknown", `{}`, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
 	} {
 		sc := &StreamContent{}
 		s.setStatusMarks(sc, under, probeJSON(t, c.probe), c.transcoded)
 		if sc.StatusFitsCap != c.fits || sc.StatusOverCap != c.over || sc.StatusStallSub != c.sub {
 			t.Errorf("%s: fits %v, over %v, sub %q", c.name, sc.StatusFitsCap, sc.StatusOverCap, sc.StatusStallSub)
+		}
+	}
+	// A real probe (2026-10-02): H.264 at 4.9 with two AC-3 5.1 dubs. As
+	// stereo the stream was 5.0 and marked neither way; a browser that
+	// declares aac51 gets 5.1 at 384 kbit/s, 5.2 -- over the cap.
+	const twoAC351 = `{"format":{"bit_rate":"5938688"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"5112688"}},
+		{"codec_type":"audio","codec_name":"ac3","bit_rate":"384000","channels":6,"sample_rate":"48000"},
+		{"codec_type":"audio","codec_name":"ac3","bit_rate":"384000","channels":6,"sample_rate":"48000"}]}`
+	sc := &StreamContent{VideoStreamUserData: &models.VideoStreamUserData{DecodeRequest: models.DecodeRequest{Decode: "aac51"}}}
+	s.setStatusMarks(sc, under, probeJSON(t, twoAC351), true)
+	if !sc.StatusOverCap || sc.StatusFitsCap || sc.StatusStallSub != "Без подписки — до 5\u00a0Мбит/с, а файлу нужно 5,2\u00a0Мбит/с" {
+		t.Errorf("AC-3 5.1 with aac51: fits %v, over %v, sub %q", sc.StatusFitsCap, sc.StatusOverCap, sc.StatusStallSub)
+	}
+}
+
+// The audio the player pulls is the transcoder's decision for the track it
+// starts on, and the declaration changes it (content-transcoder
+// services/audio.go audioOutputFor, at the deployed sha-22f64b9): with aac51
+// a multichannel track is AAC 5.1 at 384 kbit/s, or copied where it already
+// is AAC in a configuration ADTS can say; Dolby is copied with ec3/ac3, on
+// a passthrough's fMP4 only. Without a declaration, stereo as always.
+func TestPlayedBitrate_DeclaredAudio(t *testing.T) {
+	const aac48 = 128 * 48000 / 44
+	probe := func(audio string) *api.MediaProbe {
+		return probeJSON(t, `{"format":{"bit_rate":"5000000"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"4000000"}},`+audio+`]}`)
+	}
+	const (
+		aac51    = `{"codec_type":"audio","codec_name":"aac","channels":6,"channel_layout":"5.1","sample_rate":"48000","tags":{"BPS":"448000"}}`
+		aac51PCE = `{"codec_type":"audio","codec_name":"aac","channels":6,"channel_layout":"5.1(side)","sample_rate":"48000","tags":{"BPS":"448000"}}`
+		aac71    = `{"codec_type":"audio","codec_name":"aac","channels":8,"channel_layout":"7.1","sample_rate":"48000","tags":{"BPS":"640000"}}`
+		eac351   = `{"codec_type":"audio","codec_name":"eac3","bit_rate":"640000","channels":6,"sample_rate":"48000"}`
+		ac351    = `{"codec_type":"audio","codec_name":"ac3","bit_rate":"448000","channels":6,"sample_rate":"48000"}`
+		eac3st   = `{"codec_type":"audio","codec_name":"eac3","bit_rate":"224000","channels":2,"sample_rate":"48000"}`
+	)
+	for _, c := range []struct {
+		name        string
+		audio       string
+		decode      string
+		videoCopied bool
+		want        int64
+	}{
+		{"AAC 5.1, no declaration: stereo", aac51, "", false, 4000000 + aac48},
+		{"AAC 5.1 with aac51: copied", aac51, "aac51", false, 4000000 + 448000},
+		{"AAC 5.1 in a PCE with aac51: encoded to 5.1", aac51PCE, "aac51", false, 4000000 + 384000},
+		{"AAC 7.1 with aac51: encoded to 5.1", aac71, "aac51", false, 4000000 + 384000},
+		{"E-AC-3 5.1 with aac51: encoded to 5.1", eac351, "aac51", false, 4000000 + 384000},
+		{"E-AC-3 5.1 with ec3 on the old route: TS takes no copy, stereo", eac351, "ec3", false, 4000000 + aac48},
+		{"E-AC-3 5.1 with aac51 and ec3 on the old route: 5.1", eac351, "aac51,ec3", false, 4000000 + 384000},
+		{"E-AC-3 5.1 with ec3 on a passthrough: copied", eac351, "hevc10,aac51,ec3", true, 4000000 + 640000},
+		{"AC-3 5.1 with ac3 on a passthrough: copied", ac351, "hevc10,aac51,ac3", true, 4000000 + 448000},
+		{"AC-3 5.1 with ec3 alone on a passthrough: encoded to 5.1", ac351, "hevc10,aac51,ec3", true, 4000000 + 384000},
+		{"stereo E-AC-3 with every token: stereo AAC", eac3st, "hevc10,aac51,ac3,ec3", true, 4000000 + aac48},
+		{"a check that had not answered declares nothing", eac351, "unknown", false, 4000000 + aac48},
+	} {
+		vsud := &models.VideoStreamUserData{DecodeRequest: models.DecodeRequest{Decode: c.decode}}
+		if got, _ := playedBitrateRouted(probe(c.audio), true, c.videoCopied, vsud); got != c.want {
+			t.Errorf("%s: %d, want %d", c.name, got, c.want)
+		}
+	}
+	// nginx-vod serves the track as it is, whatever is declared.
+	if got := playedBitrate(probe(eac351), false, &models.VideoStreamUserData{DecodeRequest: models.DecodeRequest{Decode: "aac51"}}); got != 4000000+640000 {
+		t.Errorf("nginx-vod: %d", got)
+	}
+}
+
+// The player starts on the track the picker marks default -- a saved
+// choice, the viewer's language -- not on the first one (hls-manager.js
+// data-default; nginx-vod and audio files have only the first).
+func TestPlayedBitrate_TheTrackThePlayerStartsOn(t *testing.T) {
+	const aac48 = 128 * 48000 / 44
+	mp := probeJSON(t, `{"format":{"bit_rate":"5000000"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"4000000"}},
+		{"codec_type":"audio","codec_name":"ac3","bit_rate":"384000","channels":6,"sample_rate":"48000","tags":{"language":"rus"}},
+		{"codec_type":"audio","codec_name":"aac","channels":2,"sample_rate":"48000","tags":{"language":"eng","BPS":"128000"}}]}`)
+	en := []language.Tag{language.English}
+	for _, c := range []struct {
+		name       string
+		vsud       *models.VideoStreamUserData
+		transcoded bool
+		want       int64
+	}{
+		{"no viewer data: the first", nil, true, 4000000 + aac48},
+		{"English browser: the English copy", &models.VideoStreamUserData{AcceptLangTags: en}, true, 4000000 + 128000},
+		{"English browser, Russian picked: the Russian 5.1", &models.VideoStreamUserData{AcceptLangTags: en, ResolvedLang: "ru", DecodeRequest: models.DecodeRequest{Decode: "aac51"}}, true, 4000000 + 384000},
+		{"English browser, the first track saved", &models.VideoStreamUserData{AcceptLangTags: en, AudioID: "mp-0"}, true, 4000000 + aac48},
+		{"carried over from the last file", &models.VideoStreamUserData{AudioID: "mp-0", Carry: &models.TrackCarry{AudioLang: "en"}}, true, 4000000 + 128000},
+		{"nginx-vod: the first, whatever the language", &models.VideoStreamUserData{AcceptLangTags: en}, false, 4000000 + 384000},
+	} {
+		if got := playedBitrate(mp, c.transcoded, c.vsud); got != c.want {
+			t.Errorf("%s: %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+// Edges of the per-track numbers: tags add up to the file plus 5% at most,
+// and audio that weighs the whole file leaves no video to speak of.
+func TestPlayedBitrate_Edges(t *testing.T) {
+	const aac48 = 128 * 48000 / 44
+	tags := func(file, video string) *api.MediaProbe {
+		return probeJSON(t, `{"format":{"bit_rate":"`+file+`"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"`+video+`"}},
+			{"codec_type":"audio","codec_name":"ac3","bit_rate":"200000","channels":2,"sample_rate":"48000"}]}`)
+	}
+	if got := playedBitrate(tags("4000000", "4000000"), true, nil); got != 4000000+aac48 {
+		t.Errorf("tags at 1.05 of the file: %d, want them taken", got)
+	}
+	if got := playedBitrate(tags("4000000", "4000001"), true, nil); got != 0 {
+		t.Errorf("tags over 1.05 of the file: %d, want 0 (stale)", got)
+	}
+	noVideo := func(audio string) *api.MediaProbe {
+		return probeJSON(t, `{"format":{"bit_rate":"1000000"},"streams":[{"codec_type":"video","codec_name":"h264"},
+			{"codec_type":"audio","codec_name":"ac3","bit_rate":"`+audio+`","channels":2,"sample_rate":"48000"}]}`)
+	}
+	for _, a := range []string{"1000000", "1040000"} {
+		if got := playedBitrate(noVideo(a), true, nil); got != 0 {
+			t.Errorf("audio of %s in a 1000000 file: %d, want 0", a, got)
+		}
+	}
+}
+
+// Where the stream's own rate is not known, a bound on it can still say it
+// fits: the copied video and audio are a part of the file, an encode adds
+// its own rate, and the transcoder's re-encode of a video is capped (VBV
+// -maxrate 1.3 x its rate for the height). A bound says nothing of "over".
+func TestSetStatusMarks_Ceiling(t *testing.T) {
+	s := &ActionScript{i18n: i18n.New(os.DirFS("../../locales"))}
+	under := &web.Context{Lang: "ru", ApiClaims: &api.Claims{Rate: "5M"}}
+	const capOnly = "Без подписки — до 5 Мбит/с"
+	for _, c := range []struct {
+		name        string
+		probe       string
+		transcoded  bool
+		videoCopied bool
+		fits        bool
+	}{
+		{"H.264, no number for its AAC: the file, 1.33", `{"format":{"bit_rate":"1330000"},"streams":[{"codec_type":"video","codec_name":"h264"},
+			{"codec_type":"audio","codec_name":"aac","channels":2,"sample_rate":"48000"}]}`, true, false, true},
+		{"stale tags: the file, 0.7", probeStale, true, false, true},
+		{"stale tags, the audio re-encoded: the file and the encode", `{"format":{"bit_rate":"3000000"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"7816333"}},
+			{"codec_type":"audio","codec_name":"ac3","channels":6,"sample_rate":"48000"}]}`, true, false, true},
+		{"stale tags, the encode tips it over the margin", `{"format":{"bit_rate":"4300000"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"7816333"}},
+			{"codec_type":"audio","codec_name":"ac3","channels":6,"sample_rate":"48000"}]}`, true, false, false},
+		{"the audio re-encoded at a rate not known: no bound", `{"format":{"bit_rate":"1330000"},"streams":[{"codec_type":"video","codec_name":"h264"},
+			{"codec_type":"audio","codec_name":"ac3","channels":6}]}`, true, false, false},
+		{"a file of 6 under no numbers: no fit, and no over from a bound", `{"format":{"bit_rate":"6000000"},"streams":[{"codec_type":"video","codec_name":"h264"},
+			{"codec_type":"audio","codec_name":"aac","channels":2,"sample_rate":"48000"}]}`, true, false, false},
+		{"nginx-vod, no numbers: the file", `{"format":{"bit_rate":"2000000"},"streams":[{"codec_type":"video","codec_name":"h264"},
+			{"codec_type":"audio","codec_name":"aac","channels":2}]}`, false, false, true},
+		{"passthrough, no numbers: the file", `{"format":{"bit_rate":"2000000"},"streams":[{"codec_type":"video","codec_name":"hevc","height":1080},
+			{"codec_type":"audio","codec_name":"aac","channels":2}]}`, true, true, true},
+		{"Xvid 480p re-encoded: at most 3.25 and the AAC", `{"format":{"bit_rate":"1500000"},"streams":[{"codec_type":"video","codec_name":"mpeg4","height":480},
+			{"codec_type":"audio","codec_name":"mp3","bit_rate":"128000","channels":2,"sample_rate":"48000"}]}`, true, false, true},
+		{"HEVC 720p re-encoded: at most 6.5, no fit", `{"format":{"bit_rate":"1500000"},"streams":[{"codec_type":"video","codec_name":"hevc","height":720},
+			{"codec_type":"audio","codec_name":"aac","channels":2,"tags":{"BPS":"128000"}}]}`, true, false, false},
+		{"re-encoded, its copied AAC's tag stale with the rest: no bound", `{"format":{"bit_rate":"1000000"},"streams":[{"codec_type":"video","codec_name":"mpeg4","height":480,"tags":{"BPS":"7816333"}},
+			{"codec_type":"audio","codec_name":"aac","channels":2,"sample_rate":"48000","tags":{"BPS":"64000"}}]}`, true, false, false},
+		{"re-encoded, no height: no bound", `{"format":{"bit_rate":"1500000"},"streams":[{"codec_type":"video","codec_name":"mpeg4"},
+			{"codec_type":"audio","codec_name":"mp3","bit_rate":"128000","channels":2,"sample_rate":"48000"}]}`, true, false, false},
+	} {
+		sc := &StreamContent{}
+		s.setRoutedStatusMarks(sc, under, probeJSON(t, c.probe), c.transcoded, c.videoCopied)
+		if sc.StatusFitsCap != c.fits || sc.StatusOverCap || sc.StatusStallSub != capOnly {
+			t.Errorf("%s: fits %v (want %v), over %v, sub %q", c.name, sc.StatusFitsCap, c.fits, sc.StatusOverCap, sc.StatusStallSub)
+		}
+	}
+}
+
+// The transcoder's VBV cap for a re-encode of a video of the height:
+// 1.3 x DefaultRenditions' rate, interpolated (content-transcoder
+// services/hls.go Rendition.Rate, codecParams -maxrate).
+func TestEncodedVideoCeiling(t *testing.T) {
+	for _, c := range []struct {
+		height int
+		want   int64
+	}{
+		{0, 0}, {120, 325000}, {240, 650000}, {360, 1300000}, {480, 3250000},
+		{576, 4550000}, {720, 6500000}, {1080, 10400000}, {2160, 10400000},
+	} {
+		if got := encodedVideoCeiling(c.height); got != c.want {
+			t.Errorf("%dp: %d, want %d", c.height, got, c.want)
 		}
 	}
 }

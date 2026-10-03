@@ -1173,6 +1173,24 @@ so the cap card and "this file needs N" work as for H.264. Every other caller of
 unchanged, and the cap gate before the session still falls back to the file's rate for HEVC —
 conservative, and right for a passthrough.
 
+The marks count the audio as the declaration has the transcoder make it (`audioOut`, a copy of
+content-transcoder's `audioOutputFor`): under `aac51` a track of more than two channels is AAC 5.1 at
+384&nbsp;kbit/s, or copied with its own rate where it already is AAC 5.1 in a layout ADTS can say; under
+`ec3`/`ac3` E-AC-3/AC-3 is copied on a passthrough (fMP4) only; everything else is stereo AAC at
+139.6&nbsp;kbit/s, as without a declaration. The track counted is the one the player starts on — the
+picker's default (`startAudio`, held to `GetAudioTracks` by `TestStartAudio_IsThePickersDefault`), not
+the first. Before 2026-10-03 every transcoded track counted as stereo: a file with a 5.1 dub read about
+0.24&nbsp;Mbit/s light, and one at 4.9 with AC-3 5.1 was marked neither way at a 5M cap instead of over it.
+The cap gate (`capGateBitrate`) reads the same number.
+
+Where the stream's own rate is not known, its **ceiling** can still mark it as fitting
+(`StatusFitsCap`, never `StatusOverCap` or "needs N"): the file, for tracks served as they are, plus an
+audio encode's rate; for a video the transcoder re-encodes, its VBV cap — `-maxrate` 1.3 times the
+rate it sets by the height (`encodedVideoCeiling`, a copy of content-transcoder's `Rendition.Rate`),
+which at a 5M cap with `FitsMargin` fits up to about 550p. Measured with the transcoder's own FFmpeg on
+noise, the worst case for its quality target (480p and 360p, 90&nbsp;s): 1.03–1.045 times `-maxrate` on
+average in MPEG-TS, 1.14 at most a 4&nbsp;s segment — inside `FitsMargin`.
+
 #### An MP4 whose audio nginx-vod cannot hand the browser — `jobs/scripts/vod_route.go`
 
 rest-api sends a file to nginx-vod or to the transcoder by its extension alone: an `.mp4` goes to

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	claimsproto "github.com/webtor-io/claims-provider/proto"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/statusview"
@@ -166,23 +167,31 @@ func TestCapGateBitrate(t *testing.T) {
 			{"codec_type":"audio","codec_name":"aac","bit_rate":"128000","channels":2,"sample_rate":"48000"}]}`), true, 4128000},
 	}
 	for _, c := range cases {
-		if got := capGateBitrate(c.mp, c.transcoded); got != c.want {
+		if got := capGateBitrate(c.mp, c.transcoded, nil); got != c.want {
 			t.Errorf("%s: %d, want %d", c.name, got, c.want)
 		}
 	}
 	// The same number as the status's line: the cap modal and the status
 	// speak of one stream.
 	owner := probeJSON(t, probeOwner)
-	if capGateBitrate(owner, true) != playedBitrate(owner, true) {
+	if capGateBitrate(owner, true, nil) != playedBitrate(owner, true, nil) {
 		t.Error("the cap gate and the status's marks read different rates")
+	}
+	// The declaration counts there too: AC-3 5.1 is AAC 5.1 at 384 kbit/s
+	// for a browser that declares aac51, stereo for one that does not.
+	aac51 := &models.VideoStreamUserData{DecodeRequest: models.DecodeRequest{Decode: "aac51"}}
+	ac351 := probeJSON(t, `{"format":{"bit_rate":"5938688"},"streams":[{"codec_type":"video","codec_name":"h264","tags":{"BPS":"5112688"}},
+		{"codec_type":"audio","codec_name":"ac3","bit_rate":"384000","channels":6,"sample_rate":"48000"}]}`)
+	if got := capGateBitrate(ac351, true, aac51); got != 5112688+384000 {
+		t.Errorf("AC-3 5.1 with aac51: %d", got)
 	}
 	// At a 5 Mbps cap the two-dub file streams at 3.6: no cap modal for it.
 	// By the file's 6.6 it had one.
 	capped := ctxWith("5M", "free")
-	if _, limited := checkCachedRateLimit(capped, capGateBitrate(dts, true)); limited {
+	if _, limited := checkCachedRateLimit(capped, capGateBitrate(dts, true, nil)); limited {
 		t.Error("a 3.6 Mbps stream at a 5 Mbps cap got the cap modal")
 	}
-	if sdd, limited := checkCachedRateLimit(capped, capGateBitrate(probeJSON(t, probeOwner), true)); !limited || !almostEqual(sdd.RequiredSpeedMbps, float64(8934213+aac48)/(1<<20)) {
+	if sdd, limited := checkCachedRateLimit(capped, capGateBitrate(probeJSON(t, probeOwner), true, nil)); !limited || !almostEqual(sdd.RequiredSpeedMbps, float64(8934213+aac48)/(1<<20)) {
 		t.Errorf("the owner's file over a 5 Mbps cap: limited %v, file needs %v", limited, sdd.RequiredSpeedMbps)
 	}
 }
@@ -218,7 +227,7 @@ func TestSwarmGate_HoldsTheFileRate(t *testing.T) {
 	}
 	for _, tc := range cases {
 		mp := probeJSON(t, tc.probe)
-		fileRate, streamRate := getVideoBitrate(mp), capGateBitrate(mp, true)
+		fileRate, streamRate := getVideoBitrate(mp), capGateBitrate(mp, true, nil)
 		if !(float64(streamRate) < tc.measured*8 && tc.measured*8 < float64(fileRate)) {
 			t.Fatalf("%s: the case needs a swarm between the played rate %d and the file's %d", tc.name, streamRate, fileRate)
 		}

@@ -98,20 +98,22 @@ type StreamContent struct {
 	// the status's own, which lacks the second half. "" without a cap.
 	StatusStallSub string
 	// StatusFitsCap: the played stream needs no more than the viewer's cap,
-	// with statusview.FitsMargin to spare (statusview.FitsCap), so it plays
-	// smoothly at the cap and the status says nothing under the bar while
-	// it plays. Only that: a real stall of it while thp's limiter holds the
-	// requests still gets the stream box -- the estimate is not proof (the
-	// page's present, lib/transferStatus.js).
+	// with statusview.FitsMargin to spare (statusview.FitsCap) -- or, what
+	// it pulls not known, a bound on that does (playedBitrateRouted's
+	// ceiling: the file for tracks served as they are, the transcoder's
+	// cap on a re-encode) -- so it plays smoothly at the cap and the status
+	// says nothing under the bar while it plays. Only that: a real stall of
+	// it while thp's limiter holds the requests still gets the stream box
+	// -- the estimate is not proof (the page's present, lib/transferStatus.js).
 	StatusFitsCap bool
 	// StatusOverCap: the played stream needs more than the viewer's cap
 	// (statusview.OverCap). At the cap its player stalls once the buffer
 	// runs out, so the status shows the stream box as soon as it is due,
-	// while the player still plays. Neither this nor StatusFitsCap: what
-	// the player pulls is not known (playedBitrate 0: re-encoded video, no
-	// per-track numbers, stale ones) or is under the cap by less than
-	// statusview.FitsMargin; the fact while it plays, the box at a real
-	// stall.
+	// while the player still plays. Never from a bound. Neither this nor
+	// StatusFitsCap: what the player pulls is not known (playedBitrate 0:
+	// re-encoded video, no per-track numbers, stale ones) and no bound on
+	// it fits, or it is under the cap by less than statusview.FitsMargin;
+	// the fact while it plays, the box at a real stall.
 	StatusOverCap bool
 	// StatusAnswered: this run is the slow-download modal's "watch as is"
 	// (force-slow) -- the viewer was just told the stream will be slower
@@ -405,8 +407,8 @@ func episodeTag(ref *models.VideoRef) string {
 // stream is no reason to skip the check.
 //
 // The swarm is not held against it: see getVideoBitrate.
-func capGateBitrate(mp *api.MediaProbe, transcoded bool) int64 {
-	if bps := playedBitrate(mp, transcoded); bps > 0 {
+func capGateBitrate(mp *api.MediaProbe, transcoded bool, vsud *models.VideoStreamUserData) int64 {
+	if bps := playedBitrate(mp, transcoded, vsud); bps > 0 {
 		return bps
 	}
 	return getVideoBitrate(mp)
@@ -566,6 +568,10 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		ExternalData:   &models.ExternalData{},
 		DomainSettings: dsd,
 		StatusAnswered: s.forceSlow,
+		// Here, not with the render's other fields: the status marks read
+		// it (setStatusMarks), and a passthrough's are made again before
+		// those fields are set.
+		VideoStreamUserData: vsud,
 	}
 	// Dev-only short-circuit: render the slow_download / no_peers error
 	// modals without any rest-api work. Wired from the resource-page hash
@@ -868,7 +874,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 	if sc.MediaProbe != nil {
 		fileRate := getVideoBitrate(sc.MediaProbe)
 		// Falls back to fileRate, so it is known whenever fileRate is.
-		streamRate := capGateBitrate(sc.MediaProbe, transcode)
+		streamRate := capGateBitrate(sc.MediaProbe, transcode, vsud)
 		if streamRate > 0 {
 			if s.forceSlow {
 				j.Skip(s.t("job.checkingBandwidth"))
@@ -955,7 +961,6 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			}
 		}
 	}
-	sc.VideoStreamUserData = vsud
 	// What plays after this file (next_item.go). Not for the embed: there is
 	// no file list there to move through.
 	if dsd == nil {
@@ -1630,7 +1635,9 @@ type ActionScript struct {
 // setStatusMarks puts on sc what the transfer status needs to know of the
 // probed file against the viewer's cap (StatusStallSub, StatusFitsCap,
 // StatusOverCap), which the player element carries to the page. The rate
-// compared is what the player pulls (playedBitrate), not the file's own.
+// compared is what the player pulls (playedBitrate), not the file's own:
+// the audio as the start's declaration has the transcoder make it, of the
+// track the player starts on (sc.VideoStreamUserData).
 func (s *ActionScript) setStatusMarks(sc *StreamContent, c *web.Context, mp *api.MediaProbe, transcoded bool) {
 	s.setRoutedStatusMarks(sc, c, mp, transcoded, false)
 }
@@ -1639,9 +1646,11 @@ func (s *ActionScript) setStatusMarks(sc *StreamContent, c *web.Context, mp *api
 // videoCopied for a route that hands the browser the source's video as it
 // is (playedBitrateRouted).
 func (s *ActionScript) setRoutedStatusMarks(sc *StreamContent, c *web.Context, mp *api.MediaProbe, transcoded bool, videoCopied bool) {
-	bps := playedBitrateRouted(mp, transcoded, videoCopied)
+	bps, ceiling := playedBitrateRouted(mp, transcoded, videoCopied, sc.VideoStreamUserData)
 	sc.StatusStallSub = s.statusStallSub(c, bps)
-	sc.StatusFitsCap = statusFitsCap(c, bps)
+	// What it pulls not known, a bound on it can still say it fits; never
+	// that it is over, nor what it needs.
+	sc.StatusFitsCap = statusFitsCap(c, bps) || bps == 0 && statusFitsCap(c, ceiling)
 	sc.StatusOverCap = statusOverCap(c, bps)
 }
 

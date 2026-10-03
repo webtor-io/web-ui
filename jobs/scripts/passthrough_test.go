@@ -131,13 +131,13 @@ func TestPlayedBitrateRouted(t *testing.T) {
 	const aac48 = 128 * 48000 / 44
 	const hevc = `{"format":{"bit_rate":"5650625"},"streams":[{"codec_type":"video","codec_name":"hevc","tags":{"BPS":"4999862"}},
 		{"codec_type":"audio","codec_name":"eac3","bit_rate":"640000","channels":6,"sample_rate":"48000"}]}`
-	if got := playedBitrateRouted(probeJSON(t, hevc), true, false); got != 0 {
+	if got, _ := playedBitrateRouted(probeJSON(t, hevc), true, false, nil); got != 0 {
 		t.Errorf("re-encoded: %d, want 0", got)
 	}
-	if got := playedBitrate(probeJSON(t, hevc), true); got != 0 {
+	if got := playedBitrate(probeJSON(t, hevc), true, nil); got != 0 {
 		t.Errorf("playedBitrate: %d, want 0", got)
 	}
-	if got, want := playedBitrateRouted(probeJSON(t, hevc), true, true), int64(4999862+aac48); got != want {
-		t.Errorf("passed through: %d, want %d", got, want)
+	if got, _ := playedBitrateRouted(probeJSON(t, hevc), true, true, nil); got != int64(4999862+aac48) {
+		t.Errorf("passed through: %d, want %d", got, 4999862+aac48)
 	}
 }

@@ -19,7 +19,7 @@ import (
 // language.
 func TestCapModal_SaysWhatTheStatusSays(t *testing.T) {
 	s := &ActionScript{i18n: i18n.New(os.DirFS("../../locales"))}
-	bps := capGateBitrate(probeJSON(t, probeOwner), true)
+	bps := capGateBitrate(probeJSON(t, probeOwner), true, nil)
 	tpl, err := template.New("slow_download.html").Funcs(offerFuncs(t, prodCatalog(), true)).
 		ParseFiles("../../templates/views/action/errors/slow_download.html", "../../templates/partials/icons.html")
 	if err != nil {

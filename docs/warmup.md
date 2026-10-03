@@ -27,7 +27,8 @@ The two branches hold their speed against different rates (2026-09-26):
 - **The plan's cap** (`checkCachedRateLimit`, the cached branch and the late `hit` one)
   against **what the player pulls** (`capGateBitrate` → `playedBitrate`,
   `jobs/scripts/status_bitrate.go`: the video and one audio track, as the transcoder or
-  nginx-vod serve them), because that is what thp caps — the same number the transfer
+  nginx-vod serve them — the track the player starts on, its audio as the start's declaration
+  has it made, docs/player.md), because that is what thp caps — the same number the transfer
   status's "…and this file needs N" and its over-the-cap mark are made of, so the cap
   modal and the status say one thing. The file's rate is the fallback only where the
   played stream is not known (re-encoded video, stale tags, no per-track numbers). Before,
