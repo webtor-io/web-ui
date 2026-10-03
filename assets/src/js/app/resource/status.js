@@ -9,7 +9,7 @@ import { publishPlayerLabel } from '../../lib/playerLabel';
 import { applyBadge } from '../../lib/statusBadge';
 import { debugQuery } from '../../lib/statusDebug';
 import { watchStatusStream } from '../../lib/statusStream';
-import { NAVBAR_H } from '../../lib/stickyStatus';
+import { NAVBAR_H, fixedBottom } from '../../lib/stickyStatus';
 
 // The transfer status view (#torrent-status, views/resource/get.html): one
 // status stream per page, drawn into the card's block and into its copy in
@@ -126,13 +126,16 @@ av(async function() {
     // the time the layout is read, and leaves nothing (the block itself is
     // never its anchor: overflow-anchor none, views/resource/get.html). With
     // the block on screen and no film playing, nothing: the block is where
-    // the eye is, and the box comes in under it.
+    // the eye is, and the box comes in under it. Kept at its distance below
+    // what is fixed at the top, not below the window's top: the sticky bar,
+    // when up, grows with the same box, and a film kept still under it was
+    // covered by it (34 of 206 px left on a phone, review 2026-10-03).
     const steadily = (write) => {
         const ref = playingOnScreen() || (container.getBoundingClientRect().bottom <= 0 ? document.getElementById('content') : null);
-        const before = ref && ref.getBoundingClientRect().top;
+        const before = ref && ref.getBoundingClientRect().top - fixedBottom();
         write();
         if (!ref) return;
-        const d = ref.getBoundingClientRect().top - before;
+        const d = ref.getBoundingClientRect().top - fixedBottom() - before;
         if (d) window.scrollBy(0, d);
     };
     const render = () => {

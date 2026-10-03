@@ -153,3 +153,12 @@ export function stickyBottom(root = document) {
     bar.hidden = was;
     return NAVBAR_H + h;
 }
+
+// fixedBottom is where what is fixed at the top ends right now: the sticky
+// bar's bottom while it is up, the navbar's otherwise -- unlike stickyBottom,
+// not where it will end once a scroll lands.
+export function fixedBottom(root = document) {
+    const bar = root.querySelector('#torrent-status-sticky');
+    if (!bar || bar.hidden || bar.classList.contains('-translate-y-full')) return NAVBAR_H;
+    return bar.getBoundingClientRect().bottom;
+}

@@ -984,6 +984,60 @@ test('the block changing height: what is under it scrolled away, or a film playi
     assert.deepEqual(scrolls, [128, -128, 128, -128], 'closed: made up for too');
 });
 
+// The sticky bar up (the block scrolled away above it): the bar grows with
+// the same box, so what is kept still is the film's -- or the rows' --
+// distance below the bar, not below the top of the window. Kept below the
+// window's top, the film stayed and the grown bar covered it: 34 of its
+// 206 px left on a phone (review 2026-10-03).
+test('the block changing height under the sticky bar: kept at its distance below the bar', (t) => {
+    downloading(t);
+    // Before the × of the test above (three days back): no day of it here.
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() - 5 * DAY });
+    const box = () => card().querySelector('[data-tx-pbox]');
+    forgetBox();
+    source.message(S.active);
+    const bar = document.getElementById('torrent-status-sticky');
+    const mock = (el, rect) => {
+        const real = el.getBoundingClientRect;
+        el.getBoundingClientRect = rect;
+        t.after(() => { el.getBoundingClientRect = real; });
+    };
+    const wasHidden = bar.hidden;
+    const wasOff = bar.classList.contains('-translate-y-full');
+    bar.hidden = false;
+    bar.classList.remove('-translate-y-full');
+    const scrolls = [];
+    const realScrollBy = window.scrollBy;
+    window.scrollBy = (x, y) => scrolls.push(y);
+    t.after(() => {
+        window.scrollBy = realScrollBy;
+        bar.hidden = wasHidden;
+        bar.classList.toggle('-translate-y-full', wasOff);
+        delete video.dataset.statusOverCap;
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    // The box is 128 px in both blocks: the rows under the card's block move
+    // by it, and the bar's bottom with it.
+    const grown = () => (box().hidden ? 0 : 128);
+    mock(bar, () => ({ top: 72, bottom: 72 + 153 + grown() }));
+    mock(container, () => ({ top: -400, bottom: -10 }));
+    mock(document.getElementById('content'), () => ({ top: 200 + grown(), bottom: 650 + grown() }));
+    source.message(S.tier_dl);
+    assert.equal(box().hidden, false, 'fixture: the box came up');
+    assert.deepEqual(scrolls, [], 'the rows moved with the bar: nothing to make up');
+    forgetBox();
+    assert.deepEqual(scrolls, [], 'gone: nothing either');
+    // A film playing on screen that does not move (the block is not above
+    // it in the flow): kept below the grown bar, it moves down with it.
+    mock(video, () => ({ top: 300, bottom: 506 }));
+    video.dataset.statusOverCap = '';
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 4 });
+    source.message(S.tier_dl);
+    assert.equal(box().hidden, false, 'fixture: the stream box came up');
+    assert.deepEqual(scrolls, [-128], 'the film kept its distance below the bar');
+});
+
 test('the plan boxes\' buttons are watched for their impression', () => {
     const watched = observed.flatMap((io) => io.targets);
     assert.equal(watched.length, 4, 'two boxes per block, two blocks');
