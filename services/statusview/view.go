@@ -903,7 +903,9 @@ func (b *builder) badge() Badge {
 		if pct(t.Progress) > 0 {
 			l += " " + ps
 		}
-		return Badge{Tone: "warn", Icon: "warn", Label: l, Extra: swarm}
+		// No swarm in brackets: the approved badge has none (owner,
+		// 2026-09-25 -- the badge as the mockup draws it).
+		return Badge{Tone: "warn", Icon: "warn", Label: l}
 	case b.key == KeyVaulted || b.key == KeyVaultedTier || b.key == KeyVaultedIdle:
 		// Vault's purple and its layers, as approved (2026-09-25); the old
 		// one was the green shield.

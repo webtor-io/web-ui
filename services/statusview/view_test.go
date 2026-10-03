@@ -349,7 +349,7 @@ func TestBuild_EveryStateOfTheDesign(t *testing.T) {
 			bar:   Bar{Mode: "pieces", Tone: "vault"},
 			hint:  "Vault ждёт недостающие куски: у 12 пиров на связи есть только 73% раздачи. Он продолжает проверять и вернёт очки, если куски не появятся."},
 		{design: "vault_failed", in: anonFree(Torrent{State: "vault_failed", Progress: 37, Seeders: 3, SwarmKnown: true, Pieces: true}, zero), key: KeyVaultFailed,
-			badge: "warn warn Перенос не удался, повторяем 37% (3 сида)",
+			badge: "warn warn Перенос не удался, повторяем 37%",
 			bar:   Bar{Mode: "pieces", Tone: "vault"},
 			hint:  "Последняя попытка сохранить раздачу в Vault не прошла. Vault продолжает пробовать; ничего не потеряно."},
 		{design: "vaulting_idle", in: anonFree(Torrent{State: "vaulting", Progress: 64, Seeders: 9, SwarmKnown: true, Pieces: true}, zero), key: KeyVaultingIdle,

@@ -65,11 +65,10 @@
    "badge": {
     "tone": "warn",
     "icon": "warn",
-    "label": "Перенос не удался, повторяем 37%",
-    "extra": "(3 сида)"
+    "label": "Перенос не удался, повторяем 37%"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"warn\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-warn\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Перенос не удался, повторяем 37% (3 сида)\"\u003e\u003cspan data-tx-blabel\u003eПеренос не удался, повторяем 37%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(3 сида)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"warn\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-warn\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Перенос не удался, повторяем 37%\"\u003e\u003cspan data-tx-blabel\u003eПеренос не удался, повторяем 37%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "vaulted_idle",

@@ -185,7 +185,7 @@ func TestStatusStream_DashboardBadgeIsThePagesBadge(t *testing.T) {
 		{"debug_status=caching&progress=43" + avail, statusview.KeyMissingIdle, "Needed pieces missing · 43%", "(12 peers, 0 seeders)"},
 		{"debug_status=vaulting&progress=64&seeders=9", statusview.KeyVaultingIdle, "Vaulting 64%", "(9 seeders)"},
 		{"debug_status=vault_waiting", statusview.KeyVaultWait, "Waiting for seeders", ""},
-		{"debug_status=vault_failed&progress=37&seeders=3", statusview.KeyVaultFailed, "Transfer failed, retrying 37%", "(3 seeders)"},
+		{"debug_status=vault_failed&progress=37&seeders=3", statusview.KeyVaultFailed, "Transfer failed, retrying 37%", ""},
 		{"debug_status=caching&progress=43&seeders=14&paused=1", statusview.KeyPaused, "Caching paused 43%", "(14 seeders)"},
 		{"debug_status=vaulted", statusview.KeyVaultedIdle, "Vaulted", ""},
 	} {
