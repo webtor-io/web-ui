@@ -87,7 +87,13 @@ the badge (`TestHold_SlowSwarmStaysOnTheChain`; a stop after such a swarm
 reaches the badge that much later). The gap is measured from a still call
 to the next move: the loop calls the hold more than once on one piece (its
 frame, a tick, a thp event within `movingFor`), and the second call of a
-piece measured "a gap" of a fraction of a second -- back to `HoldFor`. Through the hold it is **drawn as it last
+piece measured "a gap" of a fraction of a second -- back to `HoldFor`. A
+swarm that moves in every call for longer than `HoldFor` has no gap any
+more: a fast one's frame comes every second and the tick within
+`movingFor` of it, so no call saw it still, and the gap from its last pause
+(the player's, a seek, a cold start) stayed -- after 40 s of nothing and
+five minutes of moving, its stop kept the chain for a minute
+(`TestHold_AFastSwarmForgetsAnOldGap`). Through the hold it is **drawn as it last
 moved**: its last speed, the sweep, and the key that went with it
 (`Input.HeldBps`) — never a pause, a dash or a badge key's hint on the chain;
 the paused, missing and idle stories are the badge's, told once the hold is

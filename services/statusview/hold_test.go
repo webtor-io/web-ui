@@ -96,6 +96,36 @@ func TestHold_SlowSwarmStaysOnTheChain(t *testing.T) {
 	}
 }
 
+// A fast swarm moves in every call: its frame each second, and the tick and
+// a thp event within the half second after it (movingFor), so no call sees
+// it still. The gap it was held for came from its last pause -- the
+// player's, a seek, a cold start -- and stayed: after 40 s of nothing and
+// then five minutes of a frame every second, its stop kept the chain for a
+// minute. Moving for longer than HoldFor, it has no gap any more.
+func TestHold_AFastSwarmForgetsAnOldGap(t *testing.T) {
+	t0 := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	at := func(ms int) time.Time { return t0.Add(time.Duration(ms) * time.Millisecond) }
+	r := mbpsBytes(38)
+	var h Hold
+	h.Swarm(r, t0)
+	for s := 1; s < 40; s++ {
+		h.Swarm(0, at(s*1000))
+	}
+	last := 0
+	for s := 40; s < 340; s++ {
+		h.Swarm(r, at(s*1000))
+		h.Swarm(r, at(s*1000+300))
+		last = s*1000 + 300
+	}
+	ms := last
+	for h.Swarm(0, at(ms)) != 0 {
+		ms += 100
+	}
+	if held := time.Duration(ms-last) * time.Millisecond; held > HoldFor {
+		t.Errorf("held %v after a stop, a 40 s pause five minutes before it", held)
+	}
+}
+
 // The viewer's stream to thp is lost (a pod rotation, an ingress reload)
 // and reopened with backoff; the reopened stream's first event carries no
 // speed. Through that the viewer stays on the chain as last read -- for
