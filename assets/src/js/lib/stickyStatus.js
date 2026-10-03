@@ -58,10 +58,17 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     let shown = false;
     let hideTimer = null;
     const win = bar.ownerDocument.defaultView;
+    const html = bar.ownerDocument.documentElement;
+    // Keyboard focus and anchors stop below what is fixed at the top: the
+    // navbar alone is style.css's html scroll-padding-top; while the bar is
+    // up its height joins it, measured on every call -- the box in it comes
+    // and goes.
+    const pad = () => { html.style.scrollPaddingTop = shown ? `${stickyBottom(root)}px` : ''; };
     const apply = () => {
         const show = offScreen && moving && win.innerHeight >= MIN_WINDOW_H;
-        if (show === shown) return;
+        if (show === shown) { pad(); return; }
         shown = show;
+        pad();
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
         // `hidden` is what takes it out of the a11y tree and off the screen;
         // the transform is the movement. Unhidden first, so the transition
@@ -134,6 +141,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
 
     return () => {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        html.style.scrollPaddingTop = '';
         io.disconnect();
         win.removeEventListener('resize', apply);
         document.removeEventListener('torrent-status', onStatus);

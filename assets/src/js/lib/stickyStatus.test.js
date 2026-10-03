@@ -283,3 +283,31 @@ test('stickyBottom: the navbar, plus the bar when something moves', async () => 
     assert.equal(stickyBottom(document), NAVBAR_H);
     p.stop();
 });
+
+// Keyboard focus and anchors stop below what is fixed at the top: the
+// navbar's 72 px are style.css's html scroll-padding-top, and while the bar
+// is up its height joins them -- measured on every message, for the box in
+// it comes and goes. Down, the stylesheet's alone again.
+test('while the bar is up, focus and anchors stop below it as well as the navbar', async () => {
+    const html = document.documentElement;
+    const p = page();
+    let h = 60;
+    Object.defineProperty(p.bar, 'offsetHeight', { configurable: true, get: () => h });
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    p.io.fire(false, -120);
+    await settle();
+    assert.equal(p.bar.hidden, false, 'fixture: up');
+    assert.equal(html.style.scrollPaddingTop, `${NAVBAR_H + 60}px`);
+    h = 216; // the plan box came up in it
+    status({ resourceId: 'res', state: 'tier', moving: true });
+    await settle();
+    assert.equal(html.style.scrollPaddingTop, `${NAVBAR_H + 216}px`, 'measured again on a message');
+    p.io.fire(true, 40);
+    await settle();
+    assert.equal(html.style.scrollPaddingTop, '', 'down: the stylesheet\'s navbar alone');
+    p.io.fire(false, -120);
+    await settle();
+    assert.notEqual(html.style.scrollPaddingTop, '');
+    p.stop();
+    assert.equal(html.style.scrollPaddingTop, '', 'stopped: none of its own');
+});
