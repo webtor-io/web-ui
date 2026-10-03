@@ -788,6 +788,15 @@ html {
 .tx-dx:hover {
   color: #f1f5f9;
 }
+/* Touch: a finger's size, as the box's × (.tx-px) and the player card's;
+   the glyph and the header's height stay where they were. */
+@media (pointer: coarse) {
+  .tx-dx {
+    width: 44px;
+    height: 44px;
+    margin: -12px -14px -12px 0;
+  }
+}
 .tx-dx svg {
   width: 16px;
   height: 16px;

@@ -151,3 +151,9 @@ test('nothing of the status or the Vault rows moves for a viewer who asked for l
         for (const sel of r.sel.split(',').map((s) => s.trim())) assert.ok(still.has(sel), `${sel} keeps its animation`);
     }
 });
+
+test('the details\' × is a finger\'s size on a touch screen, as the box\'s', () => {
+    const coarse = rule('.tx-dx', ['pointer: coarse']);
+    assert.equal(coarse.width, '44px');
+    assert.equal(coarse.height, '44px');
+});
