@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,7 @@ import (
 	"github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/statusview"
 	vault "github.com/webtor-io/web-ui/services/vault"
+	"github.com/webtor-io/web-ui/services/web"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 )
@@ -284,10 +286,11 @@ func liveOffers() *offer.Service {
 // statusServer serves the real status handler the way the app does, minus
 // the page: a session and a CSRF token in place, the viewer's tier in the
 // claims, language routing.
-func statusServer(t *testing.T, h *Handler, tier, rate string) *httptest.Server {
+func statusServer(t *testing.T, h *Handler, tier, rate string, mw ...gin.HandlerFunc) *httptest.Server {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.Use(mw...)
 	r.Use(sessions.Sessions("session", cookie.NewStore([]byte("test-secret"))))
 	r.Use(func(c *gin.Context) {
 		c.Set("csrfSecret", "s")
@@ -811,5 +814,48 @@ func TestStatusStream_VaultPollFollowsTheTransfer(t *testing.T) {
 	}
 	if vaultPollTicks(&vaultModels.Resource{Funded: true, Vaulted: true}, true) != vaultedPollEvery {
 		t.Error("vaulted: polled least")
+	}
+}
+
+// A pod going away ends its status streams as soon as the drain begins --
+// not 20 s later at the drain's timeout -- each with a retry of its own
+// between one and five seconds, so the tabs do not all come back to the
+// remaining pods in the same instant.
+func TestStatusStream_EndsWhenTheServerDrains(t *testing.T) {
+	node := newFakeNode(t, atCapEvents(3))
+	h := &Handler{api: testAPI(t, node.srv), offers: liveOffers()}
+	drain := make(chan struct{})
+	srv := statusServer(t, h, "free", "5M", func(c *gin.Context) {
+		c.Request = c.Request.WithContext(web.WithDrain(c.Request.Context(), drain))
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	msgs, raw, rawMu := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok&session=1")
+	until(t, msgs, 5*time.Second, "the first message", func(map[string]any) bool { return true })
+	close(drain)
+	select {
+	case <-func() chan struct{} {
+		done := make(chan struct{})
+		go func() {
+			for range msgs {
+			}
+			close(done)
+		}()
+		return done
+	}():
+	case <-time.After(2 * time.Second):
+		t.Fatal("the stream is still open after the drain began")
+	}
+	rawMu.Lock()
+	sent := raw.String()
+	rawMu.Unlock()
+	var ms int
+	for _, line := range strings.Split(sent, "\n") {
+		if v, ok := strings.CutPrefix(line, "retry: "); ok {
+			ms, _ = strconv.Atoi(v)
+		}
+	}
+	if ms < 1000 || ms > 5000 {
+		t.Errorf("retry %d ms, want 1000..5000", ms)
 	}
 }

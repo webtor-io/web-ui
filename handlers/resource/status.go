@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"time"
@@ -21,6 +23,7 @@ import (
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/statusview"
 	vault "github.com/webtor-io/web-ui/services/vault"
+	"github.com/webtor-io/web-ui/services/web"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 )
@@ -620,11 +623,21 @@ func (s *Handler) status(c *gin.Context) {
 		go s.statusLoop(ctx, claims, resourceID, statusCh, env)
 	}
 
+	// The pod is shutting down: end now rather than hold the drain until
+	// its timeout and be cut then. retry spreads the tabs' reconnects to
+	// the remaining pods over a few seconds (the browser's default would
+	// bring them all back at once).
+	draining := web.Draining(c.Request.Context())
+
 	c.Stream(func(w io.Writer) bool {
 		ticker := time.NewTicker(5 * time.Second)
 		select {
 		case <-ctx.Done():
 			ticker.Stop()
+			return false
+		case <-draining:
+			ticker.Stop()
+			_, _ = fmt.Fprintf(w, "retry: %d\n\n", 1000+rand.IntN(4000))
 			return false
 		case <-ticker.C:
 			c.SSEvent("ping", "")

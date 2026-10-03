@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -67,7 +68,29 @@ func (s *Web) Serve() error {
 	if h == nil {
 		h = s.r
 	}
-	return s.gs.Serve(&http.Server{Handler: h}, ln)
+	srv := &http.Server{Handler: h}
+	drain := make(chan struct{})
+	srv.RegisterOnShutdown(func() { close(drain) })
+	srv.BaseContext = func(net.Listener) context.Context { return WithDrain(context.Background(), drain) }
+	return s.gs.Serve(srv, ln)
+}
+
+type drainKey struct{}
+
+// Draining fires when the server serving ctx's request begins to shut
+// down; nil -- never -- outside one. Shutdown waits for every request up to
+// WEB_SHUTDOWN_TIMEOUT and does not cancel their contexts, so a long-lived
+// stream (the status SSE) held every pod stop for the whole 20 s and was
+// cut then anyway: it ends on this instead, and the browser reconnects to
+// another pod.
+func Draining(ctx context.Context) <-chan struct{} {
+	ch, _ := ctx.Value(drainKey{}).(<-chan struct{})
+	return ch
+}
+
+// WithDrain is ctx with drain as its Draining signal.
+func WithDrain(ctx context.Context, drain <-chan struct{}) context.Context {
+	return context.WithValue(ctx, drainKey{}, drain)
 }
 
 // Close drains the server (cs.GracefulServer): in-flight requests get up to

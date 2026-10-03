@@ -1064,6 +1064,15 @@ under the piece bar.
   is bounded at 2 s (`vaultReadTimeout`), the database row and the Vault API
   together: the loop waits on it, and an unbounded read stopped the stream's
   first message and every tick while the pool was exhausted.
+- **Pod shutdown.** `http.Server.Shutdown` waits for every request up to
+  `WEB_SHUTDOWN_TIMEOUT` (20 s) without cancelling it, so the status streams
+  held every web-ui pod stop for the whole of it and were cut then anyway
+  (114 of 158 stops in a week timed out). The server signals the drain
+  (`web.Draining`, set from `RegisterOnShutdown` through `BaseContext`):
+  the status stream sends `retry:` with a random 1–5 s and ends at once, and
+  the page's EventSource reconnects to another pod after that delay, the
+  tabs spread out instead of all at once. Other long streams (job logs)
+  still drain as before.
 - **Token rotation.** thp ends every stream at its token's expiry (10
   minutes). That is planned, not a failure: 30 s before it the watch opens
   the next stream with a fresh token and switches to it the moment it opens

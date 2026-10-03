@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -79,5 +80,52 @@ func TestCloseDrainsInFlightRequests(t *testing.T) {
 	}
 	if _, err := http.Get(url); err == nil {
 		t.Fatal("server still accepts connections after Close")
+	}
+}
+
+// A long-lived stream (the status SSE) holds the drain until its timeout --
+// 20 s on every pod stop -- and is cut then anyway. Draining tells it the
+// drain has begun, so it can end at once and let the browser reconnect to
+// another pod.
+func TestDrainingSignalsLongStreams(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	started := make(chan struct{})
+	var drained atomic.Bool
+	r := gin.New()
+	r.GET("/stream", func(c *gin.Context) {
+		close(started)
+		select {
+		case <-Draining(c.Request.Context()):
+			drained.Store(true)
+		case <-time.After(4 * time.Second):
+		}
+		c.String(http.StatusOK, "bye")
+	})
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	s := &Web{host: "127.0.0.1", port: port, gs: cs.NewGracefulServer(5 * time.Second), r: r}
+	go func() { _ = s.Serve() }()
+	go func() {
+		for i := 0; i < 50; i++ {
+			if resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/stream", port)); err == nil {
+				_, _ = io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	<-started
+	start := time.Now()
+	s.Close()
+	if took := time.Since(start); !drained.Load() || took > time.Second {
+		t.Errorf("drained %v, Close took %v", drained.Load(), took.Round(time.Millisecond))
+	}
+	if Draining(context.Background()) != nil {
+		t.Error("outside a server: no signal (a nil channel never fires)")
 	}
 }
