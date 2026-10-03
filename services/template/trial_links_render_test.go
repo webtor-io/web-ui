@@ -284,3 +284,37 @@ func TestTrialTargetsTakeTheirLinkFromTrialURL(t *testing.T) {
 		}
 	}
 }
+
+// trialNoteRe is a trial's terms in a template: the span and its classes.
+var trialNoteRe = regexp.MustCompile(`<span class="([^"]*)"[^>]*>\{\{ tn \$\.Lang "offer\.trialNote"`)
+
+// The trial's terms ("7 days free · cancel anytime") are the honest half of
+// the offer, at 11 px under its button: w-sub, as the status's box has them
+// (.tx-pn). w-muted is 3.3-3.7:1 on the cards and modals they sit on, under
+// AA's 4.5:1 for text that small -- the grace popup, the first offer a free
+// stream gets, the lowest of them (review 2026-10-03).
+func TestTrialNotesAreLegible(t *testing.T) {
+	n := 0
+	err := filepath.WalkDir("../../templates", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".html") {
+			return err
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, m := range trialNoteRe.FindAllStringSubmatch(string(b), -1) {
+			n++
+			if !strings.Contains(" "+m[1]+" ", " text-w-sub ") {
+				t.Errorf("%s: the trial note is %q, want text-w-sub", path, m[1])
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 4 {
+		t.Errorf("%d trial notes in the templates: the download nudge, the grace popup, no_peers and slow_download have one each", n)
+	}
+}

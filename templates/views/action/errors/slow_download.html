@@ -102,7 +102,7 @@
                 {{ t $.Lang "offer.watchUncapped" }}
             </a>
             {{- if $offer.TrialDays }}
-            <span class="text-[11px] text-w-muted leading-tight text-center">{{ tn $.Lang "offer.trialNote" $offer.TrialDays }}</span>
+            <span class="text-[11px] text-w-sub leading-tight text-center">{{ tn $.Lang "offer.trialNote" $offer.TrialDays }}</span>
             {{- end }}
         </div>
         {{- else if and (not $isFree) hasPlans }}

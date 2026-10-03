@@ -298,7 +298,8 @@ Preview (dev only): `/notifications/preview/winback?lang=ru` (`reason=trial`,
 2. Name the surface in `offer.TrialFroms` (a `From*` constant) and in the table above,
    and link `{{ or (trialURL $.Lang "<surface>" $offer) $offer.URL (langPath $.Lang
    "/donate") }}`; the button names the outcome for this surface, `offer.trialNote` goes
-   under it when `.TrialDays` (see "The button").
+   under it when `.TrialDays` (see "The button"), 11 px in `text-w-sub` — `w-muted` is
+   under AA there (3.3–3.7:1; `TestTrialNotesAreLegible`).
 3. Add `data-umami-event` + `tier` + `target`, and an impression event if the click rate
    is going to be read.
 4. Cover it in a render test with a catalog, without one, with a trial the checkout
