@@ -84,31 +84,6 @@ test('the mirror needs both: the status out of view AND a transfer moving', asyn
     p.stop();
 });
 
-// A phone on its side: 390 px of window, the navbar 72 of them, and the bar
-// with its box another 156 -- 58% of the screen over an inline film. Not
-// there (review 2026-10-03); upright, the bar carries the whole box as the
-// owner decided (2026-09-25).
-test('a window under 500 px tall (a phone on its side): no bar; upright again, the bar', async (t) => {
-    const win = dom.window;
-    const setHeight = (h) => {
-        Object.defineProperty(win, 'innerHeight', { configurable: true, value: h });
-        win.dispatchEvent(new win.Event('resize'));
-    };
-    t.after(() => setHeight(768));
-    const p = page();
-    status({ resourceId: 'res', state: 'caching', moving: true });
-    p.io.fire(false, -120);
-    await settle();
-    assert.equal(p.bar.hidden, false, 'fixture: up');
-    setHeight(390);
-    await settle();
-    assert.equal(p.bar.hidden, true, 'on its side: down');
-    setHeight(844);
-    await settle();
-    assert.equal(p.bar.hidden, false, 'upright: up again');
-    p.stop();
-});
-
 test('a status that has not been scrolled to yet is not mirrored', async () => {
     const p = page();
     status({ resourceId: 'res', state: 'caching', moving: true });
@@ -275,9 +250,6 @@ test('stickyBottom: the navbar, plus the bar when something moves', async () => 
     assert.equal(p.bar.hidden, true, 'the card is still on screen');
     assert.equal(stickyBottom(document), NAVBAR_H + 181, 'measured while hidden');
     assert.equal(p.bar.hidden, true, 'and left hidden');
-    Object.defineProperty(dom.window, 'innerHeight', { configurable: true, value: 390 });
-    assert.equal(stickyBottom(document), NAVBAR_H, 'a phone on its side: the bar will not be up');
-    Object.defineProperty(dom.window, 'innerHeight', { configurable: true, value: 768 });
     status({ resourceId: 'res', state: 'cached', moving: false });
     await settle();
     assert.equal(stickyBottom(document), NAVBAR_H);

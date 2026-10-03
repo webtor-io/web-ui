@@ -39,12 +39,6 @@ export const NAVBAR_H = 72;
 // `hidden` may take it out of the tree.
 const SLIDE_MS = 200;
 
-// No bar in a window shorter than this: a phone on its side (390 px, the
-// navbar 72 of them, the bar with its box another 156 -- 58% of the screen
-// over an inline film; review 2026-10-03). Upright the bar carries the whole
-// box, as the owner decided (2026-09-25).
-const MIN_WINDOW_H = 500;
-
 export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     const bar = root.querySelector('#torrent-status-sticky');
     let real = root.querySelector('#torrent-status');
@@ -57,7 +51,6 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     // "show it again" for "already shown" and leave it parked off-screen.
     let shown = false;
     let hideTimer = null;
-    const win = bar.ownerDocument.defaultView;
     const html = bar.ownerDocument.documentElement;
     // Keyboard focus and anchors stop below what is fixed at the top: the
     // navbar alone is style.css's html scroll-padding-top; while the bar is
@@ -65,7 +58,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     // and goes.
     const pad = () => { html.style.scrollPaddingTop = shown ? `${stickyBottom(root)}px` : ''; };
     const apply = () => {
-        const show = offScreen && moving && win.innerHeight >= MIN_WINDOW_H;
+        const show = offScreen && moving;
         if (show === shown) { pad(); return; }
         shown = show;
         pad();
@@ -115,8 +108,6 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
         apply();
     }, { threshold: 0, rootMargin: `-${NAVBAR_H}px 0px 0px 0px` });
     io.observe(real);
-    // A phone turned: the window's height decides again.
-    win.addEventListener('resize', apply);
 
     const onStatus = (e) => {
         if (!e.detail || e.detail.resourceId !== real.dataset.resourceId) return;
@@ -143,7 +134,6 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
         html.style.scrollPaddingTop = '';
         io.disconnect();
-        win.removeEventListener('resize', apply);
         document.removeEventListener('torrent-status', onStatus);
         window.removeEventListener('async', onSwap);
     };
@@ -151,13 +141,12 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
 
 // stickyBottom is where what is fixed at the top of the page ends once the
 // status block has scrolled away: the navbar, and under it the sticky status
-// whenever something moves in a window tall enough for it -- it will be up by
-// the time a scroll lands. The
+// whenever something moves -- it will be up by the time a scroll lands. The
 // bar mirrors the whole block (plan box included), so its height is measured,
 // not assumed: unhidden and hidden again in the same task, nothing painted.
 export function stickyBottom(root = document) {
     const bar = root.querySelector('#torrent-status-sticky');
-    if (!bar || !bar.hasAttribute('data-moving') || bar.ownerDocument.defaultView.innerHeight < MIN_WINDOW_H) return NAVBAR_H;
+    if (!bar || !bar.hasAttribute('data-moving')) return NAVBAR_H;
     const was = bar.hidden;
     bar.hidden = false;
     const h = bar.offsetHeight;
