@@ -37,6 +37,7 @@ import (
 	"github.com/supertokens/supertokens-golang/recipe/userroles"
 	"github.com/supertokens/supertokens-golang/supertokens"
 	"github.com/urfave/cli"
+	"github.com/webtor-io/lazymap"
 )
 
 const (
@@ -114,7 +115,15 @@ type Auth struct {
 	hasSupetokens       bool
 	overrideUserEmail   string
 	adminStore          *adminauth.Store
+	// userIDs remembers which web-ui user a SuperTokens user resolved to
+	// (resolveUser).
+	userIDs *lazymap.LazyMap[uuid.UUID]
 }
+
+// userIDsExpire bounds the one staleness the userIDs cache adds: a Patreon
+// user's email, which GetOrCreateUser rewrites when Patreon reports a new
+// one, waits for the entry to expire.
+const userIDsExpire = 10 * time.Minute
 
 func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 	return &Auth{
@@ -135,6 +144,11 @@ func New(c *cli.Context, cl *http.Client, pg *cs.PG) *Auth {
 		patreonClientSecret: c.String(patreonClientSecretFlag),
 		overrideUserEmail:   c.String(overrideUserEmail),
 		adminStore:          adminauth.NewStore(c.String(adminPasswordFlag), adminauth.NewPGRepo(pg)),
+		userIDs: lazymap.New[uuid.UUID](&lazymap.Config{
+			Expire:      userIDsExpire,
+			Capacity:    10000,
+			Concurrency: 256,
+		}),
 	}
 }
 
@@ -424,7 +438,7 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 	}
 	if sess != nil {
 		ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
-		u, isNew, err := s.createUser(r.Context(), sess, func(name string) { metrics.MarkAt(c, name) })
+		u, isNew, err := s.resolveUser(r.Context(), sess, func(name string) { metrics.MarkAt(c, name) })
 		if err != nil {
 			// App DB unreachable while materializing the user — same class.
 			_ = c.Error(err)
@@ -436,6 +450,77 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 		otherHandler(w, r.WithContext(ctx))
 	} else {
 		otherHandler(w, r)
+	}
+}
+
+// resolveUser is createUser with the SuperTokens user -> web-ui user pair
+// remembered. The pair does not change (Email is identity, see models.User),
+// so a hit skips both SuperTokens core lookups and the get-or-create and
+// reads the row by primary key: the user is as fresh as before. Those were
+// three calls in a row on every signed-in request, each into Postgres in the
+// end (the core keeps its users there); on 2026-10-03 they were most of a
+// signed-in page's time before its handler, 1.6 s at worst.
+func (s *Auth) resolveUser(ctx context.Context, sess sessmodels.SessionContainer, mark func(string)) (*models.User, bool, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return s.createUser(ctx, sess, mark)
+	}
+	// A miss is shared by every request of this user waiting on it, so it
+	// must not fail them all when the first one's client goes away.
+	shared := context.WithoutCancel(ctx)
+	return resolveCached(s.userIDs, sess.GetUserID(),
+		func() (*models.User, bool, error) { return s.createUser(shared, sess, mark) },
+		func(id uuid.UUID) (*models.User, error) {
+			defer mark("pg-user")
+			return models.GetUserByID(ctx, db, id)
+		})
+}
+
+// errNoUser is create's (nil, nil): createUser's degrade to "no user" when
+// the database is gone. Passed through as it was, and not kept.
+var errNoUser = defaultErrors.New("no user")
+
+// resolveCached is resolveUser's logic: create resolves the user the long
+// way (and is all a miss runs), load reads a user by primary key.
+func resolveCached(ids *lazymap.LazyMap[uuid.UUID], key string, create func() (*models.User, bool, error), load func(uuid.UUID) (*models.User, error)) (*models.User, bool, error) {
+	var u *models.User
+	var isNew bool
+	resolve := func() (id uuid.UUID, err error) {
+		// lazymap does not recover: a panic here would leave the entry
+		// loading for good and every later request of this user waiting.
+		defer func() {
+			if r := recover(); r != nil {
+				u, err = nil, fmt.Errorf("resolveUser: panic: %v", r)
+			}
+		}()
+		u, isNew, err = create()
+		if err == nil && u == nil {
+			err = errNoUser
+		}
+		if err != nil {
+			return uuid.Nil, err
+		}
+		return u.UserID, nil
+	}
+	for attempt := 0; ; attempt++ {
+		id, err := ids.Get(key, resolve)
+		if defaultErrors.Is(err, errNoUser) {
+			return nil, false, nil
+		}
+		if err != nil || u != nil {
+			// A miss resolved here, or failed (errors are not kept).
+			return u, isNew, err
+		}
+		got, err := load(id)
+		if err != nil || got != nil {
+			return got, false, err
+		}
+		// The row is gone (the account was deleted): resolve afresh through
+		// the cache, once, so the new pair is kept.
+		ids.Drop(key)
+		if attempt == 1 {
+			return nil, false, fmt.Errorf("resolveUser: user %s not found after resolving supertokens user %s again", id, key)
+		}
 	}
 }
 
