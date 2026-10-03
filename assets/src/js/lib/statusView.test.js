@@ -33,6 +33,15 @@ global.EventSource = class {
     // Test side: what the server would send.
     message(status) { this.onmessage({ data: JSON.stringify(status) }); }
     ping() { (this.listeners.ping || []).forEach((fn) => fn({})); }
+    // Refused (403): the browser closes it for good and says so once.
+    refuse() { this.readyState = 2; this.onerror({}); }
+};
+// The tab's visibility (jsdom's own says "prerender" for good).
+let visibility = 'visible';
+Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+const setVisibility = (v) => {
+    visibility = v;
+    document.dispatchEvent(new window.Event('visibilitychange'));
 };
 const observed = [];
 global.IntersectionObserver = class {
@@ -48,6 +57,8 @@ document.addEventListener('torrent-status', (e) => events.push(e.detail));
 // lib/av registers the init against the element holding the script; the
 // fixture's container is where get.html puts it.
 const container = document.getElementById('torrent-status');
+// What the view's renewal swaps in: the block as the server renders it.
+const FRESH = container.innerHTML;
 const script = document.createElement('script');
 container.appendChild(script);
 Object.defineProperty(document, 'currentScript', { configurable: true, get: () => script });
@@ -1038,6 +1049,181 @@ test('a stopped download keeps You with no transfer until a different file is pi
     assert.equal(card().querySelectorAll('[data-tx-node]')[2].hidden, true, 'new file has no remembered download');
     document.getElementById('file').append(video);
     freshVideo();
+});
+
+// ---- the stream's life: refused, renewed, given up, let go while hidden ----
+
+// The view's renewal as lib/async.js runs it (asyncLayout reload ->
+// loadAsyncView): the page URL fetched again with the view's X-Layout, the
+// block it renders swapped into the container, the async event, the view's
+// init again. The fetch is held here until the test lets it land.
+const reloads = [];
+const land = async ({ csrf = 'csrf-token', token = 'status-token' } = {}) => {
+    const done = reloads.shift();
+    container.innerHTML = FRESH;
+    const inner = container.querySelector('#torrent-status-block');
+    inner.dataset.csrf = csrf;
+    inner.dataset.statusToken = token;
+    window.dispatchEvent(new window.CustomEvent('async', { detail: { target: container } }));
+    await init.call(container);
+    if (done) done();
+    source = sources.at(-1);
+};
+const HOUR = 60 * 60 * 1000;
+// Each test on its own clock, hours past every other test's: the minute
+// between two renewals is the container's, and the tests share it.
+const lifecycle = (t, hours) => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() + hours * HOUR });
+    container.reload = () => new Promise((resolve) => reloads.push(resolve));
+    t.after(() => { reloads.length = 0; });
+};
+const streamParam = (name) => new URL(source.url, 'https://webtor.io').searchParams.get(name);
+// A page view from scratch on the shared container (leaving it, coming back).
+const restart = async () => {
+    destroy.call(container);
+    await init.call(container);
+    source = sources.at(-1);
+};
+
+// The CSRF pair is checked with the token (handlers/resource status.go): a
+// session cookie changed since the page (the CSRF storm of 2026-09-28)
+// refused the stream, and the renewal brought a fresh token but sent the
+// page's old CSRF -- refused again. The renewed block carries its own.
+test('a refused stream renews the block: the fresh token, and the CSRF that came with it', async (t) => {
+    lifecycle(t, 3);
+    await restart();
+    source.message(S.active);
+    const n = sources.length;
+    source.refuse();
+    assert.equal(reloads.length, 1, 'renewed at once');
+    await land({ csrf: 'csrf-2', token: 'status-token-2' });
+    assert.equal(sources.length, n + 1, 'a new stream on the renewed block');
+    assert.equal(streamParam('token'), 'status-token-2');
+    assert.equal(streamParam('_csrf'), 'csrf-2', 'the CSRF of the session the block was rendered for');
+});
+
+// The renewed block is the page's render -- for a torrent nothing has been
+// asked about yet, "checking" with its dots -- and the new stream's first
+// word comes only after the server has tried the seeder's stats. The last
+// word drawn stays meanwhile: no "checking", no hairline, every renewal.
+test('a renewed block draws the last word at once, not the page\'s "checking"', async (t) => {
+    lifecycle(t, 4);
+    await restart();
+    source.message(S.active);
+    source.refuse();
+    await land();
+    for (const block of [card(), sticky()]) {
+        assert.equal(block.getAttribute('data-key'), 'active');
+        assert.equal(block.getAttribute('data-mode'), 'chain');
+        assert.equal(block.querySelector('[data-tx-bar]').getAttribute('data-mode'), 'pieces');
+    }
+});
+
+// A second refusal within the minute after a renewal used to be dropped:
+// no retry, the block stood still on its first frame for good (129 of 4218
+// page views in 6 h, 2026-10-03). It waits for the minute's end now; and a
+// renewal that keeps being refused gives up out loud.
+test('refused again within the minute: renewed once it is up; refused for good: "Статус недоступен", the stream\'s word withdrawn', async (t) => {
+    lifecycle(t, 5);
+    await restart();
+    source.message(S.stream_stall);
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 1 });
+    fire('loadstart');
+    t.after(() => {
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    source.refuse();
+    assert.equal(reloads.length, 1, 'the first: at once');
+    await land();
+    source.refuse();
+    assert.equal(reloads.length, 0, 'within the minute: not yet');
+    t.mock.timers.tick(65 * 1000);
+    assert.equal(reloads.length, 1, 'once the minute is up: not dropped');
+    await land();
+    const n = sources.length;
+    source.refuse();
+    assert.equal(reloads.length, 0, 'renewing does not help: no more');
+    t.mock.timers.tick(5 * 60 * 1000);
+    assert.equal(reloads.length, 0);
+    assert.equal(sources.length, n);
+    for (const block of [card(), sticky()]) {
+        assert.equal(block.getAttribute('data-key'), 'status_unknown');
+        assert.equal(block.getAttribute('data-mode'), 'badge');
+        assert.equal(block.querySelector('[data-tx-badge]').getAttribute('data-icon'), 'unknown');
+        assert.equal(block.querySelector('[data-tx-blabel]').textContent, 'Статус недоступен');
+    }
+    assert.equal(window._txPlayerLabel, null, 'no status, no lock');
+    assert.equal(events.at(-1).moving, false, 'the sticky bar stands down');
+    fire('waiting');
+    t.mock.timers.tick(2000);
+    assert.equal(card().getAttribute('data-key'), 'status_unknown', 'nothing draws over it');
+    // A stream that works again (the next init) starts the count over.
+    await init.call(container);
+    source = sources.at(-1);
+    source.message(S.active);
+    source.refuse();
+    assert.equal(reloads.length, 1);
+});
+
+// Leaving the page while the renewal's fetch is out: the fetch still lands
+// in the container it was made for (lib/loadAsyncView.js) and ran the init
+// there -- a stream open for a page that is gone, its listeners on the next
+// page's player.
+test('leaving the page while the block renews: nothing comes back to life on the detached container', async (t) => {
+    lifecycle(t, 7);
+    await restart();
+    source.message(S.active);
+    source.refuse();
+    assert.equal(reloads.length, 1);
+    const n = sources.length;
+    const place = [container.parentNode, container.nextSibling];
+    destroy.call(container);
+    container.remove();
+    try {
+        await land();
+        assert.equal(sources.length, n, 'no stream for a page that is gone');
+    } finally {
+        place[0].insertBefore(container, place[1]);
+        await restart();
+    }
+});
+
+// A tab left in the background held its stream -- and the server's loop,
+// its Vault polling, the seeder's and the proxy's subscriptions -- for hours
+// (streams of an hour or more: 73% of all stream time, 2026-10-03). Hidden
+// for a minute it lets go; back, it opens again, renewing first where the
+// token it would open with has expired.
+test('a tab hidden for a minute lets the stream go; back, the stream again, renewed first once the token is old', async (t) => {
+    lifecycle(t, 8);
+    t.after(() => setVisibility('visible'));
+    await restart();
+    source.message(S.active);
+    let first = source;
+    setVisibility('hidden');
+    t.mock.timers.tick(30 * 1000);
+    setVisibility('visible');
+    t.mock.timers.tick(60 * 1000);
+    assert.equal(first.closed, false, 'away for half a minute: kept');
+    setVisibility('hidden');
+    t.mock.timers.tick(60 * 1000);
+    assert.equal(first.closed, true, 'a minute: let go');
+    const n = sources.length;
+    setVisibility('visible');
+    assert.equal(sources.length, n + 1, 'back: open again');
+    source = sources.at(-1);
+    assert.equal(streamParam('token'), 'status-token', 'the token still good');
+    assert.equal(card().getAttribute('data-key'), 'active', 'the block as it was meanwhile');
+    source.message(S.active);
+    first = source;
+    setVisibility('hidden');
+    t.mock.timers.tick(HOUR);
+    assert.equal(first.closed, true);
+    setVisibility('visible');
+    assert.equal(sources.length, n + 1, 'the token has expired: no stream on it');
+    assert.equal(reloads.length, 1, 'renewed first');
+    await land({ token: 'status-token-3' });
+    assert.equal(streamParam('token'), 'status-token-3');
 });
 
 // The server's last word (a vaulted torrent whose viewer's link cannot be

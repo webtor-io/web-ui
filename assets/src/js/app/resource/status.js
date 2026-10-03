@@ -3,10 +3,12 @@ import {
     NAVBAR_H, applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
     paintBar, playerCause, playerLabel, forPhase, present, upsellElsewhere,
 } from '../../lib/transferStatus';
-import { hide } from '../../lib/inPlace';
+import { attr, hide } from '../../lib/inPlace';
 import { createPlayerActivity } from '../../lib/playerActivity';
 import { publishPlayerLabel } from '../../lib/playerLabel';
+import { applyBadge } from '../../lib/statusBadge';
 import { debugQuery } from '../../lib/statusDebug';
+import { watchStatusStream } from '../../lib/statusStream';
 
 // The transfer status view (#torrent-status, views/resource/get.html): one
 // status stream per page, drawn into the card's block and into its copy in
@@ -43,6 +45,10 @@ const anchoring = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'f
 
 av(async function() {
     const container = this;
+    // A renewal's fetch that lands after the page has gone (lib/
+    // loadAsyncView.js swaps it into the container it was made for and runs
+    // this there): nothing to come back to.
+    if (!container.isConnected) return;
     const resourceId = container.dataset.resourceId;
     const inner = container.querySelector('#torrent-status-block');
     const card = inner && inner.querySelector('[data-tx]');
@@ -76,8 +82,13 @@ av(async function() {
     const ctaWatch = createCtaWatch({ umami: window.umami });
     for (const b of blocks) for (const box of b.refs.boxes) ctaWatch.watch(box.cta);
 
-    let last = null; // the last status message
-    let steady = null; // the last one that was not a gap
+    // The last status message -- kept on the container: a renewal's block is
+    // the page's render ("checking" for a torrent nothing has been asked
+    // about), and the new stream's first word comes only once the server has
+    // tried the seeder's stats. The last word is drawn into it meanwhile
+    // (below), not "checking" and the hairline for those seconds.
+    let last = container._statusLast || null;
+    let steady = last && !isGap(last) ? last : null; // the last one that was not a gap
     let gapSince = 0;
     let ticker = null;
     // Another file was picked and the stream reopened on it (onSwap), and
@@ -168,7 +179,7 @@ av(async function() {
         // (a paused buffer that stopped growing): drawn again every second
         // while there is one. A box kept up follows other offers coming and
         // going (its button) the same way.
-        const tick = phase !== 'none' || !!last.view.plan || held || !!last.view.playing || !!mem.box;
+        const tick = !asleep && (phase !== 'none' || !!last.view.plan || held || !!last.view.playing || !!mem.box);
         if (tick && !ticker) ticker = setInterval(render, TICK_MS);
         if (!tick && ticker) {
             clearInterval(ticker);
@@ -231,6 +242,7 @@ av(async function() {
             swapped = false;
         }
         last = status;
+        container._statusLast = status;
         render();
     };
 
@@ -249,8 +261,13 @@ av(async function() {
     // word brought it back in the sticky bar from `steady` (review
     // 2026-09-27). Set below, once the stream exists.
     let onSwap = null;
+    // The stream's life (lib/statusStream.js): set below, once there is one.
+    let stream = null;
+    // A hidden tab has let the stream go (lib/statusStream.js): no ticker.
+    let asleep = false;
 
     const teardown = () => {
+        if (stream) stream.stop();
         // No status, no word on the cap: the player's label goes plain.
         publishPlayerLabel(null);
         for (const x of closes) x.removeEventListener('click', onDismiss);
@@ -266,7 +283,10 @@ av(async function() {
         }
     };
 
-    const csrfToken = container.dataset.csrf;
+    // On the block a renewal swaps in, not on the container: the CSRF pair is
+    // the session cookie's, and a cookie changed since the page refused the
+    // renewed stream again with the page's old one.
+    const csrfToken = inner.dataset.csrf;
     if (!csrfToken) {
         container._statusTeardown = teardown;
         return;
@@ -294,24 +314,26 @@ av(async function() {
     // every few seconds.
     let finished = false;
 
-    // The token lives an hour; a long download or vaulting is watched for
-    // longer. When the stream is refused, reload this view the async way:
-    // this.reload() (lib/async.js asyncLayout) re-fetches the page URL with
-    // X-Layout "resource/status_inner", swaps in the fresh block with the
-    // fresh token, and re-runs this init. Same URL, so the edge's challenge
-    // clearance a person already holds lets it through and a client that
-    // never loaded the page stops right here. At most once per
-    // RELOAD_MIN_MS per view, so a dead stream never becomes a loop.
-    const RELOAD_MIN_MS = 60 * 1000;
-    const renew = () => {
-        if (!statusToken || typeof container.reload !== 'function') return;
-        const lastReload = container._statusReloadAt || 0;
-        if (Date.now() - lastReload < RELOAD_MIN_MS) return;
-        container._statusReloadAt = Date.now();
-        // loadAsyncView only destroys views *inside* the target; this view is
-        // the target, so drop our own listeners before the swap re-inits it.
-        if (container._statusTeardown) { container._statusTeardown(); container._statusTeardown = null; }
-        container.reload();
+    // Renewing gives nothing (lib/statusStream.js): the status says it is
+    // unavailable -- the badge statusview has for it, its words rendered with
+    // the block -- in both copies, and takes its word on the cap back from
+    // the player. Not the box: an up one stays, as through any state.
+    const dead = () => {
+        teardown();
+        container._statusTeardown = null;
+        container._statusLast = null;
+        const label = inner.dataset.statusUnknown || '';
+        for (const b of blocks) {
+            attr(b.refs.block, 'data-key', 'status_unknown');
+            attr(b.refs.block, 'data-mode', 'badge');
+            attr(b.refs.block, 'data-sticky', false);
+            applyBadge(b.refs.badge, { tone: 'muted', icon: 'unknown', label });
+            attr(b.refs.bar, 'data-mode', 'divider');
+            hide(b.refs.hint, true);
+        }
+        document.dispatchEvent(new CustomEvent('torrent-status', {
+            detail: { resourceId, state: 'unknown', moving: false },
+        }));
     };
 
     const open = () => {
@@ -331,6 +353,7 @@ av(async function() {
             } catch (err) {
                 return;
             }
+            stream.spoke();
             onStatus(status);
             if (status.final) {
                 finished = true;
@@ -339,15 +362,40 @@ av(async function() {
             }
         };
         source.onerror = () => {
-            // A refused stream (403 — token expired) closes the EventSource
-            // for good; network blips reconnect on their own with the same URL.
+            // A refused stream (403) closes the EventSource for good; network
+            // blips reconnect on their own with the same URL.
             if (source.readyState === EventSource.CLOSED) {
                 container._statusSource = null;
                 if (container._statusGone) return;
-                renew();
+                stream.refused();
             }
         };
     };
+    stream = watchStatusStream(container, {
+        open: () => {
+            asleep = false;
+            open();
+        },
+        close: () => {
+            asleep = true;
+            if (container._statusSource) container._statusSource.close();
+            container._statusSource = null;
+            if (ticker) {
+                clearInterval(ticker);
+                ticker = null;
+            }
+        },
+        // loadAsyncView only destroys views *inside* the target; this view
+        // is the target, so it drops its own listeners before the swap
+        // re-inits it.
+        teardown: () => {
+            if (container._statusTeardown) {
+                container._statusTeardown();
+                container._statusTeardown = null;
+            }
+        },
+        dead,
+    });
 
     onSwap = (e) => {
         if (!e.detail || !e.detail.target || e.detail.target.id !== 'content') return;
@@ -356,6 +404,7 @@ av(async function() {
         if (!next || next === file) return;
         file = next;
         container._statusDownloadSeen = false;
+        container._statusLast = null;
         swapped = true;
         mem.box = null;
         dropBoxes();
@@ -371,6 +420,7 @@ av(async function() {
     // streaming is answered from disk without loading it (torrent-web-seeder
     // cold stats), so there is nothing left to defer.
     container._statusTeardown = teardown;
+    render();
     open();
 
 }, function() {

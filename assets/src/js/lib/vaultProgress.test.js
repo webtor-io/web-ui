@@ -38,6 +38,13 @@ global.EventSource = class {
     message(status) { this.onmessage({ data: JSON.stringify(status) }); }
     refuse() { this.readyState = 2; this.onerror({}); }
 };
+// The tab's visibility (jsdom's own says "prerender" for good).
+let visibility = 'visible';
+Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+const setVisibility = (v) => {
+    visibility = v;
+    document.dispatchEvent(new window.Event('visibilitychange'));
+};
 
 // lib/av registers the init against the element holding the script: the
 // table's async-layout wrapper, where views/vault/index.html puts it.
@@ -179,17 +186,37 @@ test('vaulted: the badge the page renders for a vaulted pledge ("Saved"), the pu
     assert.equal(sources[0].closed, true);
 });
 
-test('a refused stream (its token expired) reloads the table the async way, at most once a minute', async () => {
+test('a refused stream (its token expired) reloads the table the async way, at most once a minute -- a refusal sooner waits for it', async (t) => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() });
     await destroy.call(target);
     await init.call(target);
+    t.after(() => destroy.call(target));
     assert.equal(sources.length, 4, 'a stream for each live row again');
     const [a, b] = sources.slice(2);
     let reloads = 0;
     root.reload = () => { reloads++; };
     a.refuse();
-    assert.equal(reloads, 1);
+    b.refuse();
+    assert.equal(reloads, 1, 'one renewal for the table');
     assert.equal(a.closed && b.closed, true, 'its own streams closed before the swap');
     await init.call(target);
     sources[4].refuse();
     assert.equal(reloads, 1, 'not again within the minute');
+    t.mock.timers.tick(65 * 1000);
+    assert.equal(reloads, 2, 'once it is up: not dropped');
+});
+
+test('a tab hidden for a minute lets the rows\' streams go; back, they open again', async (t) => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() + 60 * 60 * 1000 });
+    t.after(() => setVisibility('visible'));
+    await init.call(target);
+    t.after(() => destroy.call(target));
+    const n = sources.length;
+    const open = sources.slice(n - 2);
+    open[0].message(S.vaulting_only.status);
+    setVisibility('hidden');
+    t.mock.timers.tick(60 * 1000);
+    assert.ok(open.every((s) => s.closed), 'a minute away: let go');
+    setVisibility('visible');
+    assert.equal(sources.length, n + 2, 'back: a stream for each live row again');
 });

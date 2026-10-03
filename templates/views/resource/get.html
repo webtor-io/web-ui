@@ -17,9 +17,12 @@
      partial (fresh block + fresh token) in, then the view re-inits (lib/async.js
      asyncLayout, lib/loadAsyncView.js). Same route, same edge challenge. Called with the
      view context ($): .Data = GetData. data-status-file is the file the plan box's
-     download ETA prices (the whole torrent without one). */}}
+     download ETA prices (the whole torrent without one). The CSRF token rides with the
+     status token: both are the renewal's, and a session cookie changed since the page
+     refused the renewed stream again with the page's old one. data-status-unknown: the
+     status's words once renewing does not help (lib/statusStream.js). */}}
 {{ define "resource/status_inner" }}
-<div id="torrent-status-block" data-status-token="{{ statusToken .Data.Resource.ID }}"{{ with .Data }}{{ if and (has . "Item") .Item }} data-status-file="{{ .Item.PathStr }}"{{ end }}{{ end }}>
+<div id="torrent-status-block" data-status-token="{{ statusToken .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-status-unknown="{{ t .Lang "resource.status.unknown" }}"{{ with .Data }}{{ if and (has . "Item") .Item }} data-status-file="{{ .Item.PathStr }}"{{ end }}{{ end }}>
 {{- with .Data }}{{ if and (has . "StatusView") .StatusView }}{{ template "resource/status" (withContext $ .StatusView) }}{{ end }}{{ end }}
 </div>
 {{ "resource/status.js" | asset }}
@@ -77,7 +80,7 @@
 {{ end }}
 {{ end }}
 {{ define "resource/status_container" }}
-<div id="torrent-status" class="min-w-0" data-resource-id="{{ .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
+<div id="torrent-status" class="min-w-0" data-resource-id="{{ .Data.Resource.ID }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
     {{ template "resource/status_inner" . }}
 </div>
 {{ end }}

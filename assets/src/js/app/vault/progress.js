@@ -2,6 +2,7 @@ import av from '../../lib/av';
 import { langPath } from '../../lib/i18n';
 import { applyBadge, bindBadge } from '../../lib/statusBadge';
 import { debugQuery } from '../../lib/statusDebug';
+import { watchStatusStream } from '../../lib/statusStream';
 
 // The Vault page's live rows (views/vault/index.html "vault/pledges_table"):
 // one status stream per pledge being vaulted -- the resource page's
@@ -104,26 +105,6 @@ function rowBadge(status, savedLabel) {
     return { ...(b || SAVED), label: savedLabel };
 }
 
-// The status stream takes a page-issued, hash-bound token that lives an hour
-// (handlers/resource/torrent_link.go); a vaulting is watched for longer. When
-// a stream is refused, reload the table the async way: this.reload()
-// (lib/async.js asyncLayout) re-fetches /vault with X-Layout
-// "vault/pledges_table", swaps in rows with fresh tokens and re-runs this
-// init. At most once per RELOAD_MIN_MS per view, so a dead stream never
-// becomes a loop.
-const RELOAD_MIN_MS = 60 * 1000;
-
-function renew(root) {
-    if (root._vaultProgressGone || typeof root.reload !== 'function') return;
-    const last = root._vaultProgressReloadAt || 0;
-    if (Date.now() - last < RELOAD_MIN_MS) return;
-    root._vaultProgressReloadAt = Date.now();
-    // loadAsyncView only destroys views *inside* the target; this view is the
-    // target, so close our own streams before the swap re-inits it.
-    closeAll(root);
-    root.reload();
-}
-
 function closeAll(root) {
     if (root._vaultProgressSources) {
         root._vaultProgressSources.forEach((s) => s.close());
@@ -131,7 +112,13 @@ function closeAll(root) {
     }
 }
 
-function attachRow(root, row) {
+// The status stream takes a page-issued, hash-bound token that lives an hour
+// (handlers/resource/torrent_link.go); a vaulting is watched for longer. A
+// refused stream renews the table the async way (lib/statusStream.js: this
+// view's reload() re-fetches /vault with X-Layout "vault/pledges_table" and
+// swaps in rows with fresh tokens), and a hidden tab lets the streams go --
+// the same life as the resource page's status.
+function attachRow(stream, row) {
     const resourceId = row.dataset.resourceId;
     const csrf = row.dataset.csrf;
     if (!resourceId || !csrf) return null;
@@ -153,6 +140,7 @@ function attachRow(root, row) {
         } catch (err) {
             return;
         }
+        stream.spoke();
         applyRowFill(row, status);
         applyBadge(badge, rowBadge(status, savedLabel));
         if (status.state === 'vaulted') {
@@ -161,9 +149,9 @@ function attachRow(root, row) {
         }
     };
     source.onerror = () => {
-        // A refused stream (403 — token expired) closes the EventSource for
-        // good; network blips reconnect on their own with the same URL.
-        if (statusToken && source.readyState === EventSource.CLOSED) renew(root);
+        // A refused stream (403) closes the EventSource for good; network
+        // blips reconnect on their own with the same URL.
+        if (source.readyState === EventSource.CLOSED) stream.refused();
     };
 
     return source;
@@ -171,19 +159,27 @@ function attachRow(root, row) {
 
 av(async function () {
     const root = this;
-    root._vaultProgressGone = false;
+    // A renewal that lands after the page has gone: nothing to come back to.
+    if (!root.isConnected) return;
     const rows = root.querySelectorAll('[data-vault-progress]');
     if (!rows.length) return;
 
-    const sources = [];
-    rows.forEach((row) => {
-        const s = attachRow(root, row);
-        if (s) sources.push(s);
-    });
-    root._vaultProgressSources = sources;
+    const open = () => {
+        const sources = [];
+        rows.forEach((row) => {
+            const s = attachRow(stream, row);
+            if (s) sources.push(s);
+        });
+        root._vaultProgressSources = sources;
+    };
+    // Given up (renewing gives nothing): the rows keep their last word. A
+    // signed-in page whose CSRF keeps being refused has lost its session.
+    const stream = watchStatusStream(root, { open, close: () => closeAll(root), teardown: () => closeAll(root), dead: () => closeAll(root) });
+    root._vaultProgressStream = stream;
+    open();
 }, function () {
     const root = this;
-    root._vaultProgressGone = true;
+    if (root._vaultProgressStream) root._vaultProgressStream.stop();
     closeAll(root);
 });
 
