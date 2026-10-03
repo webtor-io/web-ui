@@ -44,7 +44,7 @@ function page() {
         <div id="torrent-status-sticky" hidden class="-translate-y-full">
             <div data-status-mirror-for="res"></div>
         </div>`;
-    const stop = initStickyStatus(document, { slideMs: 0, holdMs: 30 });
+    const stop = initStickyStatus(document, { slideMs: 0 });
     return { stop, bar: document.querySelector('#torrent-status-sticky'), io: observers[0] };
 }
 const status = (detail) => document.dispatchEvent(new dom.window.CustomEvent('torrent-status', { detail }));
@@ -203,32 +203,17 @@ test('it slides out before it is hidden, and a quick return cancels the hiding',
     stop();
 });
 
-test('a one-second gap in the data does not blink the bar; a lasting one takes it down', async () => {
-    const p = page(); // holdMs: 30
+// The status view holds a gap in the data itself (statusView.test.js): the
+// bar believes `moving` as it comes, a gap's included.
+test('`moving` as it comes: the bar has no hold of its own', async () => {
+    const p = page();
     status({ resourceId: 'res', state: 'caching', moving: true });
     p.io.fire(false, -100);
     await settle();
     assert.equal(p.bar.hidden, false);
-
-    // Stats briefly unavailable, then back: the bar never leaves.
     status({ resourceId: 'res', state: 'unknown', moving: false });
     await settle();
-    assert.equal(p.bar.hidden, false, 'held through the gap');
-    status({ resourceId: 'res', state: 'caching', moving: true });
-    await new Promise((r) => setTimeout(r, 60));
-    assert.equal(p.bar.hidden, false, 'and the cancelled stop never lands');
-
-    // The same status that stays is believed.
-    status({ resourceId: 'res', state: 'idle', moving: false });
-    await new Promise((r) => setTimeout(r, 60));
-    assert.equal(p.bar.hidden, true, 'a transfer that really stopped');
-
-    // An answer is not a gap: no waiting.
-    status({ resourceId: 'res', state: 'caching', moving: true });
-    await settle();
-    status({ resourceId: 'res', state: 'cached', moving: false });
-    await settle();
-    assert.equal(p.bar.hidden, true, 'cached ends it at once');
+    assert.equal(p.bar.hidden, true, 'the view stopped holding it: down');
     p.stop();
 });
 

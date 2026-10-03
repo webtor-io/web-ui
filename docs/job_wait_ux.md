@@ -44,7 +44,10 @@ Shown only when **both** hold: the real `#torrent-status` has gone under the nav
 view's `sticky` — the chain is up (bytes from the swarm, bytes to the viewer, the plan's
 cap binding, or the viewer waiting for data; the chain gives way to the badge only 10 s
 after the last movement). The badge — nothing moves — has no sticky bar. The mirror keeps
-its last picture through a 1-second `unknown`/`idle` gap (up to 8 s).
+its last picture through a 1-second `unknown`/`idle` gap, and stays up with it (up to
+8 s; one hold, the status view's: the event's `moving` is the held view's, and
+`stickyStatus.js` has none of its own since 2026-10-03 — two timers on one rule could
+drift apart). The hold outlives the status token's renewal.
 
 - "Gone upwards" is `bottom <= rootBounds.top`, **not** `top < 0`: the observer fires at
   the crossing, when the top is still ~+28 px, and never again — `top < 0` worked on a

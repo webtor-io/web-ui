@@ -1,6 +1,6 @@
 import av from '../../lib/av';
 import {
-    NAVBAR_H, applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
+    applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
     paintBar, playerCause, playerLabel, playing, forPhase, present, upsellElsewhere,
 } from '../../lib/transferStatus';
 import { attr, hide } from '../../lib/inPlace';
@@ -9,6 +9,7 @@ import { publishPlayerLabel } from '../../lib/playerLabel';
 import { applyBadge } from '../../lib/statusBadge';
 import { debugQuery } from '../../lib/statusDebug';
 import { watchStatusStream } from '../../lib/statusStream';
+import { NAVBAR_H } from '../../lib/stickyStatus';
 
 // The transfer status view (#torrent-status, views/resource/get.html): one
 // status stream per page, drawn into the card's block and into its copy in
@@ -26,7 +27,8 @@ import { watchStatusStream } from '../../lib/statusStream';
 // unavailable (`unknown`) or a missed stats event (`idle`), both gone a second
 // later mid-transfer. The sticky bar keeps its last picture through them for
 // up to GAP_HOLD_MS -- repainting it read as a blink (owner, 2026-09-20) --
-// and stickyStatus.js holds the bar itself up for as long.
+// and stays up with it (the event's `moving` is the held view's; the bar has
+// no hold of its own).
 const isGap = (status) => status.state === 'unknown' || status.state === 'idle';
 const GAP_HOLD_MS = 8000;
 
@@ -82,14 +84,17 @@ av(async function() {
     const ctaWatch = createCtaWatch({ umami: window.umami });
     for (const b of blocks) for (const box of b.refs.boxes) ctaWatch.watch(box.cta);
 
-    // The last status message -- kept on the container: a renewal's block is
-    // the page's render ("checking" for a torrent nothing has been asked
-    // about), and the new stream's first word comes only once the server has
-    // tried the seeder's stats. The last word is drawn into it meanwhile
-    // (below), not "checking" and the hairline for those seconds.
-    let last = container._statusLast || null;
-    let steady = last && !isGap(last) ? last : null; // the last one that was not a gap
-    let gapSince = 0;
+    // The last status message, the last one that was not a gap and when the
+    // gap began -- kept on the container: a renewal's block is the page's
+    // render ("checking" for a torrent nothing has been asked about), and the
+    // new stream's first word comes only once the server has tried the
+    // seeder's stats. The last word is drawn into it meanwhile (below), not
+    // "checking" and the hairline for those seconds; a gap under way is
+    // still held (the sticky bar's one hold).
+    const kept = container._statusKept || {};
+    let last = kept.last || null;
+    let steady = kept.steady || null;
+    let gapSince = kept.gapSince || 0;
     let ticker = null;
     // Another file was picked and the stream reopened on it (onSwap), and
     // the new stream has not yet said anything but a gap: `last` and
@@ -180,9 +185,10 @@ av(async function() {
         // Broadcast rather than reach into the sticky bar from here: this
         // view owns the stream, not the page furniture that shows it.
         // `moving`: the chain is up -- something moves, or the viewer waits
-        // (the badge has no sticky bar).
+        // (the badge has no sticky bar) -- in the view the bar keeps through
+        // a gap in the data: the bar stays up with its picture, one hold.
         document.dispatchEvent(new CustomEvent('torrent-status', {
-            detail: { resourceId, state: last.state, moving: !!shown(last).sticky },
+            detail: { resourceId, state: last.state, moving: !!shown(held ? steady : last).sticky },
         }));
         // The view the player keeps changes with the player's own time too
         // (a paused buffer that stopped growing): drawn again every second
@@ -251,7 +257,7 @@ av(async function() {
             swapped = false;
         }
         last = status;
-        container._statusLast = status;
+        container._statusKept = { last, steady, gapSince };
         render();
     };
 
@@ -330,7 +336,7 @@ av(async function() {
     const dead = () => {
         teardown();
         container._statusTeardown = null;
-        container._statusLast = null;
+        container._statusKept = null;
         const label = inner.dataset.statusUnknown || '';
         for (const b of blocks) {
             attr(b.refs.block, 'data-key', 'status_unknown');
@@ -413,7 +419,7 @@ av(async function() {
         if (!next || next === file) return;
         file = next;
         container._statusDownloadSeen = false;
-        container._statusLast = null;
+        container._statusKept = null;
         swapped = true;
         mem.box = null;
         dropBoxes();

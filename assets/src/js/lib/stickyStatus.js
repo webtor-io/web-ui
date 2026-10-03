@@ -23,21 +23,23 @@
 //   - something is moving (the `moving` of the torrent-status event, the
 //     view's `sticky`): bytes from the swarm, bytes to the viewer, or the
 //     plan's cap binding -- a finished or idle torrent that nobody is
-//     receiving has nothing to report, and the bar would be furniture.
+//     receiving has nothing to report, and the bar would be furniture. A
+//     gap in the data (the seeder's stats a second away) is held by the
+//     status view itself: `moving` is the view the bar keeps through it
+//     (app/resource/status.js), so the bar does not blink with it (owner,
+//     2026-09-20) and goes once the gap is believed.
 
 // The navbar the mirror sits under (`top-[72px]` in the markup); the same
 // number shrinks the observer's root so the status counts as gone when it
-// slides under the navbar rather than when it leaves the window.
-const NAVBAR_H = 72;
+// slides under the navbar rather than when it leaves the window. A plain
+// constant: the status view imports it too (two bundles, no state).
+export const NAVBAR_H = 72;
 
 // Matches `duration-200` on the bar: how long it takes to slide away before
 // `hidden` may take it out of the tree.
 const SLIDE_MS = 200;
 
-// How long a transfer may look stopped before the bar believes it.
-const HOLD_MS = 8000;
-
-export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs = HOLD_MS } = {}) {
+export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     const bar = root.querySelector('#torrent-status-sticky');
     let real = root.querySelector('#torrent-status');
     if (!bar || !real || typeof IntersectionObserver !== 'function') return null;
@@ -100,25 +102,10 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs =
     }, { threshold: 0, rootMargin: `-${NAVBAR_H}px 0px 0px 0px` });
     io.observe(real);
 
-    // A transfer does not stop being one because a single status said so.
-    // The stream reports `unknown` when the seeder's stats are briefly
-    // unavailable and `idle` when a stats event is missing, then `caching`
-    // again a second later -- and the bar blinked out and back with it
-    // (owner, 2026-09-20). Those two are held for a grace period before they
-    // count; an answer (`cached`, `vaulted`, `vault_failed`) ends it at once.
-    const HOLD = new Set(['unknown', 'idle']);
-    let stopTimer = null;
     const onStatus = (e) => {
         if (!e.detail || e.detail.resourceId !== real.dataset.resourceId) return;
-        const now = !!e.detail.moving;
-        if (now || !HOLD.has(e.detail.state)) {
-            if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
-            setMoving(now);
-            apply();
-            return;
-        }
-        if (!moving || stopTimer) return;
-        stopTimer = setTimeout(() => { stopTimer = null; setMoving(false); apply(); }, holdMs);
+        setMoving(!!e.detail.moving);
+        apply();
     };
     document.addEventListener('torrent-status', onStatus);
 
@@ -138,7 +125,6 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS, holdMs =
 
     return () => {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-        if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
         io.disconnect();
         document.removeEventListener('torrent-status', onStatus);
         window.removeEventListener('async', onSwap);

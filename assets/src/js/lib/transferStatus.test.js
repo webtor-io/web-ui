@@ -17,9 +17,10 @@ global.document = dom.window.document;
 
 const {
     present, applyView, bindBlock, paintBar, mirrorBlock, initDetails, upsellElsewhere, createCtaWatch, safeHref, ctaProps,
-    playing, holesMask, NAVBAR_H, playerLabel, playerCause,
+    playing, holesMask, playerLabel, playerCause,
     keepBox, newBoxMemory, applyKeptBox, boxDismissed, dismissBox, dismissedAt, BOX_GOES, BOX_QUIET_HINTS, DISMISS_KEY, DISMISS_MS,
 } = await import('./transferStatus.js');
+const { NAVBAR_H } = await import('./stickyStatus.js');
 
 function page() {
     document.body.innerHTML = PAGE;

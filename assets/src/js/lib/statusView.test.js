@@ -140,8 +140,8 @@ test('a message is drawn into both blocks, and the sticky bar is told whether an
         assert.equal(block.querySelector('[data-tx-bar]').getAttribute('data-mode'), 'pieces');
     }
     assert.deepEqual(events.at(-1), { resourceId: RID, state: 'caching', moving: true });
-    source.message(S.idle_torrent);
-    assert.deepEqual(events.at(-1), { resourceId: RID, state: 'idle', moving: false });
+    source.message(S.cached);
+    assert.deepEqual(events.at(-1), { resourceId: RID, state: 'cached', moving: false });
 });
 
 test('long swarm gaps keep all three actors in the card and sticky chain while downloading or playing', (t) => {
@@ -566,13 +566,23 @@ test('the ×: gone from both blocks, none for a day; the pink cap and the player
     assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'a day on: the box again');
 });
 
-test('a one-second gap: the card says it, the sticky bar keeps its picture', () => {
+// The bar itself is held up with its picture: the event says `moving` from
+// the view the bar keeps, one hold for both (stickyStatus.js has none of its
+// own) -- for 8 s, then the gap is believed.
+test('a one-second gap: the card says it, the sticky bar keeps its picture and stays up; a lasting one takes it down', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 9 * 60 * 60 * 1000 });
     source.message(S.active);
     source.message(S.status_unknown);
     assert.equal(card().getAttribute('data-key'), 'status_unknown');
     assert.equal(sticky().getAttribute('data-key'), 'active', 'held through the gap');
+    assert.equal(events.at(-1).moving, true, 'and the bar with it');
     source.message(S.active);
     assert.equal(sticky().getAttribute('data-key'), 'active');
+    source.message(S.idle_torrent);
+    assert.equal(events.at(-1).moving, true, 'a missed stats event: held as well');
+    t.mock.timers.tick(8000);
+    source.ping();
+    assert.equal(events.at(-1).moving, false, 'a gap that lasts: believed');
 });
 
 test('"vaulted" no longer ends the stream: the viewer\'s link keeps changing', () => {
@@ -1210,6 +1220,20 @@ test('a renewed block draws the last word at once, not the page\'s "checking"', 
         assert.equal(block.getAttribute('data-mode'), 'chain');
         assert.equal(block.querySelector('[data-tx-bar]').getAttribute('data-mode'), 'pieces');
     }
+});
+
+// The hold through a gap in the data outlives a renewal too: it is the one
+// that keeps the sticky bar up.
+test('a renewal in the middle of a gap: the next gap is still held', async (t) => {
+    lifecycle(t, 4.5);
+    await restart();
+    source.message(S.active);
+    source.message(S.status_unknown);
+    source.refuse();
+    await land();
+    source.message(S.status_unknown);
+    assert.equal(sticky().getAttribute('data-key'), 'active', 'the picture held');
+    assert.equal(events.at(-1).moving, true, 'and the bar up');
 });
 
 // A second refusal within the minute after a renewal used to be dropped:

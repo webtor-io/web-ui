@@ -43,12 +43,10 @@
 import { impressionKey } from './impression';
 import { attr, hide, text } from './inPlace';
 import { applyBadge, bindBadge } from './statusBadge';
+// The fixed navbar over the page: what sits under it is not on screen.
+import { NAVBAR_H } from './stickyStatus';
 
 const HAVE_POPOVER_API = (el) => !!el && typeof el.showPopover === 'function';
-
-// The fixed navbar over the page (`top-[72px]` under it in the markup, and
-// stickyStatus.js's NAVBAR_H): what sits under it is not on screen.
-export const NAVBAR_H = 72;
 
 // Only our own paths and https links become an href. The URL is the server's
 // (a /trial or /donate path, or the plan's checkout from the catalog), but a
