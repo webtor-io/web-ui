@@ -1361,6 +1361,36 @@ test('refused again within the minute: renewed once it is up; refused for good: 
     assert.equal(reloads.length, 1);
 });
 
+// Given up with the plan box up: the box stays, as through any state -- and
+// its × still closes it. Giving up let go of every listener, the ×'s with
+// them: the press did nothing (Umami counted a close all the same).
+test('refused for good with the box up: it stays, and its × still closes it', async (t) => {
+    lifecycle(t, 5.5);
+    await restart();
+    forgetBox();
+    downloading(t);
+    t.after(() => {
+        window.localStorage.removeItem('status-plan-box-dismissed');
+        container._txBox.dismissedAt = 0;
+    });
+    source.message(S.tier_dl);
+    const boxes = () => [card(), sticky()].flatMap((b) => Array.from(b.querySelectorAll('[data-tx-pbox]')));
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'fixture: the box up');
+    source.refuse();
+    await land();
+    source.refuse();
+    t.mock.timers.tick(65 * 1000);
+    await land();
+    source.refuse();
+    assert.equal(card().getAttribute('data-key'), 'status_unknown', 'fixture: given up');
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'the box stays');
+    card().querySelector('[data-tx-pclose]').click();
+    assert.ok(boxes().every((b) => b.hidden), 'the × closes it, in both blocks');
+    for (const block of [card(), sticky()]) {
+        assert.equal(block.getAttribute('data-key'), 'status_unknown', 'and draws no old word over it');
+    }
+});
+
 // Leaving the page while the renewal's fetch is out: the fetch still lands
 // in the container it was made for (lib/loadAsyncView.js) and ran the init
 // there -- a stream open for a page that is gone, its listeners on the next

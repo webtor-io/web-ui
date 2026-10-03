@@ -679,7 +679,9 @@ under the piece bar.
   and moved the page by a line). It goes only with no seeders (`noseed`) or a
   Vault failure (`vault_failed`), where the offer would be false, and at the
   viewer's ×: gone from the card and the sticky bar, none for 24 h in this
-  browser on any torrent (`localStorage["status-plan-box-dismissed"]`, a
+  browser on any torrent — also after the status gave up ("unavailable",
+  `status.js dead`: the × is the one listener it keeps) —
+  (`localStorage["status-plan-box-dismissed"]`, a
   timestamp; this page view remembers it where storage fails), Umami
   `donate-status-bar-dismiss` with the box's props. Its accessible name says
   so (`resource.status.dismissBox`, "Hide this offer for a day, on every

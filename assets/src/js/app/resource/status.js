@@ -375,9 +375,13 @@ av(async function() {
     // Renewing gives nothing (lib/statusStream.js): the status says it is
     // unavailable -- the badge statusview has for it, its words rendered with
     // the block -- in both copies, and takes its word on the cap back from
-    // the player. Not the box: an up one stays, as through any state.
+    // the player. Not the box: an up one stays, as through any state, and its
+    // × keeps working (teardown let go of it) -- with no last word to draw,
+    // so the press draws nothing over "unavailable".
     const dead = () => {
         teardown();
+        last = null;
+        for (const x of closes) x.addEventListener('click', onDismiss);
         container._statusTeardown = null;
         container._statusKept = null;
         const label = inner.dataset.statusUnknown || '';
