@@ -27,6 +27,7 @@ import (
 	_ "image/png"  // register decoder
 	"io"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -44,6 +45,7 @@ import (
 	_ "golang.org/x/image/webp" // register webp decoder
 	cs "github.com/webtor-io/common-services"
 	ra "github.com/webtor-io/rest-api/services"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 )
@@ -520,13 +522,18 @@ func contentProbeURL(dlURL string) string {
 	return dlURL + "~cp"
 }
 
-func (s *Service) fetchCapped(ctx context.Context, url string, maxBytes int64) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func (s *Service) fetchCapped(ctx context.Context, u string, maxBytes int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, err
 	}
 	resp, err := s.cl.Do(req)
 	if err != nil {
+		// A transport error quotes the URL, thp's with the token and the
+		// api-key: redacted, as services/api do() has it.
+		if ue, ok := err.(*url.Error); ok {
+			ue.URL = helpers.RedactURL(ue.URL)
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()
