@@ -44,14 +44,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "12 Мбит/с"
@@ -137,14 +135,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -244,14 +240,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -371,14 +365,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -478,14 +470,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -605,14 +595,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -712,14 +700,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -839,14 +825,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -947,14 +931,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -1074,14 +1056,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -1180,7 +1160,6 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "swarm",
       "on": true,
       "speed": "1,2 Мбит/с",
@@ -1188,7 +1167,6 @@
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "1,2 Мбит/с"
@@ -1275,7 +1253,6 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "swarm",
        "on": true,
        "speed": "1,2 Мбит/с",
@@ -1283,7 +1260,6 @@
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -1384,14 +1360,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "swarm",
       "speed": "0 Мбит/с",
       "note": "ждём данные"
@@ -1477,14 +1451,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -1585,14 +1557,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "swarm",
       "speed": "0 Мбит/с",
       "note": "нет нужных кусков"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "swarm",
       "speed": "0 Мбит/с",
       "note": "ждём данные"
@@ -1677,13 +1647,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -1782,14 +1750,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -1873,14 +1839,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -1974,13 +1938,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "24 Мбит/с"
@@ -2059,13 +2021,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -2155,13 +2115,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -2274,13 +2232,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -2376,13 +2332,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "off",
       "dots": true
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -2462,13 +2416,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "off",
        "dots": true
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -2565,13 +2517,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "pause",
       "speed": "пауза"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -2654,13 +2604,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "pause",
        "speed": "пауза"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -2761,13 +2709,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "off",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -2850,13 +2796,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "off",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -2955,14 +2899,12 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "swarm",
       "speed": "0 Мбит/с",
       "note": "нет нужных кусков"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -3046,13 +2988,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -3146,13 +3086,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "off",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -3230,13 +3168,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "off",
        "speed": "ждём данные"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -3326,13 +3262,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -3409,13 +3343,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -3510,13 +3442,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "off",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -3599,13 +3529,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "off",
        "speed": "ждём данные"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -3702,13 +3630,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -3791,13 +3717,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -3898,14 +3822,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "vault",
       "on": true,
       "speed": "22 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "12 Мбит/с"
@@ -3993,14 +3915,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "on": true,
        "speed": "22 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -4102,14 +4022,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "vault",
       "on": true,
       "speed": "22 Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -4195,14 +4113,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "on": true,
        "speed": "22 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -4298,13 +4214,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "24 Мбит/с"
@@ -4384,13 +4298,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -4481,13 +4393,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -4601,13 +4511,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -4698,13 +4606,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -4782,13 +4688,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -4886,13 +4790,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "off",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -4976,13 +4878,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "off",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -5083,14 +4983,12 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "swarm",
       "speed": "0 Мбит/с",
       "note": "нет нужных кусков"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -5174,13 +5072,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -5280,13 +5176,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "off",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -5369,13 +5263,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "off",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -5475,13 +5367,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "vault",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -5566,13 +5456,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -5673,14 +5561,12 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "on": true,
       "speed": "38 Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "plan",
       "on": true,
       "speed": "5 Мбит/с",
@@ -5777,14 +5663,12 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "on": true,
        "speed": "38 Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -5878,13 +5762,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -5961,13 +5843,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "flow",
        "on": true,
        "speed": "24 Мбит/с"
@@ -6047,13 +5927,11 @@
      "segs": [
       {
        "show": false,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -6149,13 +6027,11 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "12 Мбит/с"
@@ -6241,13 +6117,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -6348,13 +6222,11 @@
     "segs": [
      {
       "show": true,
-      "kind": "swarm",
       "tone": "vault",
       "speed": "— Мбит/с"
      },
      {
       "show": true,
-      "kind": "viewer",
       "tone": "flow",
       "on": true,
       "speed": "12 Мбит/с"
@@ -6442,13 +6314,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -6549,13 +6419,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "flow",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -6638,13 +6506,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "flow",
        "on": true,
        "speed": "12 Мбит/с"
@@ -6731,13 +6597,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "flow",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }
@@ -6838,13 +6702,11 @@
     "segs": [
      {
       "show": false,
-      "kind": "swarm",
       "tone": "vault",
       "speed": "— Мбит/с"
      },
      {
       "show": false,
-      "kind": "viewer",
       "tone": "off",
       "speed": "— Мбит/с"
      }
@@ -6929,13 +6791,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "flow",
        "on": true,
        "speed": "12 Мбит/с"
@@ -7024,13 +6884,11 @@
      "segs": [
       {
        "show": true,
-       "kind": "swarm",
        "tone": "vault",
        "speed": "— Мбит/с"
       },
       {
        "show": true,
-       "kind": "viewer",
        "tone": "off",
        "speed": "нет передачи"
       }

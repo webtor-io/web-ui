@@ -220,14 +220,11 @@ const (
 	planBoxOff = int(PlanBoxHold / sampleEvery)
 )
 
-// PlanBoxRun is how many of thp's full-window events at the cap the box
-// takes; PlanBoxFromOpen how many events of a stream at the cap from its
-// open (the zero-length window, thp's ring filling, then PlanBoxRun of
-// them). For the tests that feed a stream enough of them to reach it.
-const (
-	PlanBoxRun      = planBoxRun
-	PlanBoxFromOpen = thpWindowSec + planBoxRun
-)
+// PlanBoxFromOpen is how many events of a stream at the cap the box takes
+// from its open: the zero-length window, thp's ring filling, then
+// planBoxRun full-window ones. For the tests that feed a stream enough of
+// them to reach it.
+const PlanBoxFromOpen = thpWindowSec + planBoxRun
 
 // planLimited is the verdict for one event given the previous one. It turns
 // on only while requests come -- thp's word on the second since its previous

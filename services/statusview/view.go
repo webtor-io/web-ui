@@ -211,8 +211,7 @@ type Node struct {
 
 // Seg is one link of the chain, the arrow towards the viewer.
 type Seg struct {
-	Show bool   `json:"show"`
-	Kind string `json:"kind"` // swarm (swarm → source) | viewer (source → you)
+	Show bool `json:"show"`
 	// Tone is the colour, which says the cause: flow (cyan, data flowing),
 	// plan (pink, the plan's cap), swarm (amber, the swarm), vault (purple),
 	// pause (amber, dashed), off (grey, dashed).
@@ -409,7 +408,7 @@ func Build(in Input) *View {
 	alt := in
 	alt.Viewer = Viewer{Known: true, Present: true, CapMbps: in.Viewer.CapMbps}
 	v.Resting = build(alt)
-	v.Resting.Segs[1] = Seg{Show: true, Kind: "viewer", Tone: "off", Speed: i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.noTransfer")}
+	v.Resting.Segs[1] = Seg{Show: true, Tone: "off", Speed: i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.noTransfer")}
 	v.Resting.Details.Rows[2].Value = v.Resting.Segs[1].Speed
 	v.PreparingLabel = i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.waitingData")
 	v.PausedLabel = i18n.TranslateWithLocalizer(in.Loc, "resource.status.chain.paused")
@@ -420,7 +419,7 @@ func Build(in Input) *View {
 	if in.Torrent.State == "idle" || in.Torrent.State == "unknown" {
 		r := v.Resting
 		r.Nodes[0].Show = true
-		r.Segs[0] = Seg{Show: true, Kind: "swarm", Tone: "off", Speed: v.PreparingLabel}
+		r.Segs[0] = Seg{Show: true, Tone: "off", Speed: v.PreparingLabel}
 		r.Details.Rows[0].Show, r.Details.Rows[0].Value = true, v.PreparingLabel
 	}
 	return v
@@ -809,7 +808,7 @@ func (b *builder) sourceNode() Node {
 // swarmSeg is the swarm's link as it is now; whether it is drawn is
 // participants'.
 func (b *builder) swarmSeg() Seg {
-	s := Seg{Kind: "swarm", Tone: "off"}
+	s := Seg{Tone: "off"}
 	t := b.in.Torrent
 	rate := Quantize(BytesToMbps(t.RateBps))
 	flow := func(tone string) {
@@ -845,7 +844,7 @@ func (b *builder) swarmSeg() Seg {
 // whether they are drawn is participants'.
 func (b *builder) viewerSeg() (Seg, Node) {
 	you := Node{Kind: "you", Icon: "user", Name: b.t("resource.status.chain.you"), Caption: b.t("resource.status.chain.youCaption")}
-	s := Seg{Kind: "viewer", Tone: "off"}
+	s := Seg{Tone: "off"}
 	v := b.v
 	switch {
 	case !v.Known:
