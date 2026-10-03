@@ -1966,7 +1966,7 @@
     "donate.tier.vaultGB": "🗄️ {{.VP}} Vault Points ({{.VP}} GB)",
     "donate.tier.vaultTB": "🗄️ {{.VP}} Vault Points ({{.TB}} TB)",
     "donate.tier.vaultUnlimited": "🗄️ Unlimited Vault",
-    "donate.tier.speed": "⚡ Download speed up to {{.Rate}} Mbit/s",
+    "donate.tier.speed": "⚡ Download speed up to {{.Rate}} Mbps",
     "donate.tier.speedUnlimited": "⚡ Unlimited download speed",
     "donate.tier.prioritySupport": "🧑‍💼 Priority support",
     "donate.tier.supporterBadge": "❤️ Supporter badge",

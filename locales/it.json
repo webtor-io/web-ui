@@ -1885,7 +1885,7 @@
     "donate.tier.vaultGB": "🗄️ {{.VP}} Vault Points ({{.VP}} GB)",
     "donate.tier.vaultTB": "🗄️ {{.VP}} Vault Points ({{.TB}} TB)",
     "donate.tier.vaultUnlimited": "🗄️ Vault illimitato",
-    "donate.tier.speed": "⚡ Velocità di download fino a {{.Rate}} Mbit/s",
+    "donate.tier.speed": "⚡ Velocità di download fino a {{.Rate}} Mbps",
     "donate.tier.speedUnlimited": "⚡ Velocità di download illimitata",
     "donate.tier.prioritySupport": "🧑‍💼 Supporto prioritario",
     "donate.tier.supporterBadge": "❤️ Badge sostenitore",

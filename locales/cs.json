@@ -1911,7 +1911,7 @@
     "donate.tier.vaultGB": "🗄️ {{.VP}} Vault Points ({{.VP}} GB)",
     "donate.tier.vaultTB": "🗄️ {{.VP}} Vault Points ({{.TB}} TB)",
     "donate.tier.vaultUnlimited": "🗄️ Neomezený Vault",
-    "donate.tier.speed": "⚡ Rychlost stahování až {{.Rate}} Mbit/s",
+    "donate.tier.speed": "⚡ Rychlost stahování až {{.Rate}} Mbps",
     "donate.tier.speedUnlimited": "⚡ Neomezená rychlost stahování",
     "donate.tier.prioritySupport": "🧑‍💼 Prioritní podpora",
     "donate.tier.supporterBadge": "❤️ Odznak podporovatele",

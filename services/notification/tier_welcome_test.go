@@ -64,7 +64,7 @@ func TestSendTierWelcome_KeyPerTierAndAllLines(t *testing.T) {
 		// Benefit lines come from the donate card's copy, numbers from
 		// the catalog.
 		"250 Vault Points (250\u00a0GB)",
-		"up to 50\u00a0Mbit/s",
+		"up to 50\u00a0Mbps",
 		// Links carry labels, never raw URLs as text.
 		">Connect Stremio<", ">Open Vault<", ">Open Discover<", ">Pick a series to follow<", ">Manage or cancel on Patreon<",
 		"support.patreon.com", ">How to cancel, step by step<",

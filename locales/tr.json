@@ -1881,7 +1881,7 @@
     "donate.tier.vaultGB": "🗄️ {{.VP}} Vault Points ({{.VP}} GB)",
     "donate.tier.vaultTB": "🗄️ {{.VP}} Vault Points ({{.TB}} TB)",
     "donate.tier.vaultUnlimited": "🗄️ Sınırsız Vault",
-    "donate.tier.speed": "⚡ {{.Rate}} Mbit/s'ye kadar indirme hızı",
+    "donate.tier.speed": "⚡ {{.Rate}} Mbps'ye kadar indirme hızı",
     "donate.tier.speedUnlimited": "⚡ Sınırsız indirme hızı",
     "donate.tier.prioritySupport": "🧑‍💼 Öncelikli destek",
     "donate.tier.supporterBadge": "❤️ Destekçi rozeti",

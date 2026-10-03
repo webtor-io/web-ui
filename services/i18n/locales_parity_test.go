@@ -188,3 +188,24 @@ func TestUnitsFollowTheirNumberWithANoBreakSpace(t *testing.T) {
 		}
 	}
 }
+
+// TestMegabitIsSpelledOneWay: a locale writes the megabit one way, the way
+// the transfer status prints a speed (resource.status.mbps) -- "Mbps" in
+// most, "Мбит/с" in Russian. /donate's "up to 50 Mbit/s" under a status
+// card that said "5 Mbps" read as two different units.
+func TestMegabitIsSpelledOneWay(t *testing.T) {
+	spellings := []string{"Mbps", "Mbit/s", "MBit/s", "Mb/s", "Мбит/с", "Мб/с"}
+	for lang, d := range localeFiles(t) {
+		unit := strings.TrimPrefix(d["resource.status.mbps"], "{{.N}} ")
+		if unit == d["resource.status.mbps"] {
+			t.Fatalf("locales/%s.json: resource.status.mbps is not {{.N}} and a unit: %q", lang, unit)
+		}
+		for k, v := range d {
+			for _, s := range spellings {
+				if s != unit && strings.Contains(v, s) {
+					t.Errorf("locales/%s.json: %s writes %q, the status writes %q", lang, k, s, unit)
+				}
+			}
+		}
+	}
+}
