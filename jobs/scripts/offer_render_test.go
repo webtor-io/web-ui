@@ -115,10 +115,11 @@ func TestDownloadNudgeRenders(t *testing.T) {
 		// The title names the limit, the button the outcome ("up to": the file
 		// is not whole on our side, the swarm may be slower than any plan) and
 		// the wait the plan's time as its best case for the same reason, the
-		// line under the button the risk remover.
+		// line under the button the risk remover -- in the status box's grey
+		// (.tx-pn, w-sub: 4.5:1 at 11px, where w-muted was 3.6:1).
 		{"free, movie", prodCatalog(), true, FileDownload{URL: "u", TierName: "free", RateMbps: 5, SizeBytes: movie},
 			[]string{"Download speed is capped at 5\u00a0Mbps", "4.3\u00a0GB takes about 1\u00a0h 57\u00a0min. With a subscription — as little as 12\u00a0min",
-				`href="/trial?from=download-nudge"`, "Download up to 10× faster", "7 days free · cancel anytime",
+				`href="/trial?from=download-nudge"`, "Download up to 10× faster", `text-[11px] text-w-sub leading-tight text-center">7 days free · cancel anytime`,
 				`data-umami-event="donate-download"`, `data-umami-event-target="trial"`, "donate-download-shown", "eta: 1"},
 			[]string{"ads", "action.", "offer.", "Try free", "checkout.example"}},
 		// Already whole on our side: the cap is the only brake, so the full

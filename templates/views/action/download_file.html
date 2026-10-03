@@ -46,7 +46,7 @@
                 {{ if $x }}{{ if .Data.Cached }}{{ tn $.Lang "offer.downloadFaster" $x }}{{ else }}{{ tn $.Lang "offer.downloadUpTo" $x }}{{ end }}{{ else }}{{ t $.Lang "offer.downloadFasterPlain" }}{{ end }}
             </a>
             {{- if $offer.TrialDays }}
-            <span class="text-[11px] text-w-muted leading-tight text-center">{{ tn $.Lang "offer.trialNote" $offer.TrialDays }}</span>
+            <span class="text-[11px] text-w-sub leading-tight text-center">{{ tn $.Lang "offer.trialNote" $offer.TrialDays }}</span>
             {{- end }}
         </div>
     </div>
