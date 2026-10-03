@@ -17,6 +17,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/adminauth"
 	sv "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/metrics"
 
 	defaultErrors "errors"
 
@@ -390,6 +391,7 @@ type IsNewContext struct{}
 func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySessionOptions, otherHandler http.HandlerFunc) {
 	w, r := c.Writer, c.Request
 	sess, err := session.GetSession(r, w, options)
+	metrics.MarkAt(c, "st-session")
 	if err != nil {
 		ctx := context.WithValue(r.Context(), ErrorContext{}, err)
 		r := r.WithContext(ctx)
@@ -422,7 +424,7 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 	}
 	if sess != nil {
 		ctx := context.WithValue(r.Context(), sessmodels.SessionContext, sess)
-		u, isNew, err := s.createUser(r.Context(), sess)
+		u, isNew, err := s.createUser(r.Context(), sess, func(name string) { metrics.MarkAt(c, name) })
 		if err != nil {
 			// App DB unreachable while materializing the user — same class.
 			_ = c.Error(err)
@@ -437,7 +439,8 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 	}
 }
 
-func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer) (u *models.User, isNew bool, err error) {
+// mark notes each step for the home page's Server-Timing (metrics.MarkAt).
+func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer, mark func(string)) (u *models.User, isNew bool, err error) {
 	db := s.pg.Get()
 	if db == nil {
 		// Database outage is transient and recoverable, unlike an identity
@@ -454,17 +457,21 @@ func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer)
 
 	// Try to get user from passwordless first
 	userInfo, err := passwordless.GetUserByID(userID)
+	mark("st-passwordless")
 	if err == nil && userInfo != nil && userInfo.Email != nil {
+		defer mark("pg-user")
 		return models.GetOrCreateUser(ctx, db, *userInfo.Email, nil)
 	}
 
 	// If not found in passwordless, try third-party
 	tpUserInfo, err := thirdparty.GetUserByID(userID)
+	mark("st-thirdparty")
 	if err == nil && tpUserInfo != nil && tpUserInfo.Email != "" {
 		var patreonUserID *string = nil
 		if tpUserInfo.ThirdParty.ID == "patreon" {
 			patreonUserID = &tpUserInfo.ThirdParty.UserID
 		}
+		defer mark("pg-user")
 		return models.GetOrCreateUser(ctx, db, tpUserInfo.Email, patreonUserID)
 	}
 	// Every branch above either returned or carried its own error. Getting

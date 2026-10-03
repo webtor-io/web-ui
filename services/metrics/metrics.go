@@ -158,12 +158,19 @@ type mark struct {
 // service). ServerTiming turns the notes into segments.
 func Mark(name string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if t, ok := c.Get(startKey); ok {
-			marks, _ := c.Get(marksKey)
-			l, _ := marks.([]mark)
-			c.Set(marksKey, append(l, mark{name, time.Since(t.(time.Time))}))
-		}
+		MarkAt(c, name)
 		c.Next()
+	}
+}
+
+// MarkAt is Mark from inside a middleware, for the steps of one that calls
+// out more than once (auth: the session, the SuperTokens lookups, the user
+// row).
+func MarkAt(c *gin.Context, name string) {
+	if t, ok := c.Get(startKey); ok {
+		marks, _ := c.Get(marksKey)
+		l, _ := marks.([]mark)
+		c.Set(marksKey, append(l, mark{name, time.Since(t.(time.Time))}))
 	}
 }
 
