@@ -150,6 +150,22 @@ func TestGracePopupStartsTheTrialThroughTrial(t *testing.T) {
 			}
 			checkTrialCTA(t, "grace/"+c.name, lang, offer.FromGrace, out, c.target, c.href)
 		}
+		// In an embed whose domain lends its owner's claims the cap is not
+		// the viewer's to lift: the popup still says the free minutes are
+		// over and offers the cap's speed, and sells nothing.
+		data.CapLent = true
+		var buf bytes.Buffer
+		if err := tpl.ExecuteTemplate(&buf, "main", map[string]interface{}{"Data": data, "Lang": "en", "User": nil}); err != nil {
+			t.Fatalf("%s: execute: %v", c.name, err)
+		}
+		out := buf.String()
+		if !strings.Contains(out, `id="grace-cta"`) || !strings.Contains(out, "grace-cta-continue") {
+			t.Fatalf("%s, lent cap: the popup or its continue button did not render", c.name)
+		}
+		checkTrialCTA(t, "grace/lent/"+c.name, "en", offer.FromGrace, out, "", "")
+		if strings.Contains(out, "action.grace.body") || strings.Contains(out, "offer.trialNote") {
+			t.Errorf("%s, lent cap: the popup still asks for an upgrade", c.name)
+		}
 	}
 }
 
