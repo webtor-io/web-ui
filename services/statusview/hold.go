@@ -12,6 +12,11 @@ import "time"
 // in the data -- a stream to thp lost and being reopened.
 const HoldFor = 10 * time.Second
 
+// maxHold: a slow swarm's hold stretches over its gap between two pieces
+// (Hold.Swarm), never past this -- a swarm back after minutes of nothing is
+// not on a cadence of minutes, and a pause after it must reach the badge.
+const maxHold = time.Minute
+
 // Hold is the chain's memory for one status stream. Without a viewer, the
 // chain turns into the badge HoldFor after the swarm last moved. With a
 // viewer using an incomplete source, the swarm stays after that too, but
@@ -22,6 +27,8 @@ const HoldFor = 10 * time.Second
 type Hold struct {
 	at  time.Time
 	bps float64
+	// gap is the time between the swarm's last two moves.
+	gap time.Duration
 	// viewer is the last reading that put the viewer on the chain, taken
 	// at viewerAt.
 	viewer   Viewer
@@ -31,14 +38,22 @@ type Hold struct {
 // Swarm folds the swarm at now: bps is its rate while it moves -- its bytes
 // arrived just now, at a rate its label shows (the status loop's word) --
 // and 0 while it does not. It returns the rate the chain draws the swarm at
-// (Input.HeldBps): bps while it moves, the last one for HoldFor after it
+// (Input.HeldBps): bps while it moves, the last one for the hold after it
 // stopped, 0 once the hold is over or before it ever moved.
+//
+// The hold is HoldFor, or half as long again as the gap between the last two
+// moves when that is longer, up to maxHold: a slow swarm's big pieces (1.2
+// Mbps verifies a 4 MiB piece every ~27 s) came with the badge for the rest
+// of every gap. The first gap is not known until the second piece.
 func (h *Hold) Swarm(bps float64, now time.Time) float64 {
 	if Quantize(BytesToMbps(bps)) > 0 {
+		if !h.at.IsZero() {
+			h.gap = now.Sub(h.at)
+		}
 		h.at, h.bps = now, bps
 		return bps
 	}
-	if !h.at.IsZero() && now.Sub(h.at) < HoldFor {
+	if !h.at.IsZero() && now.Sub(h.at) < min(max(HoldFor, h.gap*3/2), maxHold) {
 		return h.bps
 	}
 	return 0

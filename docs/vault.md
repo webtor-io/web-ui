@@ -476,7 +476,14 @@ after the approval.
 
 **Transitions.** The two participants leave differently. **The swarm** is
 held: `statusview.Hold` — one per status stream (`viewEnv.hold`) — keeps it
-on the chain for `HoldFor` (10 s) after it last moved, **drawn as it last
+on the chain for `HoldFor` (10 s) after it last moved — or, once the gap
+between its last two moves is known and longer, for half as long again as
+that gap, at most a minute (`maxHold`): a slow swarm's big pieces (1.2 Mbps
+verifies a 4 MiB piece every ~27 s) handed the chain to the badge for the
+rest of every gap, 23 switches in 300 s (46 for 2 MiB, 11 for 8 MiB), and
+now only its first gap, before the second piece says how long one is, shows
+the badge (`TestHold_SlowSwarmStaysOnTheChain`; a stop after such a swarm
+reaches the badge that much later). Through the hold it is **drawn as it last
 moved**: its last speed, the sweep, and the key that went with it
 (`Input.HeldBps`) — never a pause, a dash or a badge key's hint on the chain;
 the paused, missing and idle stories are the badge's, told once the hold is
@@ -495,7 +502,7 @@ torrent open since its previous event (`active`, or `conns > 0`), and until
 thp has seen none for `statusview.PresenceDebounce` (2 s) —
 `Viewer.Present`, `Sample.presence`, `statusview.Meter`. Speed is only the
 number on their segment (a dash while a request is open and no bytes came
-yet, and again once none came for 10 s — `freshAfter`: the last number
+yet, and again once none came for 10 s — `freshAfter`: the last number
 stands through a second without bytes, not for good; thp counts a request
 from its first 2xx byte, so a segment the transcoder holds back reads as
 this dash, not as a stall; `TestMeter_LabelGoesWithTheBytes`). Measured the same day: thp's `conns` went 1→0 within 1.2 s of a
