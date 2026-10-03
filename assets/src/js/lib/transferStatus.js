@@ -401,7 +401,11 @@ export function newBoxMemory() {
 // under a box that stayed put (Chrome check 2026-09-27). It goes
 // only where the offer turns false (BOX_GOES), or at the viewer's close (not
 // here: dismissBox). The returned boxKey and boxCtx are the drawn box's state
-// and context -- its props, which the block's current key may have left.
+// and context -- its props, which the block's current key may have left:
+// those it came up with, while its words follow the server's box. One
+// appearance is one impression (createCtaWatch counts per set of props) and
+// its clicks carry the same state (2026-10-03: ~6% of the shown events were
+// an up box counted again as the state moved on, tier_dl -> cached_tier).
 export function keepBox(mem, pres, view, { dismissed = false, elsewhere = false } = {}) {
     if (BOX_GOES.has(view && view.key)) {
         mem.box = null;
@@ -409,7 +413,7 @@ export function keepBox(mem, pres, view, { dismissed = false, elsewhere = false 
     }
     const fresh = pres.box ? { box: pres.box, key: pres.key, ctx: pres.ctx, auth: (view && view.auth) || '', tier: (view && view.tier) || '' } : null;
     if (mem.box) {
-        if (fresh) mem.box = fresh;
+        if (fresh) mem.box = { ...fresh, key: mem.box.key, ctx: mem.box.ctx };
         const plan = !!(view && view.plan) || BOX_QUIET_HINTS.has(view && view.key);
         return {
             ...pres,

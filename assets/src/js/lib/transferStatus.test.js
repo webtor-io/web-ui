@@ -1137,18 +1137,19 @@ test('while the server sends a box, its words follow it in place', () => {
     assert.notDeepEqual(stall.box, dl.box, 'fixture: another variant');
     assert.equal(stall.box.title, 'Видео подгружается медленнее, чем играет');
     assert.equal(stall.box.sub, byDesign.stream_stall.stallSub);
-    assert.equal(stall.boxKey, 'stream_stall');
-    assert.equal(stall.boxCtx, 'stream');
+    // Its props are those it came up with: one appearance.
+    assert.equal(stall.boxKey, 'tier_dl');
+    assert.equal(stall.boxCtx, 'download');
     // Playing on: the server still sends the box, the player's rules drop
     // it -- the last words drawn stay, those of the stall.
     const ok = keep(mem, byDesign.stream_ok);
     assert.equal(ok.key, 'stream_ok', 'the block says the player plays');
     assert.deepEqual(ok.box, stall.box);
-    assert.equal(ok.boxKey, 'stream_stall');
+    assert.equal(ok.boxKey, 'tier_dl');
     // Cached now: the download box's words for a whole file.
     const cached = keep(mem, byDesign.cached_tier);
     assert.deepEqual(cached.box, present(byDesign.cached_tier.status.view, {}).box);
-    assert.equal(cached.boxKey, 'cached_tier');
+    assert.equal(cached.boxKey, 'tier_dl');
     // The server stops: those.
     assert.deepEqual(keep(mem, byDesign.cached).box, cached.box);
 });
@@ -1364,6 +1365,42 @@ test('a renewed block gets the kept box at once', () => {
     const none = page();
     applyKeptBox(none.refs, newBoxMemory(), 'card');
     assert.ok(Array.from(none.block.querySelectorAll('[data-tx-pbox]')).every((b) => b.hidden), 'nothing kept: nothing drawn');
+});
+
+// One appearance, one impression (2026-10-03: ~6% of the shown events were a
+// box already on screen counted again as the server's state moved on,
+// tier_dl -> cached_tier, stream_stall <-> stream_over): its words follow the
+// server's box in place, its props stay those it came up with -- the click
+// carries the same, so shows and clicks by state still compare.
+test('impression: a box up whose state moves on is the same appearance -- its words follow, its props stay', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { block, refs } = page();
+    const tracked = [];
+    let io;
+    class IO {
+        constructor(cb) { this.cb = cb; io = this; }
+        observe() {}
+        disconnect() {}
+        fire(el, ratio) { this.cb([{ target: el, isIntersecting: ratio > 0, intersectionRatio: ratio }]); }
+    }
+    const watch = createCtaWatch({ umami: { track: (n, p) => tracked.push([n, p]) }, IO, registry: new Set() });
+    const a = block.querySelector('[data-tx-cta]');
+    watch.watch(a);
+    const mem = newBoxMemory();
+    const draw = (st) => {
+        applyView(refs, st.status.view, keep(mem, st), 'card');
+        watch.refresh();
+    };
+    draw(byDesign.tier_dl);
+    io.fire(a, 1);
+    t.mock.timers.tick(1000);
+    assert.equal(tracked.length, 1, 'fixture: seen');
+    draw(byDesign.cached_tier);
+    t.mock.timers.tick(3000);
+    assert.equal(tracked.length, 1, 'cached now: the same appearance');
+    assert.equal(block.querySelector('[data-tx-pt]').textContent, present(byDesign.cached_tier.status.view, {}).box.title, 'its words follow');
+    assert.deepEqual(ctaProps(a), tracked[0][1], 'the props it came up with, on the click too');
+    watch.stop();
 });
 
 // The impression stays one per offer: a kept box whose props do not change is
