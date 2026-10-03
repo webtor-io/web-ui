@@ -79,8 +79,10 @@
     {{ end }}
 {{ end }}
 {{ end }}
+{{/* overflow-anchor: none -- the block is never the engine's scroll anchor: what its
+     own growth moves is made up for by app/resource/status.js (steadily). */}}
 {{ define "resource/status_container" }}
-<div id="torrent-status" class="min-w-0" data-resource-id="{{ .Data.Resource.ID }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
+<div id="torrent-status" class="min-w-0" style="overflow-anchor: none" data-resource-id="{{ .Data.Resource.ID }}" data-async-layout="{{`{{ template "resource/status_inner" $ }}`}}">
     {{ template "resource/status_inner" . }}
 </div>
 {{ end }}

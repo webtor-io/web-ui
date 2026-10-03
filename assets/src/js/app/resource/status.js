@@ -38,12 +38,16 @@ const GAP_HOLD_MS = 8000;
 // last status is drawn again every TICK_MS. Writes only what changed.
 const TICK_MS = 1000;
 
-// Engines without scroll anchoring (Safari before 27) move everything under
-// the card when its block grows or shrinks -- the plan box coming, closed by
-// the viewer, or gone with another file -- even while the block is scrolled
-// away, so a playing video jumps. There the page makes up for it itself
-// (steadily).
-const anchoring = () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('overflow-anchor', 'auto');
+// A film playing on screen: the page's own video, not paused or ended, at
+// least partly between the navbar and the bottom of the window.
+const playingOnScreen = () => {
+    for (const v of document.querySelectorAll('video')) {
+        if (v.paused || v.ended) continue;
+        const b = v.getBoundingClientRect();
+        if (b.bottom > NAVBAR_H && b.top < window.innerHeight) return v;
+    }
+    return null;
+};
 
 av(async function() {
     const container = this;
@@ -103,20 +107,26 @@ av(async function() {
     // box is not -- it priced the old file, and keepBox would take it as this
     // page view's.
     let swapped = false;
-    // Scrolled away above the viewport, on an engine that does not anchor:
-    // whatever the block gains or loses in height while `write` runs, the
-    // page scrolls by, so nothing under it moves.
+    // What must not move while `write` changes the block's height (the plan
+    // box coming, closed by the viewer, gone with another file): a film
+    // playing on screen -- the box came up over it and pushed it 114-191 px
+    // down -- and, with the block scrolled away above, everything under it
+    // (#content). Each is measured itself, before and after, and the page
+    // scrolls by what it actually moved, in every engine: Chrome anchors the
+    // scroll on the poster beside the block on wide screens, which does not
+    // move, so the rows under the block jumped all the same (2026-10-03); an
+    // engine that anchored on something that did move has made up for it by
+    // the time the layout is read, and leaves nothing (the block itself is
+    // never its anchor: overflow-anchor none, views/resource/get.html). With
+    // the block on screen and no film playing, nothing: the block is where
+    // the eye is, and the box comes in under it.
     const steadily = (write) => {
-        let before = null;
-        if (!anchoring()) {
-            const r = container.getBoundingClientRect();
-            if (r.bottom <= 0) before = r.height;
-        }
+        const ref = playingOnScreen() || (container.getBoundingClientRect().bottom <= 0 ? document.getElementById('content') : null);
+        const before = ref && ref.getBoundingClientRect().top;
         write();
-        if (before !== null) {
-            const d = container.getBoundingClientRect().height - before;
-            if (d) window.scrollBy(0, d);
-        }
+        if (!ref) return;
+        const d = ref.getBoundingClientRect().top - before;
+        if (d) window.scrollBy(0, d);
     };
     const render = () => {
         if (!last || !last.view) return;

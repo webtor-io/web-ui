@@ -910,10 +910,15 @@ test('a session seek: the lock and the cause the server gave stay through its PO
     }
 });
 
-// Engines without scroll anchoring move everything under the card when its
-// block changes height, even with the card scrolled away: the page scrolls
-// by the difference itself there -- and leaves it to the engine elsewhere.
-test('scrolled away on an engine without anchoring: the page makes up for the block\'s height', (t) => {
+// What must not move when the block changes height (the plan box coming,
+// closed, gone with another file). With the block scrolled away above:
+// everything under it -- Chrome anchors the scroll on the poster beside the
+// block on wide screens, and the poster does not move, so the rows under the
+// block jumped 114 px (2026-10-03). With the block on screen: a film playing
+// on screen -- the box came up over it and pushed it 114-191 px down. Each
+// measured itself before and after the write: an engine that has made up for
+// it (anchored on something that moved) leaves nothing to make up for.
+test('the block changing height: what is under it scrolled away, or a film playing on screen, stays put', (t) => {
     downloading(t);
     // The × below is remembered for a day: stamped three days back, it has
     // run out for the tests after this one.
@@ -921,35 +926,62 @@ test('scrolled away on an engine without anchoring: the page makes up for the bl
     const box = () => card().querySelector('[data-tx-pbox]');
     forgetBox();
     source.message(S.active); // a known start: no box
-    const realRect = container.getBoundingClientRect;
-    const away = () => ({ top: -400, bottom: -10, height: box().hidden ? 150 : 278 });
-    container.getBoundingClientRect = away;
+    const mock = (el, rect) => {
+        const real = el.getBoundingClientRect;
+        el.getBoundingClientRect = rect;
+        t.after(() => { el.getBoundingClientRect = real; });
+    };
+    // The box is 128 px: what is under the block moves by it, unless the
+    // engine anchored on it.
+    const under = (top) => () => ({ top: top + (box().hidden ? 0 : 128), bottom: top + 450 + (box().hidden ? 0 : 128) });
     const scrolls = [];
     const realScrollBy = window.scrollBy;
     window.scrollBy = (x, y) => scrolls.push(y);
-    const realCSS = global.CSS;
-    global.CSS = { supports: () => false };
+    t.after(() => {
+        window.scrollBy = realScrollBy;
+        delete video.dataset.statusOverCap;
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    let block = { top: -400, bottom: -10 };
+    mock(container, () => block);
+    const content = document.getElementById('content');
+    mock(content, under(200));
     source.message(S.tier_dl);
-    assert.deepEqual(scrolls, [128], 'the plan box came in: scrolled by its height');
+    assert.deepEqual(scrolls, [128], 'scrolled away: the box came in, made up for');
     source.message(S.active);
     assert.deepEqual(scrolls, [128], 'the cap over: the box stays, nothing to make up');
-    global.CSS = { supports: (p) => p === 'overflow-anchor' };
     forgetBox();
+    assert.deepEqual(scrolls, [128, -128], 'gone: made up for too');
+    content.getBoundingClientRect = () => ({ top: 200, bottom: 650 });
     source.message(S.tier_dl);
-    assert.deepEqual(scrolls, [128], 'the engine anchors: left to it');
-    global.CSS = { supports: () => false };
-    container.getBoundingClientRect = () => ({ top: 100, bottom: 400, height: box().hidden ? 150 : 278 });
+    assert.deepEqual(scrolls, [128, -128], 'the engine anchored on what moved: nothing left to make up');
     forgetBox();
-    assert.deepEqual(scrolls, [128], 'on screen: the block is where the eye is, nothing to make up');
-    container.getBoundingClientRect = away;
+    content.getBoundingClientRect = under(200);
+    block = { top: 100, bottom: 400 };
     source.message(S.tier_dl);
-    assert.deepEqual(scrolls, [128, 128]);
+    assert.deepEqual(scrolls, [128, -128], 'on screen, no film playing: the block is where the eye is');
+    forgetBox();
+    // A film over the cap playing on screen, under the block: the stream box
+    // comes up, the film does not move.
+    mock(video, under(500));
+    video.dataset.statusOverCap = '';
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 4 });
+    source.message(S.tier_dl);
+    assert.equal(box().hidden, false, 'fixture: the box came up');
+    assert.deepEqual(scrolls, [128, -128, 128], 'a film playing on screen: made up for');
+    setVideo({ paused: true });
+    forgetBox();
+    assert.deepEqual(scrolls, [128, -128, 128], 'paused: nothing to keep still');
+    setVideo({ paused: false });
+    video.getBoundingClientRect = under(900);
+    source.message(S.tier_dl);
+    assert.deepEqual(scrolls, [128, -128, 128], 'playing below the screen: nothing either');
     // The viewer closes it -- from the sticky bar, the card's block far above.
+    setVideo({ paused: true });
+    block = { top: -400, bottom: -10 };
     sticky().querySelector('[data-tx-pclose]').click();
-    assert.deepEqual(scrolls, [128, 128, -128], 'closed: made up for too');
-    container.getBoundingClientRect = realRect;
-    window.scrollBy = realScrollBy;
-    global.CSS = realCSS;
+    assert.deepEqual(scrolls, [128, -128, 128, -128], 'closed: made up for too');
 });
 
 test('the plan boxes\' buttons are watched for their impression', () => {
@@ -1000,16 +1032,16 @@ test('another file picked at the cap: the old box goes with the swap, and nothin
     source.message(S.tier_dl);
     const boxes = () => [card(), sticky()].flatMap((b) => [b.querySelector('[data-tx-pbox]'), b.querySelector('[data-tx-dplan]')]);
     assert.ok(boxes().every((b) => !b.hidden), 'fixture: the box up, in both blocks and their details');
-    // Scrolled away, on an engine without anchoring: the swap makes up for
+    // Scrolled away: the swap makes up for
     // the box's height as a message would.
     const box = () => card().querySelector('[data-tx-pbox]');
+    const content = document.getElementById('content');
     const realRect = container.getBoundingClientRect;
-    container.getBoundingClientRect = () => ({ top: -400, bottom: -10, height: box().hidden ? 150 : 278 });
+    container.getBoundingClientRect = () => ({ top: -400, bottom: -10 });
+    content.getBoundingClientRect = () => ({ top: 200 + (box().hidden ? 0 : 128), bottom: 650 + (box().hidden ? 0 : 128) });
     const scrolls = [];
     const realScrollBy = window.scrollBy;
     window.scrollBy = (x, y) => scrolls.push(y);
-    const realCSS = global.CSS;
-    global.CSS = { supports: () => false };
     try {
         const n = sources.length;
         document.getElementById('file').dataset.statusFile = '/Sintel/Extras/Trailer.mkv';
@@ -1029,8 +1061,8 @@ test('another file picked at the cap: the old box goes with the swap, and nothin
         assert.deepEqual(scrolls, [-128], 'and nothing more moved');
     } finally {
         container.getBoundingClientRect = realRect;
+        delete content.getBoundingClientRect;
         window.scrollBy = realScrollBy;
-        global.CSS = realCSS;
     }
 });
 
