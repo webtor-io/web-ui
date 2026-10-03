@@ -165,3 +165,8 @@ test('the box\'s × says what it does: the offer goes for a day, on every torren
     assert.equal(x.getAttribute('aria-label'), ru['resource.status.dismissBox']);
     assert.notEqual(x.getAttribute('aria-label'), doc.querySelector('[data-tx-close]').getAttribute('aria-label'), 'not the popover\'s "Close"');
 });
+
+test('opening the details is counted', () => {
+    const doc = new JSDOM(PAGE).window.document;
+    assert.equal(doc.querySelector('.tx-chain').getAttribute('data-umami-event'), 'status-details');
+});

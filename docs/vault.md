@@ -464,7 +464,10 @@ Phone caption "cache"; `Node.Kind` `cache`. When nothing moves the page shows th
 cache"…; two as the approved design draws them: "checking" cyan, "In Vault"
 purple with Vault's layers), with the piece bar and the state's hint under
 it. The sticky bar and the details popover exist only with the chain; the
-plan box only with the chain at the cap.
+plan box only with the chain at the cap. A press on the chain is Umami's
+`status-details` (2026-10-03; no props): whether anyone opens the details,
+where the ≈ MB/s and the plan's line are. The chain toggles the popover, so
+the rarer press that closes it counts too.
 
 `statusview.View.Mode` is `chain` or `badge`, and the key (the cause) is
 separate from it: the approved rows are `active`, `tier` (→ `tier_dl` /

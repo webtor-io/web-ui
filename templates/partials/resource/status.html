@@ -68,8 +68,9 @@
          badge, invisible in this mode, cannot say itself (a description is
          read out with the button, not again on every change). In the
          badge's mode the chain stays laid out, invisible (and so neither
-         focusable nor read): the row keeps its height. */}}
-    <button type="button" class="tx-chain" data-tx-toggle popovertarget="tx-details" aria-expanded="false" aria-label="{{ .Details.Title }}" aria-describedby="tx-bdesc" title="{{ .Details.Title }}">
+         focusable nor read): the row keeps its height. Umami counts its
+         presses (status-details): whether anyone opens the details. */}}
+    <button type="button" class="tx-chain" data-tx-toggle popovertarget="tx-details" aria-expanded="false" aria-label="{{ .Details.Title }}" aria-describedby="tx-bdesc" title="{{ .Details.Title }}" data-umami-event="status-details">
         {{- template "resource/status_node" (index .Nodes 0) }}
         {{- template "resource/status_seg" (index .Segs 0) }}
         {{- template "resource/status_node" (index .Nodes 1) }}
