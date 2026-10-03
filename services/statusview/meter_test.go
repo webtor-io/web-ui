@@ -729,6 +729,37 @@ func TestMeter_StallIsARequestOpenNow(t *testing.T) {
 	}
 }
 
+// Through a second without bytes the last label stands -- not for good:
+// bytes that stopped freshAfter ago are no speed ("Nothing flowing — —").
+// The viewer stays on the chain, their requests say so, with a dash. thp
+// counts a request from its first 2xx byte, so a segment the transcoder
+// holds back reads this way, never as a stall.
+func TestMeter_LabelGoesWithTheBytes(t *testing.T) {
+	var m Meter
+	m.Observe(hlsSample(0, true), at(0))
+	m.Observe(hlsSample(3e6, true), at(1))
+	for s := 2; s <= 11; s++ {
+		m.Observe(hlsSample(0, true), at(s))
+	}
+	if r := m.Reading(at(11)); !r.Present || r.Mbps == 0 {
+		t.Fatalf("9 s without bytes: %+v, want the last label", r)
+	}
+	m.Observe(hlsSample(0, true), at(12))
+	r := m.Reading(at(12))
+	if !r.Present || r.Mbps != 0 || r.Stalled {
+		t.Fatalf("10 s without bytes: %+v, want present, no number, not stalled", r)
+	}
+	v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: Torrent{State: "cached", Progress: 100}, Viewer: r, ClaimCapMbps: 5})
+	if got := chain(v); got != "Кэш (cached) [off — Мбит/с] Вы" {
+		t.Errorf("chain %s", got)
+	}
+	// Bytes again: a new number from their own first sample.
+	m.Observe(hlsSample(1.1e6, true), at(13))
+	if r := m.Reading(at(13)); r.Mbps == 0 {
+		t.Errorf("bytes again: %+v", r)
+	}
+}
+
 // Not fixed here (review, 2026-09-25): a paused page player whose film the
 // transcoder is still making keeps reloading its playlist. The transcoder
 // leaves #EXT-X-ENDLIST off until its run completes (and its pacing stops

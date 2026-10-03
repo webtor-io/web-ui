@@ -495,7 +495,10 @@ torrent open since its previous event (`active`, or `conns > 0`), and until
 thp has seen none for `statusview.PresenceDebounce` (2 s) —
 `Viewer.Present`, `Sample.presence`, `statusview.Meter`. Speed is only the
 number on their segment (a dash while a request is open and no bytes came
-yet). Measured the same day: thp's `conns` went 1→0 within 1.2 s of a
+yet, and again once none came for 10 s — `freshAfter`: the last number
+stands through a second without bytes, not for good; thp counts a request
+from its first 2xx byte, so a segment the transcoder holds back reads as
+this dash, not as a stall; `TestMeter_LabelGoesWithTheBytes`). Measured the same day: thp's `conns` went 1→0 within 1.2 s of a
 client's abort, and the page drew "you" for ~25 s more — the five-second
 window's tail, the meter's 10 s speed hold, a chain hold on top; the speed
 hold is gone. When the viewer leaves and nothing else moves, the badge comes

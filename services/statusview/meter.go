@@ -116,7 +116,8 @@ type Viewer struct {
 	// a thp that does not say (Sample.presence). The numbers below are the
 	// meter's only while Present.
 	Present bool
-	// Mbps is the quantized speed to the viewer; 0 — no number (yet).
+	// Mbps is the quantized speed to the viewer; 0 — no number (yet, or no
+	// bytes for freshAfter).
 	Mbps float64
 	// Stalled: a request is open now (conns) and no bytes arrived for
 	// stallAfter.
@@ -284,9 +285,10 @@ const (
 	// neighbouring tenths every second.
 	emaTau = 3 * time.Second
 	// freshAfter: bytes that stopped this long ago ended the last transfer:
-	// the next one is measured from its own first sample, not blended into
-	// a stale average. Only the number: whether the viewer is on the chain
-	// is their requests' (PresenceDebounce).
+	// its label goes (Reading), and the next one is measured from its own
+	// first sample, not blended into a stale average. Only the number:
+	// whether the viewer is on the chain is their requests'
+	// (PresenceDebounce).
 	freshAfter = 10 * time.Second
 	// stallAfter: a request is open and nothing arrives for this long —
 	// the node waits for a piece from the swarm. Open at thp's sample
@@ -458,8 +460,11 @@ func (m *Meter) Reading(now time.Time) Viewer {
 		return v
 	}
 	// Through a sample without bytes the last label stands -- the number,
-	// not the presence: that is the requests'.
-	v.Mbps = m.shown
+	// not the presence: that is the requests'. Not past freshAfter: bytes
+	// that stopped that long ago are no speed, and the link says "—".
+	if m.zeroSince.IsZero() || now.Sub(m.zeroSince) < freshAfter {
+		v.Mbps = m.shown
+	}
 	return v
 }
 
