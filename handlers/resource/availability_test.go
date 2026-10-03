@@ -129,7 +129,7 @@ func TestResolveStatus_CarriesTheHoles(t *testing.T) {
 		t.Errorf("view torrent: %+v", tr)
 	}
 	stats.Completed = 100
-	if cached := resolveStatus(nil, nil, stats); cached.State != "cached" || cached.Missing != "" {
+	if cached := presented(resolveStatus(nil, nil, stats), true); cached.State != "cached" || cached.Missing != "" {
 		t.Errorf("no bar, no holes: %+v", cached)
 	}
 }

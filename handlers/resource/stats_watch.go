@@ -255,7 +255,6 @@ func (w *statsWatch) status(db *vaultModels.Resource, apiRes *vault.Resource, no
 	status := resolveStatus(db, apiRes, w.last)
 	if status.State == "idle" && w.unavailable {
 		status.State = "unknown"
-		status.withBarPolicy()
 	}
 	if w.last != nil && !w.stale && !w.firstStatsAt.IsZero() {
 		activity := hasActive(w.last.Active) || (!w.lastProgressAt.IsZero() && now.Sub(w.lastProgressAt) < settleAfter)

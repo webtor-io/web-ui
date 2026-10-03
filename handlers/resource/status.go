@@ -42,7 +42,8 @@ type TorrentStatus struct {
 	// Pieces is the piece bar: PieceBuckets bytes, base64, one per bucket,
 	// 0..255 = share of the bucket's pieces the seeder holds. Active is a
 	// base64 bitset of buckets with pieces the seeder is fetching right now.
-	// Empty when nothing is known and for complete content (see barStates).
+	// Empty when nothing is known and wherever the view draws no bar
+	// (present).
 	Pieces string `json:"pieces,omitempty"`
 	Active string `json:"active,omitempty"`
 	// Missing is a base64 bitset of the buckets holding a piece nobody
@@ -299,27 +300,6 @@ func (t *TorrentStatus) withSwarm(stats *TorrentStatsData) *TorrentStatus {
 	return t
 }
 
-// barStates are the states in which the piece bar is drawn: the torrent is
-// on its way -- caching, a Vault transfer, one that failed mid-way with
-// pieces already stored, or Vault waiting for seeders over what the cache
-// holds (the approved design, 2026-09-25, draws its purple bar). Complete
-// content (cached, vaulted) draws nothing: a static full bar told the user
-// nothing the badge did not. An idle seeder that merely knows its pieces
-// draws nothing either -- it drew an empty bar that vanished when its stats
-// channel closed -- unless pieces nobody connected has are the story: the
-// bar is where they are hatched. Everything else shows the hairline
-// divider.
-var barStates = map[string]bool{"caching": true, "vaulting": true, "vault_failed": true, "vault_waiting": true}
-
-// withBarPolicy strips the piece bar from states that must not show one.
-func (t *TorrentStatus) withBarPolicy() *TorrentStatus {
-	if !barStates[t.State] && !(t.State == "idle" && t.holes) {
-		t.Pieces, t.Active, t.Missing, t.PiecesDone, t.PiecesTotal, t.PiecesLabel = "", "", "", 0, 0, ""
-		t.Rate = 0
-	}
-	return t
-}
-
 // pieceMap is the seeder's piece state as this status stream knows it. The
 // seeder sends the full list only in the first event of a stream and then
 // just the pieces that changed (torrent-web-seeder Stat.StatStream → diff), so
@@ -455,10 +435,6 @@ func (m *pieceMap) holes() []byte {
 // from vault DB state, vault API state, and torrent seeding stats.
 // Priority: vaulted > vaulting > cached > caching > idle.
 func resolveStatus(dbResource *vaultModels.Resource, apiResource *vault.Resource, stats *TorrentStatsData) *TorrentStatus {
-	return resolveStatusRaw(dbResource, apiResource, stats).withBarPolicy()
-}
-
-func resolveStatusRaw(dbResource *vaultModels.Resource, apiResource *vault.Resource, stats *TorrentStatsData) *TorrentStatus {
 	vaultState := resolveVaultState(dbResource, apiResource)
 	cachingState := resolveCachingState(stats)
 
@@ -540,7 +516,11 @@ func resolveCachingState(stats *TorrentStatsData) *TorrentStatus {
 	}
 	progress := float64(stats.Completed) / float64(stats.Total) * 100
 	if progress >= 100 {
-		return (&TorrentStatus{State: "cached", Progress: 100}).withSwarm(stats)
+		// Whole: the swarm sends it nothing any more, whatever the
+		// smoothed rate still says.
+		st := (&TorrentStatus{State: "cached", Progress: 100}).withSwarm(stats)
+		st.Rate = 0
+		return st
 	}
 	return (&TorrentStatus{State: "caching", Progress: progress}).withSwarm(stats)
 }
@@ -761,9 +741,15 @@ func (e *viewEnv) present(st *TorrentStatus, viewer, last statusview.Viewer, siz
 	if !e.withView {
 		b := e.build(st, statusview.Viewer{}, statusview.Viewer{}, 0, 0, false, held).Badge
 		st.Badge = &b
-		return
+	} else {
+		st.View = e.build(st, viewer, last, sizeBytes, bitrateMbps, false, held)
 	}
-	st.View = e.build(st, viewer, last, sizeBytes, bitrateMbps, false, held)
+	// The bar's data goes out exactly where a bar is drawn -- the view's
+	// word (statusview's bar), the one policy. The dashboard's rows draw
+	// none: it was three quarters of their bytes.
+	if st.View == nil || st.View.Bar.Mode != "pieces" {
+		st.Pieces, st.Active, st.Missing, st.PiecesLabel = "", "", "", ""
+	}
 }
 
 // viewer is the viewer's reading the view draws at now: the session
@@ -893,7 +879,6 @@ func debugStatus(c *gin.Context, env *viewEnv) *TorrentStatus {
 			}
 		}
 	}
-	st.withBarPolicy()
 	env.debug = true
 	env.present(st, debugViewer(c), statusview.Viewer{}, debugSizeBytes, f("bitrate"), time.Now())
 	return st

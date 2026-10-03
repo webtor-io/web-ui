@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/statusview"
 
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	vault "github.com/webtor-io/web-ui/services/vault"
@@ -406,46 +407,70 @@ func TestPieceMap_SmallTorrentAndDiffOnlyStream(t *testing.T) {
 
 // Complete content draws no bar — the badge already says it; the bar exists
 // only while something moves.
-func TestResolveStatus_NoBarForCompleteContent(t *testing.T) {
-	if st := resolveStatus(&vaultModels.Resource{Funded: true, Vaulted: true}, nil, nil); st.Pieces != "" {
+// presented is st as the stream sends it: presented for the resource page
+// (withView) or for a Vault dashboard row.
+func presented(st *TorrentStatus, withView bool) *TorrentStatus {
+	env := &viewEnv{lang: "en", loc: ruLoc().Localizer("en"), tier: "free", withView: withView}
+	env.present(st, statusview.Viewer{}, statusview.Viewer{}, 0, 0, dashT0)
+	return st
+}
+
+// Complete content draws no bar: a static full bar told the user nothing
+// the badge did not.
+func TestPresent_NoBarForCompleteContent(t *testing.T) {
+	if st := presented(resolveStatus(&vaultModels.Resource{Funded: true, Vaulted: true}, nil, nil), true); st.Pieces != "" {
 		t.Error("vaulted must not draw a bar")
 	}
-	if st := resolveStatus(nil, nil, &TorrentStatsData{Total: 10, Completed: 10, Fill: []byte{255}, Active: []byte{0}}); st.State != "cached" || st.Pieces != "" {
+	if st := presented(resolveStatus(nil, nil, &TorrentStatsData{Total: 10, Completed: 10, Fill: []byte{255}, Active: []byte{0}, PiecesDone: 1, PiecesTotal: 1}), true); st.State != "cached" || st.Pieces != "" || st.PiecesLabel != "" {
 		t.Errorf("cached must not draw a bar: %+v", st)
 	}
-	if idle := resolveStatus(nil, nil, nil); idle.Pieces != "" {
+	if idle := presented(resolveStatus(nil, nil, nil), true); idle.Pieces != "" {
 		t.Error("idle must not pretend to know the pieces")
+	}
+	// Whole, the swarm sends nothing any more: no speed on its link,
+	// whatever the smoothed rate still says.
+	cached := presented(resolveStatus(nil, nil, &TorrentStatsData{Total: 10, Completed: 10, Seeders: 3, Rate: 4 << 20}), true)
+	if seg := cached.View.Segs[0]; seg.On {
+		t.Errorf("a cached torrent's swarm link moves: %+v", seg)
 	}
 }
 
-// The bar exists only while something moves or once the content is complete;
-// an idle seeder that knows its pieces draws nothing, and neither do the
-// states where nothing is known.
-func TestBarPolicy(t *testing.T) {
-	stats := &TorrentStatsData{Total: 100, Completed: 0, Seeders: 1, Fill: []byte{255, 0}, Active: []byte{0}}
-	if st := resolveStatus(nil, nil, stats); st.State != "idle" || st.Pieces != "" {
+// One policy for the piece bar -- statusview's (View.Bar): the bar's data
+// goes out exactly where the page draws a bar. An idle seeder that knows
+// its pieces draws nothing; one whose pieces nobody else has does (the
+// hatch). The Vault dashboard draws no bar at all.
+func TestPresent_PieceBarOnlyWhereDrawn(t *testing.T) {
+	bar := func(st *TorrentStatus) bool {
+		return st.Pieces != "" && st.Active != "" && st.PiecesLabel != "" && st.View.Bar.Mode == "pieces"
+	}
+	stats := &TorrentStatsData{Total: 100, Completed: 0, Seeders: 1, Fill: []byte{255, 0}, Active: []byte{0}, PiecesDone: 1, PiecesTotal: 2}
+	if st := presented(resolveStatus(nil, nil, stats), true); st.State != "idle" || st.Pieces != "" || st.PiecesLabel != "" {
 		t.Errorf("idle with known pieces must not draw a bar: %+v", st)
 	}
 	stats.Completed = 10
-	if st := resolveStatus(nil, nil, stats); st.State != "caching" || st.Pieces == "" {
+	if st := presented(resolveStatus(nil, nil, stats), true); st.State != "caching" || !bar(st) {
 		t.Errorf("caching must draw the bar: %+v", st)
 	}
-	// An idle seeder whose pieces nobody else has: the bar is where they
-	// are hatched.
-	holes := &TorrentStatsData{Total: 100, Peers: 12, Fill: []byte{0, 0}, Active: []byte{0}, Holes: []byte{2}, AvailabilityKnown: true}
-	if st := resolveStatus(nil, nil, holes); st.State != "idle" || st.Pieces == "" || st.Missing == "" {
+	holes := &TorrentStatsData{Total: 100, Peers: 12, Fill: []byte{0, 0}, Active: []byte{0}, Holes: []byte{2}, AvailabilityKnown: true, PiecesTotal: 2}
+	if st := presented(resolveStatus(nil, nil, holes), true); st.State != "idle" || !bar(st) || st.Missing == "" {
 		t.Errorf("idle with holes draws the bar: %+v", st)
 	}
 	db := &vaultModels.Resource{Funded: true}
 	// Vault waiting for seeders: the purple bar over what the cache holds,
 	// as the approved design (2026-09-25) draws it.
-	waiting := resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{255, 0}, Active: []byte{0}, Live: true, LiveFor: noSeedersAfter})
-	if waiting.State != "vault_waiting" || waiting.Pieces == "" {
+	waiting := presented(resolveStatus(db, &vault.Resource{Status: vault.StatusQueued}, &TorrentStatsData{Total: 100, Fill: []byte{255, 0}, Active: []byte{0}, Live: true, LiveFor: noSeedersAfter, PiecesTotal: 2}), true)
+	if waiting.State != "vault_waiting" || !bar(waiting) {
 		t.Errorf("waiting for seeders draws the cache's pieces: %+v", waiting)
 	}
-	failed := resolveStatus(db, &vault.Resource{Status: vault.StatusFailed, StoredSize: 30, TotalSize: 100}, &TorrentStatsData{Total: 100, Completed: 30, Fill: []byte{255, 0}, Active: []byte{0}})
-	if failed.State != "vault_failed" || failed.Pieces == "" {
+	failed := presented(resolveStatus(db, &vault.Resource{Status: vault.StatusFailed, StoredSize: 30, TotalSize: 100}, &TorrentStatsData{Total: 100, Completed: 30, Fill: []byte{255, 0}, Active: []byte{0}, PiecesTotal: 2}), true)
+	if failed.State != "vault_failed" || !bar(failed) {
 		t.Errorf("a failed transfer with stored pieces keeps its bar: %+v", failed)
+	}
+	// The dashboard's rows draw the badge and the fill, never the bar:
+	// its data was three quarters of a row's bytes.
+	dash := presented(resolveStatus(nil, nil, &TorrentStatsData{Total: 100, Completed: 10, Seeders: 1, Fill: []byte{255, 0}, Active: []byte{1}, Holes: []byte{2}, AvailabilityKnown: true, PiecesTotal: 2}), false)
+	if dash.Pieces != "" || dash.Active != "" || dash.Missing != "" || dash.PiecesLabel != "" || dash.Badge == nil {
+		t.Errorf("the dashboard got the bar: %+v", dash)
 	}
 }
 
