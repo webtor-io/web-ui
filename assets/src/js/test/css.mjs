@@ -1,6 +1,7 @@
 // Reading a stylesheet in a test, and the WCAG contrast of what it paints:
 // for guards that hold a colour, an opacity or a size to the rule it must
-// keep (lib/statusStyle.test.js). No browser: the values are the file's own.
+// keep (lib/statusMarkup.test.js, lib/player/buffering-label.test.js). No
+// browser: the values are the file's own.
 import { readFileSync } from 'node:fs';
 
 // Every rule of the file, nested at-rules followed: { sel, at, decls } --

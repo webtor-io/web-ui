@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { cssRules, findRule, color, over, contrast, hex } from '../../test/css.mjs';
 import { answerLabel, capLock, lockKey, statusSpoke } from './buffering-label.js';
 
 // The label the transfer status publishes while the viewer is held at the
@@ -156,30 +154,18 @@ test('one lock seen is one lock seen, whichever of the two raised it', () => {
 // stylesheet itself, and the contrast computed over a pure white frame --
 // the worst frame there is for white text on a translucent pill.
 
-const CSS = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../styles/player.css'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-// Every innermost rule (those inside @media included): [selector,
-// { property: value }]; and those whose selector names the pill.
-const rules = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .map(([, sel, body]) => [sel.trim().replace(/\s+/g, ' '), Object.fromEntries(body.split(';')
-        .map((d) => d.split(':'))
-        .filter((kv) => kv.length >= 2)
-        .map(([k, ...v]) => [k.trim(), v.join(':').trim()]))]);
-const pillRules = rules.filter(([sel]) => sel.includes('wt-buffering-pill'));
-// The first rule whose selector list has exactly `sel`: the one at the top
-// level (the @media ones come after it in the file).
+const rules = cssRules(new URL('../../../styles/player.css', import.meta.url));
+// Every rule whose selector names the pill, those inside @media included.
+const pillRules = rules.filter((r) => r.sel.includes('wt-buffering-pill')).map((r) => [r.sel, r.decls]);
+// The rule whose selector list has exactly `sel`, at the top level.
 const rule = (sel) => {
-    const r = rules.find(([s]) => s.split(',').map((x) => x.trim()).includes(sel));
-    assert.ok(r, `a rule for ${sel}`);
-    return r[1];
+    const d = findRule(rules, sel);
+    assert.ok(d, `a rule for ${sel}`);
+    return d;
 };
 
 // The layers of a background, bottom first: the colour, and every flat
 // gradient over it (one colour at every stop) as a layer of that colour.
-const rgba = (s) => {
-    const [r, g, b, a = 1] = s.slice(s.indexOf('(') + 1, -1).split(',').map((x) => parseFloat(x));
-    return { rgb: [r, g, b], a };
-};
 const layers = (bg) => {
     // Split at the commas outside parentheses.
     const parts = [];
@@ -199,20 +185,11 @@ const layers = (bg) => {
     return parts.map((part) => {
         const stops = part.match(/rgba?\([^)]*\)/g) || [];
         assert.ok(stops.length && stops.every((x) => x.replace(/\s/g, '') === stops[0].replace(/\s/g, '')), `a flat layer: ${part}`);
-        return rgba(stops[0]);
+        return color(stops[0]);
     }).reverse();
 };
-const over = (frame, ls) => ls.reduce((under, { rgb, a }) => rgb.map((c, i) => a * c + (1 - a) * under[i]), frame);
-const lum = (rgb) => {
-    const lin = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    const [r, g, b] = rgb.map(lin);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const contrast = (a, b) => {
-    const [x, y] = [lum(a), lum(b)];
-    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
-};
-const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+// The layers painted over the frame, bottom first.
+const paint = (frame, ls) => ls.reduce((under, { rgb, a }) => over(under, rgb, a), frame);
 const WHITE = [255, 255, 255];
 const PINKS = /232,\s*67,\s*147|253,\s*121,\s*168|#fd79a8|#e84393/i;
 
@@ -235,7 +212,7 @@ test('on a pure white frame the words and the cap read at 4.5:1 or better, hover
     const text = hex(rule('.wt-buffering-pill').color);
     const pink = hex(rule('.wt-buffering-cap').color);
     for (const [state, sel] of [['at rest', '.wt-buffering-pill'], ['hovered or open', 'button.wt-buffering-pill:hover']]) {
-        const bg = over(WHITE, layers(rule(sel).background));
+        const bg = paint(WHITE, layers(rule(sel).background));
         assert.ok(contrast(text, bg) >= 4.5, `${state}: "Buffering" ${contrast(text, bg).toFixed(2)}:1`);
         assert.ok(contrast(pink, bg) >= 4.5, `${state}: the cap ${contrast(pink, bg).toFixed(2)}:1`);
     }
