@@ -120,7 +120,9 @@ type TorrentStatus struct {
 // half a second between samples). The seeder's counter grows a verified
 // piece at a time, so between two pieces nothing arrives for a while; the
 // view's hold (statusview.Hold) keeps the swarm on the chain as it last
-// moved through such a gap, for HoldFor from its last piece. Judged by the
+// moved through such a gap, for HoldFor from its last piece -- or half as
+// long again as its gap between pieces when that is longer, up to a minute
+// (statusview maxHold). Judged by the
 // smoothed rate instead, the swarm "moved" for 13 s after its last byte at
 // 38 Mbps (the rate decays by 0.6 a tick), and the hold came on top of that:
 // the badge 14-22 s after the last byte, and a chain showing a pause or a
@@ -675,7 +677,8 @@ type viewEnv struct {
 	// hold keeps the swarm on this stream's chain through the gaps between
 	// its pieces, and the viewer through a lost stream to thp
 	// (statusview.Hold): the chain gives way to the badge statusview.HoldFor
-	// after the swarm last moved -- and at once when the viewer leaves with
+	// after the swarm last moved (up to 1.5x its gap between pieces, at most
+	// a minute, for a slow swarm) -- and at once when the viewer leaves with
 	// nothing else moving: they are on it while a request of theirs is open
 	// (statusview.Viewer.Present), not while a speed is held.
 	hold statusview.Hold

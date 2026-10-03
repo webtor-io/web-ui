@@ -932,7 +932,8 @@ func (b *builder) swarmSuffix() string {
 }
 
 // bar draws the pieces where the torrent is on its way to Webtor or Vault
-// (handlers/resource barStates strips them everywhere else) -- Vault's wait
+// (handlers/resource present sends the bar's data only where this says
+// pieces) -- Vault's wait
 // for seeders too, over what the cache already holds, as approved -- and
 // before anything is cached only where there are pieces nobody has to
 // hatch; everything else is the hairline divider.

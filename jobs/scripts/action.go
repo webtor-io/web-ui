@@ -1850,7 +1850,7 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	// with Access-Control-Allow-Origin: *.
 	//
 	// ApiClaims.SessionID is the right value for both cases: the user hash
-	// when signed in, a hash of the session cookie when not (see
+	// when signed in, a hash of the session's store id when not (see
 	// api.GenerateSessionID). Dedup across *repeat visits by the same
 	// visitor* — which is what the cache is for — is preserved; dedup across
 	// different visitors, which was never safe, is not.

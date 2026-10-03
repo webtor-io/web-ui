@@ -210,6 +210,9 @@ func (s *Helper) HasControls(settings *models.StreamSettings) bool {
 	return controls
 }
 
+// jobs/scripts startAudio is a copy of this default rule (that package
+// cannot import this one); TestStartAudio_IsThePickersDefault fails when
+// they part.
 func (s *Helper) GetAudioTracks(ud *models.VideoStreamUserData, mp *api.MediaProbe) []ListItem {
 	var res []ListItem
 	if mp == nil {
