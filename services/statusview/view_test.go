@@ -796,8 +796,13 @@ func TestBuild_NoCTA(t *testing.T) {
 		// slow seeders: "10× faster, about 3 min" would be false.
 		"few seeders, the viewer at the cap": base(caching(40, 2, 1.2), atCap),
 		"one seeder, the viewer at the cap":  base(caching(40, 1, 0.3), atCap),
-		"stall":                              base(caching(43, 14, 38), stalled),
-		"missing pieces":                     base(func() Torrent { t := holes("caching", 43); t.ReaderMissing = 1; return t }(), stalled),
+		// The two seeders still past the swarm's hold: a swarm whose speed
+		// is not known now is not a fast one.
+		"few seeders standing still, the viewer at the cap": base(caching(40, 2, 0), atCap),
+		// 4.96 reads "5 Mbps", and is still under the cap.
+		"few seeders just under the cap, the viewer at the cap": base(caching(40, 2, 4.96), atCap),
+		"stall":          base(caching(43, 14, 38), stalled),
+		"missing pieces": base(func() Torrent { t := holes("caching", 43); t.ReaderMissing = 1; return t }(), stalled),
 		// Pieces nobody connected has, the viewer at the cap on what is
 		// here: the file cannot finish with a plan or without one, and an
 		// ETA for it would be sold on a wait it cannot keep.
@@ -809,6 +814,10 @@ func TestBuild_NoCTA(t *testing.T) {
 		if v := Build(in); v.Plan != nil {
 			t.Errorf("%s (%s): plan %+v", name, v.Key, v.Plan)
 		}
+	}
+	// Two seeders faster than the cap: the cap is the brake, and sold.
+	if v := Build(base(caching(40, 2, 12), atCap)); v.Key != KeyTier || v.Plan == nil || v.Plan.Download.Box == nil {
+		t.Errorf("two fast seeders at the cap: %s %+v", v.Key, v.Plan)
 	}
 	// Only the sale goes there: the viewer's link still says the cap.
 	if v := Build(base(holes("caching", 43), atCap)); v.Segs[1].Tone != "plan" {

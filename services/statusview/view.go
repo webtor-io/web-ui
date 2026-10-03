@@ -639,13 +639,15 @@ func missingHere(t Torrent) bool {
 }
 
 // swarmBound: a few seeders and a swarm slower than the cap — the swarm is
-// the bottleneck, and no plan would help.
+// the bottleneck, and no plan would help. A still one too (past its hold,
+// Input.HeldBps): the viewer reads what is cached, and a swarm whose speed
+// is not known is not a fast one. Against the rate itself, not its label:
+// 4.96 reads "5", and is under a cap of 5.
 func swarmBound(t Torrent, capMbps float64) bool {
 	if t.Seeders < 1 || t.Seeders > fewSeeders {
 		return false
 	}
-	s := Quantize(BytesToMbps(t.RateBps))
-	return s > 0 && (capMbps <= 0 || s < capMbps)
+	return capMbps <= 0 || BytesToMbps(t.RateBps) < capMbps
 }
 
 func isTierKey(k string) bool {

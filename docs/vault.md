@@ -1001,8 +1001,14 @@ under the piece bar.
   swaps only `#content`, so the page reopens the stream with the new `file=`
   (`#file[data-status-file]`). No box comes up on pause, no or few seeders (a few
   seeders slower than the cap win over the viewer being at the cap: they read
-  what is cached, the rest waits for the swarm with or without a plan),
-  pieces nobody has, a stall, a Vault failure, or while another offer is on screen
+  what is cached, the rest waits for the swarm with or without a plan; so do a
+  few seeders standing still past the swarm's hold — a speed not known is not
+  a fast one — and the rate is compared as it is, not as its label rounds it:
+  4.96 reads "5" and is under a cap of 5; `statusview.swarmBound`. No seeder
+  and peers — `fewSeeders` counts seeders only — still sells; the owner has
+  not decided that one), pieces nobody has (also with the viewer at the cap:
+  the file does not finish with a plan either; the pink link stays), a stall,
+  a Vault failure, or while another offer is on screen
   (`data-upsell-surface`: the grace popup, the cap modal, the download
   nudge) or on its way — the grace popup from the moment the player's
   element leaves the window by movie time until the player puts it up and
