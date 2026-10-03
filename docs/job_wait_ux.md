@@ -47,7 +47,10 @@ after the last movement). The badge — nothing moves — has no sticky bar. The
 its last picture through a 1-second `unknown`/`idle` gap, and stays up with it (up to
 8 s; one hold, the status view's: the event's `moving` is the held view's, and
 `stickyStatus.js` has none of its own since 2026-10-03 — two timers on one rule could
-drift apart). The hold outlives the status token's renewal.
+drift apart). The hold outlives the status token's renewal. No bar in a window under
+500 px tall — a phone on its side, where the navbar and the bar with its box covered 58% of
+the screen over an inline film (review 2026-10-03, not measured how many watch so); upright
+the bar carries the whole box (owner, 2026-09-25).
 
 - "Gone upwards" is `bottom <= rootBounds.top`, **not** `top < 0`: the observer fires at
   the crossing, when the top is still ~+28 px, and never again — `top < 0` worked on a
