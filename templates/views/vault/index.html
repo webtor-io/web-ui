@@ -70,7 +70,7 @@
             {{ if not .Funded }}
               <div class="flex flex-col items-center gap-0.5">
                 {{- template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}
-                {{ if .ExpiresIn }}<span class="text-[10px] text-w-muted">{{ .ExpiresIn | duration }}</span>{{ end }}
+                {{ if .ExpiresIn }}<span class="text-[11px] text-w-sub">{{ .ExpiresIn | duration }}</span>{{ end }}
               </div>
             {{ else if .ShowProgress }}
               {{- template "status/badge" (statusBadge "cyan" "dots" (t $.Lang "resource.status.checking")) }}

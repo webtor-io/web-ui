@@ -191,8 +191,14 @@ html {
   border-color: rgba(251, 191, 36, 0.45);
   color: #fbbf24;
 }
-.tx-node[data-dim] {
+/* Dimmed ("?", Vault not started): the icon and the outline, not the
+   words -- at half opacity "?" read at 3.9:1 on the card. The outline in the
+   node's own colour, so a dimmed Vault node stays purple. */
+.tx-node[data-dim] .tx-ic {
   opacity: 0.5;
+}
+.tx-node[data-dim] .tx-pill {
+  border-color: color-mix(in srgb, currentColor 20%, transparent);
 }
 
 /* The badge: the one the page had before the chain (git 5d55b26e), one
@@ -235,6 +241,12 @@ html {
 }
 .tx-badge[data-pulse] .tx-bi {
   @apply animate-pulse;
+}
+/* The swarm, "(14 seeders)", a step back from the words: at 0.85 it reads
+   at 4.5:1 or more in every tone that carries it (5.2:1 at worst, Vault's
+   purple on the card); 0.7 read 4.0-4.5:1. lib/statusMarkup.test.js. */
+.tx-bx {
+  opacity: 0.85;
 }
 .tx-bx:empty {
   display: none;
@@ -654,10 +666,13 @@ html {
   width: 16px;
   height: 16px;
 }
+/* w-sub, not the approved design's w-muted: at 11px #64748b read 3.6:1 on
+   the box, and "cancel any time" is the half of the offer that must be
+   read. The size keeps it under the button. */
 .tx-pn {
   font-size: 11px;
   line-height: 13px;
-  color: #64748b;
+  color: #94a3b8;
   text-align: center;
 }
 /* The viewer's × (owner, 2026-09-27): the box stays until they close it. A
@@ -774,7 +789,7 @@ html {
 }
 .tx-rsub {
   font-size: 12px;
-  color: #64748b;
+  color: #94a3b8;
 }
 .tx-rsub:empty {
   display: none;

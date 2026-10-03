@@ -155,7 +155,7 @@ func TestVaultProgressRowsCarryStatusToken(t *testing.T) {
 
 // badgeRe is one status badge element (partials/status/badge.html) with its
 // tone, icon, pulse, glyph, the words' title and the words.
-var badgeRe = regexp.MustCompile(`<span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="([a-z]*)" data-icon="([a-z]*)"( data-pulse)?><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-([a-z]*)"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text" title="([^"]*)"><span data-tx-blabel>([^<]*)</span> <span class="tx-bx opacity-70" data-tx-bextra>([^<]*)</span></span></span>`)
+var badgeRe = regexp.MustCompile(`<span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="([a-z]*)" data-icon="([a-z]*)"( data-pulse)?><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-([a-z]*)"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text" title="([^"]*)"><span data-tx-blabel>([^<]*)</span> <span class="tx-bx" data-tx-bextra>([^<]*)</span></span></span>`)
 
 // pendingBadge is statusview's badge for a torrent nothing has been asked
 // about yet ("checking"), as the badge regexp reads it: what a live row

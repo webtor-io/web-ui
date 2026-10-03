@@ -27,7 +27,7 @@
      there would be read out after the words it repeats; the words are read
      by their content (the chain's aria-describedby included). */}}
 {{ define "status/badge" }}
-<span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="{{ .Tone }}" data-icon="{{ .Icon }}"{{ if .Pulse }} data-pulse{{ end }}><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-{{ .Icon }}"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text"{{ with .DescID }} id="{{ . }}"{{ end }} title="{{ .Label }}{{ with .Extra }} {{ . }}{{ end }}"><span data-tx-blabel>{{ .Label }}</span> <span class="tx-bx opacity-70" data-tx-bextra>{{ .Extra }}</span></span></span>
+<span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="{{ .Tone }}" data-icon="{{ .Icon }}"{{ if .Pulse }} data-pulse{{ end }}><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-{{ .Icon }}"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text"{{ with .DescID }} id="{{ . }}"{{ end }} title="{{ .Label }}{{ with .Extra }} {{ . }}{{ end }}"><span data-tx-blabel>{{ .Label }}</span> <span class="tx-bx" data-tx-bextra>{{ .Extra }}</span></span></span>
 {{- end }}
 
 {{/* The badge's icons, as <symbol>s for a sprite the page already has (the

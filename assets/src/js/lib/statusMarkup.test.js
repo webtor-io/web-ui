@@ -1,0 +1,108 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { JSDOM } from 'jsdom';
+import { cssRules, findRule, color, hex, over, contrast } from '../test/css.mjs';
+
+// The transfer status's and the Vault page's own style and markup held to
+// what they must keep for a reader: text at 4.5:1 on the grounds it is drawn
+// on (WCAG 1.4.3 -- all of it 10-14px), no meaning in colour alone, focus
+// clear of what is fixed at the top, motion off for who asked for less.
+// Read from the stylesheet itself and from the markup the Go tests generate
+// from the real templates (__fixtures__).
+const STYLE = cssRules(new URL('../../styles/style.css', import.meta.url));
+const PLAYER = cssRules(new URL('../../styles/player.css', import.meta.url));
+const W = createRequire(import.meta.url)('../../../../tailwind.config.js').theme.extend.colors.w;
+const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const PAGE = read('./__fixtures__/transfer-status-page.html');
+const VAULT = read('./__fixtures__/vault-page.html');
+
+const rule = (sel, at) => {
+    const d = findRule(STYLE, sel, at);
+    assert.ok(d, `a rule for ${sel}${at ? ' in ' + at.join(' ') : ''}`);
+    return d;
+};
+const opacity = (sel, at) => parseFloat((findRule(STYLE, sel, at) || {}).opacity ?? '1');
+const readable = (what, fg, bg) => {
+    const c = contrast(fg, bg);
+    assert.ok(c >= 4.5, `${what}: ${c.toFixed(2)}:1, under 4.5:1`);
+};
+
+// The grounds: the film card and the sticky bar (the block's --tx-bg), the
+// player's cap card, the details popover; the Vault table is bg-base-200/50
+// in a bg-base-300/50 card on the page (style.css --color-base-*: the w
+// palette's surface, card and bg).
+const CARD = hex(rule('.tx')['--tx-bg']);
+const STICKY = hex(rule('#torrent-status-sticky .tx')['--tx-bg']);
+const DETAILS = hex(rule('.tx-details').background);
+const VAULT_TABLE = over(over(hex(W.bg), hex(W.card), 0.5), hex(W.surface), 0.5);
+const pbox = (ground) => {
+    const { rgb, a } = color(rule('.tx-pbox').background);
+    return over(ground, rgb, a);
+};
+
+test('the plan box, the hint and the details read at 4.5:1 wherever they are drawn', () => {
+    const playerCard = hex(findRule(PLAYER, '.wt-cap-card.tx-pbox').background);
+    for (const [where, ground] of [['the card', pbox(CARD)], ['the sticky bar', pbox(STICKY)], ['the player\'s card', playerCard]]) {
+        // "7 days free · cancel any time": the honest half of the offer.
+        readable(`the trial note on ${where}`, hex(rule('.tx-pn').color), ground);
+        readable(`the box's line on ${where}`, hex(rule('.tx-ps').color), ground);
+    }
+    for (const [where, ground] of [['the card', CARD], ['the sticky bar', STICKY]]) {
+        readable(`the hint on ${where}`, hex(rule('.tx-hint').color), ground);
+    }
+    for (const sel of ['.tx-dt', '.tx-rlabel', '.tx-rsub', '.tx-rv']) {
+        readable(`the details' ${sel}`, hex(rule(sel).color), DETAILS);
+    }
+});
+
+// A tone's words and ground, from its rule: the w palette's utilities
+// (tailwind.config.js) or the muted tone's own rgba. The tones from DaisyUI's
+// and Tailwind's palettes are not resolved here -- of them only warn carries
+// the swarm, 6.6:1 at 0.85 (2026-10-03).
+const tone = (name) => {
+    const d = rule(`.tx-badge[data-tone="${name}"]`);
+    const text = d['@apply'].match(/text-w-(\w+)/);
+    const bg = d['@apply'].match(/bg-w-(\w+)\/(\d+)/);
+    return { fg: hex(W[text[1]]), bg: bg ? { rgb: hex(W[bg[1]]), a: bg[2] / 100 } : color(d['background-color']) };
+};
+
+test('a badge\'s swarm, "(14 seeders)", reads at 4.5:1 in its tone on every ground', () => {
+    // Dimmed in one place, where this test reads it: not by a utility on
+    // the partial's span.
+    const span = read('../../../../templates/partials/status/badge.html').match(/class="tx-bx([^"]*)"/);
+    assert.ok(span, 'the swarm\'s span');
+    assert.doesNotMatch(span[1], /opacity/, 'the swarm\'s dimming is style.css .tx-bx');
+    const dim = opacity('.tx-bx');
+    for (const name of ['muted', 'cyan', 'vault', 'pink']) {
+        const { fg, bg } = tone(name);
+        for (const [where, ground] of [['the card', CARD], ['the sticky bar', STICKY], ['the Vault table', VAULT_TABLE]]) {
+            const g = over(ground, bg.rgb, bg.a);
+            readable(`${name} on ${where}`, over(g, fg, dim), g);
+        }
+    }
+});
+
+test('a dimmed node ("?", Vault waiting) dims its icon and outline, never its words', () => {
+    // The node's opacity is the group's: words and pill both over the card.
+    const a = opacity('.tx-node[data-dim]') * opacity('.tx-node[data-dim] .tx-pill');
+    const pill = hex(rule('.tx-pill').background);
+    for (const [where, ground] of [['the card', CARD], ['the sticky bar', STICKY]]) {
+        const bg = over(ground, pill, a);
+        readable(`"?" on ${where}`, over(ground, hex(rule('.tx-node').color), a), bg);
+        readable(`the name on ${where}`, over(ground, hex(rule('.tx-nm').color), a), bg);
+        readable(`Vault's value on ${where}`, over(ground, hex(rule('.tx-node[data-tone="vault"] .tx-pill').color), a), bg);
+        readable(`the phone's caption on ${where}`, over(ground, hex(rule('.tx-node', ['@container']).color), a), ground);
+    }
+});
+
+test('a pledge\'s "Expiring" says how long is left at 4.5:1 and 11px', () => {
+    const doc = new JSDOM(VAULT).window.document;
+    const td = doc.querySelector('[data-tone="pink"]').closest('td');
+    const left = [...td.querySelectorAll('span')].find((s) => /text-\[\d+px\]/.test(s.className));
+    assert.ok(left, 'the time left under the badge');
+    const cls = left.className;
+    assert.ok(parseInt(cls.match(/text-\[(\d+)px\]/)[1], 10) >= 11, `${cls}: 11px or more`);
+    readable('the time left', hex(W[cls.match(/text-w-(\w+)/)[1]]), VAULT_TABLE);
+});

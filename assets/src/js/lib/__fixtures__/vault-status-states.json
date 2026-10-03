@@ -12,7 +12,7 @@
     "extra": "(9 сидов)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"up\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-up\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Сохраняется 64% (9 сидов)\"\u003e\u003cspan data-tx-blabel\u003eСохраняется 64%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(9 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"up\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-up\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Сохраняется 64% (9 сидов)\"\u003e\u003cspan data-tx-blabel\u003eСохраняется 64%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(9 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "vaulting_idle",
@@ -27,7 +27,7 @@
     "extra": "(9 сидов)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"up\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-up\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Сохраняется 64% (9 сидов)\"\u003e\u003cspan data-tx-blabel\u003eСохраняется 64%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(9 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"up\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-up\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Сохраняется 64% (9 сидов)\"\u003e\u003cspan data-tx-blabel\u003eСохраняется 64%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(9 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "vault_missing",
@@ -41,7 +41,7 @@
     "label": "Ждём недостающие куски · 58%"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"clock\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-clock\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Ждём недостающие куски · 58%\"\u003e\u003cspan data-tx-blabel\u003eЖдём недостающие куски · 58%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"clock\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-clock\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Ждём недостающие куски · 58%\"\u003e\u003cspan data-tx-blabel\u003eЖдём недостающие куски · 58%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "vault_waiting",
@@ -55,7 +55,7 @@
     "label": "Ждём сидов"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"clock\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-clock\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Ждём сидов\"\u003e\u003cspan data-tx-blabel\u003eЖдём сидов\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"clock\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-clock\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Ждём сидов\"\u003e\u003cspan data-tx-blabel\u003eЖдём сидов\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "vault_failed",
@@ -69,7 +69,7 @@
     "extra": "(3 сида)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"warn\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-warn\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Перенос не удался, повторяем 37% (3 сида)\"\u003e\u003cspan data-tx-blabel\u003eПеренос не удался, повторяем 37%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(3 сида)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"warn\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-warn\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Перенос не удался, повторяем 37% (3 сида)\"\u003e\u003cspan data-tx-blabel\u003eПеренос не удался, повторяем 37%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(3 сида)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "vaulted_idle",
@@ -82,7 +82,7 @@
     "label": "В Vault"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"vault\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"В Vault\"\u003e\u003cspan data-tx-blabel\u003eВ Vault\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"vault\" data-icon=\"vault\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-vault\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"В Vault\"\u003e\u003cspan data-tx-blabel\u003eВ Vault\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "caching_only",
@@ -97,7 +97,7 @@
     "extra": "(14 сидов)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"cyan\" data-icon=\"down\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-down\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Кэширование 43% (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eКэширование 43%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"cyan\" data-icon=\"down\" data-pulse\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-down\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Кэширование 43% (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eКэширование 43%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "checking",
@@ -110,7 +110,7 @@
     "label": "Проверяем активность…"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"cyan\" data-icon=\"dots\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-dots\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Проверяем активность…\"\u003e\u003cspan data-tx-blabel\u003eПроверяем активность…\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"cyan\" data-icon=\"dots\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-dots\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Проверяем активность…\"\u003e\u003cspan data-tx-blabel\u003eПроверяем активность…\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "paused",
@@ -124,7 +124,7 @@
     "extra": "(14 сидов)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"pause\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Кэширование на паузе 43% (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eКэширование на паузе 43%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"pause\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-pause\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Кэширование на паузе 43% (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eКэширование на паузе 43%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "noseed",
@@ -137,7 +137,7 @@
     "label": "Нет сидов · 43%"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"err\" data-icon=\"noseed\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-noseed\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Нет сидов · 43%\"\u003e\u003cspan data-tx-blabel\u003eНет сидов · 43%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"err\" data-icon=\"noseed\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-noseed\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Нет сидов · 43%\"\u003e\u003cspan data-tx-blabel\u003eНет сидов · 43%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "missing_idle",
@@ -151,7 +151,7 @@
     "extra": "(12 пиров, 0 сидов)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"warn\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-warn\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Нет нужных кусков · 43% (12 пиров, 0 сидов)\"\u003e\u003cspan data-tx-blabel\u003eНет нужных кусков · 43%\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(12 пиров, 0 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"warn\" data-icon=\"warn\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-warn\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Нет нужных кусков · 43% (12 пиров, 0 сидов)\"\u003e\u003cspan data-tx-blabel\u003eНет нужных кусков · 43%\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(12 пиров, 0 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "cached",
@@ -164,7 +164,7 @@
     "label": "В кэше"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"ok\" data-icon=\"check\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-check\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"В кэше\"\u003e\u003cspan data-tx-blabel\u003eВ кэше\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"ok\" data-icon=\"check\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-check\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"В кэше\"\u003e\u003cspan data-tx-blabel\u003eВ кэше\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "idle_torrent",
@@ -178,7 +178,7 @@
     "extra": "(14 сидов)"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"muted\" data-icon=\"idle\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-idle\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Ожидает (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eОжидает\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"muted\" data-icon=\"idle\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-idle\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Ожидает (14 сидов)\"\u003e\u003cspan data-tx-blabel\u003eОжидает\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e(14 сидов)\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  },
  {
   "design": "status_unknown",
@@ -191,6 +191,6 @@
     "label": "Статус недоступен"
    }
   },
-  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"muted\" data-icon=\"unknown\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-unknown\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Статус недоступен\"\u003e\u003cspan data-tx-blabel\u003eСтатус недоступен\u003c/span\u003e \u003cspan class=\"tx-bx opacity-70\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
+  "ssr": "\u003cspan class=\"tx-badge badge badge-sm gap-1.5 px-3 py-0.5\" data-tx-badge tabindex=\"-1\" data-tone=\"muted\" data-icon=\"unknown\"\u003e\u003csvg class=\"tx-bi\" aria-hidden=\"true\"\u003e\u003cuse href=\"#tx-b-unknown\"\u003e\u003c/use\u003e\u003c/svg\u003e\u003cspan class=\"tx-bdots loading loading-dots loading-xs\" aria-hidden=\"true\"\u003e\u003c/span\u003e\u003cspan class=\"badge-text\" title=\"Статус недоступен\"\u003e\u003cspan data-tx-blabel\u003eСтатус недоступен\u003c/span\u003e \u003cspan class=\"tx-bx\" data-tx-bextra\u003e\u003c/span\u003e\u003c/span\u003e\u003c/span\u003e"
  }
 ]
