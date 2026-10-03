@@ -1025,12 +1025,56 @@ type statusVault interface {
 // seeder's first frame (statusLoop).
 const firstStatusWait = 3 * time.Second
 
-// The loop asks Vault every vaultPollEvery ticks (a second each), and every
-// vaultedPollEvery once the torrent is vaulted.
+// The loop asks Vault every vaultPollEvery ticks (a second each) while it
+// matters within seconds, every vaultIdlePollEvery otherwise, and every
+// vaultedPollEvery once the torrent is vaulted (vaultPollTicks). Each read
+// is bounded by vaultReadTimeout: the loop waits on it.
 const (
-	vaultPollEvery   = 2
-	vaultedPollEvery = 30
+	vaultPollEvery     = 2
+	vaultedPollEvery   = 30
+	vaultIdlePollEvery = 15
+	vaultReadTimeout   = 2 * time.Second
 )
+
+// vaultPollTicks is how many ticks apart the loop asks Vault. Often while a
+// transfer is under way (funded, not vaulted: its progress) and while the
+// viewer is signed in -- a pledge is a click away, and the page does not
+// reopen its stream after one, so "vaulting" shows up on this stream's next
+// read. Otherwise the torrent changes only when someone else pledges, and a
+// tab stays open for hours (p99 4.3 h, 2026-10-02): every 2 s that was most
+// of the database's reads. Vaulted is final on this page (the stream stays
+// open only for the viewer's link): far less often still.
+func vaultPollTicks(db *vaultModels.Resource, signedIn bool) int {
+	switch {
+	case db != nil && db.Vaulted:
+		return vaultedPollEvery
+	case db != nil && db.Funded, signedIn:
+		return vaultPollEvery
+	}
+	return vaultIdlePollEvery
+}
+
+// readVault is Vault's word on the resource, bounded: the database row, and
+// the Vault API's transfer for a funded one. A failed read keeps the last
+// row (db) and drops the transfer's progress.
+func (s *Handler) readVault(ctx context.Context, resourceID string, db *vaultModels.Resource) (*vaultModels.Resource, *vault.Resource) {
+	ctx, cancel := context.WithTimeout(ctx, vaultReadTimeout)
+	defer cancel()
+	dbRes, err := s.statusVault.GetResource(ctx, resourceID)
+	if err != nil {
+		log.WithError(err).WithField("resourceID", resourceID).Warn("failed to get vault resource for status")
+	} else {
+		db = dbRes
+	}
+	if db == nil || !db.Funded || db.Vaulted {
+		return db, nil
+	}
+	apiRes, err := s.statusVault.GetVaultAPIResource(ctx, resourceID)
+	if err != nil {
+		log.WithError(err).WithField("resourceID", resourceID).Warn("failed to get vault api resource for status")
+	}
+	return db, apiRes
+}
 
 // statusLoop runs in a background goroutine, computing status updates and sending them to the channel.
 // For the resource page (env.withView) it also follows the viewer's own thp
@@ -1097,17 +1141,7 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	// Fetch vault state before first send to avoid idle→vaulted flicker
 	if s.statusVault != nil {
-		var err error
-		lastDBResource, err = s.statusVault.GetResource(ctx, resourceID)
-		if err != nil {
-			log.WithError(err).Warn("failed to get vault resource for initial status")
-		}
-		if lastDBResource != nil && lastDBResource.Funded && !lastDBResource.Vaulted {
-			lastAPIResource, err = s.statusVault.GetVaultAPIResource(ctx, resourceID)
-			if err != nil {
-				log.WithError(err).Warn("failed to get vault api resource for initial status")
-			}
-		}
+		lastDBResource, lastAPIResource = s.readVault(ctx, resourceID, nil)
 	}
 
 	for {
@@ -1150,30 +1184,10 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 		case <-ticker.C:
 
-			// Vaulted is final on this page (the stream stays open only for
-			// the viewer's link): the database is asked far less often.
-			every := vaultPollEvery
-			if lastDBResource != nil && lastDBResource.Vaulted {
-				every = vaultedPollEvery
-			}
-			if s.statusVault != nil && vaultTick%every == 0 {
-				dbRes, err := s.statusVault.GetResource(ctx, resourceID)
-				if err != nil {
-					log.WithError(err).Warn("failed to get vault resource for status")
-				} else {
-					lastDBResource = dbRes
-				}
-				lastAPIResource = nil
-				if lastDBResource != nil && lastDBResource.Funded && !lastDBResource.Vaulted {
-					apiRes, err := s.statusVault.GetVaultAPIResource(ctx, resourceID)
-					if err != nil {
-						log.WithError(err).Warn("failed to get vault api resource for status")
-					} else {
-						lastAPIResource = apiRes
-					}
-				}
-			}
 			vaultTick++
+			if s.statusVault != nil && vaultTick%vaultPollTicks(lastDBResource, env.signedIn) == 0 {
+				lastDBResource, lastAPIResource = s.readVault(ctx, resourceID, lastDBResource)
+			}
 
 			stats.tick(time.Now())
 

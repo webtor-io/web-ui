@@ -738,3 +738,78 @@ func TestStatusStream_VaultWaitingNeedsLiveSwarm(t *testing.T) {
 		t.Errorf("still vault_waiting after the frames went cold at %v", coldAt)
 	}
 }
+
+// blockingVault is a database that never answers: every read waits for
+// its context.
+type blockingVault struct{ calls *atomic.Int32 }
+
+func (v blockingVault) GetResource(ctx context.Context, _ string) (*vaultModels.Resource, error) {
+	v.calls.Add(1)
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (v blockingVault) GetVaultAPIResource(ctx context.Context, _ string) (*vault.Resource, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A slow database does not stop the status: a Vault read is bounded, and
+// the stream says what it knows without it. Unbounded, the loop waited on
+// it before its first message and in every tick, its selects unread.
+func TestStatusStream_SlowVaultDoesNotHoldTheStream(t *testing.T) {
+	node := newFakeNode(t, nil)
+	calls := &atomic.Int32{}
+	h := &Handler{api: testAPI(t, node.srv), offers: liveOffers(), statusVault: blockingVault{calls}}
+	srv := statusServer(t, h, "free", "5M")
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok&session=1")
+	until(t, msgs, vaultReadTimeout+3*time.Second, "the first message", func(m map[string]any) bool { return m["state"] == "cached" })
+	if n := calls.Load(); n < 1 {
+		t.Errorf("Vault asked %d times", n)
+	}
+}
+
+// A torrent nobody has pledged, watched by a viewer who cannot pledge
+// (anonymous): Vault is asked every vaultIdlePollEvery, not every two
+// seconds: tabs stay open for hours (p99 4.3 h), and each one read the
+// database every two seconds for as long.
+func TestStatusStream_VaultPollFollowsTheTransfer(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		res  *vaultModels.Resource
+		max  int32
+		min  int32
+	}{
+		{"unfunded, anonymous", &vaultModels.Resource{}, 2, 1},
+		{"funded, transferring", &vaultModels.Resource{Funded: true}, 10, 3},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			node := newFakeNode(t, nil)
+			v := fakeStatusVault{res: c.res, calls: &atomic.Int32{}}
+			h := &Handler{api: testAPI(t, node.srv), offers: liveOffers(), statusVault: v}
+			srv := statusServer(t, h, "free", "5M")
+			ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+			defer cancel()
+			msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok&session=1")
+			for range msgs {
+			}
+			if n := v.calls.Load(); n < c.min || n > c.max {
+				t.Errorf("%d Vault reads in 6 s, want %d..%d", n, c.min, c.max)
+			}
+		})
+	}
+	// A signed-in viewer can pledge at any moment, and the page does not
+	// reopen the stream after it: "vaulting" has to show up in seconds.
+	if vaultPollTicks(&vaultModels.Resource{}, true) != vaultPollEvery || vaultPollTicks(nil, true) != vaultPollEvery {
+		t.Error("signed in, unfunded: polled often")
+	}
+	if vaultPollTicks(nil, false) != vaultIdlePollEvery || vaultPollTicks(&vaultModels.Resource{}, false) != vaultIdlePollEvery {
+		t.Error("anonymous, unfunded: polled rarely")
+	}
+	if vaultPollTicks(&vaultModels.Resource{Funded: true, Vaulted: true}, true) != vaultedPollEvery {
+		t.Error("vaulted: polled least")
+	}
+}

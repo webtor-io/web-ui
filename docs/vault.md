@@ -1055,6 +1055,15 @@ under the piece bar.
   and ends the stream; the page closes its EventSource on it rather than let
   it reconnect to the same answer. While the stream stays open on a vaulted
   torrent, the Vault database is asked every 30 s instead of every 2 s.
+  Every 2 s is kept for a transfer under way (funded, not vaulted) and for a
+  signed-in viewer — a pledge is a click away, and the page does not reopen
+  its stream after one, so "Saving" appears on the stream's next read; an
+  anonymous viewer of a torrent nobody pledged gets a read every 15 s
+  (`vaultPollTicks`; tabs stay open for hours, p99 4.3 h, and the 2 s reads
+  were most of the status's load on the database's pool of five). Each read
+  is bounded at 2 s (`vaultReadTimeout`), the database row and the Vault API
+  together: the loop waits on it, and an unbounded read stopped the stream's
+  first message and every tick while the pool was exhausted.
 - **Token rotation.** thp ends every stream at its token's expiry (10
   minutes). That is planned, not a failure: 30 s before it the watch opens
   the next stream with a fresh token and switches to it the moment it opens

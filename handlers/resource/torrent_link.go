@@ -24,9 +24,12 @@ const (
 const torrentFileTokenTTL = 6 * time.Hour
 
 // statusTokenTTL is how long the status stream stays openable from one
-// page render. The stream itself lives minutes and the client reopens it
-// with the same token, so this bounds how long a tab keeps a live badge
-// without a reload. Bots that cannot load the page (it is challenged at the
+// page render. It is checked when a stream opens, not while one runs: an
+// open stream lives as long as its tab (p50 46 s, p99 4.3 h, 15 h the
+// longest, 2026-10-02). What it bounds is the reopen -- after a network
+// blip or a pod rollout the client reopens with the same token, and once
+// that is refused the page reloads its status block for a fresh one
+// (status.js renew). Bots that cannot load the page (it is challenged at the
 // edge) cannot mint one; a harvested pair of session cookie and CSRF token
 // used to open the stream indefinitely — 2026-09-07, ~1 000 streams per
 // half hour under forged Referer headers, each one loading a torrent on a
