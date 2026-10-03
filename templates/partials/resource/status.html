@@ -130,7 +130,7 @@
      The line, the label and the arrowhead are the animated parts; they are
      never replaced, only the segment's attributes change. */}}
 {{ define "resource/status_seg" }}
-<span class="tx-seg" data-tx-seg data-tone="{{ .Tone }}"{{ if .On }} data-moving{{ end }}{{ if .Dots }} data-dots{{ end }}{{ if not .Show }} hidden{{ end }}><span class="tx-trk"><span class="tx-ln"></span><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><svg class="tx-lk" aria-hidden="true"><use href="#tx-i-lock"></use></svg><span class="tx-spd">{{ .Speed }}</span><i class="tx-note">{{ with .Note }}· {{ . }}{{ end }}</i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
+<span class="tx-seg" data-tx-seg data-tone="{{ .Tone }}"{{ if .On }} data-moving{{ end }}{{ if .Dots }} data-dots{{ end }}{{ if not .Show }} hidden{{ end }}><span class="tx-trk"><span class="tx-ln"></span><svg class="tx-lk" aria-hidden="true"><use href="#tx-i-lock"></use></svg><span class="tx-sp"><svg class="tx-pz" aria-hidden="true"><use href="#tx-i-pause"></use></svg><span class="tx-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="tx-spd">{{ .Speed }}</span><i class="tx-note">{{ with .Note }}· {{ . }}{{ end }}</i></span><svg class="tx-hd" aria-hidden="true"><use href="#tx-i-head"></use></svg></span></span>
 {{- end }}
 
 {{/* The plan box: bolt, title and ETA; the button and the trial note under

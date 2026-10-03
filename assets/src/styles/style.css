@@ -397,10 +397,11 @@ html {
 .tx-seg[data-tone="pause"] .tx-pz {
   display: block;
 }
-/* The plan's cap as a shape, not only pink: the player's lock before the
-   speed, in the compact chain only -- the wide one says "· cap" in words,
-   the compact one has no note (WCAG 1.4.1; after the box's × a phone has
-   nothing else that says it). */
+/* The plan's cap as a shape, not only pink: the player's lock at the start
+   of the line, in the compact chain only -- the wide one says "· cap" in
+   words, the compact one has no note (WCAG 1.4.1; after the box's × a phone
+   has nothing else that says it). On the track, not in the speed's label:
+   a 320 px phone has 56 px for "5 Mbps", and a lock before it cut it. */
 .tx-lk {
   display: none;
   width: 12px;
@@ -956,8 +957,16 @@ html {
     background: none;
     font-size: 11px;
   }
+  /* Centred on the line, as the arrowhead at its other end; the line
+     starts after it. */
   .tx-seg[data-tone="plan"] .tx-lk {
     display: block;
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+  }
+  .tx-seg[data-tone="plan"] .tx-ln {
+    left: 15px;
   }
   /* The button full width under the words; the × clear of the title,
      beside it rather than beside the button. */

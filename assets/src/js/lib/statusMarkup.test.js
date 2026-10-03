@@ -110,13 +110,20 @@ test('a pledge\'s "Expiring" says how long is left at 4.5:1 and 11px', () => {
 test('the cap on a phone is a lock as well as pink: the compact chain has no "· cap"', () => {
     assert.equal(rule('.tx-note', ['@container']).display, 'none', 'what this guards: the word is gone there');
     assert.equal(rule('.tx-lk').display, 'none', 'the wide chain says "· cap" in words');
-    assert.equal(rule('.tx-seg[data-tone="plan"] .tx-lk', ['@container']).display, 'block');
+    const lk = rule('.tx-seg[data-tone="plan"] .tx-lk', ['@container']);
+    assert.equal(lk.display, 'block');
+    // At the start of the line, not before the speed: a 262 px block (a 320 px
+    // phone) has 56 px for "5 Мбит/с", and the lock's 15 px there cut it to
+    // "5 Мбит/(" (review 2026-10-03). The line makes room for it instead.
+    assert.equal(lk.position, 'absolute', 'the lock takes no width from the speed');
+    assert.ok(parseFloat(rule('.tx-seg[data-tone="plan"] .tx-ln', ['@container']).left) >= parseFloat(rule('.tx-lk').width), 'the line starts after the lock');
     const doc = new JSDOM(PAGE).window.document;
     assert.ok(doc.getElementById('tx-i-lock'), 'the lock in the block\'s sprite');
     const segs = doc.querySelectorAll('.tx-seg');
     assert.ok(segs.length > 0);
     for (const s of segs) {
         assert.equal(s.querySelector('.tx-lk use')?.getAttribute('href'), '#tx-i-lock', 'every segment has the lock (stable DOM: the tone shows it)');
+        assert.equal(s.querySelector('.tx-lk').parentElement.className, 'tx-trk', 'on the track, out of the speed\'s label');
     }
 });
 
