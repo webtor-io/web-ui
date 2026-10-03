@@ -38,6 +38,12 @@ type statsWatch struct {
 	// lastProgressAt is zero until Completed first grows on this stream;
 	// firstStatsAt starts the observation window.
 	lastProgressAt, firstStatsAt time.Time
+	// gapRate is what the last growth brought over the gap before it, when
+	// that gap was longer than pieceGap; 0 after a growth that came sooner.
+	// The meter takes a piece in over the second it arrived in, and a slow
+	// swarm's 4 MiB every 27 s read 13-22 Mbps instead of 1.2 (status
+	// draws the lower).
+	gapRate float64
 	// liveSince is when this stream's frames turned live (zero while cold).
 	liveSince time.Time
 	// stale: the stream closed and a reconnect is pending. The last known
@@ -133,6 +139,14 @@ func (w *statsWatch) frame(ev api.EventData, now time.Time) bool {
 		w.firstStatsAt = now
 		w.lastCompleted = ev.Completed
 	} else if ev.Completed != w.lastCompleted {
+		since := w.lastProgressAt
+		if since.IsZero() {
+			since = w.firstStatsAt
+		}
+		w.gapRate = 0
+		if gap := now.Sub(since); gap > pieceGap && ev.Completed > w.lastCompleted {
+			w.gapRate = float64(ev.Completed-w.lastCompleted) / gap.Seconds()
+		}
 		w.lastCompleted = ev.Completed
 		w.lastProgressAt = now
 	}
@@ -253,6 +267,9 @@ func (w *statsWatch) status(db *vaultModels.Resource, apiRes *vault.Resource, no
 		}
 	}
 	status := resolveStatus(db, apiRes, w.last)
+	if w.gapRate > 0 && status.Rate > w.gapRate {
+		status.Rate = w.gapRate
+	}
 	if status.State == "idle" && w.unavailable {
 		status.State = "unknown"
 	}

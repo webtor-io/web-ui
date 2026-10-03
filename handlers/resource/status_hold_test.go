@@ -65,6 +65,57 @@ func TestViewEnv_HoldsTheSwarmThroughAGap(t *testing.T) {
 	}
 }
 
+// Two seeders verify a 4 MiB piece every 27 s: 1.24 Mbps. The smoothed
+// rate took each piece in as it came -- 0.4 of 4 MiB over the second it
+// arrived in, 13-22 Mbps -- and the hold drew the swarm at that for its
+// whole stretch: faster than the viewer's cap of 5, so "a few slow
+// seeders" (swarmBound) did not hold, and the plan was sold (tier) in
+// most frames of a swarm a plan cannot speed up. A piece after a gap moves
+// at what came over the gap. Real meter, hold and view, as the loop calls
+// them: a tick every second, the piece's frame at a phase within it.
+func TestViewEnv_SlowSwarmIsNotFasterThanItsPieces(t *testing.T) {
+	loc := i18n.New(os.DirFS("../../locales")).Localizer("ru")
+	atCap := statusview.Viewer{Known: true, Present: true, Mbps: 5, Limited: true, PlanBox: true, CapMbps: 5}
+	const piece, every = 4 << 20, 27
+	real := float64(piece) / every
+	t0 := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	for _, phase := range []time.Duration{550 * time.Millisecond, 700 * time.Millisecond, 900 * time.Millisecond} {
+		env := &viewEnv{lang: "ru", loc: loc, tier: "free", withView: true}
+		w, _, _ := newTestStatsWatch()
+		w.ch = make(chan api.EventData)
+		done := 0
+		frame := func() api.EventData {
+			return api.EventData{Total: 400 << 20, Completed: done, Seeders: 2, Peers: 2}
+		}
+		w.frame(frame(), t0)
+		tier, fastest := 0, 0.0
+		for s := 1; s <= 600; s++ {
+			steps := []time.Duration{0}
+			if s%every == 0 {
+				steps = append(steps, phase)
+			}
+			for _, d := range steps {
+				now := t0.Add(time.Duration(s)*time.Second + d)
+				if d == 0 {
+					w.tick(now)
+				} else {
+					done += piece
+					w.frame(frame(), now)
+				}
+				st := w.status(nil, nil, now)
+				fastest = max(fastest, st.viewTorrent(false).RateBps)
+				env.present(st, atCap, atCap, 0, 0, now)
+				if st.View.Key == statusview.KeyTier {
+					tier++
+				}
+			}
+		}
+		if tier > 0 || fastest > real*1.5 {
+			t.Errorf("piece at +%v: the swarm moved at up to %.1f Mbps (it sends %.2f), the plan sold in %d frames of 622", phase, statusview.BytesToMbps(fastest), statusview.BytesToMbps(real), tier)
+		}
+	}
+}
+
 // A still swarm has no rate in the view, whatever the smoothed rate says:
 // the chain moves while the bytes arrive, not while their average decays.
 func TestViewTorrent_StillSwarmHasNoRate(t *testing.T) {

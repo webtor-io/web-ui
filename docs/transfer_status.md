@@ -639,7 +639,12 @@ under the piece bar.
   what is cached, the rest waits for the swarm with or without a plan; so do a
   few seeders standing still past the swarm's hold — a speed not known is not
   a fast one — and the rate is compared as it is, not as its label rounds it:
-  4.96 reads "5" and is under a cap of 5; `statusview.swarmBound`. No seeder
+  4.96 reads "5" and is under a cap of 5; `statusview.swarmBound`. A piece
+  that comes after more than 2 s of nothing moves at what came over the gap
+  (`statsWatch.gapRate`, `pieceGap`), not at the meter's take on its one
+  second: two seeders verifying 4 MiB every 27 s read 13–22 Mbps for the
+  whole hold, over the cap, and sold the plan in 578 of 622 frames
+  (`TestViewEnv_SlowSwarmIsNotFasterThanItsPieces`). No seeder
   and peers — `fewSeeders` counts seeders only — still sells; the owner has
   not decided that one), pieces nobody has (also with the viewer at the cap:
   the file does not finish with a plan either; the pink link stays), a stall,
