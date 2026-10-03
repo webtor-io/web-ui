@@ -2115,6 +2115,29 @@ test('Play while the popup is up is the answer "continue"', async (t) => {
     assert.equal(p.events.filter((e) => e.name === 'grace-soft-cta-click').length, 1, 'one answer');
 });
 
+// The popup is modal: the player's own keys stop at it -- the arrows moved
+// the film under it, back into the window too, with the popup still up --
+// but for Play (the answer "continue", above) and Next (the hold dropped,
+// docs/grace_token.md). A key on one of the popup's own buttons is that
+// button's: space on the close is the close, not "continue".
+test('the popup up: the player\'s keys stop at it, and a key on its own button is the button\'s', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => gracePopup(page));
+    await playPast(p, 31);
+    assert.ok(popupUp(), 'fixture: up');
+    const at = p.video.currentTime;
+    keydown('ArrowRight');
+    keydown('ArrowLeft');
+    await settle();
+    assert.equal(p.video.currentTime, at, 'no seek under it');
+    assert.ok(popupUp(), 'still up');
+    const close = graceCta().querySelector('.grace-cta-close');
+    close.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    await settle();
+    assert.equal(graceClick(p), undefined, 'not "continue" by Play');
+    assert.ok(popupUp(), 'the button\'s own press is left to the browser');
+});
+
 // Whatever else starts the film while the popup is up -- the embed's
 // player_play here; the subtitle catch-up letting go is another -- is put
 // back on its `play` event, and counted as playback the answer resumes.

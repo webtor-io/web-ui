@@ -1076,6 +1076,16 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         function onKeyDown(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
             if (sessionSeeking) return;
+            // The grace popup up, waiting for its answer: a modal over the
+            // film. A key on one of its own buttons is that button's (space
+            // on the close is the close), and of the player's keys only Play
+            // (the answer "continue") and Next (the hold dropped) reach under
+            // it (docs/grace_token.md) -- the arrows moved the film under the
+            // popup, back into the window too.
+            if (graceAnswerRef.current) {
+                if (e.target.closest && e.target.closest('#grace-cta button, #grace-cta a')) return;
+                if (![' ', 'k', 'n', 'N'].includes(e.key)) return;
+            }
             switch (e.key) {
                 case ' ':
                 case 'k':
