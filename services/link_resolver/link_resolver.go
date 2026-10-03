@@ -14,6 +14,7 @@ import (
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	ra "github.com/webtor-io/rest-api/services"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	vmodels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
@@ -128,7 +129,7 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 			return nil, errors.Wrap(merr, "failed to mark as cached in cache index")
 		}
 		log.WithFields(log.Fields{
-			"url":          url,
+			"url":          helpers.RedactURL(url),
 			"cached":       cached,
 			"backend_type": userBackend.Type,
 		}).Info("generated streaming link from backend")
@@ -154,7 +155,7 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 	}
 
 	log.WithFields(log.Fields{
-		"url":          url,
+		"url":          helpers.RedactURL(url),
 		"cached":       cached,
 		"backend_type": "webtor",
 	}).Info("generated webtor link")

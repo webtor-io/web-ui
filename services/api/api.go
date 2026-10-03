@@ -23,6 +23,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/helpers"
 
 	"github.com/urfave/cli"
 
@@ -470,7 +471,7 @@ func (s *Api) doRequestRaw(ctx context.Context, c *Claims, url string, method st
 		return
 	}
 
-	res, err = s.cl.Do(req)
+	res, err = s.do(req)
 	if err != nil {
 		return
 	}
@@ -593,6 +594,18 @@ func (s *Api) proxyURL(u string) (string, error) {
 	return u, nil
 }
 
+// do is s.cl.Do with the URL in its error redacted. A failed request's error
+// quotes the URL whole, and the URLs to torrent-http-proxy carry the site's
+// api-key and the viewer's token; every caller logs that error (Loki,
+// 2026-10-03: "stats SSE failed", 267 lines a day).
+func (s *Api) do(req *http.Request) (*http.Response, error) {
+	res, err := s.cl.Do(req)
+	if ue, ok := err.(*url.Error); ok {
+		ue.URL = helpers.RedactURL(ue.URL)
+	}
+	return res, err
+}
+
 func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.Request, error) {
 	resolved, err := s.proxyURL(u)
 	if err != nil {
@@ -684,7 +697,7 @@ func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string, decod
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request")
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create transcoder session")
 	}
@@ -724,7 +737,7 @@ func (s *Api) DeleteTranscoderSession(ctx context.Context, baseURL string, sessi
 	if err != nil {
 		return errors.Wrap(err, "failed to create request")
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete transcoder session")
 	}
@@ -746,7 +759,7 @@ func (s *Api) DownloadWithRange(ctx context.Context, u string, start int, end in
 		}
 		req.Header.Set("Range", fmt.Sprintf("bytes=%v-%v", startStr, endStr))
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		log.WithError(err).Error("failed to do request")
 		return nil, 0, err
@@ -833,7 +846,7 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do request")
 	}
@@ -890,7 +903,7 @@ func (s *Api) GetMediaProbe(ctx context.Context, u string) (*MediaProbe, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do request")
 	}
@@ -922,7 +935,7 @@ func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do request")
 	}
@@ -1072,7 +1085,7 @@ func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, ran
 		}
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%s", rangeStart, endStr))
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to do warmup request")
 	}

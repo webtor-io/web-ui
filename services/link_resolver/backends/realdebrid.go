@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/link_resolver/common"
 	rd "github.com/webtor-io/web-ui/services/realdebrid"
 )
@@ -122,7 +123,7 @@ func (s *RealDebrid) ResolveLink(ctx context.Context, token, hash string, fileId
 		log.WithFields(log.Fields{
 			"hash":     hash,
 			"file_idx": fileIdx,
-			"url":      url,
+			"url":      helpers.RedactURL(url),
 			"cached":   cached,
 		}).Debug("link resolution completed, caching result")
 
@@ -379,7 +380,7 @@ func (s *RealDebrid) resolveLink(ctx context.Context, client *rd.Client, hash st
 	log.WithFields(log.Fields{
 		"hash":     hash,
 		"file_idx": fileIdx,
-		"url":      download.Download,
+		"url":      helpers.RedactURL(download.Download),
 		"cached":   true,
 	}).Info("generated realdebrid link")
 

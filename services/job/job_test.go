@@ -1,8 +1,10 @@
 package job
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -184,5 +186,27 @@ func TestRun_ReportsOutcomeOnce(t *testing.T) {
 	_ = j.Run(context.Background())
 	if got := before(metrics.JobOK) - ok0; got != 1 {
 		t.Fatalf("replay must not be counted as a run: ok=%v", got)
+	}
+}
+
+// A rendered item is the download script with the stream URL in it, the
+// site's api-key and the viewer's token included. The log keeps it without
+// them; the item itself (storage, browser) is untouched.
+func TestLogToLogger_RedactsCredentials(t *testing.T) {
+	var buf bytes.Buffer
+	out, lvl := log.StandardLogger().Out, log.GetLevel()
+	log.SetOutput(&buf)
+	log.SetLevel(log.InfoLevel)
+	defer func() { log.SetOutput(out); log.SetLevel(lvl) }()
+
+	u := "https://h.example/89f8ee4c/a.mp4?api-key=SECRET-KEY&token=SECRET-TOKEN"
+	j := &Job{ID: "id", Queue: "download"}
+	l := LogItem{Level: Custom, Body: `<script>var url = "` + u + `";</script>`, Location: u, Message: "failed: " + u}
+	j.logToLogger(l)
+	if got := buf.String(); strings.Contains(got, "SECRET") || !strings.Contains(got, "a.mp4?api-key=<redacted>") {
+		t.Errorf("log line: %s", got)
+	}
+	if !strings.Contains(l.Body, "SECRET-KEY") {
+		t.Error("the item itself must keep the URL whole")
 	}
 }

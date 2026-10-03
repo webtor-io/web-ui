@@ -1393,7 +1393,7 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	}
 
 	// Check stats URL is accessible before opening SSE
-	log.WithField("resourceID", resourceID).WithField("url", statItem.URL[:min(len(statItem.URL), 80)]).Info("status: connecting to stats SSE")
+	log.WithField("resourceID", resourceID).WithField("url", helpers.RedactURL(statItem.URL)).Info("status: connecting to stats SSE")
 
 	// Open SSE connection to torrent-http-proxy (use parent ctx, not timeout ctx)
 	ch, err := s.api.Stats(ctx, statItem.URL)

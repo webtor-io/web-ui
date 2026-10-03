@@ -269,6 +269,26 @@ func TestSessionStats_ErrorsDoNotQuoteTheURL(t *testing.T) {
 	}
 }
 
+// Every request to torrent-http-proxy carries the site's api-key and, for a
+// viewer, a token; its callers log the error whole ("stats SSE failed",
+// "warmup head failed"), so the error must not carry them.
+func TestStats_ErrorsDoNotQuoteCredentials(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	u := srv.URL + "/abc/?api-key=SECRET-KEY&stats=true&token=SECRET-TOKEN"
+	srv.Close() // connection refused
+	a := &Api{cl: http.DefaultClient}
+	_, err := a.Stats(context.Background(), u)
+	if err == nil {
+		t.Fatal("want an error from a closed server")
+	}
+	if strings.Contains(err.Error(), "SECRET") {
+		t.Errorf("error quotes a credential: %v", err)
+	}
+	if !strings.Contains(err.Error(), "/abc/") {
+		t.Errorf("error lost the rest of the URL: %v", err)
+	}
+}
+
 // The status derives the viewer's session stream from this export, so every
 // URL in it must be on the standard domain: rest-api moves them there with
 // use-premium-domain=false.

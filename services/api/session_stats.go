@@ -55,7 +55,7 @@ func (s *Api) SessionStats(ctx context.Context, u string) (<-chan SessionStatsDa
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make new request")
 	}
-	res, err := s.cl.Do(req)
+	res, err := s.do(req)
 	if err != nil {
 		// A transport error quotes the URL, and the URL carries a token
 		// minted for this stream: keep it out of every log line.

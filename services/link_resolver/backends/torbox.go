@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/link_resolver/common"
 	tb "github.com/webtor-io/web-ui/services/torbox"
 )
@@ -104,7 +105,7 @@ func (s *Torbox) ResolveLink(ctx context.Context, token, hash string, fileIdx in
 		log.WithFields(log.Fields{
 			"hash":     hash,
 			"file_idx": fileIdx,
-			"url":      url,
+			"url":      helpers.RedactURL(url),
 			"cached":   cached,
 		}).Debug("link resolution completed, caching result")
 
@@ -248,7 +249,7 @@ func (s *Torbox) resolveLink(ctx context.Context, client *tb.Client, hash string
 	log.WithFields(log.Fields{
 		"hash":     hash,
 		"file_idx": fileIdx,
-		"url":      downloadURL,
+		"url":      helpers.RedactURL(downloadURL),
 		"cached":   true,
 	}).Info("generated torbox link")
 

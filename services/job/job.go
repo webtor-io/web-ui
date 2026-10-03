@@ -12,6 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/metrics"
 )
 
@@ -283,11 +284,11 @@ func (s *Job) logToLogger(l LogItem) {
 		"ID":       s.ID,
 		"Queue":    s.Queue,
 		"Tag":      l.Tag,
-		"Location": l.Location,
+		"Location": helpers.RedactURL(l.Location),
 		"Template": l.Template,
-		"Body":     l.Body,
+		"Body":     helpers.RedactURL(l.Body),
 		"Status":   l.Status,
-	}).Log(levelMap[l.Level], message)
+	}).Log(levelMap[l.Level], helpers.RedactURL(message))
 }
 
 func (s *Job) log(l LogItem) error {

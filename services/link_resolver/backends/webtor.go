@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/lazymap"
 	ra "github.com/webtor-io/rest-api/services"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/api"
 )
 
@@ -118,7 +119,7 @@ func (s *Webtor) ResolveLink(ctx context.Context, apiClaims *api.Claims, hash st
 	log.WithFields(log.Fields{
 		"hash":     hash,
 		"file_idx": fileIdx,
-		"url":      item.URL,
+		"url":      helpers.RedactURL(item.URL),
 		"cached":   cached,
 	}).Info("generated webtor link")
 
