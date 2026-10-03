@@ -1186,6 +1186,52 @@ test('a stopped download keeps You with no transfer until a different file is pi
     freshVideo();
 });
 
+// A screen reader is told what matters, once (WCAG 4.1.3): no seeders, in
+// the cache, Vault failing, the plan box coming up -- not the speeds of every
+// second (the block itself is not live for that reason). A state counts once
+// it has held 3 s: the badge's words at that moment. One region, in the
+// card's block and outside its .tx: the sticky bar's copy would say it twice.
+test('the screen reader hears what matters, once: no seeders, the cache, the box -- not the speeds', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 2.5 * 60 * 60 * 1000 });
+    downloading(t);
+    const all = document.querySelectorAll('[data-tx-announce]');
+    assert.equal(all.length, 1, 'one region');
+    const region = all[0];
+    assert.equal(region.getAttribute('role'), 'status');
+    assert.equal(region.closest('[data-tx]'), null, 'outside the block the sticky bar copies');
+    // A page view that opens on a torrent already cached: where it starts,
+    // not a change.
+    delete container._txSaid;
+    region.textContent = '';
+    source.message(S.cached);
+    t.mock.timers.tick(5000);
+    source.ping();
+    assert.equal(region.textContent, '', 'the state the page opens on: nothing');
+    source.message(S.active);
+    t.mock.timers.tick(5000);
+    source.message(S.active);
+    assert.equal(region.textContent, '', 'the speeds: nothing');
+    source.message(S.noseed);
+    assert.equal(region.textContent, '', 'not at once: it may be gone the next second');
+    t.mock.timers.tick(3000);
+    source.ping();
+    assert.equal(region.textContent, S.noseed.view.badge.label);
+    t.mock.timers.tick(3000);
+    source.message(S.noseed);
+    assert.equal(region.textContent, S.noseed.view.badge.label, 'said once');
+    source.message(S.active);
+    t.mock.timers.tick(3000);
+    source.ping();
+    assert.equal(region.textContent, '', 'moving again: nothing to say');
+    source.message(S.cached);
+    t.mock.timers.tick(3000);
+    source.ping();
+    assert.equal(region.textContent, S.cached.view.badge.label);
+    source.message(S.tier_dl);
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'fixture: the box');
+    assert.equal(region.textContent, S.tier_dl.view.plan.download.box.title, 'the box: at once, it stays');
+});
+
 // ---- the stream's life: refused, renewed, given up, let go while hidden ----
 
 // The view's renewal as lib/async.js runs it (asyncLayout reload ->

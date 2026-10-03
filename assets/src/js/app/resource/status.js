@@ -3,7 +3,7 @@ import {
     applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
     paintBar, playerCause, playerLabel, playing, forPhase, present, upsellElsewhere,
 } from '../../lib/transferStatus';
-import { attr, hide } from '../../lib/inPlace';
+import { attr, hide, text } from '../../lib/inPlace';
 import { createPlayerActivity } from '../../lib/playerActivity';
 import { publishPlayerLabel } from '../../lib/playerLabel';
 import { applyBadge } from '../../lib/statusBadge';
@@ -31,6 +31,13 @@ import { NAVBAR_H } from '../../lib/stickyStatus';
 // no hold of its own).
 const isGap = (status) => status.state === 'unknown' || status.state === 'idle';
 const GAP_HOLD_MS = 8000;
+
+// What a screen reader is told (WCAG 4.1.3), once: these states, once they
+// have held ANNOUNCE_MS (the badge's words then), and the plan box coming
+// up. Not the speeds of every second: the block itself is not live for that
+// reason (views/resource/get.html), and nothing told of the rest.
+const ANNOUNCED = new Set(['noseed', 'cached', 'vaulted', 'vault_failed']);
+const ANNOUNCE_MS = 3000;
 
 // A plan box's wording depends on time as well as on messages (the minute
 // after a stall, the player leaving its grace window, another offer coming
@@ -174,6 +181,7 @@ av(async function() {
             }
         });
         ctaWatch.refresh();
+        announce(now);
         // The player's buffering label: the lock and its card whenever the
         // view says the viewer is held at the cap with the stream box due,
         // outside the grace window and with no other offer up (the same env;
@@ -210,6 +218,31 @@ av(async function() {
             clearInterval(ticker);
             ticker = null;
         }
+    };
+    // The region is the renewed block's; what was said is the container's,
+    // so a renewal says nothing again. `heard`: the server's key and since
+    // when. The first state that holds is where the page starts, not a
+    // change: nothing said. A state left and come back to is said again: the
+    // region is cleared on the way out, so the same words are a change.
+    const region = inner.querySelector('[data-tx-announce]');
+    let heard = { key: '', since: 0 };
+    const announce = (now) => {
+        if (!region) return;
+        const said = container._txSaid || (container._txSaid = { key: null, box: false });
+        if (mem.box && !said.box) {
+            said.box = true;
+            text(region, mem.box.box.title || '');
+            return;
+        }
+        said.box = !!mem.box;
+        const key = last.view.key;
+        if (key !== heard.key) heard = { key, since: now };
+        if (key === said.key || now - heard.since < ANNOUNCE_MS) return;
+        const first = said.key === null;
+        said.key = key;
+        if (first) return;
+        const b = last.view.badge;
+        text(region, ANNOUNCED.has(key) && b ? b.label || '' : '');
     };
     const activity = createPlayerActivity(document, { onChange: render });
     // Only an explicit download start retains the viewer afterwards. A final

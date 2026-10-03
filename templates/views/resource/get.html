@@ -24,6 +24,9 @@
 {{ define "resource/status_inner" }}
 <div id="torrent-status-block" data-status-token="{{ statusToken .Data.Resource.ID }}" data-csrf="{{ .CSRF }}" data-status-unknown="{{ t .Lang "resource.status.unknown" }}"{{ with .Data }}{{ if and (has . "Item") .Item }} data-status-file="{{ .Item.PathStr }}"{{ end }}{{ end }}>
 {{- with .Data }}{{ if and (has . "StatusView") .StatusView }}{{ template "resource/status" (withContext $ .StatusView) }}{{ end }}{{ end }}
+{{- /* What matters, said once to a screen reader (app/resource/status.js): outside .tx,
+     which the sticky bar copies -- every word would be said twice. */}}
+<p class="sr-only" role="status" aria-live="polite" data-tx-announce></p>
 </div>
 {{ "resource/status.js" | asset }}
 {{ end }}
