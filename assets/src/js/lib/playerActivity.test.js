@@ -540,6 +540,31 @@ test('"watch as is" on the slow-download modal: answered until the first real st
     p.activity.stop();
 });
 
+// Two answers on one element, two offers: "watch as is" on the swarm's
+// slow-download modal (it says nothing of the plan) spent by a stall inside
+// the grace window does not spend the grace popup's answer twenty minutes
+// later -- that one is told of the cap now, and waits for its own first
+// real stall (owner, 2026-09-26; docs/grace_token.md).
+test('an answer spent is that answer: the grace popup\'s, after the modal\'s was spent, waits for its own stall', () => {
+    const p = setup('data-grace-duration-sec="1200" data-status-over-cap data-offer-answered="continue-slow"');
+    playing(p);
+    p.set({ readyState: 2, currentTime: 300 });
+    p.fire('waiting');
+    p.tick(3000);
+    p.set({ readyState: 4, currentTime: 300.3 });
+    p.fire('playing');
+    assert.equal(p.activity.offerAnswered(), false, 'the modal\'s answer: spent by the swarm\'s stall');
+    p.tick(20 * 60 * 1000);
+    p.set({ currentTime: 1201 });
+    p.video.dataset.graceCtaAnswered = 'continue';
+    assert.equal(p.activity.offerAnswered(), true, 'the popup answered: told of the cap now');
+    p.set({ readyState: 2 });
+    p.fire('waiting');
+    p.tick(STALL_MIN_MS);
+    assert.equal(p.activity.offerAnswered(), false, 'its own first real stall spends it');
+    p.activity.stop();
+});
+
 // A stall that ended before the answer was the popup's to speak of: it does
 // not spend the answer, though the verdict stays 'buffering' for its minute.
 // One still under way when the viewer answers is the cap, now: the video is

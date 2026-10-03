@@ -72,8 +72,8 @@ export const RESUME_MIN_S = 0.1;
 const HAVE_FUTURE_DATA = 3;
 
 // The expando on a player element whose answer a real stall has spent
-// (offerAnswered). A string, not a Symbol: a second copy of this module
-// (CLAUDE.md, shared JS state) must read the same one.
+// (offerAnswered): which answer (answerOf). A string, not a Symbol: a second
+// copy of this module (CLAUDE.md, shared JS state) must read the same one.
 const GRACE_SPENT = '_txGraceCapHit';
 
 // answered: the viewer has answered an offer about the cap for this player
@@ -82,6 +82,10 @@ const GRACE_SPENT = '_txGraceCapHit';
 // "watch as is" before playback (data-offer-answered, rendered by the stream
 // job for a force-slow run, StreamContent.StatusAnswered).
 const answered = (m) => !!m && !!m.dataset && ('graceCtaAnswered' in m.dataset || 'offerAnswered' in m.dataset);
+// Which of the two it is: a stall spends that answer, not the next one. The
+// modal's "watch as is" spent inside the grace window left the popup's
+// answer at its end spent before it was given, and the box came at once.
+const answerOf = (m) => (answered(m) ? ('graceCtaAnswered' in m.dataset ? 'grace' : 'offer') : '');
 
 const isMedia = (el) => !!el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO');
 
@@ -197,7 +201,7 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
     // source, not the answer: it stays spent.
     const counted = (t) => {
         marks.lastStallAt = t;
-        if (answered(stallEl)) stallEl[GRACE_SPENT] = true;
+        if (answered(stallEl)) stallEl[GRACE_SPENT] = answerOf(stallEl);
     };
     // A stall that has lasted long enough counts from now on, and keeps
     // counting while it lasts.
@@ -407,7 +411,7 @@ export function createPlayerActivity(doc = document, { now = () => Date.now(), o
             countOngoing(now());
             for (const m of media()) {
                 if (m.ended || !answered(m)) continue;
-                if (!m[GRACE_SPENT]) return true;
+                if (m[GRACE_SPENT] !== answerOf(m)) return true;
             }
             return false;
         },
