@@ -729,6 +729,22 @@ func TestMeter_StallIsARequestOpenNow(t *testing.T) {
 	}
 }
 
+// The owner's route (2026-10-02, kept 2026-10-03): while the viewer's
+// requests keep them on the chain, their link keeps the last number through
+// any run without bytes -- a segment the transcoder holds back included.
+// "You" does not lose its reading to a gap; it leaves with its requests.
+func TestMeter_LabelStandsWhileTheViewerIsOn(t *testing.T) {
+	var m Meter
+	m.Observe(hlsSample(0, true), at(0))
+	m.Observe(hlsSample(3e6, true), at(1))
+	for s := 2; s <= 31; s++ {
+		m.Observe(hlsSample(0, true), at(s))
+	}
+	if r := m.Reading(at(31)); !r.Present || r.Mbps == 0 {
+		t.Fatalf("30 s without bytes, requests on: %+v, want present with the last number", r)
+	}
+}
+
 // Not fixed here (review, 2026-09-25): a paused page player whose film the
 // transcoder is still making keeps reloading its playlist. The transcoder
 // leaves #EXT-X-ENDLIST off until its run completes (and its pacing stops
