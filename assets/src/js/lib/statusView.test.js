@@ -642,12 +642,11 @@ test('the page\'s player playing through an HLS gap keeps the viewer on the chai
     fire('ended');
 });
 
-// The last reading bridges the gaps between HLS segments while the film
-// plays from its buffer. Not while it waits for data: the number froze at
-// the last segment, and "You 24 Mbps" with the wave running under a
-// buffering pill says bytes flow that do not (a transcoder holding its
-// segment answers nothing the proxy counts). The viewer waits.
-test('the page\'s player stalled: the viewer waits, not the last reading with its wave', (t) => {
+// The owner's route (2026-10-02, kept 2026-10-03): the page's player keeps
+// the viewer on the chain at their last reading while it plays and while it
+// waits for data -- "You" does not go with a stall, whatever the proxy
+// counts in between.
+test('the page\'s player stalled: the viewer stays on the chain at the last reading', (t) => {
     // Before every later test's clock: a stall colours the minute after it.
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() - 3 * 60 * 60 * 1000 });
     freshVideo();
@@ -667,13 +666,12 @@ test('the page\'s player stalled: the viewer waits, not the last reading with it
     source.message(S.hls_gap);
     for (const block of [card(), sticky()]) {
         assert.equal(block.querySelectorAll('[data-tx-node]')[2].hidden, false, 'still on the chain');
-        assert.equal(seg(block).querySelector('.tx-spd').textContent, 'ждём данные');
-        assert.equal(seg(block).hasAttribute('data-moving'), false, 'no wave');
+        assert.equal(seg(block).querySelector('.tx-spd').textContent, '24 Мбит/с', 'the last reading stands');
     }
     setVideo({ readyState: 4, currentTime: 300.6 });
     fire('playing');
     source.message(S.hls_gap);
-    assert.equal(seg(card()).querySelector('.tx-spd').textContent, '24 Мбит/с', 'playing again: the reading again');
+    assert.equal(seg(card()).querySelector('.tx-spd').textContent, '24 Мбит/с');
 });
 
 // Nothing moves: the badge in both blocks, and the sticky bar is told there
