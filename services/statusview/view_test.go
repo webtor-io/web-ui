@@ -765,14 +765,15 @@ func TestBuild_AvailabilityPercent(t *testing.T) {
 }
 
 // The badge is the one the page had before the chain: its colour, icon and
-// words, the swarm in brackets where it had them.
+// words, the swarm in brackets where it had them -- the seeders, without
+// "· N leechers" (owner, 2026-09-25: "(14 сидов)"), the peers without one.
 func TestBuild_BadgeSwarm(t *testing.T) {
 	for _, c := range []struct {
 		tr   Torrent
 		want string
 	}{
-		{Torrent{State: "idle", Seeders: 14, Leechers: 9, SwarmKnown: true}, "(14 сидов · 9 личей)"},
-		{Torrent{State: "idle", Seeders: 0, Leechers: 3, SwarmKnown: true}, "(0 сидов · 3 лича)"},
+		{Torrent{State: "idle", Seeders: 14, Leechers: 9, Peers: 23, SwarmKnown: true}, "(14 сидов)"},
+		{Torrent{State: "idle", Seeders: 0, Leechers: 3, Peers: 3, SwarmKnown: true}, "(3 пира)"},
 		{Torrent{State: "idle", Seeders: 14, SwarmKnown: true}, "(14 сидов)"},
 		{Torrent{State: "idle", Peers: 5, SwarmKnown: true}, "(5 пиров)"},
 		{Torrent{State: "idle"}, ""},

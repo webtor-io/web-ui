@@ -914,15 +914,13 @@ func (b *builder) badge() Badge {
 	return Badge{Tone: "cyan", Icon: "down", Pulse: true, Label: b.t("resource.status.caching") + " " + ps, Extra: swarm}
 }
 
-// swarmSuffix is the badge's swarm in brackets: seeders and leechers when
-// the seeder splits them ("(14 seeders · 9 leechers)", with no "0 leechers"
-// tail), the combined peers otherwise, nothing when nothing is known.
+// swarmSuffix is the badge's swarm in brackets: the seeders ("(14
+// seeders)", as approved -- no "· 9 leechers" tail, owner 2026-09-25), the
+// peers without one, nothing when nothing is known.
 func (b *builder) swarmSuffix() string {
 	t := b.in.Torrent
 	s := ""
 	switch {
-	case t.Leechers > 0:
-		s = b.tn("resource.status.seeders", t.Seeders) + " · " + b.tn("resource.status.leechers", t.Leechers)
 	case t.Seeders > 0:
 		s = b.tn("resource.status.seeders", t.Seeders)
 	case t.Peers > 0:
