@@ -190,12 +190,12 @@ Player.jsx:
 - **The trial link** — no answer: a new tab, the popup stays, nothing resumes behind it.
 - **The player's other keys** stop at the popup (2026-10-03): the arrows moved the film under it — back into the window too — `f`, `m`, the subtitle delay and the speed keys acted behind a modal. Only Play (space, `k`: the answer "continue") and Next (`n`) reach under it, and a key on one of the popup's own buttons is that button's (space on the close is the close, not "continue").
 - **The player goes** (the next file, a teardown) **or the viewer presses Next** while the popup is up — the hold is dropped without resuming: an answer given while the next file loads does not start the one being left. The next file is a new element with its own window.
-- **The transfer status** does not read the popup's pause as the viewer's: while it holds playback the element carries `data-grace-cta-hold`, and `lib/playerActivity.js` counts it as playing — the viewer stays on the chain (`phase` `playing`) and the verdict keeps no minute (docs/vault.md "Your speed and the plan limit"). Paused by the viewer before the popup came up — no mark, the ordinary pause rules.
+- **The transfer status** does not read the popup's pause as the viewer's: while it holds playback the element carries `data-grace-cta-hold`, and `lib/playerActivity.js` counts it as playing — the viewer stays on the chain (`phase` `playing`) and the verdict keeps no minute (docs/transfer_status.md "Your speed and the plan limit"). Paused by the viewer before the popup came up — no mark, the ordinary pause rules.
 
 ### The popup and the transfer status's plan box
 
 One offer at a time (owner, 2026-09-26). The resource page's transfer status
-(`lib/transferStatus.js` `present`, docs/vault.md "Your speed and the plan
+(`lib/transferStatus.js` `present`, docs/transfer_status.md "Your speed and the plan
 limit", docs/transfer_status.html) has its own plan box at the cap, and past
 the window thp binds on the very next segments, so the server says the box is
 due as the popup goes up. The sequence the viewer gets:
