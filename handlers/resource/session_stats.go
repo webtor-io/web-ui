@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand/v2"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -156,14 +157,17 @@ var errFinal = errors.New("final")
 // sessionRetryable: a 4xx is thp's final answer — a thp without the route, a
 // token without a session, a refused one — and asking again gets the same;
 // so is a token we could not mint. Transport errors, 5xx and a stream that
-// ended may be a pod going away.
+// ended may be a pod going away. A 429 is thp's cap on streams per torrent
+// and session, taken by the viewer's other tabs or a reconnect overlapping
+// the stream it replaces: a slot frees when one of them closes (1.7k a day
+// were final, the viewer's link gone for the rest of the stream).
 func sessionRetryable(err error) bool {
 	if errors.Is(err, errFinal) {
 		return false
 	}
 	var se *api.StatusError
 	if errors.As(err, &se) {
-		return se.Status >= 500
+		return se.Status >= 500 || se.Status == http.StatusTooManyRequests
 	}
 	return true
 }
@@ -430,6 +434,11 @@ func (w *sessionWatch) retry(ctx context.Context, err error) {
 	}
 	w.retries++
 	delay := retryDelay(w.retries, w.jitter())
+	// thp's Retry-After, when it sends one and it is the longer wait.
+	var se *api.StatusError
+	if errors.As(err, &se) && se.Wait() > delay {
+		delay = se.Wait()
+	}
 	l.WithField("in", delay).Info("status: session stats stream lost, reopening")
 	w.stopRetry = w.after(delay, func() {
 		if ctx.Err() == nil {

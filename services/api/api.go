@@ -795,6 +795,10 @@ type StatusError struct {
 	RetryAfter string
 }
 
+// Wait is RetryAfter as a duration: zero without one, or when it is not a
+// plain count of seconds (retryAfterSeconds).
+func (e *StatusError) Wait() time.Duration { return retryAfterSeconds(e.RetryAfter) }
+
 func (e *StatusError) Error() string {
 	if e.RetryAfter != "" {
 		return fmt.Sprintf("unexpected status %v (retry-after %v)", e.Status, e.RetryAfter)

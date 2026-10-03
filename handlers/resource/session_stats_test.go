@@ -333,13 +333,60 @@ func TestSessionWatch_MintFailureIsFinal(t *testing.T) {
 // a refused one: asking again gets the same answer.
 func TestSessionWatch_FinalAnswerIsNotRetried(t *testing.T) {
 	ctx := context.Background()
-	for _, code := range []int{404, 403, 400, 429} {
+	for _, code := range []int{404, 403, 400} {
 		w, op, clk := newTestWatch(sessionOpen{err: &api.StatusError{Status: code}})
 		w.start(ctx, testTarget)
 		w.opened(ctx, recv(t, w))
 		if len(clk.delays) != 0 || op.opens() != 1 {
 			t.Errorf("%d: no retry expected, got delays %v", code, clk.delays)
 		}
+	}
+}
+
+// A 429 is thp's cap on streams per torrent and session (four), taken by
+// the viewer's other tabs or by a reconnect that overlaps the stream it
+// replaces: a slot frees when one of them closes. It is retried within the
+// same budget -- after the Retry-After thp sends with it, when that is the
+// longer wait -- and logged at Info: 1.7k a day were final and invisible.
+func TestSessionWatch_TooManyStreamsIsRetried(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		retryAfter string
+		want       time.Duration
+	}{
+		{"", retryDelay(1, 0.5)},
+		{"5", 5 * time.Second},
+		{"1", retryDelay(1, 0.5)},
+	} {
+		w, op, clk := newTestWatch(sessionOpen{err: &api.StatusError{Status: 429, RetryAfter: c.retryAfter}}, sessionOpen{ch: make(chan api.SessionStatsData)})
+		hook := logged(t)
+		w.start(ctx, testTarget)
+		w.opened(ctx, recv(t, w))
+		if len(clk.delays) != 1 || clk.delays[0] != c.want {
+			t.Fatalf("Retry-After %q: delays %v, want [%v]", c.retryAfter, clk.delays, c.want)
+		}
+		if e := hook.LastEntry(); e == nil || e.Level != log.InfoLevel {
+			t.Errorf("Retry-After %q: the refusal is not logged at Info", c.retryAfter)
+		}
+		clk.fire()
+		w.opened(ctx, recv(t, w))
+		if op.opens() != 2 || w.ch == nil || w.gaveUp {
+			t.Errorf("Retry-After %q: opens=%d open=%v gaveUp=%v", c.retryAfter, op.opens(), w.ch != nil, w.gaveUp)
+		}
+	}
+	// The budget is the same: refused every time, it gives up.
+	refused := sessionOpen{err: &api.StatusError{Status: 429}}
+	w, op, clk := newTestWatch(refused, refused, refused, refused, refused)
+	w.start(ctx, testTarget)
+	for i := 0; i < 10; i++ {
+		w.opened(ctx, recv(t, w))
+		if clk.pending() == 0 {
+			break
+		}
+		clk.fire()
+	}
+	if op.opens() != 1+sessionRetries || !w.gaveUp {
+		t.Errorf("opens=%d gaveUp=%v, want %d and given up", op.opens(), w.gaveUp, 1+sessionRetries)
 	}
 }
 

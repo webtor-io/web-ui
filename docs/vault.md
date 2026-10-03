@@ -1086,11 +1086,16 @@ under the piece bar.
   ten minutes.
 - **Degrading.** Any non-200 is "unavailable". A 4xx (a thp without the route,
   a token thp refuses) and a token that cannot be minted are final; a
-  transport error, a 5xx or a stream that ended early is reopened at most
-  three times (2, 4, 8 s, each spread ×0.5–1.5 so a thp rotation does not
-  bring every stream back in the same millisecond), each with a fresh token;
-  a reopened stream that delivered for a minute gets the budget back. Either
-  way the viewer's link is simply not drawn.
+  transport error, a 5xx, a 429 or a stream that ended early is reopened at
+  most three times (2, 4, 8 s, each spread ×0.5–1.5 so a thp rotation does
+  not bring every stream back in the same millisecond; after a 429 thp's
+  `Retry-After` when that is longer), each with a fresh token; a reopened
+  stream that delivered for a minute gets the budget back. A 429 is thp's
+  cap of four streams per torrent and session, taken by the viewer's other
+  tabs or by a reconnect overlapping the stream it replaces — a slot frees
+  when one of them closes; it used to be final (about 1.7k refusals a day,
+  logged at Debug), and is now retried and logged at Info. Either way the
+  viewer's link is simply not drawn.
 - **Known gaps.** An anonymous viewer's session id is a
   hash of the session cookie, which the store re-encodes on every save: a
   download started after one carries another id until the status stream
