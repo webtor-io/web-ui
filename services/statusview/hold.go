@@ -27,8 +27,10 @@ const maxHold = time.Minute
 type Hold struct {
 	at  time.Time
 	bps float64
-	// gap is the time between the swarm's last two moves.
-	gap time.Duration
+	// gap is the time between the swarm's last two moves, measured across
+	// a still call (still): the loop calls more than once on one piece.
+	gap   time.Duration
+	still bool
 	// viewer is the last reading that put the viewer on the chain, taken
 	// at viewerAt.
 	viewer   Viewer
@@ -47,12 +49,13 @@ type Hold struct {
 // of every gap. The first gap is not known until the second piece.
 func (h *Hold) Swarm(bps float64, now time.Time) float64 {
 	if Quantize(BytesToMbps(bps)) > 0 {
-		if !h.at.IsZero() {
+		if !h.at.IsZero() && h.still {
 			h.gap = now.Sub(h.at)
 		}
-		h.at, h.bps = now, bps
+		h.at, h.bps, h.still = now, bps, false
 		return bps
 	}
+	h.still = true
 	if !h.at.IsZero() && now.Sub(h.at) < min(max(HoldFor, h.gap*3/2), maxHold) {
 		return h.bps
 	}

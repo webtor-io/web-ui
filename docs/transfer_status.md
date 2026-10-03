@@ -84,7 +84,10 @@ verifies a 4 MiB piece every ~27 s) handed the chain to the badge for the
 rest of every gap, 23 switches in 300 s (46 for 2 MiB, 11 for 8 MiB), and
 now only its first gap, before the second piece says how long one is, shows
 the badge (`TestHold_SlowSwarmStaysOnTheChain`; a stop after such a swarm
-reaches the badge that much later). Through the hold it is **drawn as it last
+reaches the badge that much later). The gap is measured from a still call
+to the next move: the loop calls the hold more than once on one piece (its
+frame, a tick, a thp event within `movingFor`), and the second call of a
+piece measured "a gap" of a fraction of a second -- back to `HoldFor`. Through the hold it is **drawn as it last
 moved**: its last speed, the sweep, and the key that went with it
 (`Input.HeldBps`) — never a pause, a dash or a badge key's hint on the chain;
 the paused, missing and idle stories are the badge's, told once the hold is

@@ -52,7 +52,11 @@ func TestHold_KeepsTheSwarmThroughAGap(t *testing.T) {
 // ~27 s, and a hold of HoldFor gave the chain to the badge for the rest of
 // every gap -- 46, 23 and 11 switches in 300 s for 2, 4 and 8 MiB pieces.
 // Once its gap is known, the hold stretches over it: the badge only in the
-// first gap, before the second piece says how long one is.
+// first gap, before the second piece says how long one is. The loop calls
+// the hold more than once on a piece -- its stats frame, a tick, a thp
+// event inside the half second the swarm moves (movingFor) -- and the
+// second such call is no gap: measured there, the hold was back to HoldFor
+// (33.7, 17.3 and 9.1 switches with random phases).
 func TestHold_SlowSwarmStaysOnTheChain(t *testing.T) {
 	t0 := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
 	for _, mib := range []float64{2, 4, 8} {
@@ -60,17 +64,21 @@ func TestHold_SlowSwarmStaysOnTheChain(t *testing.T) {
 		var h Hold
 		flips, last := 0, ""
 		for s := 0; s < 300; s++ {
+			calls := []time.Duration{0}
 			moving := 0.0
 			if s%period == 0 {
 				moving = mbpsBytes(1.2)
+				calls = append(calls, 300*time.Millisecond)
 			}
-			tr := caching(40, 2, 0)
-			tr.RateBps = moving
-			v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: tr, Viewer: zero, ClaimCapMbps: 5, HeldBps: h.Swarm(moving, t0.Add(time.Duration(s)*time.Second))})
-			if last != "" && v.Mode != last {
-				flips++
+			for _, d := range calls {
+				tr := caching(40, 2, 0)
+				tr.RateBps = moving
+				v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: tr, Viewer: zero, ClaimCapMbps: 5, HeldBps: h.Swarm(moving, t0.Add(time.Duration(s)*time.Second+d))})
+				if last != "" && v.Mode != last {
+					flips++
+				}
+				last = v.Mode
 			}
-			last = v.Mode
 		}
 		if flips > 2 {
 			t.Errorf("%v MiB pieces, one every %d s: %d switches between the chain and the badge in 300 s", mib, period, flips)
@@ -81,6 +89,7 @@ func TestHold_SlowSwarmStaysOnTheChain(t *testing.T) {
 	var h Hold
 	r := mbpsBytes(1.2)
 	h.Swarm(r, t0)
+	h.Swarm(0, t0.Add(time.Minute))
 	h.Swarm(r, t0.Add(5*time.Minute))
 	if got := h.Swarm(0, t0.Add(5*time.Minute+maxHold)); got != 0 {
 		t.Errorf("held %v past maxHold after a five-minute gap", got)
