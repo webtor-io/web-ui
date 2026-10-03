@@ -97,7 +97,7 @@ func newSet(r prometheus.Registerer) *set {
 		}, []string{"route"}),
 		jobs: f.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace, Name: "jobs_total",
-			Help: "Async job runs finished, by queue and outcome (ok, error, rejected). Replays of a stored result are not runs.",
+			Help: "Async job runs finished, by queue and outcome (ok, error, rejected). Replays of a stored result are not runs; a run the job store refused before its script started is an error.",
 		}, []string{"job", "outcome"}),
 		jobsInFly: f.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace, Name: "jobs_in_flight",
@@ -204,6 +204,14 @@ func JobStarted() {
 func JobFinished(queue, outcome string) {
 	std.jobsInFly.Dec()
 	std.jobs.WithLabelValues(queue, outcome).Inc()
+}
+
+// JobNotStarted counts a run the job store refused before its script
+// started, as an error. Left out, a store outage showed as fewer jobs, not
+// failing ones: on 2026-10-03 dragonfly-ui refused every write for two hours
+// and jobs_total read 0.3% errors.
+func JobNotStarted(queue string) {
+	std.jobs.WithLabelValues(queue, JobError).Inc()
 }
 
 // StremioPaywallVideo counts one playback click answered with the paywall

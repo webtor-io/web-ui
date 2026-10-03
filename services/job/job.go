@@ -177,6 +177,7 @@ func (s *Job) Run(ctx context.Context) error {
 	if !s.purge {
 		items, err := s.storage.Sub(ctx, s.Queue, s.ID)
 		if err != nil {
+			s.notStarted()
 			return err
 		}
 		if items != nil {
@@ -195,6 +196,7 @@ func (s *Job) Run(ctx context.Context) error {
 	} else {
 		err := s.storage.Drop(ctx, s.Queue, s.ID)
 		if err != nil {
+			s.notStarted()
 			return err
 		}
 	}
@@ -210,6 +212,14 @@ func (s *Job) Run(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// notStarted reports a run the job store refused before the script started.
+// An observer of a job running elsewhere (no script) is not a run.
+func (s *Job) notStarted() {
+	if s.runnable != nil {
+		metrics.JobNotStarted(s.Queue)
+	}
 }
 
 // execute runs the script and reports its outcome exactly once. The log

@@ -210,3 +210,47 @@ func TestLogToLogger_RedactsCredentials(t *testing.T) {
 		t.Error("the item itself must keep the URL whole")
 	}
 }
+
+// failingStorage is the job store refusing writes, as dragonfly-ui did on
+// 2026-10-03 (ERR Out of memory): Sub cannot create the job's list and Drop
+// cannot clear it.
+type failingStorage struct{ NilStorage }
+
+func (s *failingStorage) Sub(_ context.Context, _ string, _ string) (chan LogItem, error) {
+	return nil, errors.New("ERR Out of memory")
+}
+
+func (s *failingStorage) Drop(_ context.Context, _ string, _ string) error {
+	return errors.New("ERR Out of memory")
+}
+
+// A run the store refuses never reaches the script, and must still count as
+// a failed run: otherwise a store outage reads as fewer jobs, not failing
+// ones, and WebUIJobFailures stays quiet while every job fails.
+func TestRun_CountsARunTheStoreRefused(t *testing.T) {
+	const q = "metrics-store-refused-test"
+	errs := func() float64 {
+		return metricstest.Counter(t, "webui_jobs_total", map[string]string{"job": q, "outcome": metrics.JobError})
+	}
+	e0, fly0 := errs(), metricstest.Gauge(t, "webui_jobs_in_flight")
+	script := NewScript(func(j *Job) error {
+		t.Fatal("script must not run when the store refused the job")
+		return nil
+	})
+	for _, purge := range []bool{false, true} {
+		if err := New(context.Background(), "id", q, script, &failingStorage{}, purge, nil).Run(context.Background()); err == nil {
+			t.Fatalf("purge=%v: want the store's error", purge)
+		}
+	}
+	if got := errs() - e0; got != 2 {
+		t.Fatalf("error: got %v, want 2 (Sub refused, Drop refused)", got)
+	}
+	if got := metricstest.Gauge(t, "webui_jobs_in_flight"); got != fly0 {
+		t.Fatalf("in-flight moved: %v -> %v", fly0, got)
+	}
+	// Watching a job that runs elsewhere is not a run.
+	_ = New(context.Background(), "id", q, nil, &failingStorage{}, false, nil).Run(context.Background())
+	if got := errs() - e0; got != 2 {
+		t.Fatalf("an observer was counted as a run: %v", got)
+	}
+}
