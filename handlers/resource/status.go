@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"io"
 	"net/http"
@@ -20,7 +19,6 @@ import (
 	uclaims "github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
-	"github.com/webtor-io/web-ui/services/ratemeter"
 	"github.com/webtor-io/web-ui/services/statusview"
 	vault "github.com/webtor-io/web-ui/services/vault"
 
@@ -202,13 +200,13 @@ func shouldReconnect(stats *TorrentStatsData, attempts int, sinceProgress time.D
 	return sinceProgress >= 0 && sinceProgress < recentActivity
 }
 
-// sinceProgress is the age of the last observed progress, or -1 when none was
-// observed on this stream.
-func sinceProgress(lastProgressAt time.Time) time.Duration {
+// sinceProgress is the age of the last observed progress at now, or -1 when
+// none was observed on this stream.
+func sinceProgress(lastProgressAt, now time.Time) time.Duration {
 	if lastProgressAt.IsZero() {
 		return -1
 	}
-	return time.Since(lastProgressAt)
+	return now.Sub(lastProgressAt)
 }
 
 // hasActive reports whether any bit of the active bucket bitset is set.
@@ -1026,32 +1024,13 @@ const (
 func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID string, out chan<- *TorrentStatus, env *viewEnv) {
 	defer close(out)
 
-	var statsCh <-chan api.EventData
-	var lastStats *TorrentStatsData
-	var pieces pieceMap
-	rate := ratemeter.New(0.4)
-	var lastCompleted int
-	// lastProgressAt is zero until Completed first grows on this stream;
-	// firstStatsAt starts the observation window.
-	var lastProgressAt, firstStatsAt time.Time
-	// liveSince is when this stream's frames turned live (zero while cold).
-	var liveSince time.Time
-	// statsStale: the stream closed and a reconnect is pending. The last
-	// known status keeps being shown (a frozen 51% beats a false "idle"),
-	// without speed and without the paused/no-seeders verdicts — we do not
-	// know. Seeder pods are rotated on every deploy, which closes every
-	// stream they held; the download continues on the new pod.
-	var statsStale bool
-	reconnects := 0
-	// statsUnavailable: the stats connection failed for a reason other than
-	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
-	// a dead torrent; "unknown" says what we actually know — nothing.
-	var statsUnavailable bool
+	stats := newStatsWatch(resourceID, func(ctx context.Context) statsConn {
+		return s.tryConnectStats(ctx, claims, resourceID, env.file)
+	}, realAfter)
+	defer stats.stop()
 	var lastJSON string
 	var lastDBResource *vaultModels.Resource
 	var lastAPIResource *vault.Resource
-
-	statsChResult := make(chan statsConn, 1)
 
 	// The viewer's own link (thp /session-stats), opened once the export
 	// response says which node serves them — cached content included — and
@@ -1063,70 +1042,17 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	// sizeBytes prices the download ETA: the page's file, else the torrent.
 	var sizeBytes int64
 
-	// Start stats connection attempt (single attempt, no retry to avoid starting idle seeders)
-	go func() {
-		statsChResult <- s.tryConnectStats(ctx, claims, resourceID, env.file)
-	}()
+	stats.dial(ctx)
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	vaultTick := 0
 
-	scheduleReconnect := func() {
-		if !shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)) {
-			return
-		}
-		reconnects++
-		delay := time.Duration(1<<uint(reconnects)) * time.Second // 2, 4, 8, 16, 32 s
-		log.WithField("resourceID", resourceID).WithField("attempt", reconnects).WithField("in", delay).Info("status: stats stream closed mid-download, reconnecting")
-		time.AfterFunc(delay, func() {
-			res := s.tryConnectStats(ctx, claims, resourceID, env.file)
-			select {
-			case statsChResult <- res:
-			case <-ctx.Done():
-			}
-		})
-	}
-
 	sendStatus := func() bool {
-		if lastStats != nil {
-			// Zero over a closed stream too: we do not know, as for the
-			// caching verdicts below.
-			lastStats.LiveFor = 0
-			if !liveSince.IsZero() && !statsStale {
-				lastStats.LiveFor = time.Since(liveSince)
-			}
-		}
-		status := resolveStatus(lastDBResource, lastAPIResource, lastStats)
-		if status.State == "idle" && statsUnavailable {
-			status.State = "unknown"
-			status.withBarPolicy()
-		}
-		if lastStats != nil && !statsStale && !firstStatsAt.IsZero() {
-			activity := hasActive(lastStats.Active) || (!lastProgressAt.IsZero() && time.Since(lastProgressAt) < settleAfter)
-			switch judgeSwarm(status.State, time.Since(firstStatsAt), activity, lastStats.Live, lastStats.Seeders, lastStats.Peers) {
-			case verdictChecking:
-				status.Checking = true
-			case verdictPaused:
-				status.Paused = true
-			case verdictNoSeeders:
-				status.NoSeeders = true
-			}
-		}
-		// A speed that reads as zero is zero: paused means nothing moves, and
-		// below half a kilobyte the smoothed tail is noise, not throughput.
-		if statsStale || status.Paused || status.NoSeeders || status.Checking || status.Rate < 512 {
-			status.Rate = 0
-		}
 		now := time.Now()
-		// The chain's swarm moves while its bytes arrive, not while the
-		// smoothed rate is still decaying from them (movingFor).
-		status.swarmStill = lastProgressAt.IsZero() || now.Sub(lastProgressAt) >= movingFor
-		// The first piece can arrive before the rate meter has an interval
-		// to measure it over: settled once the swarm moved, or the window
-		// is over.
-		status.settling = !firstStatsAt.IsZero() && now.Sub(firstStatsAt) < settleAfter && !env.hold.Moved()
+		status := stats.status(lastDBResource, lastAPIResource, now)
+		status.settling = status.settling && !env.hold.Moved()
 		env.present(status, env.viewer(sess, now), env.last(sess, now), sizeBytes, 0, now)
 		// A vaulted torrent's page stream stays open for the viewer's own
 		// link; once that link cannot come, nothing is left to say.
@@ -1171,31 +1097,11 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		case <-ctx.Done():
 			return
 
-		case res := <-statsChResult:
-			statsCh = res.ch
+		case res := <-stats.results:
 			if res.size > 0 {
 				sizeBytes = res.size
 			}
-			log.WithField("resourceID", resourceID).WithField("connected", res.ch != nil).WithField("msg", res.msg).Info("status: stats connection result")
-			// If export says content is cached (no torrent_client_stat), mark as cached
-			if res.ch != nil {
-				statsStale = false
-				liveSince = time.Time{}
-			}
-			if res.msg == "cached" {
-				lastStats = &TorrentStatsData{Total: 1, Completed: 1, Seeders: 0}
-			} else if res.ch == nil {
-				if statsStale && shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)) {
-					scheduleReconnect()
-				} else {
-					statsUnavailable = true
-					if statsStale {
-						// Retries exhausted: stop pretending to know.
-						lastStats = nil
-						statsStale = false
-					}
-				}
-			}
+			stats.result(ctx, res, time.Now())
 			if !initialSent {
 				if !sendStatus() {
 					return
@@ -1218,79 +1124,11 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				return
 			}
 
-		case ev, ok := <-statsCh:
-			if ok && ev.Status == api.StatTerminated {
-				// The seeder pod is going away and says so with every
-				// counter zero; the stream ends right after. Read as stats,
-				// it was a torrent with nothing stored: "idle", and the close
-				// then reconnected to nothing (shouldReconnect wants
-				// something stored) -- a deploy mid-download read "idle"
-				// for good. Skipped, the close goes through shouldReconnect
-				// with the real progress, and the new pod picks the
-				// download up.
-				log.WithField("resourceID", resourceID).Debug("status: seeder terminating")
+		case ev, ok := <-stats.ch:
+			if !ok {
+				stats.closed(ctx, time.Now())
+			} else if !stats.frame(ev, time.Now()) {
 				continue
-			}
-			if ok {
-				pieces.apply(ev)
-				fill, active := pieces.buckets()
-				// Completed is verified bytes; its delta per second is the
-				// swarm's useful throughput — the download speed a torrent
-				// client would show.
-				now := time.Now()
-				rps := rate.Sample(int64(ev.Completed), now)
-				if firstStatsAt.IsZero() {
-					firstStatsAt = now
-					lastCompleted = ev.Completed
-				} else if ev.Completed != lastCompleted {
-					lastCompleted = ev.Completed
-					lastProgressAt = now
-				}
-				live := ev.Live == nil || *ev.Live
-				if !live {
-					liveSince = time.Time{}
-				} else if liveSince.IsZero() {
-					liveSince = now
-				}
-				lastStats = &TorrentStatsData{
-					Live:              live,
-					Rate:              rps,
-					Total:             ev.Total,
-					Completed:         ev.Completed,
-					Seeders:           ev.Seeders,
-					Leechers:          ev.Leechers,
-					Peers:             ev.Peers,
-					Fill:              fill,
-					Active:            active,
-					PiecesDone:        pieces.done(),
-					PiecesTotal:       len(pieces.complete),
-					Holes:             pieces.holes(),
-					AvailabilityKnown: ev.AvailabilityKnown,
-					Availability:      ev.Availability,
-					WantedMissing:     ev.WantedMissing,
-					ReaderMissing:     ev.ReaderMissing,
-				}
-				log.WithField("resourceID", resourceID).WithField("completed", ev.Completed).WithField("total", ev.Total).WithField("peers", ev.Peers).WithField("seeders", ev.Seeders).WithField("leechers", ev.Leechers).Debug("status: got stats event")
-			} else {
-				// Stats channel closed — seeder gone or connection dropped.
-				// Keep the last status on screen while a reconnect is due;
-				// forget it only when there is nothing worth reconnecting for.
-				log.WithField("resourceID", resourceID).Warn("status: stats channel closed")
-				statsCh = nil
-				switch {
-				case shouldReconnect(lastStats, reconnects, sinceProgress(lastProgressAt)):
-					statsStale = true
-					scheduleReconnect()
-				case lastStats != nil && lastStats.whole():
-					// The seeder closes the stream once the torrent is
-					// complete: nothing is left to reconnect for, and nothing
-					// to forget either -- the torrent is in the cache.
-					// Forgotten, it read "idle" ("Webtor ожидает" on 5461f58a…,
-					// 2026-09-25). Nothing moves on it any more.
-					lastStats.Rate, lastStats.Active = 0, nil
-				default:
-					lastStats = nil
-				}
 			}
 			if !sendStatus() {
 				return
@@ -1323,103 +1161,11 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			}
 			vaultTick++
 
-			// The seeder only sends events when something changed, so a
-			// swarm that stopped sends nothing — re-sample the meter with the
-			// unchanged counter so the speed decays instead of freezing at
-			// the last value it had when the bytes stopped.
-			if lastStats != nil && statsCh != nil {
-				lastStats.Rate = rate.Sample(int64(lastCompleted), time.Now())
-			}
+			stats.tick(time.Now())
 
 			if !sendStatus() {
 				return
 			}
 		}
 	}
-}
-
-// statsConn is one attempt at the stats stream: the stream (nil when not
-// connected), why not ("cached", or what failed), where the viewer's
-// /session-stats stream is (from the same export response; zero when there
-// was none) and the size the download ETA prices (0 unknown).
-type statsConn struct {
-	ch      <-chan api.EventData
-	msg     string
-	session sessionTarget
-	size    int64
-}
-
-// tryConnectStats attempts to establish an SSE connection to the torrent-http-proxy
-// for real-time torrent-level stats. Gets the root content ID from the list response,
-// then uses ExportResourceContent to get the stat URL for the whole torrent. The
-// same export response yields the viewer's /session-stats location — no extra
-// call; it is asked for standard-domain URLs, since the premium edge buffers
-// an event stream. file is the page's path, whose size prices the ETA.
-func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resourceID string, file string) statsConn {
-	connCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Get root content ID from list response
-	list, err := s.api.ListResourceContentCached(connCtx, claims, resourceID, &api.ListResourceContentArgs{
-		Output: api.OutputList,
-		Limit:  1,
-	})
-	if err != nil {
-		msg := fmt.Sprintf("list failed: %v", err)
-		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
-		return statsConn{msg: msg}
-	}
-
-	// Use root item ID (ListResponse embeds ListItem with ID)
-	rootID := list.ID
-	if rootID == "" {
-		return statsConn{msg: "empty root ID"}
-	}
-	size := s.priceSize(connCtx, claims, resourceID, file, list.Size)
-
-	// Get torrent-level export using root content ID
-	exportResp, err := s.api.ExportResourceContentStandardDomain(connCtx, claims, resourceID, rootID)
-	if err != nil {
-		msg := fmt.Sprintf("export failed: %v", err)
-		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
-		return statsConn{msg: msg, size: size}
-	}
-	sess := sessionStatsTarget(exportResp, resourceID)
-
-	statItem, ok := exportResp.ExportItems["torrent_client_stat"]
-	if !ok || statItem.URL == "" {
-		// No stat URL means content is cached (rest-api skips torrent_client_stat for cached content)
-		return statsConn{msg: "cached", session: sess, size: size}
-	}
-
-	// Check stats URL is accessible before opening SSE
-	log.WithField("resourceID", resourceID).WithField("url", helpers.RedactURL(statItem.URL)).Info("status: connecting to stats SSE")
-
-	// Open SSE connection to torrent-http-proxy (use parent ctx, not timeout ctx)
-	ch, err := s.api.Stats(ctx, statItem.URL)
-	if err != nil {
-		// 404 from seeder means content is available (cached/vaulted)
-		if err.Error() == "cached" {
-			return statsConn{msg: "cached", session: sess, size: size}
-		}
-		msg := fmt.Sprintf("stats SSE failed: %v", err)
-		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)
-		return statsConn{msg: msg, session: sess, size: size}
-	}
-	log.WithField("resourceID", resourceID).Info("status: connected to torrent stats SSE")
-	return statsConn{ch: ch, msg: "connected", session: sess, size: size}
-}
-
-// priceSize is the size the download ETA prices: the page's file (or folder)
-// when it names one rest-api knows, else the whole torrent. A failed lookup
-// only costs the ETA its precision.
-func (s *Handler) priceSize(ctx context.Context, claims *api.Claims, resourceID, file string, rootSize int64) int64 {
-	if file == "" || file == "/" {
-		return rootSize
-	}
-	l, err := s.api.ListResourceContentCached(ctx, claims, resourceID, &api.ListResourceContentArgs{Path: file, Output: api.OutputList, Limit: 1})
-	if err != nil || l == nil || l.Size <= 0 {
-		return rootSize
-	}
-	return l.Size
 }

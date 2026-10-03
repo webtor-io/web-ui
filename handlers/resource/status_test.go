@@ -541,7 +541,7 @@ func TestReconnectPolicy(t *testing.T) {
 	if shouldReconnect(&TorrentStatsData{Total: 100, Completed: 100}, 0, fresh) || shouldReconnect(nil, 0, fresh) {
 		t.Error("complete or unknown: nothing to reconnect for")
 	}
-	if sinceProgress(time.Time{}) != -1 {
+	if sinceProgress(time.Time{}, time.Now()) != -1 {
 		t.Error("no progress observed reads as -1")
 	}
 }
