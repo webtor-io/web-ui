@@ -253,19 +253,42 @@ func TestSessionStats_GoesThroughTheProxyPath(t *testing.T) {
 	}
 }
 
-// The URL carries a token minted for this stream; a transport error must not
-// carry it into a log line.
-func TestSessionStats_ErrorsDoNotQuoteTheURL(t *testing.T) {
+// A thp URL carries the viewer's token and the api-key; a transport error
+// (*url.Error) quotes the whole URL, and every caller logs the error. None
+// of the calls to thp may carry them into a log line (do redacts them) --
+// "stats SSE failed" wrote the export token of every tab closed in its
+// first second.
+func TestThpCallsDoNotQuoteTheURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	u := srv.URL + "/session-stats/abc?api-key=k&token=SECRET-TOKEN"
+	u := srv.URL + "/abc/Movie.mkv?api-key=KEY-SECRET&stats=true&token=TOKEN-SECRET"
 	srv.Close() // connection refused
 	a := &Api{cl: http.DefaultClient}
-	_, err := a.SessionStats(context.Background(), u)
-	if err == nil {
-		t.Fatal("want an error from a closed server")
+	ctx := context.Background()
+	calls := map[string]func() error{
+		"SessionStats": func() error { _, err := a.SessionStats(ctx, u); return err },
+		"Stats":        func() error { _, err := a.Stats(ctx, u); return err },
+		"Warmup":       func() error { _, err := a.Warmup(ctx, u, 0, -1); return err },
+		"Download":     func() error { _, _, err := a.DownloadWithRange(ctx, u, 0, 100); return err },
+		"OpenSubtitles": func() error {
+			_, err := a.GetOpenSubtitles(ctx, u)
+			return err
+		},
+		"MediaProbe":     func() error { _, err := a.GetMediaProbe(ctx, u); return err },
+		"TranscoderOpen": func() error { _, err := a.CreateTranscoderSession(ctx, u, ""); return err },
+		"TranscoderDrop": func() error { return a.DeleteTranscoderSession(ctx, u, "s1") },
 	}
-	if strings.Contains(err.Error(), "SECRET-TOKEN") || strings.Contains(err.Error(), "token=") {
-		t.Errorf("error quotes the URL: %v", err)
+	for name, call := range calls {
+		err := call()
+		if err == nil {
+			t.Errorf("%s: want an error from a closed server", name)
+			continue
+		}
+		if strings.Contains(err.Error(), "SECRET") {
+			t.Errorf("%s: error quotes a credential: %v", name, err)
+		}
+		if !strings.Contains(err.Error(), "refused") {
+			t.Errorf("%s: the cause is gone: %v", name, err)
+		}
 	}
 }
 
