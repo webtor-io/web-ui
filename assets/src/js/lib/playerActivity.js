@@ -90,7 +90,8 @@ const isMedia = (el) => !!el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO
 // data-grace-cta-hold) -- is not: the viewer is reading the popup, hls.js
 // keeps filling the buffer at the cap, and the film goes on with the answer.
 // Read as playing, as it read while the film played on under the popup:
-// the viewer stays on the chain (streaming), the verdict keeps no minute.
+// the viewer stays on the chain (phase 'playing'), the verdict keeps no
+// minute.
 const viewerPaused = (m) => m.paused && !(m.dataset && 'graceCtaHold' in m.dataset);
 
 // playerState is the verdict from the players on the page and the marks the

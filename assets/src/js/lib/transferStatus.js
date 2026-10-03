@@ -249,8 +249,9 @@ export function playerCause(view) {
     return OTHER_CAUSES.has(k) ? k : '';
 }
 
-// playing is a view as the page shows it while its own player streams
-// (lib/playerActivity.js streaming): the server's whole view with the viewer
+// playing is a view as the page shows it while its own player plays (the
+// block: forPhase 'playing'; the player's label and cause: playerActivity
+// streaming, app/resource/status.js): the server's whole view with the viewer
 // on the chain at their last reading (view.playing, sent only while the
 // proxy counts no request of theirs open). An HLS player closes its request
 // between two segments -- honestly nothing open there -- and without this

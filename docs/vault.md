@@ -579,17 +579,19 @@ full, often for far longer than the debounce — so the page's own player
 decides there: the server cannot see it, and for a viewer who reads gone it sends, next to the view, the whole view
 with them on the chain at their last reading (`view.playing`,
 `Meter.Last`: the number and the plan's verdict as they last were, never a
-wait). The page draws that one while its player *streams*
+wait). The block draws that one while its player *plays*
+(`playerActivity.phase` `playing`: not paused by the viewer, or held by the
+grace popup: the popup stops the film until the viewer answers it, a pause
+of the page's and not theirs, and the player marks the element
+`data-grace-cta-hold` while it holds playback; read as playing, for the
+chain and the verdict alike, docs/grace_token.md "The popup holds the
+film"), in place, the same nodes (`transferStatus.playing`). Not while it is
+stalled for real (`buffering`, 1.5 s and more): the viewer waits ("waiting
+for data") — the number froze with the last segment. Paused by the viewer,
+on the chain with "pause" (2026-10-02). The player's label and cause read
+the server's verdict the same way while it *streams*
 (`playerActivity.streaming`: playing or waiting for data now, or paused and
-its buffer still growing — no minute after a pause, unlike the plan box's
-verdict — or held by the grace popup: the popup stops the film until the
-viewer answers it, a pause of the page's and not theirs, and the player
-marks the element `data-grace-cta-hold` while it holds playback; read as
-playing, for the chain and the verdict alike, docs/grace_token.md "The popup
-holds the film"), in place, the same nodes (`transferStatus.playing`); paused with
-the buffer full, the server's view at once — the badge once thp sees no
-request of theirs, which the playlist reloads above prevent while the
-transcoder's run is incomplete. "Still buffering"
+its buffer still growing). "Still buffering"
 is measured from the buffer as it was when the player paused: while it
 plays the baseline follows its buffer on every sample
 (`playerActivity.sampleBuffers`); baselined only while paused, it compared

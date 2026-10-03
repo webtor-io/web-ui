@@ -189,7 +189,7 @@ Player.jsx:
 - **The answer** — "Continue at N Mbps" or the close: the film goes on **only if the popup held playback**. A viewer who had paused before it came up, or a seek that lands paused, stays paused. **Play while the popup is up** (space/`k`, the big button, a click on the picture, the headset's play) **is the answer "continue"**: the popup closes, the element is marked `continue`, and the film plays whoever paused it — Play that did nothing would read as a broken player. Not blocked.
 - **The trial link** — no answer: a new tab, the popup stays, nothing resumes behind it.
 - **The player goes** (the next file, a teardown) **or the viewer presses Next** while the popup is up — the hold is dropped without resuming: an answer given while the next file loads does not start the one being left. The next file is a new element with its own window.
-- **The transfer status** does not read the popup's pause as the viewer's: while it holds playback the element carries `data-grace-cta-hold`, and `lib/playerActivity.js` counts it as playing — the viewer stays on the chain (`streaming`) and the verdict keeps no minute (docs/vault.md "Your speed and the plan limit"). Paused by the viewer before the popup came up — no mark, the ordinary pause rules.
+- **The transfer status** does not read the popup's pause as the viewer's: while it holds playback the element carries `data-grace-cta-hold`, and `lib/playerActivity.js` counts it as playing — the viewer stays on the chain (`phase` `playing`) and the verdict keeps no minute (docs/vault.md "Your speed and the plan limit"). Paused by the viewer before the popup came up — no mark, the ordinary pause rules.
 
 ### The popup and the transfer status's plan box
 
