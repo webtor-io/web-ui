@@ -161,7 +161,10 @@ and while another offer is on screen or on its way (the grace popup: one offer a
 cap, an answered grace popup) stay the block's. It publishes the label on `window` with an event
 (`lib/playerLabel.js`: two bundles, two module copies — CLAUDE.md, shared JS state), only when it
 changes, from the view the sticky bar keeps through a one-second gap in the data, and takes it back on
-teardown. No status on the page (an embed): no label, the plain pill always. A swarm or network stall
+teardown. That view is the server's verdict (with the viewer at their last reading while the player
+streams, `playing`), never the block's drawing of the page's phase (`forPhase`): a session seek's
+POST pauses the element and reads as preparation there, and the resting view drawn for it has neither
+the plan nor the cause — the lock went for the seek and the cause was lost (2026-10-02 to 10-03). No status on the page (an embed): no label, the plain pill always. A swarm or network stall
 has no plan, and a cap before its box is due has no card: the plain pill. With the label goes **the
 cause** the view names when a wait is *not* the cap's (`playerCause`, `''` for none): `swarm` (a few
 seeders slower than the cap — statusview refuses to sell there, "selling one there quotes a wait it

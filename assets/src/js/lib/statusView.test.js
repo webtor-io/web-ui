@@ -810,6 +810,38 @@ test('the player\'s cause: the other cause the view names, published with the la
     assert.deepEqual(told, ['swarm', 'stalled', 'noseed', 'missing', '', '', 'swarm'], 'told when it changes (the fact after `active`: nothing new), not every draw');
 });
 
+// A session seek (player/session-seek.js) pauses the element and marks it
+// data-transfer-seeking before its POST: the block reads that as
+// preparation (playerActivity phase) and draws the viewer waiting. The
+// player's lock and the cause are the server's verdict, not that drawing:
+// the seek's wait comes through the same limiter (owner, 2026-09-26), and
+// pieces nobody has are still why.
+test('a session seek: the lock and the cause the server gave stay through its POST', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 50 * 60 * 1000 });
+    freshVideo();
+    t.after(() => {
+        delete video.dataset.transferSeeking;
+        setVideo({ paused: true, ended: true, readyState: 4 });
+        fire('ended');
+    });
+    setVideo({ paused: false, ended: false, seeking: false, readyState: 4, currentTime: 300 });
+    fire('loadstart');
+    fire('playing');
+    source.message(S.stream_stall);
+    assert.ok(window._txPlayerLabel, 'fixture: the lock');
+    video.dataset.transferSeeking = '';
+    setVideo({ paused: true, readyState: 1 });
+    fire('pause');
+    assert.equal(card().querySelectorAll('[data-tx-seg]')[1].querySelector('.tx-spd').textContent, 'ждём данные', 'fixture: the block draws the wait');
+    assert.ok(window._txPlayerLabel, 'the seek POST under way: still the lock');
+    source.message(S.stream_stall);
+    assert.ok(window._txPlayerLabel, 'and with the next word');
+    for (const cause of ['missing', 'stalled']) {
+        source.message(S[cause]);
+        assert.equal(window._txPlayerCause, cause, `${cause}: the seek POST under way, the cause stays`);
+    }
+});
+
 // Engines without scroll anchoring move everything under the card when its
 // block changes height, even with the card scrolled away: the page scrolls
 // by the difference itself there -- and leaves it to the engine elsewhere.

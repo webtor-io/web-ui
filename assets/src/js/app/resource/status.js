@@ -1,7 +1,7 @@
 import av from '../../lib/av';
 import {
     NAVBAR_H, applyKeptBox, applyView, bindBlock, boxDismissed, createCtaWatch, dismissBox, initDetails, keepBox, mirrorBlock, newBoxMemory,
-    paintBar, playerCause, playerLabel, forPhase, present, upsellElsewhere,
+    paintBar, playerCause, playerLabel, playing, forPhase, present, upsellElsewhere,
 } from '../../lib/transferStatus';
 import { attr, hide } from '../../lib/inPlace';
 import { createPlayerActivity } from '../../lib/playerActivity';
@@ -165,8 +165,13 @@ av(async function() {
         // it the cause the view names when the wait is not the cap's
         // (playerCause: the swarm, no seeders, pieces nobody has, nothing
         // flowing): the lock the player draws by itself after its grace
-        // answer gives way to that word.
-        const told = shown(held ? steady : last);
+        // answer gives way to that word. Both are the server's verdict, not
+        // the block's drawing of the page's phase (forPhase): a session
+        // seek's POST reads as preparation there, and the resting view it
+        // draws has neither the plan nor the cause -- the lock went for the
+        // seek and the cause was lost (review 2026-10-03).
+        const raw = (held ? steady : last).view;
+        const told = activity.streaming() ? playing(raw) : raw;
         publishPlayerLabel(playerLabel(told, env), window, playerCause(told));
         // Broadcast rather than reach into the sticky bar from here: this
         // view owns the stream, not the page furniture that shows it.
