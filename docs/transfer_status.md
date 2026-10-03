@@ -671,7 +671,9 @@ under the piece bar.
   `#content`, and no box is taken from the old stream's word, which priced
   the old file, until the new stream says something other than a gap: the
   ticker drawing that word before the new stream spoke put the old box back
-  as this page view's). Once up, the box stays with the last
+  as this page view's, and so did a renewal of the stream in those seconds,
+  which held the old word through a gap until the new init no longer kept
+  it as the steady one). Once up, the box stays with the last
   words it was sent with — the server's box, while it sends one, updates it
   in place (ETA, download or stream variant) — and the plan's fact and cap
   lines are not drawn over it, nor the pause's and the data gap's hints

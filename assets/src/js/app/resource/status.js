@@ -300,7 +300,9 @@ av(async function() {
             swapped = false;
         }
         last = status;
-        container._statusKept = { last, steady, gapSince };
+        // Not the old file's word as the steady one: the swap's mark is this
+        // init's, and a renewal's init would hold it (and its box) again.
+        container._statusKept = { last, steady: swapped ? null : steady, gapSince };
         render();
     };
 

@@ -1391,6 +1391,32 @@ test('refused for good with the box up: it stays, and its × still closes it', a
     }
 });
 
+// Another file picked at the cap, a gap as the new stream's first word, and
+// the stream refused: the renewal's init found the old file's word kept as
+// the steady one (the swap's mark is the init's own), the sticky bar held
+// it through the gap, and the old box came back as this page view's.
+test('another file picked, a gap first and a renewal: the old box does not come back', async (t) => {
+    lifecycle(t, 6);
+    await restart();
+    forgetBox();
+    downloading(t);
+    source.message(S.tier_dl);
+    const boxes = () => [card(), sticky()].flatMap((b) => Array.from(b.querySelectorAll('[data-tx-pbox]')));
+    assert.equal(card().querySelector('[data-tx-pbox]').hidden, false, 'fixture: the box up');
+    const file = document.getElementById('file');
+    const was = file.dataset.statusFile;
+    t.after(() => { file.dataset.statusFile = was; });
+    file.dataset.statusFile = '/Sintel/Extras/Deleted-scenes.mkv';
+    window.dispatchEvent(new window.CustomEvent('async', { detail: { target: document.getElementById('content') } }));
+    source = sources.at(-1);
+    downloading(t);
+    source.message(S.status_unknown);
+    assert.ok(boxes().every((b) => b.hidden), 'fixture: a gap first, no old box');
+    source.refuse();
+    await land();
+    assert.ok(boxes().every((b) => b.hidden), 'after the renewal: still no old box');
+});
+
 // Leaving the page while the renewal's fetch is out: the fetch still lands
 // in the container it was made for (lib/loadAsyncView.js) and ran the init
 // there -- a stream open for a page that is gone, its listeners on the next
