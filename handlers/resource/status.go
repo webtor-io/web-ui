@@ -19,6 +19,7 @@ import (
 	"github.com/webtor-io/web-ui/services/auth"
 	uclaims "github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/statusview"
 	vault "github.com/webtor-io/web-ui/services/vault"
@@ -1045,6 +1046,9 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	}, realAfter)
 	defer stats.stop()
 	var lastJSON string
+	// shown: the states (key and mode) this stream has sent, each counted
+	// once (metrics.StatusView): which states the page shows at all.
+	shown := map[string]bool{}
 	var lastDBResource *vaultModels.Resource
 	var lastAPIResource *vault.Resource
 
@@ -1088,6 +1092,10 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 			return true
 		}
 		lastJSON = msg.data
+		if v := status.View; v != nil && !shown[v.Key+" "+v.Mode] {
+			shown[v.Key+" "+v.Mode] = true
+			metrics.StatusView(v.Key, v.Mode)
+		}
 		select {
 		case out <- msg:
 		case <-ctx.Done():

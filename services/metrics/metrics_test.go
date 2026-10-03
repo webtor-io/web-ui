@@ -15,6 +15,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	"github.com/webtor-io/web-ui/services/offer"
+	"github.com/webtor-io/web-ui/services/statusview"
 )
 
 func init() {
@@ -242,6 +243,7 @@ func TestMetricNames(t *testing.T) {
 		"webui_passthrough_fallback_total":         dto.MetricType_COUNTER,
 		"webui_vod_reroute_total":                  dto.MetricType_COUNTER,
 		"webui_trial_shortlink_total":              dto.MetricType_COUNTER,
+		"webui_status_view_total":                  dto.MetricType_COUNTER,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]
@@ -372,6 +374,34 @@ func hasSeries(t *testing.T, reg *prometheus.Registry, name string, labels map[s
 		}
 	}
 	return false
+}
+
+// The status view counter takes its key and mode from statusview: a closed
+// set, anything else is "other", and every pair exists at 0 from the start.
+func TestStatusViewIsBounded(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	old := std
+	std = s
+	defer func() { std = old }()
+	if got, want := testutil.CollectAndCount(s.statusView), len(statusKeys)*len(statusModes); got != want {
+		t.Errorf("%d series up front, want %d", got, want)
+	}
+	StatusView(statusview.KeyNoSeed, statusview.ModeBadge)
+	StatusView("tier_dl", statusview.ModeChain)
+	StatusView(statusview.KeyActive, "sideways")
+	if got := testutil.ToFloat64(s.statusView.WithLabelValues(statusview.KeyNoSeed, statusview.ModeBadge)); got != 1 {
+		t.Errorf("noseed/badge: %v", got)
+	}
+	if got := testutil.ToFloat64(s.statusView.WithLabelValues("other", statusview.ModeChain)); got != 1 {
+		t.Errorf("an unknown key: %v in other", got)
+	}
+	if got := testutil.ToFloat64(s.statusView.WithLabelValues(statusview.KeyActive, "other")); got != 1 {
+		t.Errorf("an unknown mode: %v in other", got)
+	}
+	if got, want := testutil.CollectAndCount(s.statusView), len(statusKeys)*len(statusModes); got != want {
+		t.Errorf("%d series after unknown values, want %d", got, want)
+	}
 }
 
 // The capability gauge is one-hot over a closed set of answers, and the

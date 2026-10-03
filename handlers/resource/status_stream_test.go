@@ -30,6 +30,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	uclaims "github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/metrics/metricstest"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/payments"
 	"github.com/webtor-io/web-ui/services/statusview"
@@ -857,5 +858,36 @@ func TestStatusStream_EndsWhenTheServerDrains(t *testing.T) {
 	}
 	if ms < 1000 || ms > 5000 {
 		t.Errorf("retry %d ms, want 1000..5000", ms)
+	}
+}
+
+// Which states the page's status shows is counted on the server, once per
+// stream and state: webui_status_view_total{key,mode} goes up by one the
+// first time a stream sends a key in a mode, however many messages carry
+// it after that. Not parallel: the counter is the process's.
+func TestStatusStream_CountsEachViewOncePerStream(t *testing.T) {
+	count := func() float64 {
+		return metricstest.Counter(t, "webui_status_view_total", map[string]string{"key": statusview.KeyCachedTier, "mode": statusview.ModeChain})
+	}
+	before := count()
+	node := newFakeNode(t, atCapEvents(statusview.PlanBoxFromOpen), func(n *fakeNode) { n.pace = 250 * time.Millisecond })
+	h := &Handler{api: testAPI(t, node.srv), offers: liveOffers()}
+	srv := statusServer(t, h, "free", "5M")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok&session=1")
+	// The cap's fact first, then the plan box: two messages, one key.
+	n := 0
+	until(t, msgs, 10*time.Second, "the plan box", func(m map[string]any) bool {
+		if get(m, "view", "key") == statusview.KeyCachedTier && get(m, "view", "mode") == statusview.ModeChain {
+			n++
+		}
+		return get(m, "view", "plan", "download", "box") != nil
+	})
+	if n < 2 {
+		t.Fatalf("%d cached_tier messages: nothing to count twice", n)
+	}
+	if got := count() - before; got != 1 {
+		t.Errorf("cached_tier/chain counted %v times over %d messages of one stream, want 1", got, n)
 	}
 }

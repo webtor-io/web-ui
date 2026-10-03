@@ -20,6 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/webtor-io/web-ui/services/offer"
+	"github.com/webtor-io/web-ui/services/statusview"
 )
 
 const namespace = "webui"
@@ -63,18 +64,19 @@ var knownMethods = map[string]bool{
 // each runs against an empty registry instead of reading through what the
 // previous test left behind.
 type set struct {
-	requests  *prometheus.CounterVec
-	duration  *prometheus.HistogramVec
-	inFlight  prometheus.Gauge
-	panics    *prometheus.CounterVec
-	jobs      *prometheus.CounterVec
-	jobsInFly prometheus.Gauge
-	paywall   *prometheus.CounterVec
-	trial     *prometheus.CounterVec
-	caps      *prometheus.GaugeVec
-	capChecks *prometheus.CounterVec
-	fallback  *prometheus.CounterVec
-	vodRoute  *prometheus.CounterVec
+	requests   *prometheus.CounterVec
+	duration   *prometheus.HistogramVec
+	inFlight   prometheus.Gauge
+	panics     *prometheus.CounterVec
+	jobs       *prometheus.CounterVec
+	jobsInFly  prometheus.Gauge
+	paywall    *prometheus.CounterVec
+	trial      *prometheus.CounterVec
+	caps       *prometheus.GaugeVec
+	capChecks  *prometheus.CounterVec
+	fallback   *prometheus.CounterVec
+	vodRoute   *prometheus.CounterVec
+	statusView *prometheus.CounterVec
 }
 
 func newSet(r prometheus.Registerer) *set {
@@ -129,6 +131,15 @@ func newSet(r prometheus.Registerer) *set {
 			Namespace: namespace, Name: "vod_reroute_total",
 			Help: "MP4 stream starts sent to the transcoder instead of nginx-vod because the browser cannot play their audio as nginx-vod serves it, by reason (eac3_ts: E-AC-3 in nginx-vod's MPEG-TS, which no hls.js plays; eac3, ac3: not declared; no_decoder: DTS; unserved_audio: audio nginx-vod serves none of; hevc: HEVC the declaration does not cover; fallback: a restart after the browser failed the file; other = anything else). jobs/scripts/vod_route.go.",
 		}, []string{"reason"}),
+		statusView: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace, Name: "status_view_total",
+			Help: "Resource page status streams that showed a state, by statusview key and mode (chain, badge; other = anything else): once per stream and pair, the first time a message carries it. Not the browser's refinement of tier (tier_dl, stream_ok, stream_stall).",
+		}, []string{"key", "mode"}),
+	}
+	for _, k := range statusKeys {
+		for _, m := range statusModes {
+			s.statusView.WithLabelValues(k, m).Add(0)
+		}
 	}
 	// A series that first appears at 1 has no earlier sample, and
 	// increase() loses that first click -- of every surface, on every
@@ -304,6 +315,39 @@ const (
 // site names (offer.TrialFroms), "none" without one, "other" for the rest.
 func TrialShortlink(target, utmCampaign, from string) {
 	std.trial.WithLabelValues(target, campaignLabel(utmCampaign), offer.TrialFromLabel(from)).Inc()
+}
+
+// statusKeys and statusModes are what the status view counter takes as
+// they are: statusview's keys and modes. A key added there without being
+// added here counts as "other" -- bounded, and plain to see.
+var (
+	statusKeys = []string{
+		statusview.KeyActive, statusview.KeyChecking, statusview.KeyTier, statusview.KeySwarm, statusview.KeyStalled,
+		statusview.KeyMissing, statusview.KeyCachingOnly, statusview.KeyCachingIdle, statusview.KeyCachedFlow,
+		statusview.KeyCachedTier, statusview.KeyCached, statusview.KeyPaused, statusview.KeyNoSeed,
+		statusview.KeyMissingIdle, statusview.KeyIdleTorrent, statusview.KeyUnknown, statusview.KeyVaulting,
+		statusview.KeyVaultingOnly, statusview.KeyVaultingIdle, statusview.KeyVaulted, statusview.KeyVaultedTier,
+		statusview.KeyVaultedIdle, statusview.KeyVaultWait, statusview.KeyVaultMissing, statusview.KeyVaultFailed,
+		"other",
+	}
+	statusModes = []string{statusview.ModeChain, statusview.ModeBadge, "other"}
+)
+
+// StatusView counts a resource page status stream that showed key in mode
+// (handlers/resource statusLoop: once per stream and pair). Both are bounded
+// to statusview's sets.
+func StatusView(key, mode string) {
+	std.statusView.WithLabelValues(oneOf(key, statusKeys), oneOf(mode, statusModes)).Inc()
+}
+
+// oneOf is v when set lists it, "other" when not.
+func oneOf(v string, set []string) string {
+	for _, s := range set {
+		if s == v {
+			return v
+		}
+	}
+	return "other"
 }
 
 // Transcoder capability answers (services/transcodercaps). A closed set:
