@@ -1021,6 +1021,10 @@ type statusVault interface {
 	GetVaultAPIResource(ctx context.Context, resourceID string) (*vault.Resource, error)
 }
 
+// firstStatusWait caps how long the stream's first message waits for the
+// seeder's first frame (statusLoop).
+const firstStatusWait = 3 * time.Second
+
 // The loop asks Vault every vaultPollEvery ticks (a second each), and every
 // vaultedPollEvery once the torrent is vaulted.
 const (
@@ -1043,8 +1047,8 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 	var lastAPIResource *vault.Resource
 
 	// The viewer's own link (thp /session-stats), opened once the export
-	// response says which node serves them — cached content included — and
-	// the first status is out. Each open mints its own token.
+	// response says which node serves them — cached content included. Each
+	// open mints its own token.
 	sess := newSessionWatch(resourceID, s.api.SessionStats, realAfter, func() (sessionToken, error) {
 		return sessionStatsToken(s.api.SignClaims, claims, resourceID, time.Now())
 	})
@@ -1059,8 +1063,16 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 
 	vaultTick := 0
 
+	// Nothing goes out before the stats stream has said something, up to
+	// firstStatusWait: connected, it has no frame yet, and the status
+	// without one is "idle" -- a partly cached torrent blinked from the
+	// page's "checking" to "waiting" and on to "caching".
+	started := time.Now()
 	sendStatus := func() bool {
 		now := time.Now()
+		if !stats.answered && now.Sub(started) < firstStatusWait {
+			return true
+		}
 		status := stats.status(lastDBResource, lastAPIResource, now)
 		status.settling = status.settling && !env.hold.Moved()
 		env.present(status, env.viewer(sess, now), env.last(sess, now), sizeBytes, 0, now)
@@ -1098,10 +1110,6 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 		}
 	}
 
-	// Wait for first stats connection attempt before sending initial status
-	// to avoid idle→caching flicker
-	initialSent := false
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -1112,15 +1120,11 @@ func (s *Handler) statusLoop(ctx context.Context, claims *api.Claims, resourceID
 				sizeBytes = res.size
 			}
 			stats.result(ctx, res, time.Now())
-			if !initialSent {
-				if !sendStatus() {
-					return
-				}
-				initialSent = true
+			if !sendStatus() {
+				return
 			}
-			// After the first status: for the Vault dashboard a torrent
-			// vaulted at load has ended the stream just above, before
-			// asking thp for anything.
+			// For the Vault dashboard a torrent vaulted at load has ended
+			// the stream just above, before asking thp for anything.
 			if env.withView {
 				sess.start(ctx, res.session)
 			}

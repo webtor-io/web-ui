@@ -57,7 +57,11 @@ type statsWatch struct {
 	// "cached". Rendering that as idle made an upstream 429 or 5xx look like
 	// a dead torrent; "unknown" says what we actually know — nothing.
 	unavailable bool
-	stopRetry   func() bool
+	// answered: the stream has said something -- its first frame, or that
+	// there is no stream (cached, failed). Until then the status is a
+	// guess (statusLoop holds the first message back).
+	answered  bool
+	stopRetry func() bool
 }
 
 func newStatsWatch(rid string, connect func(ctx context.Context) statsConn, after afterFunc) *statsWatch {
@@ -84,6 +88,9 @@ func (w *statsWatch) result(ctx context.Context, res statsConn, now time.Time) {
 		w.stale = false
 		w.liveSince = time.Time{}
 		w.openedAt = now
+	}
+	if res.ch == nil {
+		w.answered = true
 	}
 	// If export says content is cached (no torrent_client_stat), mark as cached
 	if res.msg == "cached" {
@@ -116,6 +123,7 @@ func (w *statsWatch) frame(ev api.EventData, now time.Time) bool {
 		log.WithField("resourceID", w.rid).Debug("status: seeder terminating")
 		return false
 	}
+	w.answered = true
 	w.pieces.apply(ev)
 	fill, active := w.pieces.buckets()
 	// Completed is verified bytes; its delta per second is the swarm's

@@ -299,3 +299,44 @@ func TestStatusStream_SeederRolloutMidDownloadReconnects(t *testing.T) {
 		}
 	}
 }
+
+// The page renders "checking" before its status stream opens. The stream's
+// first message used to go out the moment the stats stream connected,
+// before its first frame: "idle", and "caching" a moment later -- a
+// partly cached torrent blinked "Checking → Waiting → Caching". Nothing goes
+// out before the first frame (or a final answer about the stream), up to
+// firstStatusWait.
+func TestStatusStream_FirstMessageWaitsForTheFirstFrame(t *testing.T) {
+	node := newFakeNode(t, nil, func(n *fakeNode) {
+		n.stats = []statFrame{{1500 * time.Millisecond, statsFrameJSON(64, 40, 5, 2, "")}}
+	})
+	h := &Handler{api: testAPI(t, node.srv), offers: liveOffers()}
+	srv := statusServer(t, h, "free", "5M")
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok&session=1")
+	m := until(t, msgs, 5*time.Second, "the first message", func(map[string]any) bool { return true })
+	if m["state"] != "caching" {
+		t.Errorf("first message: %v %v, want caching", m["state"], get(m, "view", "key"))
+	}
+}
+
+// A stream that says nothing for firstStatusWait does not hold the page:
+// the status goes out as it is then.
+func TestStatusStream_FirstMessageWaitIsCapped(t *testing.T) {
+	node := newFakeNode(t, nil, func(n *fakeNode) {
+		n.stats = []statFrame{{firstStatusWait + 5*time.Second, statsFrameJSON(64, 40, 5, 2, "")}}
+	})
+	h := &Handler{api: testAPI(t, node.srv), offers: liveOffers()}
+	srv := statusServer(t, h, "free", "5M")
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	start := time.Now()
+	msgs, _, _ := sseStream(ctx, t, srv.URL+"/"+ssHash+"/status?_csrf=tok&session=1")
+	until(t, msgs, firstStatusWait+2*time.Second, "the first message", func(map[string]any) bool { return true })
+	if at := time.Since(start); at < firstStatusWait-500*time.Millisecond {
+		t.Errorf("first message after %v, before the wait was over", at.Round(time.Millisecond))
+	}
+}

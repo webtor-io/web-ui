@@ -776,7 +776,12 @@ under the piece bar.
   talks to thp for this. Only a stream that asks with `session=1` opens one:
   the resource page does, the Vault dashboard's rows (`vault/progress.js`) do
   not — theirs carries the view's `badge` alone, built with no viewer. It is
-  opened after the first status is out.
+  opened once the stats connection's result is in (the export names the
+  node). The stream's first message waits for the seeder's first frame, or
+  for a final answer about the stats stream (cached, failed), up to 3 s
+  (`firstStatusWait`): connected without a frame the status is "idle", and a
+  partly cached torrent blinked from the page's "checking" to "waiting" and
+  on to "caching" (`TestStatusStream_FirstMessageWaitsForTheFirstFrame`).
 - **The token** is minted server-side for every open (`sessionStatsToken`):
   the viewer's own claims — the sessionID and domain rest-api signs into the
   page's export links, so thp keys the counters the same way — with `hash` =
