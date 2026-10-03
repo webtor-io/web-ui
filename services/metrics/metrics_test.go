@@ -1,11 +1,13 @@
 package metrics
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -402,5 +404,26 @@ func TestVODRerouteIsBounded(t *testing.T) {
 	}
 	if got := testutil.CollectAndCount(s.vodRoute); got != 5 {
 		t.Errorf("%d series, want 5", got)
+	}
+}
+
+// Each Mark becomes a segment of the time since the previous one, in chain
+// order, and mw covers all of it: a slow middleware shows as its own segment.
+func TestServerTimingSegmentsByMark(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	slow := func(c *gin.Context) { time.Sleep(30 * time.Millisecond); c.Next() }
+	r.Use(Middleware(), Mark("a"), slow, Mark("b"))
+	r.GET("/", func(c *gin.Context) { c.Header("Server-Timing", ServerTiming(c)) })
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	parts := strings.Split(rec.Header().Get("Server-Timing"), ", ")
+	if len(parts) != 3 || !strings.HasPrefix(parts[0], "a;dur=") || !strings.HasPrefix(parts[1], "b;dur=") || !strings.HasPrefix(parts[2], "mw;dur=") {
+		t.Fatalf("Server-Timing %q, want a, b, mw in that order", parts)
+	}
+	var b float64
+	if _, err := fmt.Sscanf(parts[1], "b;dur=%f", &b); err != nil || b < 30 {
+		t.Fatalf("segment b = %v (%v), want the 30 ms the middleware before it slept", b, err)
 	}
 }

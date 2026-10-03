@@ -276,6 +276,7 @@ func serve(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	r.Use(metrics.Mark("sess"))
 
 	// Setting Auth
 	a := auth.New(c, cl, pg)
@@ -296,6 +297,7 @@ func serve(c *cli.Context) error {
 		//              when this middleware runs.
 		a.RegisterHandler(r, libapi.MountPath, "/stremio/", "/token/")
 	}
+	r.Use(metrics.Mark("auth"))
 
 	// Setting S3 access key extraction — must run before the access token
 	// middleware below, which is what it feeds (see services/s3).
@@ -308,6 +310,7 @@ func serve(c *cli.Context) error {
 	// Setting Access Token
 	ats := at.New(pg)
 	ats.RegisterHandler(r)
+	r.Use(metrics.Mark("token"))
 
 	// Setting Claims Client
 	cpCl := claims.NewClient(c)
@@ -327,6 +330,7 @@ func serve(c *cli.Context) error {
 		// Setting UserClaimsHandler
 		uc.RegisterHandler(r)
 	}
+	r.Use(metrics.Mark("claims"))
 
 	// Setting S3 Client
 	s3Cl := cs.NewS3Client(c, cl)
@@ -399,7 +403,7 @@ func serve(c *cli.Context) error {
 	// stashes the loaded row into the gin context so web.NewContext
 	// picks it up without an extra DB lookup per handler.
 	userSettingsSvc := usettings.New(pg)
-	r.Use(usettings.Middleware(userSettingsSvc))
+	r.Use(usettings.Middleware(userSettingsSvc), metrics.Mark("settings"))
 
 	// Setting Vault API early: the onboarding middleware below needs to know
 	// whether Vault is configured, and vault.New is nil exactly when this is.
@@ -438,7 +442,7 @@ func serve(c *cli.Context) error {
 			}
 		}
 		c.Next()
-	})
+	}, metrics.Mark("notif"))
 
 	// Setting JobQueues
 	queues := job.NewQueues(job.NewStorage(redis, gin.Mode()))

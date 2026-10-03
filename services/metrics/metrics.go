@@ -9,8 +9,10 @@
 package metrics
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -141,17 +143,52 @@ func Middleware() gin.HandlerFunc {
 	return std.middleware()
 }
 
-const startKey = "metrics.start"
+const (
+	startKey = "metrics.start"
+	marksKey = "metrics.marks"
+)
 
-// Elapsed is the time since the request entered Middleware, which stands
-// first in the chain: called from a handler, it is what the middlewares
-// before it took (session, auth, claims, onboarding). 0 without Middleware.
-func Elapsed(c *gin.Context) time.Duration {
-	if t, ok := c.Get(startKey); ok {
-		return time.Since(t.(time.Time))
-	}
-	return 0
+type mark struct {
+	name string
+	at   time.Duration
 }
+
+// Mark notes how long the request has been in the chain when it reaches this
+// point (serve.go puts one after each middleware that goes to a store or a
+// service). ServerTiming turns the notes into segments.
+func Mark(name string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if t, ok := c.Get(startKey); ok {
+			marks, _ := c.Get(marksKey)
+			l, _ := marks.([]mark)
+			c.Set(marksKey, append(l, mark{name, time.Since(t.(time.Time))}))
+		}
+		c.Next()
+	}
+}
+
+// ServerTiming is a Server-Timing value for the middlewares' share of the
+// request so far, called from a handler: one segment per Mark (the time since
+// the previous one) and mw for all of it since Middleware, which stands first
+// in the chain. Empty without Middleware.
+func ServerTiming(c *gin.Context) string {
+	t, ok := c.Get(startKey)
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	var prev time.Duration
+	marks, _ := c.Get(marksKey)
+	l, _ := marks.([]mark)
+	for _, m := range l {
+		fmt.Fprintf(&b, "%s;dur=%.1f, ", m.name, ms(m.at-prev))
+		prev = m.at
+	}
+	fmt.Fprintf(&b, "mw;dur=%.1f", ms(time.Since(t.(time.Time))))
+	return b.String()
+}
+
+func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
 
 func (s *set) middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

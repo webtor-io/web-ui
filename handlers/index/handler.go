@@ -79,7 +79,7 @@ func (s *Handler) index(c *gin.Context) {
 // caller from another package relies on RegisterHandler having run, the same
 // way handlers/resource's POST already does.
 func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status int, data *Data, errKey string, errArgs *web.ErrArgs) {
-	mw := metrics.Elapsed(c)
+	mw := metrics.ServerTiming(c)
 	t := time.Now()
 	// Continue-watching is home-page only: tool pages are SEO landings and
 	// carry their own CTA.
@@ -107,11 +107,12 @@ func Render(c *gin.Context, tb template.Builder[*web.Context], pg *cs.PG, status
 	}
 
 	// Where a slow home page spent its time before rendering, in DevTools
-	// (Timing tab, next to Cloudflare's cfOrigin): the middlewares, the
-	// continue-watching queries, the page context. 2026-10-03 a signed-in
+	// (Timing tab, next to Cloudflare's cfOrigin): the middlewares, one
+	// segment per metrics.Mark, the continue-watching queries, the page
+	// context. 2026-10-03 a signed-in
 	// home page took seconds now and then, with nothing in the logs to say
 	// which part.
-	c.Header("Server-Timing", fmt.Sprintf("mw;dur=%.1f, db;dur=%.1f, ctx;dur=%.1f", ms(mw), ms(db), ms(time.Since(t))))
+	c.Header("Server-Timing", fmt.Sprintf("%s, db;dur=%.1f, ctx;dur=%.1f", mw, ms(db), ms(time.Since(t))))
 	tb.Build("index").HTML(status, ctx)
 }
 
