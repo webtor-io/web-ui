@@ -71,7 +71,7 @@
     {{- /* data-status-file: the file picked, for the status's plan box -- the
          status stream lives outside #content and reprices its download ETA
          when a file link swaps this (app/resource/status.js). */}}
-    <div id="file" class="scroll-mt-36" data-status-file="{{ .Item.PathStr }}" data-async-layout="{{`{{ template "file" . }}`}}">
+    <div id="file" class="scroll-mt-18" data-status-file="{{ .Item.PathStr }}" data-async-layout="{{`{{ template "file" . }}`}}">
       {{ template "file" $ }}
     </div>
     {{ end }}
@@ -404,7 +404,7 @@
          threw the sticky status away on every click. The title is the one
          thing outside that names the file; nav carries the language links,
          which must point at the new URL. */}}
-    <div id="content" class="scroll-mt-36" data-async-layout="{{`{{ template "resource/content" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}">
+    <div id="content" class="scroll-mt-18" data-async-layout="{{`{{ template "resource/content" . }}`}}" data-async-update-title="{{`{{ template "title" . }} | Webtor.io`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}">
     {{ template "resource/content" $ }}
     </div>
     {{ if and ($.User | hasAuth) .Vault }}

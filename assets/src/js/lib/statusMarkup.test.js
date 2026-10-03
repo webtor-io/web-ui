@@ -119,3 +119,9 @@ test('the cap on a phone is a lock as well as pink: the compact chain has no "·
         assert.equal(s.querySelector('.tx-lk use')?.getAttribute('href'), '#tx-i-lock', 'every segment has the lock (stable DOM: the tone shows it)');
     }
 });
+
+test('keyboard focus does not scroll under the navbar', () => {
+    const nav = read('../../../../templates/partials/nav.html').match(/navbar-redesign fixed[^"]*\bh-\[(\d+)px\]/);
+    assert.ok(nav, 'the navbar\'s height');
+    assert.equal(rule('html')['scroll-padding-top'], `${nav[1]}px`);
+});

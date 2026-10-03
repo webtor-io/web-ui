@@ -344,7 +344,7 @@ func TestToolIntentFixturesAreCurrent(t *testing.T) {
 		b.WriteString(`<header id="resource-header">` + execute(t, tpl, "resource/tool_intent", ctx) + "</header>\n")
 		// The wrapper is views/resource/get.html's #content; what it holds
 		// is rendered.
-		b.WriteString(`<div id="content" class="scroll-mt-36">` + execute(t, tpl, "resource/content", ctx) + "</div>\n")
+		b.WriteString(`<div id="content" class="scroll-mt-18">` + execute(t, tpl, "resource/content", ctx) + "</div>\n")
 		got := b.String()
 
 		path := "../../assets/src/js/lib/__fixtures__/tool-intent-" + name + ".html"
