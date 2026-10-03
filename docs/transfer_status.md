@@ -641,11 +641,18 @@ under the piece bar.
   few seeders standing still past the swarm's hold — a speed not known is not
   a fast one — and the rate is compared as it is, not as its label rounds it:
   4.96 reads "5" and is under a cap of 5; `statusview.swarmBound`. A piece
-  that comes after more than 2 s of nothing moves at what came over the gap
-  (`statsWatch.gapRate`, `pieceGap`), not at the meter's take on its one
-  second: two seeders verifying 4 MiB every 27 s read 13–22 Mbps for the
-  whole hold, over the cap, and sold the plan in 578 of 622 frames
-  (`TestViewEnv_SlowSwarmIsNotFasterThanItsPieces`). No seeder
+  that comes after more than 2 s the swarm spent fetching moves at what came
+  over that time (`statsWatch.gapRate`, `pieceGap`), not at the meter's take
+  on its one second: two seeders verifying 4 MiB every 27 s read 13–22 Mbps
+  for the whole hold, over the cap, and sold the plan in 578 of 622 frames
+  (`TestViewEnv_SlowSwarmIsNotFasterThanItsPieces`). Fetching is a piece
+  wanted in the seeder's frames (`statsWatch.wantedSince`): the seeder
+  fetches on demand, 20 MiB ahead of the reader, and a fast swarm the
+  viewer's reader paces idles between pieces -- over the whole gap it read
+  the reader's pace, the cap, as its own, and swapped the box for "a few
+  slow seeders" with every piece: 0 frames of 580 sold past the first minute
+  at 95% of the cap, up to 118 switches
+  (`TestViewEnv_ReaderPacedSwarmIsNotSlow`). No seeder
   and peers — `fewSeeders` counts seeders only — still sells; the owner has
   not decided that one), pieces nobody has (also with the viewer at the cap:
   the file does not finish with a plan either; the pink link stays), a stall,

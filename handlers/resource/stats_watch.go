@@ -42,8 +42,13 @@ type statsWatch struct {
 	// that gap was longer than pieceGap; 0 after a growth that came sooner.
 	// The meter takes a piece in over the second it arrived in, and a slow
 	// swarm's 4 MiB every 27 s read 13-22 Mbps instead of 1.2 (status
-	// draws the lower).
-	gapRate float64
+	// draws the lower). The gap counts only while a piece was wanted
+	// (wantedSince, zero while the last frame wanted none): the seeder
+	// fetches on demand, and a fast swarm the viewer's reader paces idles
+	// until the readahead reaches the next piece -- over the whole gap that
+	// read the reader's pace, the cap, as the swarm's.
+	gapRate     float64
+	wantedSince time.Time
 	// liveSince is when this stream's frames turned live (zero while cold).
 	liveSince time.Time
 	// stale: the stream closed and a reconnect is pending. The last known
@@ -143,12 +148,20 @@ func (w *statsWatch) frame(ev api.EventData, now time.Time) bool {
 		if since.IsZero() {
 			since = w.firstStatsAt
 		}
+		if w.wantedSince.After(since) {
+			since = w.wantedSince
+		}
 		w.gapRate = 0
-		if gap := now.Sub(since); gap > pieceGap && ev.Completed > w.lastCompleted {
+		if gap := now.Sub(since); !w.wantedSince.IsZero() && gap > pieceGap && ev.Completed > w.lastCompleted {
 			w.gapRate = float64(ev.Completed-w.lastCompleted) / gap.Seconds()
 		}
 		w.lastCompleted = ev.Completed
 		w.lastProgressAt = now
+	}
+	if !hasActive(active) {
+		w.wantedSince = time.Time{}
+	} else if w.wantedSince.IsZero() {
+		w.wantedSince = now
 	}
 	live := ev.Live == nil || *ev.Live
 	if !live {

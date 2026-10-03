@@ -129,9 +129,10 @@ type TorrentStatus struct {
 // dash for the last ten of them.
 const movingFor = 500 * time.Millisecond
 
-// pieceGap: Completed growing again after a longer wait is a piece after a
-// gap, and its rate is what came over the gap (statsWatch.gapRate), not the
-// meter's take on one second; the seeder's frames come about every second.
+// pieceGap: Completed growing again after a longer wait, a piece wanted all
+// along, is a piece after a gap, and its rate is what came over the gap
+// (statsWatch.gapRate), not the meter's take on one second; the seeder's
+// frames come about every second.
 const pieceGap = 2 * time.Second
 
 // settleAfter is the observation window before any verdict: a piece boundary

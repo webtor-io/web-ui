@@ -70,50 +70,126 @@ func TestViewEnv_HoldsTheSwarmThroughAGap(t *testing.T) {
 // arrived in, 13-22 Mbps -- and the hold drew the swarm at that for its
 // whole stretch: faster than the viewer's cap of 5, so "a few slow
 // seeders" (swarmBound) did not hold, and the plan was sold (tier) in
-// most frames of a swarm a plan cannot speed up. A piece after a gap moves
-// at what came over the gap. Real meter, hold and view, as the loop calls
-// them: a tick every second, the piece's frame at a phase within it.
+// most frames of a swarm a plan cannot speed up. A piece after a gap the
+// swarm spent fetching moves at what came over the gap. The viewer's
+// reader waits on the swarm, so the five pieces of its 20 MiB readahead
+// are wanted (active) all along.
 func TestViewEnv_SlowSwarmIsNotFasterThanItsPieces(t *testing.T) {
-	loc := i18n.New(os.DirFS("../../locales")).Localizer("ru")
-	atCap := statusview.Viewer{Known: true, Present: true, Mbps: 5, Limited: true, PlanBox: true, CapMbps: 5}
-	const piece, every = 4 << 20, 27
+	const piece, every, window = 4 << 20, 27, 5
 	real := float64(piece) / every
-	t0 := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	done := func(i int) float64 { return float64(every * (i + 1)) }
+	enter := func(i int) float64 {
+		if i < window {
+			return -1
+		}
+		return done(i - window)
+	}
 	for _, phase := range []time.Duration{550 * time.Millisecond, 700 * time.Millisecond, 900 * time.Millisecond} {
-		env := &viewEnv{lang: "ru", loc: loc, tier: "free", withView: true}
-		w, _, _ := newTestStatsWatch()
-		w.ch = make(chan api.EventData)
-		done := 0
-		frame := func() api.EventData {
-			return api.EventData{Total: 400 << 20, Completed: done, Seeders: 2, Peers: 2}
-		}
-		w.frame(frame(), t0)
-		tier, fastest := 0, 0.0
-		for s := 1; s <= 600; s++ {
-			steps := []time.Duration{0}
-			if s%every == 0 {
-				steps = append(steps, phase)
-			}
-			for _, d := range steps {
-				now := t0.Add(time.Duration(s)*time.Second + d)
-				if d == 0 {
-					w.tick(now)
-				} else {
-					done += piece
-					w.frame(frame(), now)
-				}
-				st := w.status(nil, nil, now)
-				fastest = max(fastest, st.viewTorrent(false).RateBps)
-				env.present(st, atCap, atCap, 0, 0, now)
-				if st.View.Key == statusview.KeyTier {
-					tier++
-				}
-			}
-		}
-		if tier > 0 || fastest > real*1.5 {
-			t.Errorf("piece at +%v: the swarm moved at up to %.1f Mbps (it sends %.2f), the plan sold in %d frames of 622", phase, statusview.BytesToMbps(fastest), statusview.BytesToMbps(real), tier)
+		r := swarmRun(piece, 100, enter, done, phase, 600, 0)
+		if r.tier > 0 || r.fastest > real*1.5 {
+			t.Errorf("piece at +%v: the swarm moved at up to %.1f Mbps (it sends %.2f), the plan sold in %d frames of %d", phase, statusview.BytesToMbps(r.fastest), statusview.BytesToMbps(real), r.tier, r.frames)
 		}
 	}
+}
+
+// A fast swarm the viewer's reader paces: the seeder fetches on demand,
+// 20 MiB ahead of the reader, and the viewer reads at their cap of 5. Each
+// piece is wanted only when the readahead reaches it and comes in at 40 or
+// 200; Completed then grows at the cap's pace, a 4 MiB piece every 6-7 s.
+// Taken as "a piece after a gap", that pace read 4.6-5.3 Mbps around the
+// cap, and the key went swarm/tier with every piece: past the first minute,
+// "a few slow seeders" in all 580 frames at 95% of the cap (16 MiB), up to
+// 118 switches (2 MiB). The gap counts only while a piece is wanted. Past
+// the first minute: the first gap, before the hold knows the cadence, reads
+// a swarm standing still, whose speed is not known (swarmBound) -- with or
+// without the gap's rate.
+func TestViewEnv_ReaderPacedSwarmIsNotSlow(t *testing.T) {
+	const readahead = 20 << 20
+	for _, fast := range []float64{40, 200} {
+		for _, mib := range []int{2, 4, 8, 16} {
+			piece := mib << 20
+			for _, share := range []float64{1, 0.95} {
+				pace := txMbps(5 * share)
+				enter := func(i int) float64 { return float64(i*piece-readahead) / pace }
+				done := func(i int) float64 { return enter(i) + float64(piece)/txMbps(fast) }
+				for _, phase := range []time.Duration{600 * time.Millisecond, 900 * time.Millisecond} {
+					r := swarmRun(piece, (1<<30)/piece, enter, done, phase, 600, 60)
+					if r.tier < r.frames || r.switches > 0 {
+						t.Errorf("swarm at %.0f, %d MiB at %.0f%% of the cap, frame at +%v: the plan sold in %d frames of %d, %d switches of the key", fast, mib, share*100, phase, r.tier, r.frames, r.switches)
+					}
+				}
+			}
+		}
+	}
+}
+
+// swarmResult is what swarmRun saw past its first warm seconds: the frames
+// the view was built in, how many of them sold the plan (KeyTier), how
+// often the key changed, and the fastest the view drew the swarm at.
+type swarmResult struct {
+	frames, tier, switches int
+	fastest                float64
+}
+
+// swarmRun drives the real meter, hold and view as the status loop calls
+// them, for secs seconds of a viewer at the cap of 5 and two seeders: a
+// tick every whole second, and the seeder's frame at phase within every
+// second it has news (it sends only what changed, pieces as the diff).
+// Piece i is wanted (a priority, "active") from enter(i) and complete
+// from done(i), both in seconds.
+func swarmRun(piece, n int, enter, done func(i int) float64, phase time.Duration, secs, warm int) swarmResult {
+	loc := i18n.New(os.DirFS("../../locales")).Localizer("ru")
+	atCap := statusview.Viewer{Known: true, Present: true, Mbps: 5, Limited: true, PlanBox: true, CapMbps: 5}
+	t0 := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	env := &viewEnv{lang: "ru", loc: loc, tier: "free", withView: true}
+	w, _, _ := newTestStatsWatch()
+	w.ch = make(chan api.EventData)
+	var r swarmResult
+	sent := make([]testPiece, n)
+	last := ""
+	show := func(now time.Time) {
+		st := w.status(nil, nil, now)
+		env.present(st, atCap, atCap, 0, 0, now)
+		if now.Sub(t0) < time.Duration(warm)*time.Second {
+			return
+		}
+		r.fastest = max(r.fastest, st.viewTorrent(false).RateBps)
+		r.frames++
+		if st.View.Key == statusview.KeyTier {
+			r.tier++
+		}
+		if last != "" && st.View.Key != last {
+			r.switches++
+		}
+		last = st.View.Key
+	}
+	for s := 0; s < secs; s++ {
+		if s > 0 {
+			now := t0.Add(time.Duration(s) * time.Second)
+			w.tick(now)
+			show(now)
+		}
+		now := t0.Add(time.Duration(s)*time.Second + phase)
+		at := now.Sub(t0).Seconds()
+		ev := api.EventData{Total: int64(n * piece), Seeders: 2, Peers: 2}
+		for i := 0; i < n; i++ {
+			p := testPiece{Position: i, Complete: done(i) <= at}
+			if p.Complete {
+				ev.Completed += piece
+			} else if enter(i) <= at {
+				p.Priority = 2
+			}
+			if s == 0 || p != sent[i] {
+				ev.Pieces = append(ev.Pieces, p)
+				sent[i] = p
+			}
+		}
+		if len(ev.Pieces) > 0 {
+			w.frame(ev, now)
+			show(now)
+		}
+	}
+	return r
 }
 
 // A still swarm has no rate in the view, whatever the smoothed rate says:
