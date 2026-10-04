@@ -639,7 +639,12 @@ func capped(v Viewer) bool {
 // missingHere: the seeder knows the connected peers' pieces, there are peers
 // and no seeder among them, and some pieces nobody of them has -- wanted
 // ones, or any not complete here. Until the seeder knows, its union is a
-// lower bound: holes that are not there.
+// lower bound: holes that are not there. The page asks the seeder for the
+// torrent's root, so WantedMissing and ReaderMissing are the whole
+// torrent's and any reader's (torrent-web-seeder's proto, StatReply): a
+// piece another viewer waits on in another file of the pack counts here
+// too, and wanted includes sticky priorities (a warm-up's, a closed
+// reader's window for 90 s) nobody may be waiting on.
 func missingHere(t Torrent) bool {
 	return t.AvailabilityKnown && t.Seeders == 0 && t.Peers > 0 && (t.WantedMissing > 0 || t.Missing)
 }
