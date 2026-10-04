@@ -1,0 +1,32 @@
+: copied from torrent-web-seeder server/services/testdata/statstream_availability.sse at 95258d025cd7a1c7cf30a4f63b1191bcb976e25d (feat/swarm-availability) -- refresh by copying it over and keeping this line
+
+: root, peers connected under 20 s
+id: 0
+event: statupdate
+data: {"total":132572,"completed":0,"peers":1,"status":4,"pieces":[{"position":0,"complete":false,"priority":0},{"position":1,"complete":false,"priority":0},{"position":2,"complete":false,"priority":0},{"position":3,"complete":false,"priority":0},{"position":4,"complete":false,"priority":0},{"position":5,"complete":false,"priority":0},{"position":6,"complete":false,"priority":0},{"position":7,"complete":false,"priority":0},{"position":8,"complete":false,"priority":1}],"seeders":0,"leechers":1,"live":true,"availability":0.44444445,"availability_known":false,"missing":null,"wanted_missing":0,"reader_missing":0,"missing_unchanged":false}
+
+: root, settled
+id: 0
+event: statupdate
+data: {"total":132572,"completed":0,"peers":1,"status":4,"pieces":[{"position":0,"complete":false,"priority":0},{"position":1,"complete":false,"priority":0},{"position":2,"complete":false,"priority":0},{"position":3,"complete":false,"priority":0},{"position":4,"complete":false,"priority":0},{"position":5,"complete":false,"priority":0},{"position":6,"complete":false,"priority":0},{"position":7,"complete":false,"priority":0},{"position":8,"complete":false,"priority":1}],"seeders":0,"leechers":1,"live":true,"availability":0.44444445,"availability_known":true,"missing":[{"start":4,"end":9}],"wanted_missing":1,"reader_missing":0,"missing_unchanged":false}
+
+: next frame: piece 0 completed, holes the same
+id: 1
+event: statupdate
+data: {"total":132572,"completed":16384,"peers":1,"status":1,"pieces":[{"position":0,"complete":true,"priority":0}],"seeders":0,"leechers":1,"live":true,"availability":0.44444445,"availability_known":true,"missing":null,"wanted_missing":1,"reader_missing":0,"missing_unchanged":true}
+
+: next frame: a seeder connected, nothing missing
+id: 2
+event: statupdate
+data: {"total":132572,"completed":17884,"peers":2,"status":1,"pieces":[{"position":8,"complete":true,"priority":0}],"seeders":1,"leechers":1,"live":true,"availability":1,"availability_known":true,"missing":null,"wanted_missing":0,"reader_missing":0,"missing_unchanged":false}
+
+: a torrent not loaded here
+id: 0
+event: statupdate
+data: {"total":132572,"completed":0,"peers":0,"status":4,"pieces":[{"position":0,"complete":false,"priority":0},{"position":1,"complete":false,"priority":0},{"position":2,"complete":false,"priority":0},{"position":3,"complete":false,"priority":0},{"position":4,"complete":false,"priority":0},{"position":5,"complete":false,"priority":0},{"position":6,"complete":false,"priority":0},{"position":7,"complete":false,"priority":0},{"position":8,"complete":false,"priority":0}],"seeders":0,"leechers":0,"live":false,"availability":0,"availability_known":false,"missing":null,"wanted_missing":0,"reader_missing":0,"missing_unchanged":false}
+
+: root, settled, a reader blocked on piece 8
+id: 0
+event: statupdate
+data: {"total":132572,"completed":0,"peers":1,"status":4,"pieces":[{"position":0,"complete":false,"priority":0},{"position":1,"complete":false,"priority":0},{"position":2,"complete":false,"priority":0},{"position":3,"complete":false,"priority":0},{"position":4,"complete":false,"priority":0},{"position":5,"complete":false,"priority":0},{"position":6,"complete":false,"priority":0},{"position":7,"complete":false,"priority":0},{"position":8,"complete":false,"priority":2}],"seeders":0,"leechers":1,"live":true,"availability":0.44444445,"availability_known":true,"missing":[{"start":4,"end":9}],"wanted_missing":1,"reader_missing":1,"missing_unchanged":false}
+
