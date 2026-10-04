@@ -832,6 +832,13 @@ func TestBuild_NoCTA(t *testing.T) {
 	if v := Build(base(caching(40, 2, 12), atCap)); v.Key != KeyTier || v.Plan == nil || v.Plan.Download.Box == nil {
 		t.Errorf("two fast seeders at the cap: %s %+v", v.Key, v.Plan)
 	}
+	// Holes only in pieces nobody wants (another file of the pack): the
+	// file read at the cap finishes, and the plan is sold.
+	otherFile := holes("caching", 43)
+	otherFile.WantedMissing = 0
+	if v := Build(base(otherFile, atCap)); v.Key != KeyTier || v.Plan == nil || v.Plan.Download.Box == nil {
+		t.Errorf("holes in another file at the cap: %s %+v", v.Key, v.Plan)
+	}
 	// Only the sale goes there: the viewer's link still says the cap.
 	if v := Build(base(holes("caching", 43), atCap)); v.Segs[1].Tone != "plan" {
 		t.Errorf("missing pieces at the cap: the viewer's link %+v", v.Segs[1])

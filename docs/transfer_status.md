@@ -657,8 +657,10 @@ under the piece bar.
   at 95% of the cap, up to 118 switches
   (`TestViewEnv_ReaderPacedSwarmIsNotSlow`). No seeder
   and peers — `fewSeeders` counts seeders only — still sells; the owner has
-  not decided that one), pieces nobody has (also with the viewer at the cap:
-  the file does not finish with a plan either; the pink link stays), a stall,
+  not decided that one), wanted pieces nobody has (also with the viewer at
+  the cap: the file does not finish with a plan either; the pink link stays
+  -- holes only in pieces nobody wants, another file of a pack, still sell:
+  the seeder's holes are the whole torrent's), a stall,
   a Vault failure, or while another offer is on screen
   (`data-upsell-surface`: the grace popup, the cap modal, the download
   nudge) or on its way — the grace popup from the moment the player's
