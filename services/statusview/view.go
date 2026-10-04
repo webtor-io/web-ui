@@ -735,9 +735,15 @@ func pct(p float64) int {
 
 // availPct is the seeder's availability (a float32 share) as a whole
 // percent, rounded down but not below what it says: 0.29 arrives as
-// 0.28999999, which is 29%.
+// 0.28999999, which is 29%. Short of the whole it is at most 99: one piece
+// short of 20009 or more rounds to 1.0, and "100%" would stand next to
+// "needed pieces missing".
 func availPct(a float64) int {
-	return pct(math.Round(a*1e4) / 100)
+	p := pct(math.Round(a*1e4) / 100)
+	if a < 1 && p > 99 {
+		return 99
+	}
+	return p
 }
 
 // sourceNode is the chain's middle node: the cache (owner, 2026-09-25: "Рой

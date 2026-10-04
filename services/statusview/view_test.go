@@ -764,6 +764,28 @@ func TestBuild_AvailabilityPercent(t *testing.T) {
 	}
 }
 
+// A share short of the whole is never "100%": from 20009 pieces a float32
+// of one piece short rounds to 1.0 at two decimals, and "100%" stood next
+// to "needed pieces missing".
+func TestAvailPct(t *testing.T) {
+	for _, c := range []struct {
+		a    float64
+		want int
+	}{
+		{float64(float32(65535.0 / 65536)), 99},
+		// The first torrent where one piece short rounds to 1.0, and the
+		// one before it, which reads 99 without the clamp.
+		{float64(float32(20008.0 / 20009)), 99},
+		{float64(float32(19984.0 / 19985)), 99},
+		{1, 100},
+		{float64(float32(0.29)), 29},
+	} {
+		if got := availPct(c.a); got != c.want {
+			t.Errorf("availPct(%v) = %d, want %d", c.a, got, c.want)
+		}
+	}
+}
+
 // The badge is the one the page had before the chain: its colour, icon and
 // words, the swarm in brackets where it had them -- the seeders, without
 // "· N leechers" (owner, 2026-09-25: "(14 сидов)"), the peers without one.
