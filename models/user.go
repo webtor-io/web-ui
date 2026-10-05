@@ -136,14 +136,21 @@ func GetOrCreateUser(ctx context.Context, db *pg.DB, email string, patreonUserID
 			Limit(1).
 			Select()
 		if err == nil {
-			// Update email if it differs
+			// Update email if it differs. When the new Patreon address
+			// already names another account, keep the old one: failing here
+			// fails every request of the session and locks the patron out of
+			// the paid account.
 			if user.Email != email && email != "" {
+				prev := user.Email
 				user.Email = email
-				if _, uerr := db.Model(user).
+				_, uerr := db.Model(user).
 					Context(ctx).
 					Column("email").
 					WherePK().
-					Update(); uerr != nil {
+					Update()
+				if isUniqueViolation(uerr) {
+					user.Email = prev
+				} else if uerr != nil {
 					return nil, false, uerr
 				}
 			}
@@ -178,16 +185,26 @@ func GetOrCreateUser(ctx context.Context, db *pg.DB, email string, patreonUserID
 		return nil, false, err // DB error
 	}
 
-	// 3) Create new user
+	// 3) Create new user. Right after sign-in the browser sends two requests
+	// with the fresh session at once, both miss step 2 and both get here; the
+	// loser hits user_email_key and must take the winner's row via step 2.
 	user.Email = email
 	user.PatreonUserID = patreonUserID
 	_, err = db.Model(user).
 		Context(ctx).
 		Insert()
+	if isUniqueViolation(err) {
+		return GetOrCreateUser(ctx, db, email, patreonUserID)
+	}
 	if err != nil {
 		return nil, false, err
 	}
 	return user, true, nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr pg.Error
+	return errors.As(err, &pgErr) && pgErr.Field('C') == "23505"
 }
 
 // GetUserByID loads a user record by primary key. Returns (nil, nil) when no
