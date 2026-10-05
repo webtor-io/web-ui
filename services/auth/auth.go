@@ -397,6 +397,16 @@ func GetUserFromContext(c *gin.Context) *User {
 	return u
 }
 
+// EndSession revokes the request's SuperTokens session and clears its
+// cookies in this response, so the next request arrives signed out. A no-op
+// without one.
+func EndSession(c *gin.Context) error {
+	if sess := session.GetSessionFromRequestContext(c.Request.Context()); sess != nil {
+		return sess.RevokeSession()
+	}
+	return nil
+}
+
 type ErrorContext struct{}
 
 type UserContext struct{}

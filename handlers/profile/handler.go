@@ -330,13 +330,20 @@ func (s *Handler) getWebDAVURL(c *gin.Context) (string, error) {
 	return al + "/webdav/", nil
 }
 
-func deleteUser(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
+var deleteUser = func(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
 	return models.DeleteUser(ctx, db, userID)
 }
 
 func (s *Handler) delete(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
+	// End the session before the row goes: the /logout this redirects to
+	// still carried it, and the auth middleware resolved it by email into a
+	// fresh empty account -- deleting an account recreated it at once.
+	if err := auth.EndSession(c); err != nil {
+		web.RedirectWithError(c, err)
+		return
+	}
 	if err := deleteUser(c.Request.Context(), db, u.ID); err != nil {
 		web.RedirectWithError(c, err)
 		return
