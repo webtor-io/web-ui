@@ -20,3 +20,21 @@ export function nextLocation(refreshed, {pathname, search}) {
     }
     return '/login?return-url=' + encodeURIComponent(pathname + search);
 }
+
+// Runs the refresh attempt and settles where the interstitial goes next.
+// attemptRefreshingSession() rejects -- rather than resolving false -- when the
+// refresh request failed while the SDK still holds the session: an answer
+// >= 300 other than 401, or none at all (supertokens-website 20.1.5 fetch.js,
+// onUnauthorisedResponse -> API_ERROR). A 500 there is a SuperTokens core or
+// Postgres that does not answer; the session may be perfectly valid. That is
+// an outage, not "no session", so it settles on {error} and never on the
+// login form, which only a resolved false leads to.
+export async function settleRefresh(attempt, loc) {
+    let refreshed;
+    try {
+        refreshed = await attempt();
+    } catch (error) {
+        return {error};
+    }
+    return {next: nextLocation(refreshed, loc)};
+}

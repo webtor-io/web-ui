@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nextLocation} from './nextLocation.js';
+import {nextLocation, settleRefresh} from './nextLocation.js';
 
 // A successful refresh means the server can now resolve the session, so the
 // interstitial must re-request the page the visitor was on. That has to be a
@@ -31,4 +31,35 @@ test('failed refresh goes to login with the original path as return-url', () => 
 test('failed refresh keeps the query string in return-url', () => {
     const loc = {href: 'http://localhost:8083/library?sort=name', pathname: '/library', search: '?sort=name'};
     assert.equal(nextLocation(false, loc), '/login?return-url=%2Flibrary%3Fsort%3Dname');
+});
+
+// attemptRefreshingSession() rejects instead of resolving false when the
+// refresh request failed while the SDK still holds the session: any answer
+// >= 300 but 401 (500 from a SuperTokens core or Postgres that is down, as on
+// 2026-10-05) or no answer at all. That says nothing about whether the session
+// exists; sending the visitor to the login form for it took signed-in users
+// to /login for the length of an outage.
+test('a refresh the server fails is not "no session"', async () => {
+    const loc = {pathname: '/library', search: ''};
+    const failed = new Response('', {status: 500});
+    const res = await settleRefresh(() => Promise.reject(failed), loc);
+    assert.equal(res.error, failed);
+    assert.equal(res.next, undefined);
+});
+
+test('a refresh with no answer at all is not "no session"', async () => {
+    const loc = {pathname: '/library', search: ''};
+    const res = await settleRefresh(() => Promise.reject(new TypeError('Failed to fetch')), loc);
+    assert.ok(res.error instanceof TypeError);
+    assert.equal(res.next, undefined);
+});
+
+test('a refresh that finds no session settles on the login form', async () => {
+    const loc = {pathname: '/library', search: '?sort=name'};
+    assert.deepEqual(await settleRefresh(async () => false, loc), {next: '/login?return-url=%2Flibrary%3Fsort%3Dname'});
+});
+
+test('a refreshed session settles on a reload', async () => {
+    const loc = {pathname: '/library', search: ''};
+    assert.deepEqual(await settleRefresh(async () => true, loc), {next: null});
 });

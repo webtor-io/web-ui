@@ -1,14 +1,19 @@
 import av from '../../lib/av';
-import {nextLocation} from '../../lib/auth/nextLocation.js';
+import {settleRefresh} from '../../lib/auth/nextLocation.js';
 av(async function() {
-    const {refresh} = (await import('../../lib/supertokens'));
-    let refreshed = false;
-    try {
-        refreshed = await refresh(window._CSRF);
-    } catch (err) {
-        console.error(err);
+    const {next, error} = await settleRefresh(async () => {
+        const {refresh} = await import('../../lib/supertokens');
+        return refresh(window._CSRF);
+    }, window.location);
+    if (error) {
+        // The refresh did not answer: an outage, not a missing session. Say
+        // so instead of sending a signed-in visitor to the login form.
+        console.error(error);
+        const failed = document.getElementById('auth-refresh-failed');
+        failed?.classList.remove('hidden');
+        failed?.classList.add('flex');
+        return;
     }
-    const next = nextLocation(refreshed, window.location);
     if (next === null) {
         window.location.reload();
     } else {

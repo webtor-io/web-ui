@@ -95,7 +95,7 @@ gin applies `Use()` only to routes registered after it, so where a route sits in
 |---|---|---|---|
 | Static: `/assets`, `/pub`, `pub/*` at the root, favicons, manifest (`sta.RegisterHandler`) | disk | — | — |
 | Session + CSRF (`handlers/session`) | Redis/Dragonfly | yes, every page | — |
-| SuperTokens + user row (`services/auth`) | SuperTokens core, Postgres | no call: no token, no core query | error page (503 core, 500 row), never anonymous |
+| SuperTokens + user row (`services/auth`) | SuperTokens core, Postgres | no call: no token, no core query | error page (503 core, 500 row), never anonymous. One exception: a page request (not XHR) with an expired access token is checked locally and passes on as anonymous (claims fallback included) to the refresh interstitial (`handlers/auth`), whose refresh call needs the core. A refresh that fails there shows the outage message, not `/login` (`settleRefresh`, `lib/auth/nextLocation.js`) |
 | Self-hosted admin, no SuperTokens (`registerAdminUser`) | Postgres | — | 503, never anonymous |
 | Claims (`services/claims`) | claims-provider → Postgres, 1 min cache per key | the provider's last anonymous answer when it fails; a pod with none yet answers 503 | 503 |
 | Settings, onboarding, unread badge | Postgres | skipped | defaults (`ShowAdult=false`), page renders |
