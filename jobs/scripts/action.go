@@ -1519,9 +1519,9 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 				headOpenErr.Store(true)
 				return
 			}
-			for n := range ch {
+			for ev := range ch {
 				headEventsReceived.Store(true)
-				headDownloaded.Store(n)
+				headDownloaded.Store(ev.Verified)
 				updateMeasure()
 			}
 		}()
@@ -1536,8 +1536,8 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 				log.WithError(werr).Warn("warmup tail failed")
 				return
 			}
-			for n := range ch {
-				tailDownloaded.Store(n)
+			for ev := range ch {
+				tailDownloaded.Store(ev.Verified)
 				updateMeasure()
 			}
 		}()

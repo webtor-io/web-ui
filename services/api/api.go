@@ -1061,11 +1061,24 @@ func trimEOL(b []byte) []byte {
 	return bytes.TrimSuffix(b, []byte("\r"))
 }
 
+// WarmupEvent is one frame of the seeder's ?warmup stream.
+//
+// Verified ("data:") is the bytes inside the range whose pieces passed the
+// hash check: it moves a whole piece at a time, and the stream closes when it
+// covers the range. Have and Span ("have:", "span:", torrent-web-seeder
+// since 2026-10) are about the pieces covering the range: Span is their
+// length, Have what has arrived of them chunk by chunk, unverified chunks
+// and the boundary pieces' bytes outside the range included. Have can drop
+// (a failed hash, an eviction). A seeder before them sends only "data:",
+// and both read -1.
+type WarmupEvent struct {
+	Verified, Have, Span int64
+}
+
 // Warmup opens the seeder's ?warmup SSE stream for the byte range
 // [rangeStart, rangeEnd] (rangeEnd == -1 means "to EOF"). The seeder
 // bumps PiecePriorityHigh on every piece covering the range and emits a
-// cumulative-downloaded counter (bytes within the range that have been
-// verified) once per second. Stream close = warmup complete; the
+// WarmupEvent once per second. Stream close = warmup complete; the
 // returned channel is closed in the same moment.
 //
 // The URL is derived from statsURL — the seeder routes ?stats and
@@ -1074,7 +1087,7 @@ func trimEOL(b []byte) []byte {
 // chunks unbuffered through nginx). statsURL must be non-empty; the
 // caller is expected to have short-circuited the Cache=true branch
 // upstream (rest-api emits an empty stats URL in that case).
-func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, rangeEnd int64) (chan int64, error) {
+func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, rangeEnd int64) (chan WarmupEvent, error) {
 	if statsURL == "" {
 		return nil, errors.New("empty stats url")
 	}
@@ -1103,17 +1116,20 @@ func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, ran
 		_ = res.Body.Close()
 		return nil, errors.Errorf("warmup returned status %d", res.StatusCode)
 	}
-	ch := make(chan int64)
+	ch := make(chan WarmupEvent)
 	go func() {
 		b := res.Body
 		defer func() {
 			close(ch)
 			_ = b.Close()
 		}()
-		// Buffer is tiny — "data: <int>\n\n" is at most ~24 bytes; the
-		// scanner default (64KB) is overkill but harmless.
+		// Buffer is tiny — a frame is three "<name>: <int>" lines of at
+		// most ~24 bytes; the scanner default (64KB) is overkill but
+		// harmless.
 		scanner := bufio.NewScanner(b)
 		scanner.Split(bufio.ScanLines)
+		// have: and span: come before data:, which ends the frame.
+		ev := WarmupEvent{Have: -1, Span: -1}
 		for scanner.Scan() {
 			if ctx.Err() != nil {
 				return
@@ -1123,19 +1139,33 @@ func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, ran
 				return
 			}
 			line := scanner.Text()
-			if !strings.HasPrefix(line, "data: ") {
+			name, value, _ := strings.Cut(line, ": ")
+			var field *int64
+			switch name {
+			case "have":
+				field = &ev.Have
+			case "span":
+				field = &ev.Span
+			case "data":
+				field = &ev.Verified
+			default:
 				continue
 			}
-			n, perr := strconv.ParseInt(strings.TrimPrefix(line, "data: "), 10, 64)
+			n, perr := strconv.ParseInt(value, 10, 64)
 			if perr != nil {
 				log.WithError(perr).Errorf("failed to parse warmup data line=%v", line)
 				continue
 			}
+			*field = n
+			if name != "data" {
+				continue
+			}
 			select {
-			case ch <- n:
+			case ch <- ev:
 			case <-ctx.Done():
 				return
 			}
+			ev = WarmupEvent{Have: -1, Span: -1}
 		}
 	}()
 	return ch, nil
