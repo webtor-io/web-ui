@@ -1342,20 +1342,41 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 
 	// Warmup-SSE bookkeeping: the seeder's ?warmup endpoint bumps
 	// PiecePriorityHigh on every piece overlapping the requested range
-	// and streams a cumulative downloaded counter (bytes-within-range
-	// verified locally) once per second. Stream close = warmup done.
-	// We open head and tail in parallel so both priority bumps land up
-	// front and anacrolix can parallelise peer requests across both
+	// and streams api.WarmupEvent once per second. Stream close = warmup
+	// done. We open head and tail in parallel so both priority bumps land
+	// up front and anacrolix can parallelise peer requests across both
 	// ranges; the speed estimate is computed off the combined counter.
+	//
+	// The verdicts and the speed the gate reads stay on the verified
+	// counter. have/span (a seeder since 2026-10) drive what the viewer
+	// reads: the line's percent and the no-peers card's "received".
 	var (
-		headDownloaded     atomic.Int64
-		tailDownloaded     atomic.Int64
+		head, tail         warmStream
 		headEventsReceived atomic.Bool
 		measureStartNs     atomic.Int64
 		measureStartBytes  atomic.Int64
 	)
 	totalDownloaded := func() int64 {
-		return headDownloaded.Load() + tailDownloaded.Load()
+		return head.verified.Load() + tail.verified.Load()
+	}
+	warmupTarget := int64(limitStart + limitEnd)
+	// haveSpan is have of span over both ranges, once each range opened has
+	// sent them; ok false with a seeder that does not (nor while a range's
+	// first frame is still on its way, nor after its stream failed to open).
+	haveSpan := func() (h, sp int64, ok bool) {
+		hs, ts := head.span.Load(), tail.span.Load()
+		if (limitStart > 0 && hs <= 0) || (limitEnd > 0 && ts <= 0) || hs+ts <= 0 {
+			return 0, 0, false
+		}
+		return head.have.Load() + tail.have.Load(), hs + ts, true
+	}
+	// progress is what has arrived, and of what, for the viewer: have of
+	// span, else the verified bytes of the range.
+	progress := func() (int64, int64) {
+		if h, sp, ok := haveSpan(); ok {
+			return h, sp
+		}
+		return totalDownloaded(), warmupTarget
 	}
 	// updateMeasure latches the speed-measurement window once total
 	// downloaded crosses skipBytes — same slow-start skip the old
@@ -1382,10 +1403,12 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	const earlyMinBytes = 1 * 1024 * 1024
 	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
 	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
-	warmupTarget := int64(limitStart + limitEnd)
 	// updateWarmupLine rewrites the job's status line: the seconds left before
 	// the no-peers verdict while nothing has arrived, the percent of the
-	// warm-up range once bytes flow — the same shape as buffering's "37%".
+	// warm-up (progress) once bytes flow — the same shape as buffering's
+	// "37%". By the verified counter alone a range inside one 16 MiB piece
+	// read nothing until the piece was whole: a countdown to "no peers"
+	// while the data came.
 	// Seeders, leechers and speed are not repeated here: the resource badge
 	// and the piece bar carry them, and the no-peers card gets the counts
 	// when they matter. Called from the stats goroutine on every event and
@@ -1395,12 +1418,12 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 		if !useStatus {
 			return
 		}
-		bytes := totalDownloaded()
+		bytes, of := progress()
 		var left time.Duration
 		if bytes == 0 {
 			left = noPeersAfter - time.Since(warmupStart)
 		}
-		if line := formatWarmupLine(s.tp, bytes, warmupTarget, left); line != "" {
+		if line := formatWarmupLine(s.tp, bytes, of, left); line != "" {
 			j.StatusUpdate(line)
 		}
 	}
@@ -1458,13 +1481,16 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	//     will hang on its own 1-min deadline anyway. Surface CTA now instead
 	//     of waiting.
 	var noPeersReason atomic.Value // string: "dead" | "slow"
+	// The card's "N received" is progress, as the line's percent: by the
+	// verified bytes, "70%" was followed by "0 B received from 5 peers".
 	snapshot := func(reason string) *NoPeersError {
+		received, _ := progress()
 		return &NoPeersError{
 			Reason:   reason,
 			Peers:    int(peerCount.Load()),
 			Seeders:  int(seederCount.Load()),
 			Leechers: int(leecherCount.Load()),
-			Bytes:    totalDownloaded(),
+			Bytes:    received,
 			Elapsed:  time.Since(warmupStart),
 		}
 	}
@@ -1521,7 +1547,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			}
 			for ev := range ch {
 				headEventsReceived.Store(true)
-				headDownloaded.Store(ev.Verified)
+				head.take(ev)
 				updateMeasure()
 			}
 		}()
@@ -1537,7 +1563,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 				return
 			}
 			for ev := range ch {
-				tailDownloaded.Store(ev.Verified)
+				tail.take(ev)
 				updateMeasure()
 			}
 		}()
@@ -1927,10 +1953,25 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 	}, id
 }
 
+// warmStream is one ?warmup stream's last frame. have and span stay 0 from
+// a seeder that does not send them.
+type warmStream struct {
+	verified, have, span atomic.Int64
+}
+
+func (w *warmStream) take(ev api.WarmupEvent) {
+	w.verified.Store(ev.Verified)
+	if ev.Have < 0 || ev.Span <= 0 {
+		return
+	}
+	w.have.Store(ev.Have)
+	w.span.Store(ev.Span)
+}
+
 // formatWarmupLine is the job status line during warm-up: "43 s" while
 // nothing has arrived (seconds left before the no-peers verdict, so a silent
-// swarm shows a countdown rather than a frozen spinner), "37%" of the warm-up
-// range once bytes flow — the same shape as buffering's line. Empty when
+// swarm shows a countdown rather than a frozen spinner), "37%" of target once
+// bytes flow — the same shape as buffering's line. Empty when
 // there is nothing honest to show (no target, or the countdown is over):
 // the previous line then stays.
 func formatWarmupLine(tp func(string, map[string]any) string, bytes, target int64, left time.Duration) string {
