@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -252,6 +253,62 @@ func TestSignedInAdminIsNotAnonymousWhenPostgresFails(t *testing.T) {
 	}
 	if len(errs) == 0 {
 		t.Error("no error for the error page to answer with")
+	}
+}
+
+// adminChain runs one request through RegisterHandler's self-hosted branch
+// with the password store reading Postgres the way production wires it
+// (auth.go: NewStore(flag, NewPGRepo(pg))), and reports what came out.
+func adminChain(t *testing.T, pgHandle *cs.PG) (reached, admin, open bool, errs []*gin.Error) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	withSession(r)
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		errs = c.Errors
+	})
+	a := &Auth{
+		hasSupetokens: false,
+		pg:            pgHandle,
+		adminStore:    adminauth.NewStore("", adminauth.NewPGRepo(pgHandle)),
+	}
+	a.RegisterHandler(r)
+	r.GET("/", func(c *gin.Context) {
+		reached, admin, open = true, IsAdmin(c), IsOpenInstance(c)
+		c.Status(http.StatusOK)
+	})
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	return
+}
+
+// An instance without a password -- the self-hosted default -- serves every
+// visitor as the administrator, and whether a password exists is read from
+// Postgres on each request. When that read fails the answer is unknown:
+// nobody becomes administrator (fail closed), and nobody gets the anonymous
+// site either, which with the auth gate on was the login form for a password
+// that does not exist. The request stops at the error, which services/web
+// answers 503 ("failed to create user", TestClassifyError_DependencyOutageIs503).
+func TestOpenInstanceIsNotAnonymousWhenPostgresFails(t *testing.T) {
+	pgHandle, _ := fakePGListener(t)
+	reached, admin, open, errs := adminChain(t, pgHandle)
+	if reached {
+		t.Errorf("the page ran while Postgres failed (admin=%v open=%v): served anonymous instead of the error page", admin, open)
+	}
+	if len(errs) == 0 || !strings.HasPrefix(errs[0].Error(), "failed to create user: ") {
+		t.Errorf("errors %v, want one starting %q for the 503 page", errs, "failed to create user: ")
+	}
+}
+
+// No Postgres configured (pg.Get() == nil) is not Postgres down: the request
+// goes on as before, closed and anonymous, rather than 503 on every page.
+func TestNoPostgresConfiguredIsNotAnOutage(t *testing.T) {
+	reached, admin, open, errs := adminChain(t, &cs.PG{})
+	if !reached || len(errs) != 0 {
+		t.Errorf("reached=%v errors=%v: a Postgres that is not configured was treated as one that is down", reached, errs)
+	}
+	if admin || open {
+		t.Errorf("admin=%v open=%v without a readable password store, want closed", admin, open)
 	}
 }
 

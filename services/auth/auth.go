@@ -628,8 +628,19 @@ func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 			//     auto-admin;
 			//   password configured and no mark → stay anonymous, which lands
 			//     the request on HasAuth and from there on /login.
+			configured, err := s.adminStore.Configured(c.Request.Context())
+			if err != nil && !defaultErrors.Is(err, adminauth.ErrNoDB) {
+				// Postgres is configured and does not answer: whether this
+				// instance has a password is unknown. Nobody becomes
+				// administrator, and nobody is served anonymous either -- on an
+				// open instance that is the administrator, bounced to a login
+				// form for a password that does not exist. 503 (services/web).
+				_ = c.Error(fmt.Errorf("failed to create user: reading the admin password: %w", err))
+				c.Abort()
+				return
+			}
 			admin := true
-			if !s.adminStore.IsConfigured(c.Request.Context()) {
+			if !configured {
 				ctx := context.WithValue(c.Request.Context(), IsOpenInstanceContext{}, true)
 				c.Request = c.Request.WithContext(ctx)
 			} else {

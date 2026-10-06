@@ -14,7 +14,9 @@ import (
 // services/auth.registerAdminUser, which creates that row on first request.
 const adminEmail = "admin"
 
-var errNoDB = errors.New("database is not available")
+// ErrNoDB is what the repo answers when no Postgres is configured
+// (pg.Get() == nil): not an outage, there is nothing to ask.
+var ErrNoDB = errors.New("database is not available")
 
 type pgRepo struct {
 	pg *cs.PG
@@ -30,7 +32,7 @@ func NewPGRepo(p *cs.PG) HashRepo {
 func (r *pgRepo) Get(ctx context.Context) (string, error) {
 	db := r.pg.Get()
 	if db == nil {
-		return "", errNoDB
+		return "", ErrNoDB
 	}
 	u := &models.User{}
 	err := db.Model(u).
@@ -52,7 +54,7 @@ func (r *pgRepo) Get(ctx context.Context) (string, error) {
 func (r *pgRepo) Set(ctx context.Context, hash string) error {
 	db := r.pg.Get()
 	if db == nil {
-		return errNoDB
+		return ErrNoDB
 	}
 	u := &models.User{}
 	res, err := db.Model(u).

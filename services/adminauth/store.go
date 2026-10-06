@@ -35,16 +35,24 @@ func (s *Store) ManagedByEnv() bool {
 }
 
 func (s *Store) IsConfigured(ctx context.Context) bool {
+	configured, _ := s.Configured(ctx)
+	return configured
+}
+
+// Configured is IsConfigured with the read error kept, for a caller that must
+// not serve the request at all when the answer is unknown. It still fails
+// closed: on an error it reports configured.
+func (s *Store) Configured(ctx context.Context) (bool, error) {
 	if s.ManagedByEnv() {
-		return true
+		return true, nil
 	}
 	h, err := s.repo.Get(ctx)
 	if err != nil {
 		// Unreadable storage is not proof that no password exists. Report
 		// configured so the instance stays closed instead of falling open.
-		return true
+		return true, err
 	}
-	return h != ""
+	return h != "", nil
 }
 
 func (s *Store) Verify(ctx context.Context, password string) bool {
