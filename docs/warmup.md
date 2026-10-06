@@ -148,7 +148,53 @@ themselves are never transferred. `web-ui`:
 - Computes `downloadSpeed` from the combined head+tail counter: latches a
   `(timestamp, bytes)` measurement window once total downloaded crosses
   `skipBytes` (slow-start skip, same threshold the old `speedReader` used),
-  then divides `(final - measureStartBytes) / elapsed` at SSE close.
+  then divides `(final - measureStartBytes) / elapsed` at SSE close
+  (`speedLatch`).
+
+### `have:` and `span:` (2026-10)
+
+The seeder's frame is `have: H\nspan: S\ndata: D\n\n` since
+torrent-web-seeder's branch feat/warmup-have-span. `data` is unchanged: the verified
+bytes inside the range, and the stream still closes when it covers the range,
+so "warm-up done" still means the pieces passed the hash check. `span` is the
+length of the pieces covering the range (a piece shared by two files of a
+directory counted once), `have` what has arrived of them chunk by chunk —
+unverified chunks and the boundary pieces' bytes outside the range included;
+it can drop (a failed hash, an eviction). `api.Warmup` sends
+`WarmupEvent{Verified, Have, Span}`; a seeder before the two lines gives -1
+for both, and everything below falls back to `data`.
+
+What reads `have` (`warmUp`, once every range opened has sent it):
+
+- the status line's percent: have of span (below);
+- the no-peers card's "N received" (`NoPeersError.Bytes`), so a "70%" is not
+  followed by "0 B received". The `bytes` of the `no-peers-shown` Umami
+  event and of the "no peers / warmup deadline" log line are have from this
+  release on, not comparable with the verified bytes before it;
+- the `warmup measured` log line (below).
+
+What does not, on purpose: the dead and slow watchdogs, the hard-timeout
+threshold, the empty-SSE cache detection and the speed the BT-slow gate
+reads — every verdict stays on `data`. Moving the slow watchdog to `have` is
+an open question, not a fix: on big pieces it would turn part of today's
+120 s cards into the same card at the hard deadline (an estimate from the
+design, not measured).
+
+**`warmup measured`** (Info, one per warm-up that opened its streams,
+whatever the verdict): `phase` (`quick`, `full`, `download`), `bitrate` and
+`lower_bound` on the full measure, `job`, `outcome` (`done`, `cut` — the
+hard deadline or the caller gone —, `dead`, `slow`, `timeout`), `target`,
+`span`, `data`, `have`, `data0`/`have0` (where each speed window opened, -1
+if it did not), `speed_verified` (what the gate read), `speed_have` (the same
+window on `have`), `hash_wait` (from the moment every covering piece had
+arrived to the close: the hash checks' queue; absent when it never got
+there). Speeds are bytes a second, `bitrate` bits. It exists to decide
+whether the gate should read `have`: if full measures where the gate fired on
+`speed_verified` but `speed_have` clears the bitrate (each against
+`lower_bound`, the gate takes the larger) come to about ten a day over 2–3
+days, the gate moves to `have` (phase 2b); until then it reads what it always
+read. `TestWarmUp_HaveDrivesTheLineNotTheGate`,
+`TestWarmUp_VerdictsStayOnVerified`.
 
 **Throughput semantics shifted slightly.** The old path measured the
 end-to-end byte rate (peers → seeder → THP → web-ui). The new SSE counter
@@ -208,8 +254,10 @@ The job status line is `formatWarmupLine` (`jobs/scripts/action.go`) and it
 is deliberately minimal, the same shape as buffering's "37%": while nothing
 has arrived, the seconds left before the no-peers verdict
 (`job.warmupCountdown`, "43 s"), so a silent swarm shows a moving countdown
-rather than a frozen spinner; once bytes flow, the percent of the warm-up
-range received. Seeders, leechers and throughput are not repeated in the
+rather than a frozen spinner; once bytes flow, the percent received: have of
+span from a seeder that sends them (a range inside one 16 MiB piece used to
+count down to "no peers" while its chunks arrived), else the verified bytes
+of the warm-up range. Seeders, leechers and throughput are not repeated in the
 line — the resource page's transfer chain and piece bar carry them (docs/transfer_status.md), and
 the no-peers card gets the counts when they matter. An earlier version spelt
 out "6 seeders · 0 leechers · waiting for data, 43 s left" and wrapped onto
@@ -331,8 +379,11 @@ rule has always used. If the pod turns out to hold the full range when phase 2 s
 (someone else's stream filled it), the verdict falls back to the plan-cap check of the
 cached branch.
 
-A real fix for the granularity is a chunk-level counter from the seeder; until then do
-not shrink the measuring constants (`TestWarmupSizes` guards it).
+The chunk-level counter exists since 2026-10 (`have`/`span`, above), but the gate does
+not read it yet: `warmup measured` logs both speeds until the numbers say it should.
+Until the gate reads `have`, do not shrink the measuring constants (`TestWarmupSizes`
+guards it); after that, whether the two phases and the 10/50/10 MB constants are still
+needed is a question for the same log, not a given.
 
 The head/tail piece prioritisation, the other half of warm-up, is unaffected: it is the
 range that matters there, not its length.
