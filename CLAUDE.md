@@ -87,6 +87,25 @@ All handlers must follow two-level separation:
 - **Auth**: Use `auth.HasAuth` middleware via `r.Group().Use(auth.HasAuth)` — don't check auth manually in handlers.
 - **Reference**: `handlers/embed_domain/handler.go`, `handlers/vault/handler.go`, `handlers/streaming/backends/handler.go`
 
+### Middleware chain and its dependencies (`serve.go`)
+
+gin applies `Use()` only to routes registered after it, so where a route sits in `serve()` decides which middleware it passes. What each layer needs, in order:
+
+| Layer | Needs | Anonymous, no cookies | Signed in, dependency down |
+|---|---|---|---|
+| Static: `/assets`, `/pub`, `pub/*` at the root, favicons, manifest (`sta.RegisterHandler`) | disk | — | — |
+| Session + CSRF (`handlers/session`) | Redis/Dragonfly | yes, every page | — |
+| SuperTokens + user row (`services/auth`) | SuperTokens core, Postgres | no call: no token, no core query | error page (503 core, 500 row), never anonymous |
+| Self-hosted admin, no SuperTokens (`registerAdminUser`) | Postgres | — | 503, never anonymous |
+| Claims (`services/claims`) | claims-provider → Postgres, 1 min cache per key | the provider's last anonymous answer when it fails; a pod with none yet answers 503 | 503 |
+| Settings, onboarding, unread badge | Postgres | skipped | defaults (`ShowAdult=false`), page renders |
+
+Rules:
+- Static files are registered right after the S3/API host rewrites and before everything that needs a dependency (`static_order_test.go`). Before 2026-10-06 they sat behind claims: when Postgres went away on 2026-10-05 (03:36–03:41Z) `/assets` and the manifest answered 503 together with the pages.
+- A dependency that fails never turns a signed-in user anonymous or into "no such dependency": the request ends on the error page. `pg.Get() == nil` means "Postgres not configured", never "Postgres down".
+- An anonymous visitor degrades to the last real answer, never to a made-up one (`makeAdminClaims` is "no provider", not "provider failed").
+- Still needed by an anonymous page: Redis (session) and, for an embed on a foreign domain, Postgres (`embed_domain`). A claims-provider that hangs instead of failing costs an anonymous request up to 10 s before the fallback: lazymap does not keep errors, so `ErrorExpire` does nothing here.
+
 ### Frontend Development
 
 - **Server-side rendering first** — use Go templates with Gin, minimize client-side JavaScript.
