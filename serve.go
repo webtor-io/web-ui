@@ -256,6 +256,18 @@ func serve(c *cli.Context) error {
 	// prefix this rewrite produces.
 	libapi.RegisterHostMiddleware(r, apiHosts, libapi.HostPrefix)
 
+	// Setting Static — after the host rewrites above (on the S3 and API hosts
+	// /assets/... is theirs, not ours) and before everything below: gin
+	// applies Use() only to routes registered after it, and the session
+	// (Redis), SuperTokens, the user lookup (Postgres) and the claims
+	// (claims-provider, Postgres) are of no use to a file on disk. Registered
+	// after them, the files answered 503 whenever claims-provider could not
+	// reach Postgres (2026-10-05 03:36–03:41Z, /assets and the manifest too).
+	err = sta.RegisterHandler(c, r)
+	if err != nil {
+		return err
+	}
+
 	if err := requireSessionSecret(c); err != nil {
 		return err
 	}
@@ -340,12 +352,6 @@ func serve(c *cli.Context) error {
 
 	// Setting ApiClaimsHandler
 	sapi.RegisterHandler(r)
-
-	// Setting Static
-	err = sta.RegisterHandler(c, r)
-	if err != nil {
-		return err
-	}
 
 	// Setting Migration from v1 to v2
 	wm.RegisterHandler(r)
