@@ -1,10 +1,20 @@
 package main
 
 import (
+	"flag"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/urfave/cli"
+
+	sta "github.com/webtor-io/web-ui/handlers/static"
 )
 
 // gin applies Use() only to the routes registered after it, so which
@@ -33,6 +43,51 @@ func TestStaticIsRegisteredBeforeDependentMiddleware(t *testing.T) {
 	} {
 		if p := pos[dep]; p == 0 || p < static {
 			t.Errorf("%s is registered before the static files; they would go through it", dep)
+		}
+	}
+}
+
+// What that order buys, on the real static routes: behind them a middleware
+// that fails every request, as claims did on 2026-10-05, and the page route
+// that owns every other top-level path. The files answer, the page does not.
+func TestStaticAnswersWhileADependencyFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	assets := t.TempDir()
+	for _, f := range []string{"app.css", "night/manifest.webmanifest"} {
+		p := filepath.Join(assets, f)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range sta.RegisterFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"-" + sta.AssetsPathFlag, assets}); err != nil {
+		t.Fatal(err)
+	}
+
+	r := gin.New()
+	if err := sta.RegisterHandler(cli.NewContext(nil, fs, nil), r); err != nil {
+		t.Fatal(err)
+	}
+	r.Use(func(c *gin.Context) { c.AbortWithStatus(http.StatusServiceUnavailable) })
+	r.GET("/:resource_id", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	for path, want := range map[string]int{
+		"/assets/app.css":       http.StatusOK,
+		"/manifest.webmanifest": http.StatusOK,
+		"/robots.txt":           http.StatusOK, // pub/
+		"/pub/llms.txt":         http.StatusOK,
+		"/0123456789abcdef0123456789abcdef01234567": http.StatusServiceUnavailable,
+	} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != want {
+			t.Errorf("%s: %d, want %d", path, w.Code, want)
 		}
 	}
 }
