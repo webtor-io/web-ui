@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	proto "github.com/webtor-io/claims-provider/proto"
 	cs "github.com/webtor-io/common-services"
@@ -20,6 +22,8 @@ type Claims struct {
 	*lazymap.LazyMap[*Data]
 	cl *Client
 	pg *cs.PG
+	// anon is the provider's last answer for a visitor with no identity (Get).
+	anon atomic.Pointer[Data]
 }
 
 type Data = proto.GetResponse
@@ -92,10 +96,29 @@ func (s *Claims) Refresh(r *Request) (*Data, error) {
 	return s.Get(r)
 }
 
+// Get answers a visitor with no identity from the provider's last answer when
+// the provider fails. Every such visitor asks the same question, and the
+// provider answers it from Postgres: without this, a database outage took
+// every anonymous page down with it (2026-10-05, 503 for five minutes). The
+// fallback is the provider's real, stale answer, never the synthetic
+// no-provider claims: a provider that failed is not one that is absent. With
+// no answer on record yet (a pod started during the outage), the error stands.
 func (s *Claims) Get(r *Request) (*Data, error) {
-	return s.LazyMap.Get(cacheKey(r), func() (*Data, error) {
+	d, err := s.LazyMap.Get(cacheKey(r), func() (*Data, error) {
 		return s.Fetch(r)
 	})
+	if r.Email != "" || r.PatreonUserID != nil {
+		return d, err
+	}
+	if err == nil {
+		s.anon.Store(d)
+		return d, nil
+	}
+	if last := s.anon.Load(); last != nil {
+		log.WithError(err).Warn("claims provider failed, serving its last anonymous answer")
+		return last, nil
+	}
+	return nil, err
 }
 
 func (s *Claims) makeAdminClaims() *Data {
