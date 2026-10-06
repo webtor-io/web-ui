@@ -2041,9 +2041,12 @@ func (l *speedLatch) speed(final int64, warmupStart, now time.Time) float64 {
 // formatWarmupLine is the job status line during warm-up: "43 s" while
 // nothing has arrived (seconds left before the no-peers verdict, so a silent
 // swarm shows a countdown rather than a frozen spinner), "37%" of target once
-// bytes flow — the same shape as buffering's line. Empty when
-// there is nothing honest to show (no target, or the countdown is over):
-// the previous line then stays.
+// bytes flow — the same shape as buffering's line. Never over 99%: the
+// warm-up ends with the step, not with its percent -- have reaches span
+// while the last pieces still wait for their hash checks (hash_wait), and
+// "100%" stood on a step that was still running. Empty when there is
+// nothing honest to show (no target, or the countdown is over): the
+// previous line then stays.
 func formatWarmupLine(tp func(string, map[string]any) string, bytes, target int64, left time.Duration) string {
 	if bytes <= 0 {
 		if left <= 0 {
@@ -2055,8 +2058,8 @@ func formatWarmupLine(tp func(string, map[string]any) string, bytes, target int6
 		return ""
 	}
 	pct := float64(bytes) / float64(target) * 100
-	if pct > 100 {
-		pct = 100
+	if pct > 99 {
+		pct = 99 // 99.5 would print "100"
 	}
 	return fmt.Sprintf("%.0f%%", pct)
 }

@@ -257,7 +257,8 @@ has arrived, the seconds left before the no-peers verdict
 rather than a frozen spinner; once bytes flow, the percent received: have of
 span from a seeder that sends them (a range inside one 16 MiB piece used to
 count down to "no peers" while its chunks arrived), else the verified bytes
-of the warm-up range. Seeders, leechers and throughput are not repeated in the
+of the warm-up range; never over 99% (the next step says it is done: have
+reaches span while the hash checks still run, and "100%" stood that long). Seeders, leechers and throughput are not repeated in the
 line — the resource page's transfer chain and piece bar carry them (docs/transfer_status.md), and
 the no-peers card gets the counts when they matter. An earlier version spelt
 out "6 seeders · 0 leechers · waiting for data, 43 s left" and wrapped onto

@@ -165,7 +165,7 @@ func TestWarmUp_VerdictsStayOnVerified(t *testing.T) {
 		{"slow, old seeder", "data: 524288\n\n", 2, 10 * time.Second, "slow", 512 << 10, "5%"},
 		// The whole piece here, unverified, at the deadline: under skip
 		// bytes by the verified counter, so the timeout card.
-		{"timeout with every chunk", "have: 16777216\nspan: 16777216\ndata: 0\n\n", 60, 1500 * time.Millisecond, "timeout", 16 << 20, "100%"},
+		{"timeout with every chunk", "have: 16777216\nspan: 16777216\ndata: 0\n\n", 60, 1500 * time.Millisecond, "timeout", 16 << 20, "99%"},
 	}
 	// slowSec 2: the watchdog's first tick draws the line, the second one
 	// rules.

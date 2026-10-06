@@ -32,7 +32,10 @@ func TestFormatWarmupLine(t *testing.T) {
 		{"countdown over, nothing arrived → keep previous line", 0, mb, -3 * time.Second, ""},
 		{"bytes flowing → percent of the warm-up range", 384 * 1024, mb, 0, "38%"},
 		{"bytes flowing ignores a stale countdown", 384 * 1024, mb, 30 * time.Second, "38%"},
-		{"never above 100%", 3 * mb, mb, 0, "100%"},
+		{"never above 99%: the step ends the warm-up", 3 * mb, mb, 0, "99%"},
+		{"the whole range arrived, the step still on", mb, mb, 0, "99%"},
+		{"99.5% does not round to 100%", 995, 1000, 0, "99%"},
+		{"99.4% reads 99%", 994, 1000, 0, "99%"},
 		{"no target → nothing honest to say", 512 * 1024, 0, 0, ""},
 	}
 	for _, c := range cases {
