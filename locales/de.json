@@ -471,10 +471,15 @@
     "resource.status.chain.paused": "pausiert",
     "resource.status.chain.cap": "Limit",
     "resource.status.chain.fewSeeders": "wenige Seeder",
+    "resource.status.chain.noSeeders": "keine Seeder",
     "resource.status.chain.waitingData": "wartet auf Daten",
     "resource.status.hint.swarm": {
         "one": "Das Tempo begrenzt der einzige Seeder.",
         "other": "Das Tempo begrenzen die Seeder – gerade sind es {{.Count}}."
+    },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "Gerade ist kein Seeder mit dem ganzen Torrent verbunden – die Teile kommen von {{.Count}} verbundenen Peer, und der Schwarm begrenzt das Tempo.",
+        "other": "Gerade ist kein Seeder mit dem ganzen Torrent verbunden – die Teile kommen von {{.Count}} verbundenen Peers, und der Schwarm begrenzt das Tempo."
     },
     "resource.status.hint.stalled": "Wir warten, bis die Seeder das benötigte Stück der Datei liefern.",
     "resource.status.hint.vaulting": "Der Torrent wird in Vault gespeichert – danach ist er auch ohne Seeder verfügbar.",

@@ -472,10 +472,15 @@
     "resource.status.chain.paused": "pausado",
     "resource.status.chain.cap": "limite",
     "resource.status.chain.fewSeeders": "poucos seeders",
+    "resource.status.chain.noSeeders": "sem seeders",
     "resource.status.chain.waitingData": "aguardando dados",
     "resource.status.hint.swarm": {
         "one": "A velocidade é limitada pelo único seeder.",
         "other": "A velocidade é limitada pelos seeders — agora são {{.Count}}."
+    },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "Nenhum seeder tem o torrent inteiro agora — as partes vêm de {{.Count}} peer conectado, e o enxame limita a velocidade.",
+        "other": "Nenhum seeder tem o torrent inteiro agora — as partes vêm de {{.Count}} peers conectados, e o enxame limita a velocidade."
     },
     "resource.status.hint.stalled": "Aguardando os seeders enviarem a parte do arquivo de que você precisa.",
     "resource.status.hint.vaulting": "Este torrent está sendo salvo no Vault — depois ficará disponível mesmo sem seeders.",

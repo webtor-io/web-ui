@@ -472,10 +472,15 @@
     "resource.status.chain.paused": "duraklatıldı",
     "resource.status.chain.cap": "sınır",
     "resource.status.chain.fewSeeders": "az seeder",
+    "resource.status.chain.noSeeders": "seeder yok",
     "resource.status.chain.waitingData": "veri bekleniyor",
     "resource.status.hint.swarm": {
         "one": "Hızı tek seeder sınırlıyor.",
         "other": "Hızı seeder'lar sınırlıyor — şu anda {{.Count}} tane var."
+    },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "Şu anda torrentin tamamına sahip bir seeder yok — parçalar bağlı {{.Count}} eşten geliyor ve hızı sürü sınırlıyor.",
+        "other": "Şu anda torrentin tamamına sahip bir seeder yok — parçalar bağlı {{.Count}} eşten geliyor ve hızı sürü sınırlıyor."
     },
     "resource.status.hint.stalled": "Seeder'ların dosyanın gereken parçasını göndermesi bekleniyor.",
     "resource.status.hint.vaulting": "Bu torrent Vault'a kaydediliyor — sonra seeder olmadan da erişilebilir olacak.",

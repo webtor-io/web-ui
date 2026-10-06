@@ -664,9 +664,15 @@ under the piece bar.
   the reader's pace, the cap, as its own, and swapped the box for "a few
   slow seeders" with every piece: 0 frames of 580 sold past the first minute
   at 95% of the cap, up to 118 switches
-  (`TestViewEnv_ReaderPacedSwarmIsNotSlow`). No seeder
-  and peers — `fewSeeders` counts seeders only — still sells; the owner has
-  not decided that one), pieces nobody has (also with the viewer at the cap:
+  (`TestViewEnv_ReaderPacedSwarmIsNotSlow`). No seeder and some peers
+  count as a few seeders (owner, 2026-10-06; it used to sell: `fewSeeders`
+  counted seeders only): slower than the cap, the leechers' pieces are all
+  there is -- no box, the `swarm` state, "без сидов" on the swarm's link
+  (not "мало сидов" next to "6 пиров") and a hint that names the peers
+  (`resource.status.hint.swarmNoSeeders`; "их сейчас 0" said nothing true);
+  faster than the cap together, the box as before
+  (`TestBuild_NoSeederSwarmSaysThePeers`). Nobody connected at all with
+  bytes still coming -- a web seed -- sells as before: not decided), pieces nobody has (also with the viewer at the cap:
   the file does not finish with a plan either; the pink link stays -- any
   holes, not only wanted ones: the seeder wants the reader's 20 MiB ahead,
   so a hole further on in the same file is not wanted yet; a pack with holes

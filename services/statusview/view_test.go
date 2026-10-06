@@ -116,6 +116,14 @@ func caching(pct float64, seeders int, rate float64) Torrent {
 	return Torrent{State: "caching", Progress: pct, Seeders: seeders, SwarmKnown: true, RateBps: mbpsBytes(rate), Pieces: true}
 }
 
+// leechers is a caching torrent whose swarm is peers and no seeder, with
+// nothing known missing: the leechers' pieces are all it sends.
+func leechers(pct float64, peers int, rate float64) Torrent {
+	t := caching(pct, 0, rate)
+	t.Peers, t.Leechers = peers, peers
+	return t
+}
+
 // holes is a caching torrent whose swarm has 12 peers, no seeder, and 73%
 // of the torrent between them and us: some pieces nobody connected has.
 func holes(state string, pct float64) Torrent {
@@ -750,6 +758,45 @@ func TestBuild_MissingHintPluralsReadForTwentyOne(t *testing.T) {
 	}
 }
 
+// No seeder and slow peers: the swarm is why, as with a few seeders, and the
+// words say who sends -- not "the seeders limit the speed, there are 0 right
+// now", nor "few seeders" next to "6 peers".
+func TestBuild_NoSeederSwarmSaysThePeers(t *testing.T) {
+	v := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: leechers(8, 6, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5})
+	if v.Key != KeySwarm || chain(v) != "Рой 6 пиров [swarm+ 1,2 Мбит/с · без сидов] Кэш 8% [flow+ 1,2 Мбит/с] Вы" {
+		t.Errorf("%s %s", v.Key, chain(v))
+	}
+	if v.Hint != "Раздающих с полной копией сейчас нет — куски идут от 6 пиров на связи, и скорость ограничивает рой." {
+		t.Errorf("hint %q", v.Hint)
+	}
+	if b := badge(v); b != "cyan down+ Кэширование 8% (6 пиров)" {
+		t.Errorf("badge %q", b)
+	}
+	if r := v.Details.Rows[0]; r.Sub != "" {
+		t.Errorf("the details' swarm row counts seeders: %+v", r)
+	}
+	// Faster than the cap: not the swarm's doing.
+	if k := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: leechers(8, 6, 12), Viewer: flowing(4), ClaimCapMbps: 5}).Key; k != KeyActive {
+		t.Errorf("fast peers: %s", k)
+	}
+	for n, want := range map[int]string{1: "от 1 пира", 21: "от 21 пира", 2: "от 2 пиров", 5: "от 5 пиров", 11: "от 11 пиров", 22: "от 22 пиров"} {
+		h := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: leechers(8, n, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5}).Hint
+		if !strings.Contains(h, want+" на связи") {
+			t.Errorf("%d peers: %q", n, h)
+		}
+	}
+	for _, lang := range i18n.SupportedLangs {
+		v := Build(Input{Lang: lang, Loc: loc(lang), Torrent: leechers(8, 6, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5})
+		if v.Key != KeySwarm || !strings.Contains(v.Hint, "6") || strings.Contains(v.Hint, "0") {
+			t.Errorf("%s: %s %q", lang, v.Key, v.Hint)
+		}
+		few := Build(Input{Lang: lang, Loc: loc(lang), Torrent: caching(8, 2, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5})
+		if v.Segs[0].Note == few.Segs[0].Note || v.Hint == few.Hint {
+			t.Errorf("%s: no seeder reads as a few: %q %q", lang, v.Segs[0].Note, v.Hint)
+		}
+	}
+}
+
 // "В рое есть 73% раздачи": the seeder's float32 share, never rounded up.
 func TestBuild_AvailabilityPercent(t *testing.T) {
 	for _, c := range []struct {
@@ -836,6 +883,13 @@ func TestBuild_NoCTA(t *testing.T) {
 		"few seeders standing still, the viewer at the cap": base(caching(40, 2, 0), atCap),
 		// 4.96 reads "5 Mbps", and is still under the cap.
 		"few seeders just under the cap, the viewer at the cap": base(caching(40, 2, 4.96), atCap),
+		// No seeder and peers slower than the cap count as a few seeders
+		// (owner, 2026-10-06): the rest waits for the leechers either way.
+		"no seeder, slow peers, the viewer at the cap":           base(leechers(40, 6, 1.2), atCap),
+		"no seeder, one slow peer, the viewer at the cap":        base(leechers(40, 1, 0.3), atCap),
+		"no seeder, peers standing still, the viewer at the cap": base(leechers(40, 6, 0), atCap),
+		"no seeder, slow peers, the box held":                    base(leechers(40, 6, 1.2), boxHeld),
+
 		"stall":          base(caching(43, 14, 38), stalled),
 		"missing pieces": base(func() Torrent { t := holes("caching", 43); t.ReaderMissing = 1; return t }(), stalled),
 		// Pieces nobody connected has, the viewer at the cap on what is
@@ -857,6 +911,15 @@ func TestBuild_NoCTA(t *testing.T) {
 	// Two seeders faster than the cap: the cap is the brake, and sold.
 	if v := Build(base(caching(40, 2, 12), atCap)); v.Key != KeyTier || v.Plan == nil || v.Plan.Download.Box == nil {
 		t.Errorf("two fast seeders at the cap: %s %+v", v.Key, v.Plan)
+	}
+	// So are peers without a seeder, faster than the cap together.
+	if v := Build(base(leechers(40, 6, 12), atCap)); v.Key != KeyTier || v.Plan == nil || v.Plan.Download.Box == nil {
+		t.Errorf("no seeder, fast peers at the cap: %s %+v", v.Key, v.Plan)
+	}
+	// Nobody connected and the bytes still coming (a web seed): the
+	// decision is about peers, and this one sells as before.
+	if v := Build(base(caching(40, 0, 1.2), atCap)); v.Key != KeyTier || v.Plan == nil || v.Plan.Download.Box == nil {
+		t.Errorf("no seeder and no peer, slow, at the cap: %s %+v", v.Key, v.Plan)
 	}
 	// Only the sale goes there: the viewer's link still says the cap.
 	if v := Build(base(holes("caching", 43), atCap)); v.Segs[1].Tone != "plan" {
@@ -1001,6 +1064,7 @@ func TestBuild_Wording(t *testing.T) {
 	// never what a subscription would or would not do.
 	for _, in := range []Input{
 		{Torrent: caching(8, 2, 1.2), Viewer: flowing(1.2)},
+		{Torrent: leechers(8, 6, 1.2), Viewer: flowing(1.2)},
 		{Torrent: func() Torrent { t := holes("caching", 43); t.ReaderMissing = 1; return t }(), Viewer: stalled},
 		{Torrent: holes("caching", 43), Viewer: zero},
 		{Torrent: holes("vaulting", 58), Viewer: zero},
@@ -1309,6 +1373,11 @@ func TestBuild_English(t *testing.T) {
 	if v.Segs[0].Speed != "1.2\u00a0Mbps" || v.Segs[0].Note != "few seeders" || v.Nodes[0].Value != "2 seeders" {
 		t.Errorf("%q %q %q", v.Segs[0].Speed, v.Segs[0].Note, v.Nodes[0].Value)
 	}
+	v = Build(Input{Lang: "en", Loc: loc("en"), Torrent: leechers(8, 6, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5})
+	if v.Segs[0].Note != "no seeders" || v.Nodes[0].Value != "6 peers" ||
+		v.Hint != "No seeder with the whole torrent right now — the pieces come from 6 connected peers, and the swarm limits the speed." {
+		t.Errorf("no seeder: %q %q %q", v.Segs[0].Note, v.Nodes[0].Value, v.Hint)
+	}
 }
 
 // Every locale renders every state without a raw key leaking through.
@@ -1326,6 +1395,9 @@ func TestBuild_AllLocalesAllStates(t *testing.T) {
 		{Torrent: Torrent{State: "vaulted"}, Viewer: atCap, SizeBytes: gb12},
 		{Torrent: Torrent{State: "vaulted"}, Viewer: zero},
 		{Torrent: caching(8, 2, 1.2), Viewer: flowing(1.2)},
+		{Torrent: leechers(8, 1, 1.2), Viewer: flowing(1.2)},
+		{Torrent: leechers(8, 3, 1.2), Viewer: flowing(1.2)},
+		{Torrent: leechers(8, 6, 1.2), Viewer: flowing(1.2)},
 		{Torrent: caching(43, 3, 38), Viewer: stalled},
 		{Torrent: missing, Viewer: stalled},
 		{Torrent: holes("caching", 43), Viewer: zero},

@@ -523,11 +523,18 @@
     "resource.status.chain.cap": "cap",
     "@resource.status.chain.cap": "Transfer chain: a short note after the speed on the viewer's segment ('5 Mbps · cap') meaning the speed is at the plan's speed limit. One short noun for 'the ceiling', not a hat and not a setting.",
     "resource.status.chain.fewSeeders": "few seeders",
+    "resource.status.chain.noSeeders": "no seeders",
+    "@resource.status.chain.noSeeders": "Transfer chain: the short note after the speed on the swarm's segment ('1.2 Mbps · no seeders') when no seeder is connected and the peers there, each with only part of the torrent, send slower than the plan's cap. Lowercase, as short as 'few seeders' (the note it replaces when there are some).",
     "resource.status.chain.waitingData": "waiting for data",
     "resource.status.hint.swarm": {
         "one": "The only seeder limits the speed.",
         "other": "The seeders limit the speed — there are {{.Count}} right now."
     },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "No seeder with the whole torrent right now — the pieces come from {{.Count}} connected peer, and the swarm limits the speed.",
+        "other": "No seeder with the whole torrent right now — the pieces come from {{.Count}} connected peers, and the swarm limits the speed."
+    },
+    "@resource.status.hint.swarmNoSeeders": "Hint under the transfer status when no seeder is connected and the peers there, each with only part of the torrent, send slower than the viewer's cap: the swarm is the bottleneck. Count = connected peers. State the cause only; never mention a subscription. Where the language's 'one' form also covers 21, 31, 101… (Russian), word it so it reads right for those counts too — no singular pronoun for the peer.",
     "resource.status.hint.stalled": "Waiting for the seeders to send the piece of the file you need.",
     "resource.status.hint.vaulting": "This torrent is being saved to Vault — it will stay available even without seeders.",
     "resource.status.chain.noPieces": "needed pieces missing",

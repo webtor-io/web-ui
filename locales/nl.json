@@ -472,10 +472,15 @@
     "resource.status.chain.paused": "gepauzeerd",
     "resource.status.chain.cap": "limiet",
     "resource.status.chain.fewSeeders": "weinig seeders",
+    "resource.status.chain.noSeeders": "geen seeders",
     "resource.status.chain.waitingData": "wacht op data",
     "resource.status.hint.swarm": {
         "one": "De enige seeder beperkt de snelheid.",
         "other": "De seeders beperken de snelheid — er zijn er nu {{.Count}}."
+    },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "Er is nu geen seeder met de hele torrent — de stukken komen van {{.Count}} verbonden peer, en de swarm beperkt de snelheid.",
+        "other": "Er is nu geen seeder met de hele torrent — de stukken komen van {{.Count}} verbonden peers, en de swarm beperkt de snelheid."
     },
     "resource.status.hint.stalled": "We wachten tot de seeders het benodigde stuk van het bestand sturen.",
     "resource.status.hint.vaulting": "Deze torrent wordt in Vault opgeslagen — daarna blijft hij ook zonder seeders beschikbaar.",

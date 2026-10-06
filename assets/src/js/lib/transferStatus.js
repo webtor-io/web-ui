@@ -213,7 +213,8 @@ export function playerLabel(view, env = {}) {
 // from "the status has ruled this wait is someone else's" -- and there
 // statusview refuses to sell on purpose (key: a few seeders slower than the
 // cap, "selling one there quotes a wait it cannot keep"). The causes:
-//   swarm          a few seeders slower than the cap -- a plan would not help
+//   swarm          a few seeders (or none, and peers) slower than the cap --
+//                  a plan would not help
 //   noseed         no seeders
 //   missing        the viewer waits on a piece nobody connected has
 //   missing_idle   nothing moves, and pieces nobody has are why

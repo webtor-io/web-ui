@@ -478,12 +478,19 @@
     "resource.status.chain.paused": "pauza",
     "resource.status.chain.cap": "limit",
     "resource.status.chain.fewSeeders": "mało seedów",
+    "resource.status.chain.noSeeders": "brak seedów",
     "resource.status.chain.waitingData": "czeka na dane",
     "resource.status.hint.swarm": {
         "one": "Prędkość ogranicza jedyny seed.",
         "few": "Prędkość ograniczają seedy — jest ich teraz {{.Count}}.",
         "many": "Prędkość ograniczają seedy — jest ich teraz {{.Count}}.",
         "other": "Prędkość ograniczają seedy — jest ich teraz {{.Count}}."
+    },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonego peera, a prędkość ogranicza rój.",
+        "few": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonych peerów, a prędkość ogranicza rój.",
+        "many": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonych peerów, a prędkość ogranicza rój.",
+        "other": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonego peera, a prędkość ogranicza rój."
     },
     "resource.status.hint.stalled": "Czekamy, aż seedy wyślą potrzebny fragment pliku.",
     "resource.status.hint.vaulting": "Torrent zapisuje się w Vault — potem będzie dostępny nawet bez seedów.",

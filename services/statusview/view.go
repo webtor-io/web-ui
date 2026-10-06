@@ -89,6 +89,7 @@ const nameVault = "Vault"
 
 // fewSeeders: at most this many seeders and a swarm slower than the cap, the
 // swarm is what the transfer is waiting for — a plan would not speed it up.
+// No seeder and peers count the same (swarmBound).
 const fewSeeders = 3
 
 // View is everything the page draws for the transfer status.
@@ -567,9 +568,10 @@ func key(t Torrent, v Viewer, capMbps float64, swarmMoves bool) string {
 			return KeyChecking
 		case t.NoSeeders:
 			return KeyNoSeed
-		// A few slow seeders and the viewer at the cap anyway: they read
-		// what is cached already, and the rest waits for the swarm with or
-		// without a plan -- selling one there quotes a wait it cannot keep.
+		// A few slow seeders (or none, and peers) and the viewer at the
+		// cap anyway: they read what is cached already, and the rest
+		// waits for the swarm with or without a plan -- selling one there
+		// quotes a wait it cannot keep.
 		// Pieces nobody connected has, the same: the file does not finish
 		// with a plan either (the pink link still says the cap). Any holes,
 		// not only wanted ones: the seeder wants just the reader's 20 MiB
@@ -651,12 +653,14 @@ func missingHere(t Torrent) bool {
 }
 
 // swarmBound: a few seeders and a swarm slower than the cap — the swarm is
-// the bottleneck, and no plan would help. A still one too (past its hold,
-// Input.HeldBps): the viewer reads what is cached, and a swarm whose speed
-// is not known is not a fast one. Against the rate itself, not its label:
-// 4.96 reads "5", and is under a cap of 5.
+// the bottleneck, and no plan would help. No seeder and some peers count as
+// a few seeders (owner, 2026-10-06): the leechers' pieces are all there is,
+// and only a swarm of them faster than the cap sells the plan. A still one
+// too (past its hold, Input.HeldBps): the viewer reads what is cached, and a
+// swarm whose speed is not known is not a fast one. Against the rate itself,
+// not its label: 4.96 reads "5", and is under a cap of 5.
 func swarmBound(t Torrent, capMbps float64) bool {
-	if t.Seeders < 1 || t.Seeders > fewSeeders {
+	if t.Seeders > fewSeeders || (t.Seeders < 1 && t.Peers < 1) {
 		return false
 	}
 	return capMbps <= 0 || BytesToMbps(t.RateBps) < capMbps
@@ -846,6 +850,9 @@ func (b *builder) swarmSeg() Seg {
 	case b.key == KeySwarm:
 		flow("swarm")
 		s.Note = b.t("resource.status.chain.fewSeeders")
+		if t.Seeders < 1 {
+			s.Note = b.t("resource.status.chain.noSeeders")
+		}
 	case b.key == KeyPaused || t.Paused:
 		s.Tone, s.Speed = "pause", b.t("resource.status.chain.paused")
 	default:
@@ -977,6 +984,9 @@ func (b *builder) hint() string {
 	t := b.in.Torrent
 	missing := map[string]any{"Pct": availPct(t.Availability)}
 	switch {
+	case b.key == KeySwarm && t.Seeders < 1:
+		// "There are 0 right now" said nothing true about who sends.
+		return b.tn("resource.status.hint.swarmNoSeeders", t.Peers)
 	case b.key == KeySwarm:
 		return b.tn("resource.status.hint.swarm", t.Seeders)
 	case b.key == KeyStalled:

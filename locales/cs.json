@@ -478,12 +478,19 @@
     "resource.status.chain.paused": "pozastaveno",
     "resource.status.chain.cap": "strop",
     "resource.status.chain.fewSeeders": "málo seederů",
+    "resource.status.chain.noSeeders": "bez seederů",
     "resource.status.chain.waitingData": "čeká na data",
     "resource.status.hint.swarm": {
         "one": "Rychlost omezuje jediný seeder.",
         "few": "Rychlost omezují seedeři — teď jsou {{.Count}}.",
         "many": "Rychlost omezují seedeři — teď jich je {{.Count}}.",
         "other": "Rychlost omezují seedeři — teď jich je {{.Count}}."
+    },
+    "resource.status.hint.swarmNoSeeders": {
+        "one": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojeného peera a rychlost omezuje roj.",
+        "few": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojených peerů a rychlost omezuje roj.",
+        "many": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojeného peera a rychlost omezuje roj.",
+        "other": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojených peerů a rychlost omezuje roj."
     },
     "resource.status.hint.stalled": "Čekáme, až seedeři pošlou potřebnou část souboru.",
     "resource.status.hint.vaulting": "Torrent se ukládá do Vaultu — pak bude dostupný i bez seederů.",
