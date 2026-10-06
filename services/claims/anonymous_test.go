@@ -3,10 +3,19 @@ package claims
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	uuid "github.com/satori/go.uuid"
 	proto "github.com/webtor-io/claims-provider/proto"
+	cs "github.com/webtor-io/common-services"
 	"google.golang.org/grpc"
+
+	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/auth"
 )
 
 type fakeProvider struct {
@@ -22,7 +31,7 @@ func withProvider(p proto.ClaimsProviderClient) *Claims {
 	cl := &Client{}
 	cl.once.Do(func() {})
 	cl.cl = p
-	return New(nil, cl, nil)
+	return New(nil, cl, &cs.PG{}) // Postgres not configured: no tier write-back
 }
 
 func freeTier() *proto.GetResponse {
@@ -64,18 +73,56 @@ func TestAnonymousClaimsOutliveAProviderOutage(t *testing.T) {
 	}
 }
 
-// The anonymous answer is for anonymous visitors only: a signed-in user's
-// tier is theirs, and handing them the free one would take away what they pay
-// for without a word.
-func TestSignedInClaimsDoNotFallBackToAnonymous(t *testing.T) {
+// The same outage through the middleware every page passes. An anonymous
+// page goes on to its handler; a signed-in one stops at the error, which
+// services/web answers 503 ("failed to get claims", user_error.go) -- it is
+// not handed the free tier and the anonymous page: that would take away what
+// they pay for without a word.
+func TestMiddlewareDuringProviderOutage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 	p := &fakeProvider{resp: freeTier()}
 	s := withProvider(p)
-	if _, err := s.Get(&Request{}); err != nil {
-		t.Fatal(err)
+	signedIn := &models.User{UserID: uuid.NewV4(), Email: "paid@example.com", Tier: "free"}
+
+	var reached bool
+	var errs []*gin.Error
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		errs = c.Errors
+	})
+	r.Use(func(c *gin.Context) {
+		if c.Query("as") == "user" {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), auth.UserContext{}, signedIn))
+		}
+	})
+	s.RegisterHandler(r)
+	r.GET("/", func(c *gin.Context) {
+		reached = true
+		c.Status(http.StatusOK)
+	})
+	get := func(target string) int {
+		reached, errs = false, nil
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, target, nil))
+		return w.Code
+	}
+
+	if code := get("/"); code != http.StatusOK || !reached {
+		t.Fatalf("provider up: anonymous page answered %d", code)
 	}
 
 	p.resp, p.err = nil, errDown
-	if d, err := s.Get(&Request{Email: "paid@example.com"}); err == nil {
-		t.Fatalf("signed-in user got %v while the provider was down", d)
+	s.LazyMap.Drop(cacheKey(&Request{})) // the minute is up
+	// No error page in this chain: an abort shows as an error, not a status.
+	if get("/"); !reached || len(errs) != 0 {
+		t.Errorf("provider down: the anonymous page did not run (errors %v)", errs)
+	}
+	get("/?as=user")
+	if reached {
+		t.Error("provider down: the signed-in page ran without its own claims")
+	}
+	if len(errs) == 0 || !strings.Contains(errs[0].Error(), "failed to get claims") {
+		t.Errorf("provider down: signed-in errors %v, want failed to get claims", errs)
 	}
 }
