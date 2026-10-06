@@ -487,10 +487,10 @@
         "other": "Rychlost omezují seedeři — teď jich je {{.Count}}."
     },
     "resource.status.hint.swarmNoSeeders": {
-        "one": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojeného peera a rychlost omezuje roj.",
-        "few": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojených peerů a rychlost omezuje roj.",
-        "many": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojeného peera a rychlost omezuje roj.",
-        "other": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojených peerů a rychlost omezuje roj."
+        "one": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojeného peera a rychlost je omezena rojem.",
+        "few": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojených peerů a rychlost je omezena rojem.",
+        "many": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojeného peera a rychlost je omezena rojem.",
+        "other": "Teď není připojený žádný seeder s celým torrentem — části přicházejí od {{.Count}} připojených peerů a rychlost je omezena rojem."
     },
     "resource.status.hint.stalled": "Čekáme, až seedeři pošlou potřebnou část souboru.",
     "resource.status.hint.vaulting": "Torrent se ukládá do Vaultu — pak bude dostupný i bez seederů.",

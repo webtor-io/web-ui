@@ -766,7 +766,7 @@ func TestBuild_NoSeederSwarmSaysThePeers(t *testing.T) {
 	if v.Key != KeySwarm || chain(v) != "Рой 6 пиров [swarm+ 1,2 Мбит/с · без сидов] Кэш 8% [flow+ 1,2 Мбит/с] Вы" {
 		t.Errorf("%s %s", v.Key, chain(v))
 	}
-	if v.Hint != "Раздающих с полной копией сейчас нет — куски идут от 6 пиров на связи, и скорость ограничивает рой." {
+	if v.Hint != "Раздающих с полной копией сейчас нет — куски идут от 6 пиров на связи, и скорость ограничена роем." {
 		t.Errorf("hint %q", v.Hint)
 	}
 	if b := badge(v); b != "cyan down+ Кэширование 8% (6 пиров)" {
@@ -778,6 +778,11 @@ func TestBuild_NoSeederSwarmSaysThePeers(t *testing.T) {
 	// Faster than the cap: not the swarm's doing.
 	if k := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: leechers(8, 6, 12), Viewer: flowing(4), ClaimCapMbps: 5}).Key; k != KeyActive {
 		t.Errorf("fast peers: %s", k)
+	}
+	// No cap (an unlimited plan): nothing to call the peers slow against,
+	// as before the owner's rule -- not "the swarm limits the speed".
+	if k := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: leechers(8, 400, 200), Viewer: Viewer{Known: true, Present: true, Mbps: 80}}).Key; k != KeyActive {
+		t.Errorf("no cap, fast peers: %s", k)
 	}
 	for n, want := range map[int]string{1: "от 1 пира", 21: "от 21 пира", 2: "от 2 пиров", 5: "от 5 пиров", 11: "от 11 пиров", 22: "от 22 пиров"} {
 		h := Build(Input{Lang: "ru", Loc: loc("ru"), Torrent: leechers(8, n, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5}).Hint
@@ -793,6 +798,13 @@ func TestBuild_NoSeederSwarmSaysThePeers(t *testing.T) {
 		few := Build(Input{Lang: lang, Loc: loc(lang), Torrent: caching(8, 2, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5})
 		if v.Segs[0].Note == few.Segs[0].Note || v.Hint == few.Hint {
 			t.Errorf("%s: no seeder reads as a few: %q %q", lang, v.Segs[0].Note, v.Hint)
+		}
+	}
+	// "a prędkość ogranicza rój", "a rychlost omezuje roj": the plain word
+	// order reads "the speed limits the swarm" -- the swarm is the agent.
+	for lang, end := range map[string]string{"pl": ", a to rój ogranicza prędkość.", "cs": " a rychlost je omezena rojem."} {
+		if h := Build(Input{Lang: lang, Loc: loc(lang), Torrent: leechers(8, 6, 1.2), Viewer: flowing(1.2), ClaimCapMbps: 5}).Hint; !strings.HasSuffix(h, end) {
+			t.Errorf("%s: %q", lang, h)
 		}
 	}
 }

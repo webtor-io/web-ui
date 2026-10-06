@@ -671,7 +671,12 @@ under the piece bar.
   (not "мало сидов" next to "6 пиров") and a hint that names the peers
   (`resource.status.hint.swarmNoSeeders`; "их сейчас 0" said nothing true);
   faster than the cap together, the box as before
-  (`TestBuild_NoSeederSwarmSaysThePeers`). Nobody connected at all with
+  (`TestBuild_NoSeederSwarmSaysThePeers`). Only against a cap: without one
+  (an unlimited plan) there is nothing to call the peers slow against, and
+  no seeder reads `active` as before, not "the swarm limits the speed" to a
+  viewer reading 80 Mbps off peers sending 200. A viewer under a cap on a
+  slow swarm of peers reads `swarm` now, not `active` -- as with a few slow
+  seeders; the owner has not decided that one. Nobody connected at all with
   bytes still coming -- a web seed -- sells as before: not decided), pieces nobody has (also with the viewer at the cap:
   the file does not finish with a plan either; the pink link stays -- any
   holes, not only wanted ones: the seeder wants the reader's 20 MiB ahead,

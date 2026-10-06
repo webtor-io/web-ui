@@ -534,7 +534,7 @@
         "one": "No seeder with the whole torrent right now — the pieces come from {{.Count}} connected peer, and the swarm limits the speed.",
         "other": "No seeder with the whole torrent right now — the pieces come from {{.Count}} connected peers, and the swarm limits the speed."
     },
-    "@resource.status.hint.swarmNoSeeders": "Hint under the transfer status when no seeder is connected and the peers there, each with only part of the torrent, send slower than the viewer's cap: the swarm is the bottleneck. Count = connected peers. State the cause only; never mention a subscription. Where the language's 'one' form also covers 21, 31, 101… (Russian), word it so it reads right for those counts too — no singular pronoun for the peer.",
+    "@resource.status.hint.swarmNoSeeders": "Hint under the transfer status when no seeder is connected and the peers there, each with only part of the torrent, send slower than the viewer's cap: the swarm is the bottleneck. Count = connected peers. State the cause only; never mention a subscription. Where the language's 'one' form also covers 21, 31, 101… (Russian), word it so it reads right for those counts too — no singular pronoun for the peer. The swarm limits the speed, never the other way round: where 'speed' and 'swarm' read alike as subject and object (Russian, Polish, Czech), make the swarm the agent outright — a passive ('ограничена роем') or the swarm first.",
     "resource.status.hint.stalled": "Waiting for the seeders to send the piece of the file you need.",
     "resource.status.hint.vaulting": "This torrent is being saved to Vault — it will stay available even without seeders.",
     "resource.status.chain.noPieces": "needed pieces missing",

@@ -655,12 +655,15 @@ func missingHere(t Torrent) bool {
 // swarmBound: a few seeders and a swarm slower than the cap — the swarm is
 // the bottleneck, and no plan would help. No seeder and some peers count as
 // a few seeders (owner, 2026-10-06): the leechers' pieces are all there is,
-// and only a swarm of them faster than the cap sells the plan. A still one
-// too (past its hold, Input.HeldBps): the viewer reads what is cached, and a
-// swarm whose speed is not known is not a fast one. Against the rate itself,
-// not its label: 4.96 reads "5", and is under a cap of 5.
+// and only a swarm of them faster than the cap sells the plan. Only against
+// a cap: the decision was about a viewer at one, and without one there is
+// no speed to call the peers slow against -- 400 peers at 200 Mbps would
+// read "the swarm limits the speed" to an unlimited plan reading 80. A still
+// one too (past its hold, Input.HeldBps): the viewer reads what is cached,
+// and a swarm whose speed is not known is not a fast one. Against the rate
+// itself, not its label: 4.96 reads "5", and is under a cap of 5.
 func swarmBound(t Torrent, capMbps float64) bool {
-	if t.Seeders > fewSeeders || (t.Seeders < 1 && t.Peers < 1) {
+	if t.Seeders > fewSeeders || (t.Seeders < 1 && (t.Peers < 1 || capMbps <= 0)) {
 		return false
 	}
 	return capMbps <= 0 || BytesToMbps(t.RateBps) < capMbps

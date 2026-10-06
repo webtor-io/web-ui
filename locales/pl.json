@@ -487,10 +487,10 @@
         "other": "Prędkość ograniczają seedy — jest ich teraz {{.Count}}."
     },
     "resource.status.hint.swarmNoSeeders": {
-        "one": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonego peera, a prędkość ogranicza rój.",
-        "few": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonych peerów, a prędkość ogranicza rój.",
-        "many": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonych peerów, a prędkość ogranicza rój.",
-        "other": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonego peera, a prędkość ogranicza rój."
+        "one": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonego peera, a to rój ogranicza prędkość.",
+        "few": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonych peerów, a to rój ogranicza prędkość.",
+        "many": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonych peerów, a to rój ogranicza prędkość.",
+        "other": "Nie ma teraz seeda z całym torrentem — fragmenty przychodzą od {{.Count}} połączonego peera, a to rój ogranicza prędkość."
     },
     "resource.status.hint.stalled": "Czekamy, aż seedy wyślą potrzebny fragment pliku.",
     "resource.status.hint.vaulting": "Torrent zapisuje się w Vault — potem będzie dostępny nawet bez seedów.",
