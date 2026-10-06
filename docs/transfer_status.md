@@ -49,10 +49,10 @@ cached yet (`idle_torrent`) with a request of the viewer's open: "Cache ▸
 You" with no word next to the cache — "waiting" there read as nobody being
 around, right next to "You", and a "0%" is not backed once the seeder's
 stats are gone (an unloaded torrent is idle too). A wait for data there (a
-request open, nothing for 5 s) is the swarm's: before the first verified
-piece nothing cached could keep the viewer waiting, so it is `stalled` —
-"Swarm ▸ Cache ▸ You" and the stall's hint, as one piece in (a slow swarm's
-first 8 MiB piece at 1.2 Mbps takes ~53 s; `TestBuild_IdleWaitIsTheSwarms`).
+request open, nothing for 5 s) is the swarm's: before its first byte
+nothing cached could keep the viewer waiting, so it is `stalled` —
+"Swarm ▸ Cache ▸ You" and the stall's hint, as one piece in
+(`TestBuild_IdleWaitIsTheSwarms`).
 Phone caption "cache"; `Node.Kind` `cache`. When nothing moves the page shows the badge it had before the chain
 (git 5d55b26e: "Caching paused 43% (14 seeders)", "No seeders · 43%", "In
 cache"…; two as the approved design draws them: "checking" cyan, "In Vault"
@@ -79,15 +79,20 @@ after the approval.
 held: `statusview.Hold` — one per status stream (`viewEnv.hold`) — keeps it
 on the chain for `HoldFor` (10 s) after it last moved — or, once the gap
 between its last two moves is known and longer, for half as long again as
-that gap, at most a minute (`maxHold`): a slow swarm's big pieces (1.2 Mbps
-verifies a 4 MiB piece every ~27 s) handed the chain to the badge for the
-rest of every gap, 23 switches in 300 s (46 for 2 MiB, 11 for 8 MiB), and
-now only its first gap, before the second piece says how long one is, shows
-the badge (`TestHold_SlowSwarmStaysOnTheChain`; a stop after such a swarm
-reaches the badge that much later). The gap is measured from a still call
-to the next move: the loop calls the hold more than once on one piece (its
-frame, a tick, a thp event within `movingFor`), and the second call of a
-piece measured "a gap" of a fraction of a second -- back to `HoldFor`. A
+that gap, at most a minute (`maxHold`): a slow swarm's jumps (1.2 Mbps
+arriving as 4 MiB every ~27 s, d9c5791e) handed the chain to the badge for
+the rest of every gap, 23 switches in 300 s (46 for 2 MiB jumps, 11 for
+8 MiB), and now only its first gap, before the second jump says how long
+one is, shows the badge (`TestHold_SlowSwarmStaysOnTheChain`; a stop after
+such a swarm reaches the badge that much later). The jumps were taken for
+the seeder verifying whole pieces, and they are not that: the page asks the
+seeder for the torrent's root, whose Completed is `t.BytesCompleted`, the
+unverified chunks of a piece included (torrent-web-seeder `torrentStat`).
+Where the jumps come from is not established (2026-10-06); the hold and
+`gapRate` stay, they answer what was seen. The gap is measured from a still
+call to the next move: the loop calls the hold more than once on one jump
+(its frame, a tick, a thp event within `movingFor`), and the second call of
+a jump measured "a gap" of a fraction of a second -- back to `HoldFor`. A
 swarm that moves in every call for longer than `HoldFor` has no gap any
 more: a fast one's frame comes every second and the tick within
 `movingFor` of it, so no call saw it still, and the gap from its last pause
@@ -97,7 +102,7 @@ five minutes of moving, its stop kept the chain for a minute
 moved**: its last speed, the sweep, and the key that went with it
 (`Input.HeldBps`) — never a pause, a dash or a badge key's hint on the chain;
 the paused, missing and idle stories are the badge's, told once the hold is
-over. The swarm *moves* while its pieces arrive: the loop gives the view a
+over. The swarm *moves* while its bytes arrive: the loop gives the view a
 rate only within `movingFor` (0.5 s) of Completed growing
 (`TorrentStatus.swarmStill`). Judged by the smoothed rate instead, a 38 Mbps
 swarm "moved" for 13 s after its last byte (the rate decays by 0.6 a tick)
@@ -643,10 +648,10 @@ under the piece bar.
   what is cached, the rest waits for the swarm with or without a plan; so do a
   few seeders standing still past the swarm's hold — a speed not known is not
   a fast one — and the rate is compared as it is, not as its label rounds it:
-  4.96 reads "5" and is under a cap of 5; `statusview.swarmBound`. A piece
+  4.96 reads "5" and is under a cap of 5; `statusview.swarmBound`. A jump
   that comes after more than 2 s the swarm spent fetching moves at what came
   over that time (`statsWatch.gapRate`, `pieceGap`), not at the meter's take
-  on its one second: two seeders verifying 4 MiB every 27 s read 13–22 Mbps
+  on its one second: two seeders sending 4 MiB every 27 s read 13–22 Mbps
   for the whole hold, over the cap, and sold the plan in 578 of 622 frames
   (`TestViewEnv_SlowSwarmIsNotFasterThanItsPieces`). Fetching is a piece
   wanted in the seeder's frames (`statsWatch.wantedSince`): the seeder

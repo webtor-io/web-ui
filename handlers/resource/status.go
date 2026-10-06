@@ -59,8 +59,8 @@ type TorrentStatus struct {
 	// smoothed (services/ratemeter) from the seeder's Completed counter.
 	// Zero when unknown or when nothing is moving.
 	Rate float64 `json:"-"`
-	// Paused: caching, but nothing is being fetched — no verified bytes
-	// arrived for pausedAfter and no piece is queued. The seeder downloads
+	// Paused: caching, but nothing is being fetched — Completed did not
+	// grow for pausedAfter and no piece is queued. The seeder downloads
 	// on demand, so this means "nobody is streaming this right now", not
 	// "stuck"; the badge turns amber with a pause glyph to say so.
 	Paused bool `json:"-"`
@@ -117,12 +117,13 @@ type TorrentStatus struct {
 // movingFor: the swarm moves while its bytes arrive -- Completed grew at most
 // this long ago, which is the status sent on the stats event itself (and a
 // tick close enough to it that the rate meter has not re-sampled: it waits
-// half a second between samples). The seeder's counter grows a verified
-// piece at a time, so between two pieces nothing arrives for a while; the
-// view's hold (statusview.Hold) keeps the swarm on the chain as it last
-// moved through such a gap, for HoldFor from its last piece -- or half as
-// long again as its gap between pieces when that is longer, up to a minute
-// (statusview maxHold). Judged by the
+// half a second between samples). The counter takes chunks as they arrive
+// (statsWatch.frame), yet a slow swarm's grew in jumps with seconds of
+// nothing between them -- 4 MiB every 27 s (d9c5791e), from what is not
+// established; the view's hold (statusview.Hold) keeps the swarm on the
+// chain as it last moved through such a gap, for HoldFor from its last
+// jump -- or half as long again as its gap between jumps when that is
+// longer, up to a minute (statusview maxHold). Judged by the
 // smoothed rate instead, the swarm "moved" for 13 s after its last byte at
 // 38 Mbps (the rate decays by 0.6 a tick), and the hold came on top of that:
 // the badge 14-22 s after the last byte, and a chain showing a pause or a
@@ -130,7 +131,7 @@ type TorrentStatus struct {
 const movingFor = 500 * time.Millisecond
 
 // pieceGap: Completed growing again after a longer wait, a piece wanted all
-// along, is a piece after a gap, and its rate is what came over the gap
+// along, is a jump after a gap, and its rate is what came over the gap
 // (statsWatch.gapRate), not the meter's take on one second; the seeder's
 // frames come about every second.
 const pieceGap = 2 * time.Second

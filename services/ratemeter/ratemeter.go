@@ -1,12 +1,12 @@
 // Package ratemeter turns a monotonically growing byte counter sampled at
 // irregular moments into a smoothed bytes-per-second figure.
 //
-// The seeder reports Completed (verified bytes) about once a second; the
-// difference between two samples is the swarm's useful throughput over that
-// interval. Raw deltas jump with piece boundaries (a 4 MiB piece completing in
-// one tick reads as 4 MB/s, the next tick as 0), so the meter keeps an
-// exponential moving average — what every torrent client shows as "download
-// speed".
+// The seeder reports Completed (its bytes of the torrent, unverified chunks
+// included) about once a second; the difference between two samples is the
+// swarm's useful throughput over that interval. Raw deltas jump from tick to
+// tick (a slow swarm's 4 MiB in one tick and nothing for seconds after it),
+// so the meter keeps an exponential moving average — what every torrent
+// client shows as "download speed".
 package ratemeter
 
 import "time"

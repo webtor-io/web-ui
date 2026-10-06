@@ -617,9 +617,8 @@ func key(t Torrent, v Viewer, capMbps float64, swarmMoves bool) string {
 			return KeyMissing
 		case !present && missingHere(t) && !t.Settling:
 			return KeyMissingIdle
-		// Waiting before the first verified piece: nothing cached could
-		// keep them, the swarm does (a slow one's first piece takes a
-		// minute).
+		// Waiting before the swarm's first byte: nothing cached could
+		// keep them, the swarm does.
 		case waiting:
 			return KeyStalled
 		}
