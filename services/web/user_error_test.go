@@ -245,3 +245,18 @@ func TestHashLengthMessageInEveryLocale(t *testing.T) {
 		}
 	}
 }
+
+// What a signed-in request stops at while a dependency is down -- the claims
+// middleware and the self-hosted admin lookup -- reaches the browser as 503,
+// retry-able, never as the anonymous page.
+func TestClassifyError_DependencyOutageIs503(t *testing.T) {
+	for _, msg := range []string{
+		"failed to get claims: rpc error: code = Internal desc = failed to get claims by email",
+		"failed to create user: EOF",
+	} {
+		key := ClassifyError(errors.New(msg))
+		if code := StatusForErrKey(key); code != http.StatusServiceUnavailable {
+			t.Errorf("%q: %s, %d, want 503", msg, key, code)
+		}
+	}
+}
