@@ -780,7 +780,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 			// counts is the lower bound over the whole call.
 			var hit bool
 			quickStart := time.Now()
-			if _, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, warmupSize, tailWarmupBytes, warmupSize, true); err != nil {
+			if _, hit, err = s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, warmupSize, tailWarmupBytes, warmupSize, true, log.Fields{"phase": "quick"}); err != nil {
 				return
 			}
 			quickElapsed = time.Since(quickStart)
@@ -903,7 +903,7 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 					if fullMeasureSize <= skipBytes {
 						skipBytes = 0
 					}
-					measured, hit, werr := s.warmUp(fullCtx, j, s.t("job.checkingBandwidth"), statsURL, fileSize, fullMeasureSize, tailWarmupBytes, skipBytes, true)
+					measured, hit, werr := s.warmUp(fullCtx, j, s.t("job.checkingBandwidth"), statsURL, fileSize, fullMeasureSize, tailWarmupBytes, skipBytes, true, log.Fields{"phase": "full", "bitrate": fileRate, "lower_bound": downloadSpeed})
 					fullCancel()
 					if werr != nil {
 						return werr
@@ -1172,7 +1172,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		fileSize := int(resp.Source.Size)
 		// Silent fast-path: warmUp opens Stats and short-circuits on its own
 		// when the pod already holds the head pieces — no separate probe call.
-		if _, _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, downloadHeadWarmup, 0, 0, true); err != nil {
+		if _, _, err := s.warmUp(ctx, j, s.t("job.warmingUp"), statsURL, fileSize, downloadHeadWarmup, 0, 0, true, log.Fields{"phase": "download"}); err != nil {
 			return err
 		}
 	}
@@ -1267,7 +1267,9 @@ func piecesCoverRange(ev api.EventData, fileSize, head, tail int) bool {
 	return true
 }
 
-func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su string, size int, limitStart int, limitEnd int, skipBytes int, useStatus bool) (downloadSpeed float64, cached bool, err error) {
+// warmUp's trace goes into its "warmup measured" line: the phase, and what
+// the caller knows that warmUp does not (the bitrate, the lower bound).
+func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su string, size int, limitStart int, limitEnd int, skipBytes int, useStatus bool, trace log.Fields) (downloadSpeed float64, cached bool, err error) {
 	if limitStart > size {
 		limitStart = size
 	}
@@ -1349,12 +1351,13 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	//
 	// The verdicts and the speed the gate reads stay on the verified
 	// counter. have/span (a seeder since 2026-10) drive what the viewer
-	// reads: the line's percent and the no-peers card's "received".
+	// reads -- the line's percent and the no-peers card's "received" -- and
+	// a shadow speed in the "warmup measured" line, until its numbers say
+	// whether the gate should read it (docs/warmup.md).
 	var (
 		head, tail         warmStream
 		headEventsReceived atomic.Bool
-		measureStartNs     atomic.Int64
-		measureStartBytes  atomic.Int64
+		verified, have     speedLatch
 	)
 	totalDownloaded := func() int64 {
 		return head.verified.Load() + tail.verified.Load()
@@ -1378,19 +1381,13 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 		}
 		return totalDownloaded(), warmupTarget
 	}
-	// updateMeasure latches the speed-measurement window once total
-	// downloaded crosses skipBytes — same slow-start skip the old
-	// io.Copy-based path used, just driven off the SSE counter.
+	// updateMeasure latches the speed-measurement windows once their
+	// counters cross skipBytes — same slow-start skip the old
+	// io.Copy-based path used, just driven off the SSE counters.
 	updateMeasure := func() {
-		if measureStartNs.Load() != 0 {
-			return
-		}
-		total := totalDownloaded()
-		if total < int64(skipBytes) {
-			return
-		}
-		if measureStartNs.CompareAndSwap(0, time.Now().UnixNano()) {
-			measureStartBytes.Store(total)
+		verified.update(totalDownloaded(), int64(skipBytes))
+		if h, _, ok := haveSpan(); ok {
+			have.update(h, int64(skipBytes))
 		}
 	}
 
@@ -1568,7 +1565,50 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			}
 		}()
 	}
+	var (
+		closedAt time.Time
+		cut      error
+	)
+	// One line per warm-up that got as far as its streams, whatever the
+	// verdict: the verified and the chunk-level speeds side by side, the
+	// numbers phase 2b of docs/warmup.md waits for.
+	defer func() {
+		if cached {
+			return // the empty-SSE hit has its own line, and nothing measured
+		}
+		outcome := "done"
+		var npe *NoPeersError
+		switch {
+		case errors.As(err, &npe):
+			outcome = npe.Reason
+		case cut != nil:
+			outcome = "cut" // the hard deadline, or the caller gone
+		}
+		h, sp, _ := haveSpan()
+		data := totalDownloaded()
+		f := log.Fields{
+			"job":            j.ID,
+			"outcome":        outcome,
+			"elapsed":        closedAt.Sub(warmupStart),
+			"target":         warmupTarget,
+			"span":           sp,
+			"data":           data,
+			"have":           h,
+			"data0":          verified.start(),
+			"have0":          have.start(),
+			"speed_verified": verified.speed(data, warmupStart, closedAt),
+			"speed_have":     have.speed(h, warmupStart, closedAt),
+		}
+		// hash_wait: from the moment every covering piece had arrived to
+		// the close, which waits for them to pass the hash check.
+		hf, tf := head.fullNs.Load(), tail.fullNs.Load()
+		if cut == nil && (limitStart <= 0 || hf > 0) && (limitEnd <= 0 || tf > 0) && max(hf, tf) > 0 {
+			f["hash_wait"] = closedAt.Sub(time.Unix(0, max(hf, tf)))
+		}
+		log.WithFields(trace).WithFields(f).Info("warmup measured")
+	}()
 	wg.Wait()
+	closedAt, cut = time.Now(), warmupCtx.Err()
 
 	if noPeersFlag.Load() {
 		reason, _ := noPeersReason.Load().(string)
@@ -1597,21 +1637,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	}
 
 	final := totalDownloaded()
-	if start := measureStartNs.Load(); start != 0 {
-		measured := final - measureStartBytes.Load()
-		elapsed := time.Since(time.Unix(0, start))
-		if elapsed > 0 && measured > 0 {
-			downloadSpeed = float64(measured) / elapsed.Seconds()
-		}
-	} else if final > 0 {
-		// Hard deadline hit before measurement window opened — rough estimate
-		// over the whole warmup span so the bandwidth-check has *some* number
-		// to classify against.
-		elapsed := time.Since(warmupStart)
-		if elapsed > 0 {
-			downloadSpeed = float64(final) / elapsed.Seconds()
-		}
-	}
+	downloadSpeed = verified.speed(final, warmupStart, closedAt)
 
 	if errors.Is(warmupCtx.Err(), context.DeadlineExceeded) {
 		// Hard warmup timeout. If we didn't even reach the measurement window
@@ -1957,6 +1983,9 @@ func Action(tb template.Builder[*web.Context], api *api.Api, i18nSvc *i18n.Servi
 // a seeder that does not send them.
 type warmStream struct {
 	verified, have, span atomic.Int64
+	// fullNs is when have first reached span: every covering piece here,
+	// the close waiting only on their hash checks.
+	fullNs atomic.Int64
 }
 
 func (w *warmStream) take(ev api.WarmupEvent) {
@@ -1966,6 +1995,47 @@ func (w *warmStream) take(ev api.WarmupEvent) {
 	}
 	w.have.Store(ev.Have)
 	w.span.Store(ev.Span)
+	if ev.Have >= ev.Span {
+		w.fullNs.CompareAndSwap(0, time.Now().UnixNano())
+	}
+}
+
+// speedLatch measures a warm-up counter's speed from the moment it first
+// reaches skip bytes, the slow start left out.
+type speedLatch struct {
+	ns, bytes atomic.Int64
+}
+
+func (l *speedLatch) update(total, skip int64) {
+	if l.ns.Load() != 0 || total < skip {
+		return
+	}
+	if l.ns.CompareAndSwap(0, time.Now().UnixNano()) {
+		l.bytes.Store(total)
+	}
+}
+
+// start is the counter where the window opened, -1 while it has not.
+func (l *speedLatch) start() int64 {
+	if l.ns.Load() == 0 {
+		return -1
+	}
+	return l.bytes.Load()
+}
+
+// speed is bytes a second from the latch to now at final. With no latch (a
+// hard deadline before skip bytes arrived) it is the rough average over the
+// whole warm-up, so the bandwidth check has *some* number to classify
+// against.
+func (l *speedLatch) speed(final int64, warmupStart, now time.Time) float64 {
+	from, measured := warmupStart, final
+	if ns := l.ns.Load(); ns != 0 {
+		from, measured = time.Unix(0, ns), final-l.bytes.Load()
+	}
+	if elapsed := now.Sub(from); elapsed > 0 && measured > 0 {
+		return float64(measured) / elapsed.Seconds()
+	}
+	return 0
 }
 
 // formatWarmupLine is the job status line during warm-up: "43 s" while
