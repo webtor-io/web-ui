@@ -1225,7 +1225,7 @@ func TestBuild_StallBlamesTheSwarmOnlyWhenItIsTheSource(t *testing.T) {
 
 // A file whose estimate is under the cap still gets the stream box: the page
 // shows it only at a real stall, and a stall while thp's limiter holds the
-// requests is the cap's doing whatever the estimate said (The Knick, marked
+// requests is the cap's doing whatever the estimate said (a series, marked
 // "fits" at 4.34, stalled four times in 180 s at 5M with no box on the
 // page, 2026-09-26). Its line is the cap alone -- never "up to 5 Mbps, and
 // this file needs 3", nor "needs 4.6".
@@ -1259,7 +1259,7 @@ func TestFitsCapAndOverCap(t *testing.T) {
 		{"Sintel from nginx-vod (1.11)", 5, 1.105, true, false},
 		{"just in the margin (4.1 x 1.2 = 4.92)", 5, 4.1, true, false},
 		{"in the margin (4.2 x 1.2 = 5.04)", 5, 4.2, false, false},
-		{"The Knick, recorded at 1.16x its estimate", 5, 4.344, false, false},
+		{"the recorded series, at 1.16x its estimate", 5, 4.344, false, false},
 		{"reads 5, the cap", 5, 4.96, false, false},
 		{"reads 5.2", 5, 5.2, false, true},
 		{"the owner's file", 5, 8.65, false, true},

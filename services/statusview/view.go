@@ -1074,7 +1074,7 @@ func StallSub(loc *goi18n.Localizer, lang string, paid bool, capMbps, needMbps f
 // playedBitrate) a stream may really pull before "it fits under the cap"
 // stops being a safe thing to say of it. The estimate is the tracks'
 // average rate; what crosses thp is MPEG-TS segments of a stretch of the
-// film. Recorded in Chrome at a 5M cap (2026-09-26, The Knick s02e01,
+// film. Recorded in Chrome at a 5M cap (2026-09-26, a series episode,
 // 720p H.264, two AC3 dubs): estimated 4.56 Mbit/s (4.34 in the cap's
 // megabit); the first 132 s of video came to 83.3 MB, 5.05 Mbit/s against
 // 4.42 for the file less its audio (+14.4%: TS packets and a scene heavier

@@ -606,7 +606,7 @@ test('details: closed when the chain slides under the navbar, and when its block
 // The stream job's "fits" is an estimate; a real stall while the server says
 // the limiter binds (the box is due only after thp held the viewer at the cap
 // for 8 s) is the cap's doing whatever it estimated. Recorded 2026-09-26:
-// The Knick, marked "fits" at 4.34 of 5, pulled 5.04 and stalled four times
+// A series marked "fits" at 4.34 of 5, pulled 5.04 and stalled four times
 // in 180 s -- the page said the cap line alone and sold nothing, the owner's
 // complaint once more. "Fits" keeps its playing-case meaning only: no line.
 test('a file marked "fits" stalling at the cap: the stream box, like any stall', () => {

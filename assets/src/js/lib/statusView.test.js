@@ -711,7 +711,7 @@ test('the sticky bar\'s Vault link presses the card\'s', () => {
 
 // The stream job marks a file whose estimate is under the cap with room to
 // spare: nothing is said while it plays. A real stall of it while the box is
-// due is still the cap's doing (The Knick, 2026-09-26: marked "fits", it
+// due is still the cap's doing (a series, 2026-09-26: marked "fits", it
 // pulled 5.04 at a 5M cap and stalled four times with the cap line alone on
 // the page) -- the stream box, like any stall.
 test('a file marked "fits": nothing while it plays, the stream box at a real stall', (t) => {

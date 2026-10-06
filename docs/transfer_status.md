@@ -631,7 +631,7 @@ under the piece bar.
   while it plays — and that is all the mark means: a real stall of it while
   the box is due (thp held the viewer at the cap for 8 s) gets the stream
   box like any other, because the stall is then the cap's doing whatever
-  the estimate said. Recorded 2026-09-26 at 5M: The Knick s02e01, estimated
+  the estimate said. Recorded 2026-09-26 at 5M: a series episode, estimated
   4.56 Mbit/s (4.34 in the cap's megabit) and marked "fits" without the
   margin, pulled 5.29 (5.04 in that megabit) — the first 132 s of video 83.3 MB, 5.05 Mbit/s against
   4.42 for the file less its audio, and the transcoder's AAC 236 kbit/s

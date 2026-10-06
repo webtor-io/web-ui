@@ -54,7 +54,7 @@ func TestStatusStallSub(t *testing.T) {
 	// alone -- "up to 5, and this file needs 4.6" explains nothing.
 	knick := int64(5183646 - 2*384000 + 128*48000/44)
 	if statusFitsCap(under, knick) || statusOverCap(under, knick) {
-		t.Error("The Knick, 4.34 at 5: neither fits nor over")
+		t.Error("the recorded series, 4.34 at 5: neither fits nor over")
 	}
 	if got := s.statusStallSub(under, knick); got != "Без подписки — до 5\u00a0Мбит/с" {
 		t.Errorf("within the margin: %q", got)
@@ -130,11 +130,11 @@ const (
 	probeStale = `{"format":{"bit_rate":"718649"},"streams":[
 		{"codec_type":"video","codec_name":"h264","tags":{"BPS":"7816333"}},
 		{"codec_type":"audio","codec_name":"aac","channels":2,"sample_rate":"48000","tags":{"BPS":"640000"}}]}`
-	// The Knick s02e01 (9f99a3f2…): 720p H.264 without statistics tags,
+	// A series episode (9f99a3f2…): 720p H.264 without statistics tags,
 	// two AC3 5.1 dubs. Estimated 4.56 Mbps (4.34 in the cap's megabit);
 	// recorded at 5M, 2026-09-26, it pulled 5.29 (5.04) -- over the cap -- and
 	// stalled four times in 180 s while marked "fits".
-	probeKnick = `{"format":{"bit_rate":"5183646"},"streams":[
+	probeSeries = `{"format":{"bit_rate":"5183646"},"streams":[
 		{"codec_type":"video","codec_name":"h264","height":720},
 		{"codec_type":"audio","codec_name":"ac3","bit_rate":"384000","channels":6,"sample_rate":"48000"},
 		{"codec_type":"audio","codec_name":"ac3","bit_rate":"384000","channels":6,"sample_rate":"48000"}]}`
@@ -159,7 +159,7 @@ func TestPlayedBitrate(t *testing.T) {
 		{"seven dubs: one of them, and not the cover", probeSevenDubs, true, 4855684 + aac48},
 		{"no tags: the file less its audio", probeDerived, true, 8260633 - 3*640000 - 2*768000 + aac48},
 		{"stale tags: not known", probeStale, true, 0},
-		{"The Knick: the file less its two dubs, one re-encoded", probeKnick, true, 5183646 - 2*384000 + aac48},
+		{"the recorded series: the file less its two dubs, one re-encoded", probeSeries, true, 5183646 - 2*384000 + aac48},
 		{"Sintel through nginx-vod: its tracks as they are", probeSintel, false, 718146 + 440754},
 		{"re-encoded video: the encoder's choice, not known",
 			`{"format":{"bit_rate":"5650625"},"streams":[{"codec_type":"video","codec_name":"hevc","tags":{"BPS":"4999862"}},
@@ -217,7 +217,7 @@ func TestSetStatusMarks(t *testing.T) {
 	}{
 		{"over: the owner's file", probeOwner, true, false, true, "Без подписки — до 5\u00a0Мбит/с, а файлу нужно 8,7\u00a0Мбит/с"},
 		{"fits with room: Sintel, 1.1", probeSintel, false, true, false, "Без подписки — до 5\u00a0Мбит/с"},
-		{"within the margin: The Knick, 4.34", probeKnick, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
+		{"within the margin: the recorded series, 4.34", probeSeries, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
 		{"heavy with dubs, the stream within the margin: 4.76", probeSevenDubs, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
 		{"no tags, the stream within the margin: 4.72", probeDerived, true, false, false, "Без подписки — до 5\u00a0Мбит/с"},
 		{"stale tags: not known, the file bounds it -- fits", probeStale, true, true, false, "Без подписки — до 5\u00a0Мбит/с"},

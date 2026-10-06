@@ -62,7 +62,7 @@ export { safeHref };
 //                   statusview.FitsMargin): nothing is said under the bar
 //                   while it plays. Only that -- a real stall of it while
 //                   the server says the limiter binds is the cap's doing and
-//                   gets the stream box like any other (The Knick, 2026-09-26:
+//                   gets the stream box like any other (a series, 2026-09-26:
 //                   marked "fits" at 4.34 of 5, it pulled 5.04 and stalled
 //                   four times in 180 s with the cap line alone on the page)
 //   overCap         the stream job marked the played file as needing more
