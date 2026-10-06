@@ -85,12 +85,16 @@ the rest of every gap, 23 switches in 300 s (46 for 2 MiB jumps, 11 for
 8 MiB), and now only its first gap, before the second jump says how long
 one is, shows the badge (`TestHold_SlowSwarmStaysOnTheChain`; a stop after
 such a swarm reaches the badge that much later). The jumps were taken for
-the seeder verifying whole pieces, and they are not that: the page asks the
-seeder for the torrent's root, whose Completed is `t.BytesCompleted`, the
-unverified chunks of a piece included (torrent-web-seeder `torrentStat`).
-Where the jumps come from is not established (2026-10-06); the hold and
-`gapRate` stay, they answer what was seen. The gap is measured from a still
-call to the next move: the loop calls the hold more than once on one jump
+the seeder verifying whole pieces. The page asks the seeder for the
+torrent's root: on a live frame (the pod holds the torrent) its Completed is
+`t.BytesCompleted`, the unverified chunks of a piece included
+(torrent-web-seeder `torrentStat`); on a cold one (`coldStat`) it is the
+completed pieces in the pod's `.torrent.db`, whole pieces at a time, and
+`statsWatch.frame` feeds both to the meter and `gapRate`. Where the jumps
+come from is not established (2026-10-06), nor whether their frames were
+live; the hold and `gapRate` stay, they answer what was seen. The gap is
+measured from a still call to the next move: the loop calls the hold more
+than once on one jump
 (its frame, a tick, a thp event within `movingFor`), and the second call of
 a jump measured "a gap" of a fraction of a second -- back to `HoldFor`. A
 swarm that moves in every call for longer than `HoldFor` has no gap any

@@ -117,10 +117,12 @@ type TorrentStatus struct {
 // movingFor: the swarm moves while its bytes arrive -- Completed grew at most
 // this long ago, which is the status sent on the stats event itself (and a
 // tick close enough to it that the rate meter has not re-sampled: it waits
-// half a second between samples). The counter takes chunks as they arrive
-// (statsWatch.frame), yet a slow swarm's grew in jumps with seconds of
-// nothing between them -- 4 MiB every 27 s (d9c5791e), from what is not
-// established; the view's hold (statusview.Hold) keeps the swarm on the
+// half a second between samples). On a live frame the counter takes chunks
+// as they arrive, on a cold one (coldStat) whole pieces from disk
+// (statsWatch.frame); a slow swarm's grew in jumps with seconds of nothing
+// between them -- 4 MiB every 27 s (d9c5791e), from what is not established,
+// whether those frames were live included; the view's hold
+// (statusview.Hold) keeps the swarm on the
 // chain as it last moved through such a gap, for HoldFor from its last
 // jump -- or half as long again as its gap between jumps when that is
 // longer, up to a minute (statusview maxHold). Judged by the

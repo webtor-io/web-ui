@@ -42,10 +42,11 @@ type statsWatch struct {
 	// that gap was longer than pieceGap; 0 after a growth that came sooner.
 	// The meter takes a jump in over the second it arrived in, and a slow
 	// swarm's 4 MiB every 27 s read 13-22 Mbps instead of 1.2 (status
-	// draws the lower). Those jumps are not piece verification, as was
-	// thought when this went in (d9c5791e): this stream's Completed counts
-	// chunks as they arrive (statsWatch.frame). Where they come from is not
-	// established. The gap counts only while a piece was wanted
+	// draws the lower). They were taken for piece verification when this
+	// went in (d9c5791e); where they come from is not established, nor
+	// whether those frames were live -- a live frame's Completed takes
+	// chunks as they arrive, a cold one's whole pieces from disk
+	// (statsWatch.frame). The gap counts only while a piece was wanted
 	// (wantedSince, zero while the last frame wanted none): the seeder
 	// fetches on demand, and a fast swarm the viewer's reader paces idles
 	// until the readahead reaches the next piece -- over the whole gap that
@@ -140,10 +141,14 @@ func (w *statsWatch) frame(ev api.EventData, now time.Time) bool {
 	w.answered = true
 	w.pieces.apply(ev)
 	fill, active := w.pieces.buckets()
-	// Completed is the torrent's bytes on the seeder, the unverified chunks
-	// of its pieces included (the page asks for the root, torrent-web-seeder
-	// torrentStat → t.BytesCompleted); its delta per second is the swarm's
-	// useful throughput — the download speed a torrent client would show.
+	// Completed is the torrent's bytes on the seeder. On a live frame (the
+	// pod holds the torrent; the page asks for the root, torrent-web-seeder
+	// torrentStat → t.BytesCompleted) the unverified chunks of its pieces
+	// are included; on a cold one (coldStat) it is the completed pieces in
+	// the pod's .torrent.db, whole pieces at a time. Both feed the meter
+	// and gapRate, ev.Live is read only below. Its delta per second is the
+	// swarm's useful throughput — the download speed a torrent client
+	// would show.
 	// It can drop (a failed hash check, an eviction): the meter re-primes.
 	rps := w.rate.Sample(int64(ev.Completed), now)
 	if w.firstStatsAt.IsZero() {

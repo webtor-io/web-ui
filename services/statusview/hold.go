@@ -5,9 +5,11 @@ import "time"
 // HoldFor is how long the swarm's last moving reading stays on the chain.
 // The seeder's counter can stand still for seconds while the transfer is
 // fine, and a chain that fell back to the badge in every such gap would
-// blink. Not because it counts whole pieces, as this once said: it takes
-// chunks as they arrive (handlers/resource statsWatch.frame); what makes a
-// slow swarm's gaps is not established. The viewer is not held by speed at
+// blink. This once said it counts whole pieces; it does on a cold frame
+// (the pod does not hold the torrent: completed pieces from disk), on a
+// live one it takes chunks as they arrive (handlers/resource
+// statsWatch.frame). What makes a slow swarm's gaps is not established,
+// nor whether those frames were live. The viewer is not held by speed at
 // all (owner, 2026-09-25): they are on the chain while their requests are
 // open, with the Meter's PresenceDebounce, and the page keeps them there
 // while its own player plays (View.Playing). Hold.Viewer covers only a gap

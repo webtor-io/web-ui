@@ -1,8 +1,9 @@
 // Package ratemeter turns a monotonically growing byte counter sampled at
 // irregular moments into a smoothed bytes-per-second figure.
 //
-// The seeder reports Completed (its bytes of the torrent, unverified chunks
-// included) about once a second; the difference between two samples is the
+// The seeder reports Completed (its bytes of the torrent: on a live frame
+// with the unverified chunks, on a cold one the completed pieces on disk)
+// about once a second; the difference between two samples is the
 // swarm's useful throughput over that interval. Raw deltas jump from tick to
 // tick (a slow swarm's 4 MiB in one tick and nothing for seconds after it),
 // so the meter keeps an exponential moving average — what every torrent
