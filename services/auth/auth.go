@@ -486,8 +486,8 @@ func (s *Auth) resolveUser(ctx context.Context, sess sessmodels.SessionContainer
 		})
 }
 
-// errNoUser is create's (nil, nil): createUser's degrade to "no user" when
-// the database is gone. Passed through as it was, and not kept.
+// errNoUser is create's (nil, nil): createUser's "no user" when no
+// database is configured. Passed through as it was, and not kept.
 var errNoUser = defaultErrors.New("no user")
 
 // resolveCached is resolveUser's logic: create resolves the user the long
@@ -538,10 +538,11 @@ func resolveCached(ids *lazymap.LazyMap[uuid.UUID], key string, create func() (*
 func (s *Auth) createUser(ctx context.Context, sess sessmodels.SessionContainer, mark func(string)) (u *models.User, isNew bool, err error) {
 	db := s.pg.Get()
 	if db == nil {
-		// Database outage is transient and recoverable, unlike an identity
-		// provider that yields no email. Degrading a brief blip to "no user"
-		// is better than turning it into a broken response. The nil user is
-		// safe because makeUserFromContext checks for it explicitly.
+		// No Postgres configured (cs.PG.Get is nil only without a host), so
+		// there is no user row to give. Not an outage: a database that is
+		// configured and does not answer fails below, and the request with
+		// it (myVerifySession) -- it never turns a signed-in user anonymous.
+		// The nil user is safe because makeUserFromContext checks for it.
 		return
 	}
 	userID := sess.GetUserID()
@@ -627,15 +628,22 @@ func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 			//     auto-admin;
 			//   password configured and no mark → stay anonymous, which lands
 			//     the request on HasAuth and from there on /login.
+			admin := true
 			if !s.adminStore.IsConfigured(c.Request.Context()) {
 				ctx := context.WithValue(c.Request.Context(), IsOpenInstanceContext{}, true)
 				c.Request = c.Request.WithContext(ctx)
-				s.registerAdminUser(c)
-				c.Next()
-				return
+			} else {
+				admin = adminSessionActive(c)
 			}
-			if adminSessionActive(c) {
-				s.registerAdminUser(c)
+			if admin {
+				if err := s.registerAdminUser(c); err != nil {
+					// The administrator is signed in; a database that does not
+					// answer must not serve them the anonymous site. To the
+					// error page (services/web), 503.
+					_ = c.Error(err)
+					c.Abort()
+					return
+				}
 			}
 			c.Next()
 		})
@@ -690,21 +698,24 @@ func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 
 type IsAdminContext struct{}
 
-func (s *Auth) registerAdminUser(c *gin.Context) {
+// registerAdminUser puts the admin user into the request. Without Postgres
+// configured there is no user to put; a configured one that fails is an
+// error, never an anonymous request.
+func (s *Auth) registerAdminUser(c *gin.Context) error {
 	db := s.pg.Get()
 	if db == nil {
-		return
+		return nil
 	}
 	u, isNew, err := models.GetOrCreateUser(c.Request.Context(), db, "admin", nil)
 	if err != nil {
-		log.WithError(err).Error("failed to create admin user")
-		return
+		return fmt.Errorf("failed to create user: %w", err)
 	}
 	ctx := c.Request.Context()
 	ctx = context.WithValue(ctx, UserContext{}, u)
 	ctx = context.WithValue(ctx, IsNewContext{}, isNew)
 	ctx = context.WithValue(ctx, IsAdminContext{}, true)
 	c.Request = c.Request.WithContext(ctx)
+	return nil
 }
 
 // IsOpenInstanceContext marks a request served by an instance that has no

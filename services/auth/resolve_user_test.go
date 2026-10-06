@@ -17,6 +17,7 @@ type fakeStore struct {
 	rows    map[uuid.UUID]*models.User
 	next    *models.User
 	err     error
+	loadErr error
 	creates int
 	loads   int
 }
@@ -31,6 +32,9 @@ func (f *fakeStore) create() (*models.User, bool, error) {
 
 func (f *fakeStore) load(id uuid.UUID) (*models.User, error) {
 	f.loads++
+	if f.loadErr != nil {
+		return nil, f.loadErr
+	}
 	return f.rows[id], nil
 }
 
@@ -96,8 +100,20 @@ func TestResolveCached(t *testing.T) {
 		}
 	})
 
+	// 2026-10-05: Postgres refused connections (57P03) and the read by key
+	// failed for every signed-in request. It must stay an error -- (nil, nil)
+	// here is an anonymous visitor to myVerifySession.
+	t.Run("a failed read by key is an error, not no user", func(t *testing.T) {
+		ids, f := newIDs(), &fakeStore{rows: map[uuid.UUID]*models.User{alice.UserID: alice}, next: alice}
+		_, _, _ = resolveCached(ids, "st-alice", f.create, f.load)
+		f.loadErr = errors.New("57P03 the database system is not yet accepting connections")
+		if u, _, err := resolveCached(ids, "st-alice", f.create, f.load); err == nil || u != nil {
+			t.Fatalf("got %v %v, want the error", u, err)
+		}
+	})
+
 	t.Run("no user and no error stays no user, not kept", func(t *testing.T) {
-		// createUser's degrade when the database is gone.
+		// createUser's answer when no database is configured.
 		ids, f := newIDs(), &fakeStore{}
 		if u, _, err := resolveCached(ids, "st-x", f.create, f.load); err != nil || u != nil {
 			t.Fatalf("got %v %v", u, err)

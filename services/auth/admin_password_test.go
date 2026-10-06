@@ -214,6 +214,47 @@ func TestAdminSessionMarkActivatesAdmin(t *testing.T) {
 	}
 }
 
+// The administrator is signed in and Postgres does not answer: the request
+// stops at the error (503 from services/web: "failed to create user"), it is
+// not served the anonymous site -- with the auth gate on, that was a bounce to
+// /login, whose password then could not take either.
+func TestSignedInAdminIsNotAnonymousWhenPostgresFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	pgHandle, _ := fakePGListener(t)
+
+	r := gin.New()
+	withSession(r)
+	var errs []*gin.Error
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		errs = c.Errors
+	})
+	r.Use(func(c *gin.Context) {
+		sessions.Default(c).Set(AdminSessionKey, true)
+		c.Next()
+	})
+	a := &Auth{
+		hasSupetokens: false,
+		pg:            pgHandle,
+		adminStore:    adminauth.NewStore("some password", nil),
+	}
+	a.RegisterHandler(r)
+	reached := false
+	r.GET("/", func(c *gin.Context) {
+		reached = true
+		c.Status(http.StatusOK)
+	})
+
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if reached {
+		t.Error("the page ran for the administrator as an anonymous visitor while Postgres failed")
+	}
+	if len(errs) == 0 {
+		t.Error("no error for the error page to answer with")
+	}
+}
+
 func TestOpenInstanceWhenNoPasswordConfigured(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
