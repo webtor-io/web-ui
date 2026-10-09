@@ -75,6 +75,27 @@ const (
 	// the streamContent / download flows.
 	FFmpegTimeout = 60 * time.Second
 
+	// ffmpeg runs inside the web-ui container: with nothing bounding it, a
+	// frame of an 8K HEVC video took 3.6 GiB, the container's 5 GiB limit
+	// killed web-ui with it, and the next open of the same video killed the
+	// next pod, all three in 17 minutes (2026-10-09).
+	//
+	// ffmpegThreads pins the decoder's and the encoder's threads. On auto
+	// they follow the node's cores, and the memory with them: one frame of
+	// 4K HEVC 10-bit peaked at 1.07 GiB of address space on 6 cores, 1.5 on
+	// 11, 0.57 on 2; 1080p H.264 at 0.2 on 2 (web-ui image, 2026-10-09).
+	ffmpegThreads = "2"
+
+	// ffmpegMaxVirtualKiB caps each ffmpeg's address space (ulimit -v):
+	// over it ffmpeg fails to allocate and exits, the thumbnail fails and
+	// the pod stays. 1.5 GiB is 2.7x the 4K peak above.
+	ffmpegMaxVirtualKiB = 1536 * 1024
+
+	// maxFramePixels: a video with frames larger than DCI 4K gets no
+	// ffmpeg frame. Decoding one costs gigabytes and seconds of the
+	// container's CPU, for a preview shown a few hundred pixels wide.
+	maxFramePixels = 4096 * 2160
+
 	// downloadHTTPTimeout bounds the image-file pull. THP export URL
 	// is on-cluster and posters are small, but a cold torrent can take
 	// a while to start serving — 15 s avoids a premature failover to
@@ -156,7 +177,8 @@ func (s *Service) Enabled() bool { return s != nil }
 // caller doesn't need to feed a probe in.
 //
 // Returns ErrNoSource when the torrent has neither a usable image file
-// nor a video item — caller logs this at info and proceeds with the
+// nor a video item, or its video's frames are over maxFramePixels — caller
+// logs this at info and proceeds with the
 // favicon fallback. Other errors are propagated so they show up in the
 // daily error budget.
 func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID string) (*models.Thumbnail, error) {
@@ -192,7 +214,11 @@ func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID s
 		if dlErr != nil {
 			return nil, errors.Wrap(dlErr, "failed to resolve video download URL")
 		}
-		offset := pickFFmpegOffset(s.probeDurationSec(ctx, dlURL))
+		mp := s.probe(ctx, dlURL)
+		if px := framePixels(mp); px > maxFramePixels {
+			return nil, errors.Wrapf(ErrNoSource, "video frames of %d px, over %d", px, maxFramePixels)
+		}
+		offset := pickFFmpegOffset(durationSec(mp))
 		t, gErr := s.generateFromFFmpegFrame(ctx, db, resourceID, vid, dlURL, offset)
 		if gErr == nil {
 			return t, nil
@@ -406,31 +432,24 @@ func (s *Service) generateFromImageFile(ctx context.Context, db *pg.DB, claims *
 }
 
 func (s *Service) generateFromFFmpegFrame(ctx context.Context, db *pg.DB, resourceID string, item *ra.ListItem, dlURL string, offsetSec int) (*models.Thumbnail, error) {
-	cctx, cancel := context.WithTimeout(ctx, FFmpegTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(cctx,
-		"ffmpeg",
+	data, err := runFFmpeg(ctx,
 		"-loglevel", "error",
+		"-threads", ffmpegThreads,
 		"-ss", fmt.Sprintf("%d", offsetSec),
 		"-i", dlURL,
 		"-frames:v", "1",
+		"-threads", ffmpegThreads,
 		"-c:v", "mjpeg",
 		"-q:v", "3",
 		"-f", "image2pipe",
 		"-",
 	)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "ffmpeg failed: %s", strings.TrimSpace(stderr.String()))
+	if err != nil {
+		return nil, err
 	}
-	if out.Len() == 0 {
+	if len(data) == 0 {
 		return nil, errors.New("ffmpeg produced empty output")
 	}
-	data := out.Bytes()
 	w, h := decodeDimensions(data)
 	return s.store(ctx, db, resourceID, item.PathStr, offsetSec,
 		models.ThumbnailSourceFFmpegFrame, data, "jpg", w, h)
@@ -446,34 +465,61 @@ func (s *Service) generateFromAudioEmbeddedArt(ctx context.Context, db *pg.DB, c
 		return nil, errors.Wrap(err, "failed to resolve audio download URL")
 	}
 
-	cctx, cancel := context.WithTimeout(ctx, FFmpegTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(cctx,
-		"ffmpeg",
+	data, err := runFFmpeg(ctx,
 		"-loglevel", "error",
+		"-threads", ffmpegThreads,
 		"-i", dlURL,
 		"-map", "0:v?", // optional video stream = embedded picture
 		"-frames:v", "1",
+		"-threads", ffmpegThreads,
 		"-c:v", "mjpeg",
 		"-q:v", "3",
 		"-f", "image2pipe",
 		"-",
 	)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Wrapf(err, "ffmpeg failed: %s", strings.TrimSpace(stderr.String()))
+	if err != nil {
+		return nil, err
 	}
-	if out.Len() == 0 {
+	if len(data) == 0 {
 		return nil, errors.New("no embedded album art")
 	}
-	data := out.Bytes()
 	w, h := decodeDimensions(data)
 	return s.store(ctx, db, resourceID, item.PathStr, 0,
 		models.ThumbnailSourceAudioArt, data, "jpg", w, h)
+}
+
+// ffmpegSlots bounds the ffmpegs running at once in the pod: each under
+// ffmpegMaxVirtualKiB, two of them stay under 3 GiB next to web-ui's own
+// ~1.2 GiB, inside the container's 5 GiB.
+var ffmpegSlots = make(chan struct{}, 2)
+
+// ffmpegBin is the program runFFmpeg runs; tests swap it.
+var ffmpegBin = "ffmpeg"
+
+// runFFmpeg runs ffmpeg with args, under FFmpegTimeout, the address-space
+// cap and a slot, and returns its stdout. On failure its stderr is in the
+// error, redacted: on a failed open ffmpeg quotes its input, thp's URL with
+// the token and the api-key (60 log lines in a week, 2026-10-09).
+func runFFmpeg(ctx context.Context, args ...string) ([]byte, error) {
+	select {
+	case ffmpegSlots <- struct{}{}:
+		defer func() { <-ffmpegSlots }()
+	case <-ctx.Done():
+		return nil, errors.Wrap(ctx.Err(), "no ffmpeg slot")
+	}
+	cctx, cancel := context.WithTimeout(ctx, FFmpegTimeout)
+	defer cancel()
+	// exec leaves one process, so the context's kill reaches ffmpeg. Where
+	// the cap cannot be set, ffmpeg does not run at all.
+	script := fmt.Sprintf(`ulimit -v %d && exec "$0" "$@"`, ffmpegMaxVirtualKiB)
+	cmd := exec.CommandContext(cctx, "sh", append([]string{"-c", script, ffmpegBin}, args...)...)
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, errors.Wrapf(err, "ffmpeg failed: %s", helpers.RedactURL(strings.TrimSpace(stderr.String())))
+	}
+	return out.Bytes(), nil
 }
 
 // downloadURLFor pulls the `download` ExportItem for a torrent item.
@@ -491,19 +537,42 @@ func (s *Service) downloadURLFor(ctx context.Context, claims *api.Claims, resour
 	return dl.URL, nil
 }
 
-// probeDurationSec asks content-prober for the picked file's duration
-// so the ffmpeg seek lands at ~25 % in instead of the blind 5-min
-// default. Best-effort: any failure (timeout, prober down, missing
-// duration field) returns 0 and the caller falls back to the default
-// offset rather than aborting the whole thumbnail.
+// probe asks content-prober about the picked file: its duration, so the
+// ffmpeg seek lands at ~25 % in instead of the blind 5-min default, and
+// its frame size. Best-effort: on any failure (timeout, prober down) it is
+// nil, and the caller falls back to the default offset, its ffmpeg bounded
+// by the cap alone.
 //
 // The ~cp suffix routes through THP's content-prober chain; rest-api
 // caches the result so a streamContent probe on the same file is reused.
-func (s *Service) probeDurationSec(ctx context.Context, dlURL string) int {
+func (s *Service) probe(ctx context.Context, dlURL string) *api.MediaProbe {
 	pctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	mp, err := s.api.GetMediaProbe(pctx, contentProbeURL(dlURL))
-	if err != nil || mp == nil || mp.Format.Duration == "" {
+	if err != nil {
+		return nil
+	}
+	return mp
+}
+
+// framePixels is the largest video frame in mp, in pixels (0 when unknown).
+// The largest, because that is the stream ffmpeg picks.
+func framePixels(mp *api.MediaProbe) int {
+	if mp == nil {
+		return 0
+	}
+	px := 0
+	for _, st := range mp.Streams {
+		if st.CodecType == "video" && st.Width*st.Height > px {
+			px = st.Width * st.Height
+		}
+	}
+	return px
+}
+
+// durationSec is mp's duration in whole seconds (0 when unknown).
+func durationSec(mp *api.MediaProbe) int {
+	if mp == nil || mp.Format.Duration == "" {
 		return 0
 	}
 	d, err := strconv.ParseFloat(mp.Format.Duration, 64)
