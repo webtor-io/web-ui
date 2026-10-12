@@ -1,0 +1,47 @@
+{{/* GET and POST /embed when this instance does not serve embeds
+     (embed.Enabled): iframes already placed on other sites keep loading
+     /show -> /embed and get this instead of a player. Standalone -- no
+     scripts, no styles from the bundle; the frame is the SDK's default size
+     or the host's. */ -}}
+<!DOCTYPE html>
+<html lang="{{ .Lang }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{{ t .Lang "embed.off.title" }}</title>
+        <style>
+            html, body {
+                margin: 0;
+                height: 100%;
+                background-color: black;
+                color: rgba(255, 255, 255, 0.8);
+                font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            }
+            body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                padding: 1.5rem;
+                box-sizing: border-box;
+            }
+            .title {
+                font-size: 1.125rem;
+                font-weight: 600;
+                margin: 0 0 0.5rem;
+            }
+            .text {
+                font-size: 0.875rem;
+                margin: 0;
+            }
+            a {
+                color: #e84393;
+            }
+        </style>
+    </head>
+    <body>
+        <p class="title">{{ t .Lang "embed.off.title" }}</p>
+        <p class="text">{{ tpHTML .Lang "embed.off.text" "Link" (printf "<a href=\"https://github.com/webtor-io/self-hosted\" target=\"_blank\" rel=\"noopener\">%s</a>" (t .Lang "embed.off.link")) }}</p>
+    </body>
+</html>

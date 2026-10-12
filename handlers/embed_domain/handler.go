@@ -14,6 +14,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -23,7 +24,7 @@ type Handler struct {
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG) error {
-	if c.Bool(common.DisableEmbedFlag) {
+	if !embed.Enabled(c) {
 		return nil
 	}
 	d := c.String(common.DomainFlag)

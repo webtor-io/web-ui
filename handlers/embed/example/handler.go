@@ -2,6 +2,8 @@ package example
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/urfave/cli"
+	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 	"github.com/yargevad/filepathx"
@@ -21,7 +23,10 @@ type Example struct {
 
 type Examples []Example
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context]) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context]) {
+	if !embed.Enabled(c) {
+		return
+	}
 	examples := Examples{}
 	g, err := filepathx.Glob("templates/views/embed/example/*")
 	if err != nil {

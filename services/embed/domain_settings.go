@@ -43,18 +43,24 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 	)
 }
 
+// Enabled answers "does this instance serve embeds to other sites". Two
+// switches say no: USE_EMBED=false (what the chart sets, embed.enable) and
+// DISABLE_EMBED. Every embed surface -- the /embed page, the player's Embed
+// button, the profile's domain list, the examples -- asks this one question.
+func Enabled(c *cli.Context) bool {
+	return c.BoolT(useEmbed) && !c.Bool(common.DisableEmbedFlag)
+}
+
 type DomainSettings struct {
 	*lazymap.LazyMap[*DomainSettingsData]
 	pg             *cs.PG
 	claims         *claims.Claims
 	domain         string
-	useEmbed       bool
 	onlyAuthorized bool
 	useAds         bool
 }
 type DomainSettingsData struct {
 	Ads          bool         `json:"ads"`
-	Forbidden    bool         `json:"-"`
 	Unauthorized bool         `json:"-"`
 	Claims       *claims.Data `json:"-"`
 	SessionID    string       `json:"-"`
@@ -76,18 +82,12 @@ func NewDomainSettings(c *cli.Context, pg *cs.PG, claims *claims.Claims) (*Domai
 		LazyMap: lazymap.New[*DomainSettingsData](&lazymap.Config{
 			Expire: time.Minute,
 		}),
-		useEmbed:       c.BoolT(useEmbed),
 		useAds:         c.BoolT(useAds),
 		onlyAuthorized: c.Bool(onlyAuthorized),
 	}, nil
 }
 
 func (s *DomainSettings) Get(domain string) (*DomainSettingsData, error) {
-	if !s.useEmbed {
-		return &DomainSettingsData{
-			Forbidden: true,
-		}, nil
-	}
 	return s.LazyMap.Get(domain, func() (*DomainSettingsData, error) {
 		if s.pg == nil || s.pg.Get() == nil || s.claims == nil {
 			return &DomainSettingsData{}, nil

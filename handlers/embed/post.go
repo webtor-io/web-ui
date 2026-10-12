@@ -57,6 +57,11 @@ func (s *Handler) bindPostArgs(c *gin.Context) (*PostArgs, error) {
 }
 
 func (s *Handler) post(c *gin.Context) {
+	// A placeholder rendered before embeds were switched off can still post.
+	if !s.enabled {
+		s.off(c)
+		return
+	}
 	tpl := s.tb.Build("embed/post")
 	pd := PostData{}
 	args, err := s.bindPostArgs(c)

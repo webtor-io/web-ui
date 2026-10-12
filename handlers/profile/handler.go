@@ -26,6 +26,7 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/data_export"
+	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
 	"github.com/webtor-io/web-ui/services/notification"
@@ -193,7 +194,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
 		disableS3:        c.Bool(common.DisableS3Flag),
 		disableAPI:       c.Bool(common.DisableAPIFlag),
-		disableEmbed:     c.Bool(common.DisableEmbedFlag),
+		disableEmbed:     !embed.Enabled(c),
 		s3Secret:         s3.SigningSecret(c),
 		s3Endpoint:       s3.PublicEndpoint(c),
 		apiEndpoint:      libapi.PublicEndpoint(c),

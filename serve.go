@@ -231,6 +231,9 @@ func serve(c *cli.Context) error {
 		r.Use(redirect)
 	}
 	r.Use(w.NoindexDefault(c.Bool(w.StagingFlag)))
+	if fa := w.FrameAncestors(c.String(w.FrameAncestorsFlag)); fa != nil {
+		r.Use(fa)
+	}
 	r.RedirectTrailingSlash = false
 	r.HTMLRender = re
 
@@ -548,7 +551,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting EmbedExamplesHandler
-	wee.RegisterHandler(r, tm)
+	wee.RegisterHandler(c, r, tm)
 
 	// Setting EmbedHandler
 	we.RegisterHandler(c, cl, r, tm, jobs, ds, sapi)

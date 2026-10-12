@@ -70,6 +70,8 @@ func capCardTemplate(t *testing.T, svc *i18n.Service, o *offer.Offer) *template.
 		"tp":                 h.Tp,
 		"tn":                 h.Tn,
 		"tpHTML":             h.TpHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 	tpl, err := template.New("stream_video.html").Funcs(funcs).ParseFiles("../../templates/views/action/stream_video.html")
 	if err != nil {

@@ -44,6 +44,8 @@ func aboutFuncs() template.FuncMap {
 		// web.Helper's methods) belong here: a stub for one that does not
 		// exist would let a template pass this test and panic at startup.
 		// offer.Helper: the free-plan cap line under a comparison.
+		// web.Helper.EmbedEnabled: the SDK card.
+		"embedEnabled": func() bool { return true },
 		"hasPlans":     func() bool { return true },
 		"freeRateMbps": func() int { return 5 },
 		"seq": func(from, to int) []int {

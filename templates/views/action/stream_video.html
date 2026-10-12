@@ -427,11 +427,16 @@
              screen reader announce "Close" twice. */}}
         <form method="dialog" class="modal-backdrop"><button tabindex="-1" aria-hidden="true">close</button></form>
     </dialog>
-    {{/* Same reasoning as #subtitles above — must show over the fullscreen player. */}}
+    {{/* Same reasoning as #subtitles above — must show over the fullscreen player.
+         Only on an instance that serves embeds: the player shows its Embed
+         button when this dialog exists (Player.jsx parseFeatures). The
+         snippet carries this instance's address -- the SDK otherwise points
+         at webtor.io. */}}
+    {{ if embedEnabled }}
     <dialog class="modal" id="embed">
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
             <div class="flex">
-                <textarea name="description" class="textarea textarea-bordered w-full" readonly><video controls src="{{ .Resource.MagnetURI }}" data-path="{{ .Item.PathStr }}"></video><script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script></textarea>
+                <textarea name="description" class="textarea textarea-bordered w-full" readonly><video controls src="{{ .Resource.MagnetURI }}" data-path="{{ .Item.PathStr }}" data-config='{"baseUrl":"{{ domain }}"}'></video><script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script></textarea>
             </div>
             <div class="modal-action">
                 <div class="flex-grow text-sm flex items-center">
@@ -444,6 +449,7 @@
         {{/* Same backdrop as #subtitles above. */}}
         <form method="dialog" class="modal-backdrop"><button tabindex="-1" aria-hidden="true">close</button></form>
     </dialog>
+    {{ end }}
     {{ if .GraceDurationSec }}
     {{/* data-upsell-surface: one offer on screen at a time -- the resource
          status keeps its plan box's button down while this is up

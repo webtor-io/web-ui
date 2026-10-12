@@ -2249,7 +2249,9 @@ function parseFeatures(settings, isVideo, duration, isSession) {
         advancedtracks: isVideo,
         fullscreen: isVideo,
         chromecast: isVideo,
-        embed: isVideo,
+        // The page renders the Embed dialog only on an instance that
+        // serves embeds (stream_video.html); no dialog, no button.
+        embed: isVideo && !!document.getElementById('embed'),
         // In-player share button — same handler as the header button,
         // fires share-resource Umami with location:'player'. Treated as
         // a growth feature: locked on for ads-enabled (free) embed

@@ -2126,5 +2126,11 @@
     "stremio.paywall.needsPlan": "Para verla necesitas un plan de pago de Webtor",
     "stremio.paywall.trial": "Empieza una prueba gratis",
     "stremio.paywall.open": "Escanea el código o abre",
-    "stremio.paywall.sameAccount": "En Patreon, usa el mismo correo o la misma cuenta de Patreon con la que entras en Webtor; si no, el plan no se vinculará a tu cuenta."
+    "stremio.paywall.sameAccount": "En Patreon, usa el mismo correo o la misma cuenta de Patreon con la que entras en Webtor; si no, el plan no se vinculará a tu cuenta.",
+    "embed.off.title": "La reproducción integrada no está disponible",
+    "embed.off.text": "Los propietarios de sitios pueden servir este reproductor desde su propio {{.Link}}.",
+    "embed.off.link": "servidor Webtor",
+    "embed.unauthorized.title": "Este reproductor no está permitido en este sitio web",
+    "embed.unauthorized.text": "¿Es tu sitio web? Añade su dominio en {{.Link}}.",
+    "embed.unauthorized.link": "tu perfil del servidor Webtor"
 }

@@ -65,7 +65,7 @@ As of September 2026, the site shows no third-party ads.
 ## Developers
 
 - [API](https://webtor.io/api): JSON API for the library, Vault and torrent resources, with Swagger docs.
-- [Embed SDK](https://github.com/webtor-io/embed-sdk-js): a player for third-party websites (npm: @webtor/embed-sdk-js).
+- [Embed SDK](https://github.com/webtor-io/embed-sdk-js): a player for third-party websites, served by the site owner's own self-hosted Webtor instance; webtor.io does not serve embeds (npm: @webtor/embed-sdk-js).
 - [RapidAPI](https://rapidapi.com/paveltatarsky-Dx4aX7s_XBt/api/webtor/): the torrent API on RapidAPI.
 - [Source code](https://github.com/webtor-io): Webtor is open source, and a self-hosted image is available.
 

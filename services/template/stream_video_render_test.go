@@ -85,6 +85,8 @@ func TestStreamVideoRenders(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -360,6 +362,8 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -688,6 +692,8 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -820,6 +826,8 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 		"t":             echo,
 		"tp":            echoVariadic,
 		"tpHTML":        echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).ParseFiles(
@@ -949,6 +957,8 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -1078,6 +1088,8 @@ func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	// The real partial this time, not the stub: its markup is what is under
@@ -1203,6 +1215,8 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -1393,6 +1407,8 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -1537,6 +1553,8 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
@@ -1658,6 +1676,8 @@ func TestStreamVideoRendersEnglishBesideTheOffer(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).

@@ -2235,5 +2235,13 @@
     "@stremio.paywall.open": "Stremio paywall clip, screen 2: the line right above the big 'webtor.io/trial' address and next to the QR code. Must read naturally when followed by a web address.",
     "stremio.paywall.open": "Scan the code or open",
     "@stremio.paywall.sameAccount": "Stremio paywall clip, screen 2, small print at the bottom. The plan is linked to the Webtor account by the Patreon account the user signed in with, or else by email — a trial started under another email stays unlinked. Keep both options (same email / same Patreon account).",
-    "stremio.paywall.sameAccount": "On Patreon, use the same email or Patreon account you sign in to Webtor with, or the plan won't be linked to your account."
+    "stremio.paywall.sameAccount": "On Patreon, use the same email or Patreon account you sign in to Webtor with, or the plan won't be linked to your account.",
+    "@embed.off.title": "Shown inside an iframe on another website when this Webtor server does not serve embeds (webtor.io does not). The people reading it are that website's visitors; embed.off.text speaks to its owner. embed.off.link is the link text inside embed.off.text and must fit its grammar.",
+    "embed.off.title": "Embedded playback is not available",
+    "embed.off.text": "Site owners can serve this player from their own {{.Link}}.",
+    "embed.off.link": "Webtor server",
+    "@embed.unauthorized.title": "Shown inside an iframe on another website whose domain is not on this Webtor server's allowed embed domains. embed.unauthorized.link is the link text inside embed.unauthorized.text (the profile page of this server) and must fit its grammar.",
+    "embed.unauthorized.title": "This player is not allowed on this website",
+    "embed.unauthorized.text": "Own this website? Add its domain in {{.Link}}.",
+    "embed.unauthorized.link": "your profile on the Webtor server"
 }

@@ -349,6 +349,8 @@ func renderSubtitlesDialog(t *testing.T) string {
 		"t":             echo,
 		"tp":            echoVariadic,
 		"tpHTML":        echoHTML,
+
+		"embedEnabled": func() bool { return true },
 	}
 
 	tpl, err := template.New("stream_video.html").Funcs(funcs).ParseFiles(

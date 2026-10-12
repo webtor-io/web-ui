@@ -2126,5 +2126,11 @@
     "stremio.paywall.needsPlan": "Bunun için ücretli bir Webtor planı gerekiyor",
     "stremio.paywall.trial": "Ücretsiz denemeyi başlatın",
     "stremio.paywall.open": "Kodu tarayın veya şu adresi açın",
-    "stremio.paywall.sameAccount": "Patreon'da Webtor'a giriş yaptığınız e-postayı veya Patreon hesabını kullanın; aksi hâlde plan hesabınıza bağlanmaz."
+    "stremio.paywall.sameAccount": "Patreon'da Webtor'a giriş yaptığınız e-postayı veya Patreon hesabını kullanın; aksi hâlde plan hesabınıza bağlanmaz.",
+    "embed.off.title": "Gömülü oynatma kullanılamıyor",
+    "embed.off.text": "Site sahipleri bu oynatıcıyı kendi {{.Link}} üzerinden sunabilir.",
+    "embed.off.link": "Webtor sunucuları",
+    "embed.unauthorized.title": "Bu oynatıcıya bu sitede izin verilmiyor",
+    "embed.unauthorized.text": "Bu site sizin mi? Alan adını {{.Link}} ekleyin.",
+    "embed.unauthorized.link": "Webtor sunucusundaki profilinize"
 }

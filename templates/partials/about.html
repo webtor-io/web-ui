@@ -189,6 +189,10 @@
                 </div>
             </a>
 
+            {{/* The SDK card advertises embedding, which only an instance that
+                 serves embeds can back. Without it the API card takes its
+                 place in the row. */}}
+            {{ if embedEnabled }}
             <a href="https://github.com/webtor-io/embed-sdk-js" target="_blank" rel="noopener" data-umami-event="home-embed-sdk" class="group card bg-base-300 border border-w-line hover:border-w-cyan/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
                 <div class="card-body">
                     <div class="flex items-start justify-between gap-2">
@@ -204,8 +208,9 @@
                     </div>
                 </div>
             </a>
+            {{ end }}
 
-            <a href="{{ apiDocsURL }}" target="_blank" rel="noopener" data-umami-event="home-api-docs" class="group card bg-base-300 border border-w-line hover:border-w-purple/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
+            <a href="{{ apiDocsURL }}" target="_blank" rel="noopener" data-umami-event="home-api-docs" class="group card {{ if not embedEnabled }}md:col-span-2 {{ end }}bg-base-300 border border-w-line hover:border-w-purple/40 hover:-translate-y-1 hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300">
                 <div class="card-body">
                     <div class="flex items-start justify-between gap-2">
                         <div class="w-12 h-12 rounded-xl bg-w-purple/12 text-w-purpleL flex items-center justify-center">

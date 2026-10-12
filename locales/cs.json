@@ -2166,5 +2166,11 @@
     "stremio.paywall.needsPlan": "K tomu potřebujete placený plán Webtor",
     "stremio.paywall.trial": "Začněte zkušební období zdarma",
     "stremio.paywall.open": "Naskenujte kód nebo otevřete",
-    "stremio.paywall.sameAccount": "Na Patreonu použijte stejný e-mail nebo účet Patreon, kterým se přihlašujete do Webtoru, jinak se plán k vašemu účtu nepřiřadí."
+    "stremio.paywall.sameAccount": "Na Patreonu použijte stejný e-mail nebo účet Patreon, kterým se přihlašujete do Webtoru, jinak se plán k vašemu účtu nepřiřadí.",
+    "embed.off.title": "Vložené přehrávání není k dispozici",
+    "embed.off.text": "Provozovatelé webů mohou tento přehrávač poskytovat z vlastního {{.Link}}.",
+    "embed.off.link": "serveru Webtor",
+    "embed.unauthorized.title": "Tento přehrávač není na tomto webu povolen",
+    "embed.unauthorized.text": "Je to váš web? Přidejte jeho doménu ve {{.Link}}.",
+    "embed.unauthorized.link": "svém profilu na serveru Webtor"
 }

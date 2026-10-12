@@ -19,6 +19,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/static"
 	"github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
 
@@ -197,6 +198,7 @@ type Helper struct {
 	useAbuseStore  bool
 	useSuperTokens bool
 	apiDocsURL     string
+	embedEnabled   bool
 }
 
 func NewHelper(c *cli.Context) *Helper {
@@ -210,7 +212,15 @@ func NewHelper(c *cli.Context) *Helper {
 		ah:             static.NewAssetHashes(c.String(static.AssetsPathFlag)),
 		useSuperTokens: c.String(auth.SupertokensHostFlag) != "",
 		apiDocsURL:     libapi.PublicEndpoint(c) + "/docs/index.html",
+		embedEnabled:   embed.Enabled(c),
 	}
+}
+
+// EmbedEnabled: does this instance serve embeds to other sites. Pages that
+// offer embedding (the player's Embed dialog, the SDK card) render only then.
+// Template usage: {{ if embedEnabled }}
+func (s *Helper) EmbedEnabled() bool {
+	return s.embedEnabled
 }
 
 // ApiDocsURL is where the Swagger reference lives for this deployment — the
@@ -259,13 +269,6 @@ func (s *Helper) IsPaid(c *claims.Data) bool {
 		return true
 	}
 	return c.Context.Tier.Id != 0
-}
-
-func (s *Helper) CanManageEmbedDomains(c *claims.Data) bool {
-	if c == nil {
-		return false
-	}
-	return c.Claims != nil && c.Claims.Embed.NoAds
 }
 
 func (s *Helper) TierName(c *claims.Data) string {

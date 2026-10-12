@@ -19,6 +19,7 @@ const (
 	webPortFlag        = "port"
 	StagingFlag        = "staging"
 	RedirectDomainFlag = "redirect-domain"
+	FrameAncestorsFlag = "frame-ancestors"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -40,6 +41,14 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 			Name:   StagingFlag,
 			Usage:  "mark deployment as staging: forces X-Robots-Tag noindex on every response",
 			EnvVar: "STAGING",
+		},
+		cli.StringFlag{
+			Name: FrameAncestorsFlag,
+			// CSP frame-ancestors sources ("'self'"): which sites may put this
+			// instance's pages in a frame. Empty sends no header -- any site
+			// may, which is what a dashboard that frames a home instance needs.
+			Usage:  "Content-Security-Policy frame-ancestors sources for every page but /embed (empty: no header)",
+			EnvVar: "FRAME_ANCESTORS",
 		},
 		cli.StringFlag{
 			Name:   RedirectDomainFlag,

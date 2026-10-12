@@ -119,6 +119,8 @@ func TestGracePopupStartsTheTrialThroughTrial(t *testing.T) {
 			"t":                  echo,
 			"tp":                 echoVariadic,
 			"tpHTML":             func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) },
+
+			"embedEnabled": func() bool { return true },
 		}
 		tpl, err := template.New("stream_video.html").Funcs(funcs).ParseFiles("../../templates/views/action/stream_video.html")
 		if err != nil {

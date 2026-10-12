@@ -227,3 +227,35 @@ func TestFreeCapLineFollowsTheCatalog(t *testing.T) {
 		})
 	}
 }
+
+// The SDK card advertises embedding, so it shows only where the instance
+// serves embeds; without it the API card spans the row it leaves.
+func TestAboutSDKCardFollowsEmbed(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		funcs := aboutFuncs()
+		funcs["kebabToSnake"] = func(s string) string { return strings.ReplaceAll(s, "-", "_") }
+		funcs["faqSchema"] = func(lang string, pairs ...string) template.HTML { return "" }
+		funcs["aiEnabled"] = func() bool { return true }
+		funcs["aiFreeQuota"] = func() int { return 0 }
+		funcs["aiPaidQuota"] = func() int { return 0 }
+		funcs["blogLang"] = func(lang string) string { return lang }
+		funcs["tools"] = func() []hc.Tool { return hc.Tools }
+		funcs["apiDocsURL"] = func() string { return "/api/v1/docs/index.html" }
+		funcs["embedEnabled"] = func() bool { return enabled }
+		tpl := parseAboutTemplates(t, funcs,
+			"../../templates/partials/about.html",
+			"../../templates/partials/about/*.html")
+		var buf bytes.Buffer
+		ctx := map[string]interface{}{"Lang": "en", "Data": map[string]interface{}{"Tool": nil, "Instruction": ""}}
+		if err := tpl.ExecuteTemplate(&buf, "about", ctx); err != nil {
+			t.Fatal(err)
+		}
+		out := buf.String()
+		if got := strings.Contains(out, `data-umami-event="home-embed-sdk"`); got != enabled {
+			t.Errorf("embedEnabled=%v: SDK card rendered=%v", enabled, got)
+		}
+		if got := strings.Contains(out, `class="group card md:col-span-2 `); got == enabled {
+			t.Errorf("embedEnabled=%v: API card spans two columns=%v", enabled, got)
+		}
+	}
+}

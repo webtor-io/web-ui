@@ -2126,5 +2126,11 @@
     "stremio.paywall.needsPlan": "Daarvoor heb je een betaald Webtor-plan nodig",
     "stremio.paywall.trial": "Start een gratis proefperiode",
     "stremio.paywall.open": "Scan de code of open",
-    "stremio.paywall.sameAccount": "Gebruik op Patreon hetzelfde e-mailadres of Patreon-account waarmee je bij Webtor inlogt, anders wordt het plan niet aan je account gekoppeld."
+    "stremio.paywall.sameAccount": "Gebruik op Patreon hetzelfde e-mailadres of Patreon-account waarmee je bij Webtor inlogt, anders wordt het plan niet aan je account gekoppeld.",
+    "embed.off.title": "Ingesloten afspelen is niet beschikbaar",
+    "embed.off.text": "Site-eigenaren kunnen deze speler vanaf hun eigen {{.Link}} aanbieden.",
+    "embed.off.link": "Webtor-server",
+    "embed.unauthorized.title": "Deze speler is niet toegestaan op deze website",
+    "embed.unauthorized.text": "Is dit jouw website? Voeg het domein toe in {{.Link}}.",
+    "embed.unauthorized.link": "je profiel op de Webtor-server"
 }
