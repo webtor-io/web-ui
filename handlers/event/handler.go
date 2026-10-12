@@ -91,15 +91,15 @@ func (h *Handler) Serve() error {
 	if err != nil {
 		return err
 	}
-	err = h.subscribe(js, "common", "resource.vaulted", "web-ui-resource-vaulted", h.resourceVaulted)
+	err = h.subscribe(js, "common", "resource.vaulted", "web-ui-resource-vaulted", h.resourceVaulted, 0)
 	if err != nil {
 		return err
 	}
-	err = h.subscribe(js, "common", "resource.banned", "web-ui-resource-banned", h.resourceBanned)
+	err = h.subscribe(js, "common", "resource.banned", "web-ui-resource-banned", h.resourceBanned, 0)
 	if err != nil {
 		return err
 	}
-	err = h.subscribe(js, "common", "user.updated", "web-ui-user-updated", h.userUpdated)
+	err = h.subscribe(js, "common", "user.updated", "web-ui-user-updated", h.userUpdated, 0)
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (h *Handler) subscribeCacheEvents(js nats.JetStreamContext) {
 		subject, consumer, handler := sub.subject, sub.consumer, sub.handler
 		go retryUntil(h.done, cacheSubscribeRetry, func(attempt int) bool {
 			h.subsMu.Lock()
-			err := h.subscribe(js, "common", subject, consumer, func(b []byte) error { return handler(h.ci, b) })
+			err := h.subscribe(js, "common", subject, consumer, func(b []byte) error { return handler(h.ci, b) }, 10*time.Second)
 			h.subsMu.Unlock()
 			if err == nil {
 				if attempt > 0 {
@@ -168,7 +168,7 @@ func retryUntil(done <-chan struct{}, every time.Duration, try func(attempt int)
 	}
 }
 
-func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject string, consumer string, handler func([]byte) error) error {
+func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject string, consumer string, handler func([]byte) error, retryDelay time.Duration) error {
 	sub, err := js.PullSubscribe(subject, consumer, nats.Bind(stream, consumer))
 	if err != nil {
 		return err
@@ -197,7 +197,20 @@ func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject str
 				err = handler(msg.Data)
 				if err != nil {
 					log.WithError(err).WithField("consumer", consumer).Error("failed to handle message")
-					_ = msg.Nak()
+					if retryDelay == 0 {
+						_ = msg.Nak()
+						continue
+					}
+					// Delay the delivery AND this worker: a DB outage affects
+					// different cache keys too, not only this message.
+					if err := msg.NakWithDelay(retryDelay); err != nil {
+						log.WithError(err).WithField("consumer", consumer).Warn("failed to defer cache event")
+					}
+					select {
+					case <-h.done:
+						return
+					case <-time.After(retryDelay):
+					}
 				} else {
 					_ = msg.Ack()
 				}
