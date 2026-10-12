@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli"
 	csrf "github.com/utrack/gin-csrf"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/tracksession"
 )
 
 const (
@@ -53,6 +54,9 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 		url := fmt.Sprintf("%v:%v", c.String(redisHostFlag), c.Int(redisPortFlag))
 		store, err = redis.NewStore(10, "tcp", url, c.String(redisPassFlag), []byte(c.String(common.SessionSecretFlag)))
 		if err != nil {
+			return err
+		}
+		if err = tracksession.Install(store); err != nil {
 			return err
 		}
 		log.Infof("using redis store %v", url)

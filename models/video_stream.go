@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/webtor-io/web-ui/services/tracksession"
 	"golang.org/x/text/language"
 )
 
@@ -97,6 +98,7 @@ func (s *VideoStreamUserData) UpdateSessionData(c *gin.Context) error {
 	} else {
 		session.Set(audioKey, s.AudioID)
 	}
+	session.Set(tracksession.OrderKey, tracksession.Touch(session.Get(tracksession.OrderKey), fmt.Sprintf("%s_%s", s.ResourceID, s.ItemID)))
 	return session.Save()
 }
 
