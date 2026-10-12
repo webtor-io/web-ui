@@ -519,6 +519,10 @@ var adultMatcher = NewRegexpMatcher(
 	// Explicit XXX scene tag. Kept first for backwards compatibility
 	// — existing golden_file_083 expects this exact match.
 	`(?i)\b((X{3}))\b`,
+	// InTheCrack (skip-list 2026-10-12; the brand usually sits in the
+	// parent path). Its own entry rather than adultStudioAlternation, so
+	// the Studio field, and with it the metadata mapper input, is unchanged.
+	`(?i)\b((inthecrack))\b`,
 	// English single-occurrence keywords. All of these are
 	// effectively never found in non-adult release names.
 	// `creampie[ds]?` covers the `creampied` / `creampies` suffixed
@@ -709,7 +713,7 @@ var sportMatcher = NewRegexpMatcher(
 //      `_` to a space before matching, so the lecture form is
 //      `[\s_]`-separated here.
 var courseMatcher = NewRegexpMatcher(
-	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|lynda\.com|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy|gumroad|john[\s.-]?danaher|master[\s.-]?toddy|chael[\s.-]?sonnen|henry[\s.-]?akins|evenant|flux[\s.-]?academy|zerotomastery|ross[\s.-]?jeffries|rsd[\s.-](?:julien|max|tyler|luke)))\b`,
+	`(?i)\b((udemy|coursera|pluralsight|udacity|skillshare|linkedin\s*learning|lynda\.com|edx\.org|teamtreehouse|frontendmasters|datacamp|codecademy|egghead\.io|tutsplus|packt|oreilly|safari\s*books|master[\s.-]?class|medcurso|paracourse|gnomon[\s.-]?(?:workshop|school|series|bob[\s.-]?kato|drawing|tutorial|cgi|vfx|3d)|gnomonbobkato\w*|cerebellum[\s.-]?(?:academy|btr|tnd)?|slerm[\s.-]?(?:io|courses?)?|bc-[a-z]+course|metal[\s.-]?method|rachana[\s.-]?ranade|doublejump[\s.-]?academy|gumroad|mixwiththemasters|john[\s.-]?danaher|master[\s.-]?toddy|chael[\s.-]?sonnen|henry[\s.-]?akins|evenant|flux[\s.-]?academy|zerotomastery|ross[\s.-]?jeffries|rsd[\s.-](?:julien|max|tyler|luke)))\b`,
 	`(?i)(\[\s*(freecoursesite|freecoursesonline|fcsnew|tutsnode|devcourseweb|webtooltip|freecourselab|freeallcourse|coursehunters|coursedrive|tutslet|udemyking|freetutorials|gigacourse|getfreecourses|freecoursenet)\.[a-z]{2,4}\s*\])`,
 	`(?i)\b([a-z0-9-]+\.(courses))\b`,
 	`(?i)\b((dlc[\s_]+\w*tutorial|ubisoft[\s.]?connect[\s.]?rip|steam[\s.-]?rip|gog[\s.-]?rip|epic[\s.-]?games[\s.-]?rip))\b`,

@@ -283,3 +283,32 @@ func TestSkiplist20260907SiteBanner(t *testing.T) {
 		}
 	}
 }
+
+// Weekly skiplist mining 2026-10-12: two brands that reached
+// ai_enrich.query without a skip flag (26 + 4 rows in the week).
+func TestSkiplist20261012(t *testing.T) {
+	cases := []struct {
+		name          string
+		adult, course bool
+	}{
+		{"InTheCrack - 1234 Jane", true, false},
+		{"inthecrack.com.26.10.01.jane.1080p", true, false},
+		{"MixWithTheMasters - Mixing Lead Vocals", false, true},
+		{"mixwiththemasters.seminar.2026", false, true},
+		// Word-boundary guards.
+		{"Sample.Movie.inthecrackdown.2019.1080p", false, false},
+		{"Sample.Movie.mixwiththemastersclass.2019", false, false},
+	}
+	for _, c := range cases {
+		ti, err := Parse(&TorrentInfo{}, c.name)
+		if err != nil {
+			t.Fatalf("%q: %v", c.name, err)
+		}
+		if ti.Adult != c.adult || ti.Course != c.course {
+			t.Errorf("%q: Adult, Course = %v, %v, want %v, %v", c.name, ti.Adult, ti.Course, c.adult, c.course)
+		}
+		if ti.Studio != "" {
+			t.Errorf("%q: Studio = %q, want empty", c.name, ti.Studio)
+		}
+	}
+}
