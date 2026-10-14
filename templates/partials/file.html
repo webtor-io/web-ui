@@ -48,9 +48,10 @@
          768-844 px tall ones; app/action.js and lib/turnstileAction.js bring
          what renders here into view (lib/stickyStatus.js reveal). Closed
          explicitly: it was written `<div … />`, which HTML does not
-         self-close, so everything after it -- #list included -- was parsed
-         into it. Empty before a press, its margin collapses into the
-         footnote's. */}}
+         self-close -- the card's own </div> closed it, #file was left open,
+         #list was parsed into #file and the Vault and rating modals into
+         #content, so picking a file (a #content swap) wiped those modals.
+         Empty before a press, its margin collapses into the footnote's. */}}
     <div id="log-{{ .Item.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}"></div>
     {{/* Adult-content footnote.
          - Anonymous + adult: 18+ message REPLACES the generic 16+ ageGate

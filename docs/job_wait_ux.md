@@ -79,19 +79,26 @@ the fold on 768-844 px tall screens. Nothing moved the page toward it.
 
 - `#log-<item>` sits right under the button row (`partials/file.html`), the footnote
   after it. It is closed explicitly: it was `<div … />`, which HTML does not
-  self-close, and the file list was parsed into it.
+  self-close -- #file was left open, #list was parsed into it, and the Vault and rating
+  modals into #content, so picking a file wiped them.
 - `reveal(el)` scrolls as little as possible: nothing when `el` is wholly between what
   is fixed at the top (`stickyBottom`) and the window's bottom; otherwise its bottom to
   the fold, but its top never under the bars (a player taller than the space shows from
   its top). Nothing inside a `<dialog>`, and nothing once the viewer scrolled themselves
-  (wheel, touch, scroll keys) after the press -- `markBusy` notes the press
-  (`notePress`); order is kept as a sequence on `window.__reveal`, one record for every
-  bundle. Smooth unless `prefers-reduced-motion`.
+  (wheel, touch, scroll keys; not Space on a button, which presses it) after the press --
+  `markBusy` notes the press (`notePress`), except for the player's own restarts
+  (`resubmit`); order is kept as a sequence on `window.__reveal`, one record for every
+  bundle. Not seen: the scrollbar dragged, Tab, a wheel over the Turnstile iframe; and
+  one press counts for every job on the page. Smooth, or `instant` under
+  `prefers-reduced-motion` (`auto` would follow `html.scroll-smooth`).
 - Called by `app/action.js` on each new step, card, verdict (`inprogress`, `custom`,
   `error`, `warn`, a `done` with a message -- never `statusupdate`), on the shown player,
-  and on a refused start's card; by `lib/turnstileAction.js` on its step and on the live
-  checkbox (whose slot keeps 65 px while the iframe sizes itself). The download card's
-  "start download" takes focus (`preventScroll`).
+  and on a refused start's card, and on an image preview once it loads; by
+  `lib/turnstileAction.js` on its step and on the live checkbox itself (its slot keeps
+  65 px while the iframe sizes itself; revealing the whole block pushed it off-screen in
+  a card's tall log); by `lib/toolIntent.js` on the file's buttons at once. The download
+  card's "start download" takes focus (`preventScroll`), only while the viewer is still
+  at the press and not typing elsewhere -- their Enter would start the download.
 - The buttons on a phone (owner, 2026-10-14: variant D on the design canvas): Watch and
   Download share the width (`max-sm:flex-1` on their forms), the watched toggle is a
   44 px icon at the end of the row (label `max-sm:sr-only`, `aria-pressed`, neutral

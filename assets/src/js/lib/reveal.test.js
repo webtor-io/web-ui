@@ -83,10 +83,29 @@ test('the viewer scrolled after the press: left where they went, until the next 
     assert.equal(reveal(log), true, 'a new press brings it back');
 });
 
-test('reduced motion: no smooth scroll', () => {
+test('reduced motion: an instant scroll -- not auto, which follows html.scroll-smooth', () => {
     fresh();
     reduced = true;
     box(log, 900, 94);
     reveal(log);
-    assert.equal(scrolls[0].behavior, 'auto');
+    assert.equal(scrolls[0].behavior, 'instant');
+});
+
+test('a touch scroll is the viewer going somewhere; Space on a button and keys in a field are not', () => {
+    box(log, 900, 94);
+    fresh();
+    w.dispatchEvent(new w.Event('touchmove'));
+    assert.equal(reveal(log), false, 'touch');
+    fresh();
+    const btn = w.document.createElement('button');
+    w.document.body.appendChild(btn);
+    btn.dispatchEvent(new w.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    assert.equal(reveal(log), true, 'Space presses a button, it does not scroll');
+    fresh();
+    const input = w.document.createElement('input');
+    w.document.body.appendChild(input);
+    input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }));
+    assert.equal(reveal(log), true, 'keys in a field are typing');
+    btn.remove();
+    input.remove();
 });

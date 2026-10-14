@@ -71,8 +71,10 @@ export function markBusy(form, { now = Date.now, timeoutMs = BUSY_MAX_MS } = {})
     form.dataset.busy = 'true';
     form.dataset.busySince = String(now());
     // What the job produces is brought into view (stickyStatus.js reveal)
-    // unless the viewer scrolls away after this.
-    notePress(form.ownerDocument.defaultView);
+    // unless the viewer scrolls away after this. Not for a restart the player
+    // makes on its own (resubmit): nobody pressed, and a viewer reading the
+    // list under a playing file must not be pulled back up to it.
+    if (!form._quietPress) notePress(form.ownerDocument.defaultView);
     // The button keeps saying what it is (owner, 2026-09-19): the label and
     // its icon stay, and a spinner joins them. A button that renamed itself
     // to "preparing…" lost the one word that said which of the two buttons
@@ -180,5 +182,12 @@ export function countBusyPress(e) {
 // before the first frame then restarted nothing.
 export function resubmit(form) {
     clearBusy(form);
-    form.requestSubmit();
+    // The submit is dispatched synchronously: Turnstile or async.js mark the
+    // form inside requestSubmit(), and see the flag there.
+    form._quietPress = true;
+    try {
+        form.requestSubmit();
+    } finally {
+        delete form._quietPress;
+    }
 }

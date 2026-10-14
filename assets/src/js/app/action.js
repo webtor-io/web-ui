@@ -1,6 +1,6 @@
 import av from '../lib/av';
 import { clearBusyFor } from '../lib/actionBusy';
-import { reveal as bringIntoView } from '../lib/stickyStatus';
+import { reveal as bringIntoView, stillAtPress } from '../lib/stickyStatus';
 
 // The button that started the job stays busy until the player is shown, not
 // until its template is rendered (lib/progressLog.js): in between the player
@@ -74,10 +74,15 @@ av(async function() {
         }
         // The download card: its "start download" is what the viewer came
         // for, and the link needs a second click -- focused, so Enter starts
-        // it and a screen reader says where they are.
+        // it and a screen reader says where they are. Only while the viewer
+        // is still at the press: not after they scrolled away, and not out of
+        // a field they are typing in (their Enter would start the download).
         if (ev.level === 'custom') {
             const start = progress.querySelector('[data-transfer-download]');
-            if (start) start.focus({ preventScroll: true });
+            const ae = document.activeElement;
+            const here = !ae || ae === document.body || self.contains(ae)
+                || (ae.form && ae.form.getAttribute('data-async-target') === `#${self.id}`);
+            if (start && here && stillAtPress(window)) start.focus({ preventScroll: true });
         }
         if (ev.level !== 'rendertemplate') return;
         rendered = true;
@@ -92,7 +97,12 @@ av(async function() {
         self.appendChild(el);
         ev.render(el);
         // Download cards and image previews have no player readiness event.
-        if (!el.querySelector('video, audio')) reveal();
+        // An image has no height until it loads: brought into view then.
+        if (!el.querySelector('video, audio')) {
+            reveal();
+            const img = el.querySelector('img');
+            if (img && !img.complete) img.addEventListener('load', () => bringIntoView(el), { once: true });
+        }
     });
 }, function() {
     if (this._actionTeardown) {

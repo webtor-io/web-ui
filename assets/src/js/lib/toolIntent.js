@@ -1,3 +1,5 @@
+import { notePress, reveal } from './stickyStatus';
+
 // The tool-intent line on the resource page (partials/resource/tool_intent):
 // "Or download the files directly — no torrent client needed", shown to a
 // visitor who submitted the torrent on /magnet-to-torrent.
@@ -33,7 +35,14 @@ export function initToolIntent(root, doc = document) {
         e.preventDefault();
         // The archive reports into its modal; a file's job log, right under
         // its buttons, is brought into view by the job itself (app/action.js,
-        // lib/turnstileAction.js), like any press of that button.
+        // lib/turnstileAction.js), like any press of that button. The
+        // buttons are brought in at once: the job's first word is a round
+        // trip away, and a second press of the line on a busy button starts
+        // nothing that would move the page.
         target.button.click();
+        if (target.kind === 'file') {
+            notePress(doc.defaultView);
+            reveal(target.button, doc);
+        }
     });
 }

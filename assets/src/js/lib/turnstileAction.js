@@ -142,7 +142,10 @@ function renderLive(slot) {
             stage.querySelector('.job-stage-title').textContent = ask;
             stage.classList.add('job-stage-done');
         }
-        reveal(block || slot);
+        // The slot itself, not the block: in a card's log (a retry form) the
+        // block is the whole job log, taller than the screen, and pinning
+        // its top pushed the checkbox out of view.
+        reveal(slot);
     } catch (e) {
         st.liveId = null;
         if (st.pending) st.pending.finish('', 'live-render-failed');

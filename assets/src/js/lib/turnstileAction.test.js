@@ -45,7 +45,10 @@ function watchSecondPass(form) {
     });
     return seen;
 }
-const settle = () => new Promise((r) => setTimeout(r, 20));
+// Timer hops in sequence, not one 20 ms wait: the re-submit after a token is
+// a chain of timers, and on a loaded machine one long wait could fire before
+// the chain's later links were even scheduled (full-suite flake, 2026-10-14).
+const settle = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 2)); };
 
 test('a form outside its log gets the check written into the log, then goes out', async () => {
     const form = document.getElementById('watch');

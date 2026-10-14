@@ -6,7 +6,7 @@ const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://webtor.io/
 global.window = dom.window;
 global.document = dom.window.document;
 
-const { BUSY_MAX_MS, clearBusy, clearBusyFor, isActionForm, isBusy, markBusy, countBusyPress } = await import('./actionBusy.js');
+const { BUSY_MAX_MS, clearBusy, clearBusyFor, isActionForm, isBusy, markBusy, countBusyPress, resubmit } = await import('./actionBusy.js');
 
 function card({ action = '/ru/stream-video', label = 'Смотреть' } = {}) {
     document.body.innerHTML = `
@@ -159,4 +159,17 @@ test('a press on a working button is counted once per busy spell, and nothing el
     assert.equal(events.length, 2);
     clearBusy(p.stream);
     delete window.umami;
+});
+
+test('a restart the player makes on its own is no press: it re-arms no reveal', () => {
+    const p = card();
+    markBusy(p.stream, { timeoutMs: 50 });
+    const pressed = window.__reveal.pressAt;
+    assert.ok(pressed > 0, 'a press is noted');
+    clearBusy(p.stream);
+    p.stream.addEventListener('submit', (e) => { e.preventDefault(); markBusy(p.stream, { timeoutMs: 50 }); }, { once: true });
+    resubmit(p.stream);
+    assert.equal(isBusy(p.stream), true, 'the restart went out and is busy');
+    assert.equal(window.__reveal.pressAt, pressed, 'but noted no press');
+    clearBusy(p.stream);
 });

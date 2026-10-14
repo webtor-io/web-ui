@@ -201,3 +201,36 @@ test('an old job whose log was replaced by a new press releases nothing', async 
     dl.remove();
     host.innerHTML = saved;
 });
+
+test('the download card takes no focus from a field the viewer is typing in, nor after they scrolled away', async () => {
+    const host = w.document.getElementById('host');
+    const search = w.document.createElement('input');
+    w.document.body.appendChild(search);
+    notePress(w);
+    await init.call(host);
+    search.focus();
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'custom', tag: 'dl', body: '<a data-transfer-download href="/f" download>start</a>' }) });
+    assert.equal(w.document.activeElement, search, 'typing goes on where it was');
+    destroy.call(host);
+    search.blur();
+    notePress(w);
+    await init.call(host);
+    w.dispatchEvent(new w.WheelEvent('wheel', { deltaY: 50 }));
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'custom', tag: 'dl2', body: '<a data-transfer-download href="/f" download>start</a>' }) });
+    assert.notEqual(w.document.activeElement, host.querySelector('[data-transfer-download]'), 'scrolled away: left alone');
+    destroy.call(host);
+    search.remove();
+});
+
+test('an image preview is brought into view once it has loaded (no height before)', async () => {
+    const host = w.document.getElementById('host');
+    notePress(w);
+    await init.call(host);
+    scrolls.length = 0;
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'rendertemplate', tag: 'img', body: '<div class="wt-preview-mount"><img class="wt-preview-image" src="/p.jpg"></div>' }) });
+    const el = host.querySelector('.wt-preview-mount').parentElement;
+    below(el);
+    host.querySelector('img').dispatchEvent(new w.Event('load'));
+    assert.equal(scrolls.length, 1);
+    destroy.call(host);
+});

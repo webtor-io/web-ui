@@ -35,7 +35,10 @@ bindAsync({
 });
 
 const form = document.querySelector('form.stream');
-const settle = () => new Promise((r) => setTimeout(r, 20));
+// Timer hops in sequence, not one 20 ms wait: the re-submit after a token is
+// a chain of timers, and on a loaded machine one long wait could fire before
+// the chain's later links were even scheduled (full-suite flake, 2026-10-14).
+const settle = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 2)); };
 
 test('a refused start (400, no job) releases its button and shows the card', async () => {
     answer = { status: 400, body: '<div class="progress-alert closeable" role="alert"><pre>refused</pre></div>' };

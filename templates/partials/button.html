@@ -7,7 +7,7 @@
 <form class="{{ .Data.Action }} max-sm:flex-1 max-sm:min-w-0" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .Data.ID }}" data-async-push-state="false">
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
-    <button type="submit" class="btn btn-soft whitespace-nowrap max-sm:w-full" data-umami-event="{{ .Data.Action }}">
+    <button type="submit" class="btn btn-soft whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="{{ .Data.Action }}">
         {{ template "icons" .Data.Action }}
         {{ t .Ctx.Lang .Data.Name }}{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
     </button>

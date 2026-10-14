@@ -95,3 +95,19 @@ test('a page without the line: nothing is bound, nothing throws', () => {
     doc.getElementById('resource-header').remove();
     assert.doesNotThrow(() => initToolIntent(doc.body, doc));
 });
+
+test('a file press brings its buttons into view at once -- a repeat press too, which starts nothing', () => {
+    const { doc, win } = page('single');
+    recordPresses(doc);
+    const scrolls = [];
+    win.innerHeight = 844;
+    win.matchMedia = () => ({ matches: false });
+    win.scrollTo = (o) => scrolls.push(o);
+    const btn = doc.querySelector('#file form.download button[type=submit]');
+    btn.getBoundingClientRect = () => ({ top: 1200, bottom: 1240, height: 40 });
+    initToolIntent(doc.body, doc);
+    pressLine(doc, win);
+    assert.equal(scrolls.length, 1);
+    pressLine(doc, win);
+    assert.equal(scrolls.length, 2, 'again');
+});

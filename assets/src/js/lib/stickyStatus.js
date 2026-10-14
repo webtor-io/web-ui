@@ -177,9 +177,11 @@ export function fixedBottom(root = document) {
 //     player taller than the space shows from its top;
 //   - nothing inside a <dialog> (its own box scrolls; TAR/ZIP);
 //   - nothing once the viewer has scrolled themselves since the press
-//     (wheel, touch, scroll keys): they went somewhere on purpose. Dragging
-//     the scrollbar is not seen.
-// Smooth, unless the viewer asked for reduced motion.
+//     (wheel, touch, scroll keys): they went somewhere on purpose. Not seen:
+//     dragging the scrollbar, Tab moving focus, a wheel over the Turnstile
+//     iframe -- and a press anywhere on the page counts for every job on it.
+// Smooth, unless the viewer asked for reduced motion: then 'instant' -- not
+// 'auto', which defers to <html class="scroll-smooth"> and animates anyway.
 const GAP = 12;
 const SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ']);
 
@@ -196,6 +198,9 @@ function record(w) {
         if (!SCROLL_KEYS.has(e.key)) return;
         const t = e.target;
         if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+        // Space on a button or a link presses it -- the busy Watch pressed
+        // again -- and scrolls nothing.
+        if (e.key === ' ' && t && t.closest && t.closest('button, a[href], summary, [role=button]')) return;
         mark();
     }, { capture: true });
     return r;
@@ -207,11 +212,16 @@ export function notePress(w = window) {
     r.pressAt = ++r.seq;
 }
 
+// stillAtPress: the viewer has not scrolled away since the last press.
+export function stillAtPress(w = window) {
+    const r = record(w);
+    return r.scrollAt <= r.pressAt;
+}
+
 export function reveal(el, root = document) {
     if (!el || !el.isConnected || el.closest('dialog')) return false;
     const w = el.ownerDocument.defaultView;
-    const r = record(w);
-    if (r.scrollAt > r.pressAt) return false;
+    if (!stillAtPress(w)) return false;
     const box = el.getBoundingClientRect();
     if (!box.height) return false;
     const top = stickyBottom(root) + GAP;
@@ -221,6 +231,6 @@ export function reveal(el, root = document) {
     if (box.top - dy < top) dy = box.top - top;
     if (Math.abs(dy) < 1) return false;
     const reduce = typeof w.matchMedia === 'function' && w.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    w.scrollTo({ top: w.scrollY + dy, behavior: reduce ? 'auto' : 'smooth' });
+    w.scrollTo({ top: w.scrollY + dy, behavior: reduce ? 'instant' : 'smooth' });
     return true;
 }

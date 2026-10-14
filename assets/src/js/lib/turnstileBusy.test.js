@@ -55,7 +55,10 @@ bindAsync({
 });
 
 const watch = document.getElementById('watch');
-const settle = () => new Promise((r) => setTimeout(r, 20));
+// Timer hops in sequence, not one 20 ms wait: the re-submit after a token is
+// a chain of timers, and on a loaded machine one long wait could fire before
+// the chain's later links were even scheduled (full-suite flake, 2026-10-14).
+const settle = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 2)); };
 
 test('the button is busy from the press, through the check, and the token still goes out', async () => {
     watch.requestSubmit();
@@ -128,6 +131,27 @@ test('an answer that comes at once is re-submitted in a task of its own, not ins
     assert.equal(posts.length, before + 1, 'the re-submit, a task later');
     global.turnstile.execute = was;
     t.mock.timers.reset();
+    await settle();
+    clearBusy(watch);
+});
+
+test('the live checkbox itself is brought into view, holding its height while the iframe loads', async () => {
+    const scrolls = [];
+    dom.window.innerHeight = 844;
+    dom.window.matchMedia = () => ({ matches: false });
+    dom.window.scrollTo = (o) => scrolls.push(o);
+    watch.requestSubmit();
+    const step = document.querySelector('#log-1 [data-turnstile-step]');
+    const slot = step.lastElementChild;
+    // The block may be tall (a card's whole log): only the slot counts.
+    step.getBoundingClientRect = () => ({ top: 100, bottom: 1300, height: 1200 });
+    slot.getBoundingClientRect = () => ({ top: 900, bottom: 965, height: 65 });
+    scrolls.length = 0;
+    widgets[0]['before-interactive-callback']();
+    assert.equal(slot.style.minHeight, '65px');
+    assert.equal(scrolls.length, 1);
+    assert.equal(scrolls[0].top, 965 - (844 - 12), 'the slot to the fold, not the block\'s top under the navbar');
+    answer();
     await settle();
     clearBusy(watch);
 });
