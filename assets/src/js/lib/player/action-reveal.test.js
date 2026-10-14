@@ -10,7 +10,7 @@ import { JSDOM } from 'jsdom';
 // whose new session was dead at its first request never got to canplay; its
 // card sat in the hidden render, and the viewer read "waiting for the player"
 // for minutes.
-const dom = new JSDOM(`<!doctype html><body><div id="host"><script id="s"></script>
+const dom = new JSDOM(`<!doctype html><body><form id="watch" action="/stream-video" method="post" data-async-target="#host"><button type="submit">Watch</button></form><div id="host"><script id="s"></script>
     <div class="progress-alert" data-async-progress-log="/log/1"><div class="log-target"></div></div>
     </div></body>`, { url: 'https://webtor.io/r' });
 const w = dom.window;
@@ -84,4 +84,44 @@ test('failed preparation does not latch viewer presence', async () => {
     sources.at(-1).onmessage({ data: JSON.stringify({ level: 'error', tag: 'load', message: 'failed' }) });
     assert.equal('transferPreparing' in progress.dataset, false);
     destroy.call(host);
+});
+
+// The Watch button that started the job (lib/actionBusy.js) stays busy until
+// the player is shown -- not when its template arrives: in between it buffers
+// out of sight, and a press there replayed the job over it.
+const { markBusy, isBusy, clearBusy } = await import('../actionBusy.js');
+const watch = () => w.document.getElementById('watch');
+
+test('the button stays busy through the rendered template and the job\'s close, until the player is shown', async () => {
+    markBusy(watch(), { timeoutMs: 0 });
+    await start();
+    assert.equal(isBusy(watch()), true, 'a rendered player is not yet on screen');
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'close' }) });
+    assert.equal(isBusy(watch()), true, 'close follows rendertemplate in every job');
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    assert.equal(isBusy(watch()), false, 'released when the player can play');
+    destroy.call(w.document.getElementById('host'));
+});
+
+test('a player that never says it can play releases the button after the backstop', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    markBusy(watch(), { timeoutMs: 0 });
+    await start();
+    t.mock.timers.tick(29 * 1000);
+    assert.equal(isBusy(watch()), true);
+    t.mock.timers.tick(1000);
+    assert.equal(isBusy(watch()), false, '30 s after the template');
+    destroy.call(w.document.getElementById('host'));
+});
+
+test('a job that renders nothing to wait for (a download card) is released by its close', async () => {
+    const host = w.document.getElementById('host');
+    markBusy(watch(), { timeoutMs: 0 });
+    await init.call(host);
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'custom', tag: 'card', body: '<div>card</div>' }) });
+    assert.equal(isBusy(watch()), true);
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'close' }) });
+    assert.equal(isBusy(watch()), false);
+    destroy.call(host);
+    clearBusy(watch());
 });

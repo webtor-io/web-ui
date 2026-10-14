@@ -18,9 +18,10 @@
 // the state.
 //
 // Every busy state has to end, or a job that dies quietly leaves a dead
-// button. The ways out: the job log reports an ending (`close`, `error` --
-// no peers, the cap modal --, `rendertemplate` -- the player is up --,
-// `download`, `redirect`; lib/progressLog.js), the request itself failed
+// button. The ways out: the job log reports an ending (`error` -- no peers,
+// the cap modal --, `download`, `redirect`, `close` of a job that rendered
+// nothing; lib/progressLog.js), the player it rendered is shown or its 30 s
+// backstop passes (app/action.js), the request itself failed or was refused
 // (lib/async.js), or the safety timeout below expires.
 
 // A job may legitimately run for minutes (p99 of a stream job is ~8 min), so

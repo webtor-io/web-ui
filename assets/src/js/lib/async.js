@@ -134,7 +134,10 @@ async function async(selector, params = {}, scope = null) {
             // form itself, and a button disabled on that first pass would
             // break its second one.
             if (isActionForm(this)) {
-                if (isBusy(this)) return false;
+                // Turnstile marks an anonymous press busy before its check
+                // (lib/turnstileAction.js) and re-submits the form with the
+                // token: that second pass is the request itself, not a repeat.
+                if (isBusy(this) && !this.dataset.turnstileReady) return false;
                 markBusy(this);
             }
             let history = true;

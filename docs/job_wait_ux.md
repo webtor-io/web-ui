@@ -14,11 +14,21 @@ its label, swaps its icon for a spinner and gets `.btn-busy` (dimmed, `pointer-e
 none`, `aria-busy`) — **not** `disabled`: it is working, not refusing. The job log stays
 where it is, under the buttons.
 
-- **Marked** in `lib/async.js`, where the request actually begins — not on `submit`:
-  Turnstile intercepts the first submit and re-submits the form itself
-  (`docs/turnstile_actions.md`). A second submit of a busy form is swallowed there.
+- **Marked** at the press. For an anonymous visitor by `lib/turnstileAction.js`, before
+  its check (about a second, up to 15 s silent, two minutes when Cloudflare wants a
+  click: until 2026-10-14 the button looked idle through all of it); otherwise by
+  `lib/async.js`, where the request begins. A second submit of a busy form is swallowed
+  in both places -- in Turnstile's before the check, which would spend a token and
+  write its step over the running job's log. Turnstile's own re-submit with the token
+  carries `data-turnstile-ready` and is let through. A press dropped because another
+  form's check is running closes the dialog its onclick opened (TAR/ZIP).
 - **Released** by the job log (`lib/progressLog.js`, first thing in `renderMessage`) on
-  `close`, `error`, `rendertemplate`, `download`, `redirect`; by a failed request
+  `error`, `download`, `redirect`, and `close` of a job that rendered nothing; a job that
+  rendered a player is released by `app/action.js` when the player is shown
+  (`player_ready`, or `player_show` for a card before the first frame), or 30 s after
+  the template as a backstop. Until 2026-10-14 `rendertemplate` released it: the player
+  was still buffering out of sight, the button was live, and a press replayed the job
+  over it. Also released by a failed request
   or a non-OK answer (`async.js`: a 400 -- Turnstile refused, bad arguments, the job did
   not start -- renders `action/post`'s card with no job log, so nothing else would ever
   release it; until 2026-10-14 the button stayed dead for the full backstop under a card

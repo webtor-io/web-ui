@@ -1,4 +1,12 @@
 import av from '../lib/av';
+import { clearBusyFor } from '../lib/actionBusy';
+
+// The button that started the job stays busy until the player is shown, not
+// until its template is rendered (lib/progressLog.js): in between the player
+// buffers out of sight, and a press there threw it away and replayed the job.
+// A player that never says it can play (or has a card to show) must not hold
+// the button for BUSY_MAX_MS: this releases it anyway.
+const REVEAL_BACKSTOP_MS = 30 * 1000;
 av(async function() {
     const self = this;
     if (self._actionTeardown) self._actionTeardown();
@@ -7,6 +15,7 @@ av(async function() {
     const el = document.createElement('div');
     let gone = false;
     let rendered = false;
+    let backstop = null;
     let sdk;
     const changed = () => document.dispatchEvent(new CustomEvent('transfer-activity'));
     const endPreparation = () => {
@@ -17,11 +26,17 @@ av(async function() {
         window.removeEventListener('player_ready', reveal);
         window.removeEventListener('player_show', reveal);
     };
+    const release = () => {
+        clearTimeout(backstop);
+        backstop = null;
+        clearBusyFor(self);
+    };
     const reveal = () => {
         unlisten();
         progress.classList.add('hidden');
         el.classList.remove('hidden');
         endPreparation();
+        release();
     };
     const onClose = (ev) => {
         if (ev.target.closest('.closeable-close')) endPreparation();
@@ -29,6 +44,7 @@ av(async function() {
     self._actionTeardown = () => {
         gone = true;
         unlisten();
+        clearTimeout(backstop);
         progress.removeEventListener('click', onClose);
         if (sdk) sdk.destroy();
         endPreparation();
@@ -45,10 +61,13 @@ av(async function() {
         }
         if (ev.level !== 'rendertemplate') return;
         rendered = true;
-        // A finished job is not yet a ready player. Keep preparation until
-        // canplay, or a player card that needs to be shown (player_show).
+        // A finished job is not yet a ready player. Keep preparation -- and
+        // the busy button -- until canplay, or a player card that needs to be
+        // shown (player_show).
         window.addEventListener('player_ready', reveal);
         window.addEventListener('player_show', reveal);
+        clearTimeout(backstop);
+        backstop = setTimeout(release, REVEAL_BACKSTOP_MS);
         el.classList.add('hidden', 'mb-5');
         self.appendChild(el);
         ev.render(el);

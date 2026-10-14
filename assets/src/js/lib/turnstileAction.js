@@ -30,6 +30,8 @@
 // would make "don't load the script" the bypass. A loaded script that
 // stays silent gets SILENT_TIMEOUT_MS; a visible checkbox gets
 // INTERACTIVE_TIMEOUT_MS — a person needs time to click.
+import { isBusy, markBusy } from './actionBusy';
+
 const ACTIONS = /\/(download-file|download-dir|preview-image|stream-audio|stream-video)$/;
 const SILENT_TIMEOUT_MS = 15000;
 const INTERACTIVE_TIMEOUT_MS = 120000;
@@ -280,6 +282,18 @@ function setToken(form, token) {
     delete form.dataset.turnstileReason;
 }
 
+// closeOwnDialog: a press dropped because another form's check is running
+// must not leave the dialog its onclick opened (TAR/ZIP, partials/list.html)
+// spinning over a job that never started.
+function closeOwnDialog(form) {
+    const sel = form.getAttribute('data-async-target');
+    const target = sel ? document.querySelector(sel) : null;
+    const dialog = target && target.closest('dialog');
+    if (!dialog || !dialog.open) return;
+    if (st.pending && st.pending.slot && dialog.contains(st.pending.slot)) return; // that check is this dialog's
+    dialog.close();
+}
+
 export default function init() {
     if (!container()) return; // widget not configured: nothing to gate
     warmUp();
@@ -299,7 +313,20 @@ export default function init() {
         }
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (st.pending) return; // a check is already running for some form
+        // A working button's form, pressed again (Enter: the pointer cannot
+        // reach a busy button): swallowed here, as lib/async.js would -- the
+        // check would spend a token and write its step over the running
+        // job's log.
+        if (isBusy(form)) return;
+        if (st.pending) { // a check is already running for some form
+            closeOwnDialog(form);
+            return;
+        }
+        // Busy from the press, not from the token: the check takes a second,
+        // fifteen when Cloudflare is slow, two minutes when it wants a click,
+        // and the button looked idle through all of it. async.js lets the
+        // second pass of a busy form through (turnstileReady).
+        markBusy(form);
         // Remember the button that submitted, so requestSubmit() keeps its
         // name/value (select.js and the download split button rely on it).
         const submitter = e.submitter || null;
