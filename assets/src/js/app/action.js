@@ -32,7 +32,10 @@ av(async function() {
     const release = () => {
         clearTimeout(backstop);
         backstop = null;
-        clearBusyFor(self);
+        // Only while this job's log is still on the page: a new press into
+        // the same #log replaces it (Turnstile's step) before this view is
+        // torn down, and its form is the one busy for this target then.
+        if (progress.isConnected) clearBusyFor(self);
     };
     const reveal = () => {
         unlisten();

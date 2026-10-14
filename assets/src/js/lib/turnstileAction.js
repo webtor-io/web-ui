@@ -340,9 +340,17 @@ export default function init() {
         const submitter = e.submitter || null;
         getToken(form).then((token) => {
             setToken(form, token);
-            form.dataset[READY] = '1';
-            if (submitter && form.contains(submitter)) form.requestSubmit(submitter);
-            else form.requestSubmit();
+            // In a task of its own, not as a microtask of this press: an
+            // answer that comes at once (no script yet on a slow phone, a
+            // blocked one, a widget that failed) resolves inside the press's
+            // own submit dispatch, where a browser ignores requestSubmit().
+            // The press then did nothing -- and with the button busy from
+            // the press, it stayed dead for BUSY_MAX_MS.
+            setTimeout(() => {
+                form.dataset[READY] = '1';
+                if (submitter && form.contains(submitter)) form.requestSubmit(submitter);
+                else form.requestSubmit();
+            }, 0);
         });
     }, true);
 }

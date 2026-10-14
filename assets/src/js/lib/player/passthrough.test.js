@@ -318,6 +318,17 @@ function declaringPage(opts) {
     return win;
 }
 
+test('fallback: a start form still busy from the first job goes out again', () => {
+    const win = declaringPage();
+    const form = startForm(win);
+    form.dataset.busy = 'true';
+    const submits = captureSubmits(win);
+    const p = player(win);
+    assert.equal(fallbackToOldRoute({ video: p.v, reason: 'decode_error', path: 'mse', win, doc: win.document, track: () => {} }), 'form');
+    assert.equal(submits.length, 1);
+    assert.equal(form.dataset.busy, undefined, 'released before the submit');
+});
+
 test('fallback on the resource page: the start form again, with why, without a declaration', () => {
     const win = declaringPage();
     const form = startForm(win);

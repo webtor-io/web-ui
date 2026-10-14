@@ -14,6 +14,7 @@
 // tells the two apart.
 
 import { backgroundToken, fetchStreamRender } from './background-render.js';
+import { resubmit } from '../actionBusy.js';
 
 export const AUTO_RESUME_KEY = 'wt-auto-resume';
 const AUTO_RESUME_TTL_MS = 60 * 1000;
@@ -64,7 +65,7 @@ export function findStreamForm(root = document) {
 function restartStream() {
     const form = findStreamForm();
     if (form && typeof form.requestSubmit === 'function') {
-        form.requestSubmit();
+        resubmit(form);
         return;
     }
     window.location.hash = 'action=stream';

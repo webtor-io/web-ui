@@ -139,6 +139,20 @@ test('restart on the resource page: this file\'s start form again, with purge, o
     assert.equal(win.document.querySelectorAll(`input[${PURGE_MARK}]`).length, 0, 'the next player takes it off');
 });
 
+test('restart: a start form still busy from the first job (its player not shown yet) goes out again', () => {
+    // lib/actionBusy.js keeps the start button busy until the player is
+    // shown; a restart before that is a fresh press, and the busy guard of
+    // lib/async.js / lib/turnstileAction.js would swallow it.
+    const win = page();
+    const form = startForm(win);
+    form.dataset.busy = 'true';
+    const submits = captureSubmits(win);
+    const p = player(win);
+    assert.equal(restartStream({ win, doc: win.document, video: p.v, root: p.root }), 'form');
+    assert.equal(submits.length, 1);
+    assert.equal(form.dataset.busy, undefined, 'released before the submit');
+});
+
 test('restart: the item on the element wins; an audio render (no dialog, no item) goes by the deep link', () => {
     const win = page();
     startForm(win, { iid: 'item1', endpoint: 'stream-audio' });

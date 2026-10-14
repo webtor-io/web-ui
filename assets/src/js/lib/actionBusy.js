@@ -171,3 +171,14 @@ export function countBusyPress(e) {
     const wait = Math.round((Date.now() - Number(form.dataset.busySince)) / 1000);
     window.umami.track('busy-press', { action: action ? action[1] : 'other', wait });
 }
+
+// resubmit starts the job again from its start form: the player's own
+// restarts (lib/player/stream-restart.js, passthrough.js, preferred-lang.js).
+// They replace the running job -- a fresh press, not a repeat -- and the busy
+// state the first job left (until its player is shown) would swallow them in
+// lib/async.js or lib/turnstileAction.js: a dead session or a refused codec
+// before the first frame then restarted nothing.
+export function resubmit(form) {
+    clearBusy(form);
+    form.requestSubmit();
+}

@@ -46,6 +46,7 @@
 // no automatic restart happens at all: an unrecorded restart is no limit.
 
 import { loadDocument, postEmbedStart } from './passthrough.js';
+import { resubmit } from '../actionBusy.js';
 import { applyDeclaration, vodRescueFor, VOD_FALLBACK_REASON, VOD_FALLBACK_CLASS } from './decode-declaration.js';
 
 export const AUTO_RESTART_EVERY_MS = 5 * 60 * 1000;
@@ -239,7 +240,7 @@ export function restartStream({ win = window, doc = document, video, root = null
         // As a start from the button: the layout's hook writes the same on
         // each of Turnstile's passes (decode-declaration.js).
         try { applyDeclaration(form, win); } catch (e) { /* the hook, or none */ }
-        form.requestSubmit();
+        resubmit(form);
         return 'form';
     }
     navigate(restartURL(win.location.href, d.path || '', { forceSlow: answeredSlow(video) }));

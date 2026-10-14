@@ -111,3 +111,23 @@ test('the check is written under the button and brought into view', async () => 
     proto.getBoundingClientRect = was;
     clearBusy(watch);
 });
+
+test('an answer that comes at once is re-submitted in a task of its own, not inside the press', async (t) => {
+    // No script yet / a widget that throws: getToken resolves synchronously,
+    // and a re-submit as a microtask would run inside the press's own submit
+    // dispatch, where a browser ignores requestSubmit() (jsdom does not, so
+    // this pins the task boundary itself).
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const was = global.turnstile.execute;
+    global.turnstile.execute = () => { throw new Error('widget failed'); };
+    const before = posts.length;
+    watch.requestSubmit();
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    assert.equal(posts.length, before, 'nothing re-submitted inside the press');
+    t.mock.timers.tick(0);
+    assert.equal(posts.length, before + 1, 'the re-submit, a task later');
+    global.turnstile.execute = was;
+    t.mock.timers.reset();
+    await settle();
+    clearBusy(watch);
+});

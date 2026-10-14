@@ -180,3 +180,24 @@ test('a refused start (no job log) brings its card into view', async () => {
     assert.equal(scrolls.length, 1);
     refused.remove();
 });
+
+test('an old job whose log was replaced by a new press releases nothing', async () => {
+    const host = w.document.getElementById('host');
+    const saved = host.innerHTML;
+    markBusy(watch(), { timeoutMs: 0 });
+    await start();
+    // Download pressed into the same #log: Turnstile's step replaces the log
+    // before this view is torn down, and Download is the busy one now.
+    const dl = w.document.createElement('form');
+    dl.setAttribute('action', '/download-file');
+    dl.setAttribute('data-async-target', '#host');
+    dl.innerHTML = '<button type="submit">Download</button>';
+    w.document.body.appendChild(dl);
+    markBusy(dl, { timeoutMs: 0 });
+    host.replaceChildren(w.document.createElement('div'));
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    assert.equal(isBusy(dl), true, 'the old player\'s canplay is not the new job\'s end');
+    clearBusy(dl);
+    dl.remove();
+    host.innerHTML = saved;
+});

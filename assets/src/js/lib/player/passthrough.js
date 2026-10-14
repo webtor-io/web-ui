@@ -10,6 +10,7 @@
 // multichannel audio (createAudioGuard, below). The old route's error
 // handling for every other stream (hls-manager.js) is untouched.
 
+import { resubmit } from '../actionBusy.js';
 import {
     rememberFallback, setPendingFallback, applyDeclaration, declarationFor, declaresAudio, isAudioClass, STRUCK_BY_CLASS,
     VOD_FALLBACK_CLASS, VOD_FALLBACK_REASON, markVodRescue,
@@ -787,7 +788,7 @@ function restartFile({ win, doc, d, resourceId, itemId, reason, cls, navigate, r
         // not depend on the hook being installed on the page. The hook, where
         // it is, writes the same on each of Turnstile's passes.
         applyDeclaration(form, win);
-        form.requestSubmit();
+        resubmit(form);
         return 'form';
     }
     if (form) {
