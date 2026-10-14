@@ -32,7 +32,7 @@
      row. progressLog.js hides the host's own close link when a card brings
      its own, so the home page log does not show a second one. */}}
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center text-left">
-    <a class="close closeable-close">{{ t $.Lang "home.gotIt" }}</a>
+    <button type="button" class="close closeable-close">{{ t $.Lang "home.gotIt" }}</button>
     {{- if $dead }}
     {{/* Same shape as the streaming retries: the form targets the log host
          (#log-load, see partials/load/progress), whose data-async-layout

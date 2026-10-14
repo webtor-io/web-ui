@@ -1,8 +1,11 @@
 {{ define "main" }}
 {{ if .ErrKey }}
-<div class="progress-alert progress-alert-oneline mb-10 closeable">
+{{/* A refusal comes with no job log, so no progressLog binds .closeable-close
+     here: the button closes its own card. role=alert -- it replaces a step
+     the viewer may be waiting on, and it is the only word they get. */}}
+<div class="progress-alert progress-alert-oneline mb-10 closeable" role="alert">
     <pre>{{ t $.Lang $.ErrKey }}</pre>
-    <a class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</a>
+    <button type="button" class="close closeable-close" onclick="this.closest('.closeable').remove()">{{ t $.Lang "action.noPeers.gotIt" }}</button>
 </div>
 {{ end }}
 {{ if has .Data "Job" }}

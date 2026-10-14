@@ -1211,6 +1211,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 		return err
 	}
 	j.Custom("action/download_file", strings.TrimSpace(str))
+	metrics.DownloadReady(s.archiveFormat != "", exportMeta(de).Cache)
 	return
 }
 
@@ -1855,6 +1856,12 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 			return terr
 		}
 		log.WithError(err).WithField("reason", data.Reason).WithField("peers", data.Peers).WithField("bytes", data.BytesRaw).WithField("elapsed_s", data.ElapsedSec).Warn("no peers / warmup deadline — surfacing CTA")
+		// The card's "Try again" -- and the page's own button -- mean a fresh
+		// warm-up. The run returns nil, so without this its log stayed in
+		// storage for the rest of the job's life: a press later than the 60 s
+		// grace got the same card back at once, with the old peers and
+		// seconds, and nothing was tried.
+		j.DoNotCache()
 		j.Fail()
 		j.Custom("action/errors/no_peers", strings.TrimSpace(str))
 		return nil

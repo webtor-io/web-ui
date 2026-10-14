@@ -61,7 +61,7 @@
 </div>
 
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
-    <a class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</a>
+    <button type="button" class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</button>
     {{- if .Data.Endpoint }}
     {{/* Same resubmit shape as slow_download.html, without force-slow: a
          retry is a fresh warm-up, and the seeder pod is usually still warm. */}}

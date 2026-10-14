@@ -1,5 +1,5 @@
 import loadAsyncView from "./loadAsyncView";
-import { isActionForm, isBusy, markBusy, clearBusy } from "./actionBusy";
+import { isActionForm, isBusy, markBusy, clearBusy, countBusyPress } from "./actionBusy";
 import { seedInitialEntry } from "./historySeed";
 
 if (!window.__popstateFilters) window.__popstateFilters = [];
@@ -123,6 +123,7 @@ async function async(selector, params = {}, scope = null) {
         // Skip already-bound elements (e.g. on rebind after Preact render)
         if (el._asyncBound) continue;
         el._asyncBound = true;
+        if (isActionForm(el)) el.addEventListener('click', countBusyPress);
         el.addEventListener(params.event, async function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -162,6 +163,15 @@ async function async(selector, params = {}, scope = null) {
             const self = this;
             const fetch = function() {
                 return asyncFetch.call(self, url, targetSelector, fetchParams, params, options)
+                    .then((res) => {
+                        // Refused before a job existed (400: Turnstile, bad
+                        // arguments, the job did not start): the answer is a
+                        // card with no job log, so nothing else would ever
+                        // release the button -- it stayed dead for the full
+                        // BUSY_MAX_MS while the card said "try again".
+                        if (isActionForm(self) && res && !res.ok) clearBusy(self);
+                        return res;
+                    })
                     .catch((err) => {
                         // The job never started, so nothing will ever release
                         // the button: the request itself is the ending here.

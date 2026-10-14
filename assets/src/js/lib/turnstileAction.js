@@ -144,13 +144,17 @@ function dropLive() {
 // reads as the first step of the job — and returns the slot under it
 // where a live widget goes. The server's reply to the submit replaces the
 // whole block, step included. Forms without a log block get no step and
-// the live widget is placed right after the form.
+// the live widget is placed right after the form -- and so do forms that
+// live INSIDE their own log block (the retry and "continue at slow speed"
+// forms of the no-peers and slow cards): replacing the block would detach
+// the very form, and requestSubmit() on a form that is not connected does
+// nothing, so for an anonymous visitor those buttons did nothing at all.
 function stepBlock(form) {
     const sel = form.getAttribute('data-async-target');
     const target = sel ? document.querySelector(sel) : null;
     const slot = document.createElement('div');
     slot.className = 'px-5 pt-2 empty:hidden';
-    if (!target || target === form) {
+    if (!target || target.contains(form)) {
         slot.className = 'mt-3';
         form.insertAdjacentElement('afterend', slot);
         return { slot, line: null, detach: () => slot.remove() };

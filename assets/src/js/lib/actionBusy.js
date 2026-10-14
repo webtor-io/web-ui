@@ -6,8 +6,10 @@
 // ~6 s buffering, and the slow third of jobs takes over a minute). The button
 // stayed live through all of it, so 59% of streaming sessions pressed it more
 // than once; two thirds of the clicks that recorded nothing were simply the
-// same button again, a median 17 s later. Each of those is another POST and
-// another job.
+// same button again, a median 17 s later. Each of those was another POST. The
+// server attaches a repeat within the job id's 10-minute bucket to the job
+// already running (jobs/scripts/action.go), so the cost is the page's: the
+// log, or a player still buffering, thrown away and replayed from the start.
 //
 // So a form that started a job is BUSY: its submit button keeps its label,
 // swaps its icon for a spinner and goes dim (`.btn-busy` -- not `disabled`: it
@@ -99,6 +101,7 @@ export function clearBusy(form) {
     if (!form || !isBusy(form)) return false;
     delete form.dataset.busy;
     delete form.dataset.busySince;
+    delete form.dataset.busyPressed;
     if (form._busyTimer) {
         clearTimeout(form._busyTimer);
         form._busyTimer = null;
@@ -139,4 +142,26 @@ export function clearBusyFor(el) {
         }
     }
     return false;
+}
+
+// countBusyPress counts presses on a working button, which nothing else
+// sees: `.btn-busy` takes the pointer off the button, so the press lands on
+// its form, and Umami tracks the button (data-umami-event), not the form.
+// Those presses are what is left of the confusion the busy state was for --
+// the viewer did not see that the page is working. One event per busy spell
+// (the first press), with the action and how long it had been working, in
+// seconds. Keyboard presses are swallowed in lib/async.js and not counted.
+//
+// A click listener ON each action form (lib/async.js binds it), not one on
+// document: iOS Safari sends no click for a tap on an element that neither
+// listens for clicks itself (or through an ancestor below <body>) nor has
+// cursor:pointer, and a busy form had neither.
+export function countBusyPress(e) {
+    const form = e.currentTarget;
+    if (!isBusy(form) || form.dataset.busyPressed) return;
+    form.dataset.busyPressed = '1';
+    if (!window.umami) return;
+    const action = new URL(form.getAttribute('action') || '', window.location.href).pathname.match(ACTION_RE);
+    const wait = Math.round((Date.now() - Number(form.dataset.busySince)) / 1000);
+    window.umami.track('busy-press', { action: action ? action[1] : 'other', wait });
 }

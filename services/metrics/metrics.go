@@ -77,6 +77,7 @@ type set struct {
 	fallback   *prometheus.CounterVec
 	vodRoute   *prometheus.CounterVec
 	statusView *prometheus.CounterVec
+	dlReady    *prometheus.CounterVec
 }
 
 func newSet(r prometheus.Registerer) *set {
@@ -135,6 +136,15 @@ func newSet(r prometheus.Registerer) *set {
 			Namespace: namespace, Name: "status_view_total",
 			Help: "Resource page status streams that showed a state, by statusview key and mode (chain, badge; other = anything else): once per stream and pair, the first time a message carries it. Not the browser's refinement of tier (tier_dl, stream_ok, stream_stall).",
 		}, []string{"key", "mode"}),
+		dlReady: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace, Name: "download_ready_total",
+			Help: "Download jobs that ended in the card with the download link, by kind (file; dir = a TAR/ZIP archive) and whether the content was cached. The denominator of the Umami download-start click. A replay of a finished job is not counted.",
+		}, []string{"kind", "cached"}),
+	}
+	for _, k := range []string{"file", "dir"} {
+		for _, c := range []string{"true", "false"} {
+			s.dlReady.WithLabelValues(k, c).Add(0)
+		}
 	}
 	for _, k := range statusKeys {
 		for _, m := range statusModes {
@@ -428,6 +438,19 @@ func (s *set) vodReroute(reason string) {
 		reason = "other"
 	}
 	s.vodRoute.WithLabelValues(reason).Inc()
+}
+
+// DownloadReady counts one download job that handed the viewer its link.
+func DownloadReady(dir, cached bool) {
+	std.downloadReady(dir, cached)
+}
+
+func (s *set) downloadReady(dir, cached bool) {
+	kind := "file"
+	if dir {
+		kind = "dir"
+	}
+	s.dlReady.WithLabelValues(kind, strconv.FormatBool(cached)).Inc()
 }
 
 func campaignLabel(c string) string {

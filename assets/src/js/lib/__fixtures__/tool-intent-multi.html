@@ -117,11 +117,12 @@
                         <span class="js-select-off">Select files</span>
                         <span class="js-select-on hidden">Cancel selection</span>
                     </button>
-                    <form class="download-dir js-archive-form" action="/download-dir" method="post" enctype="multipart/form-data" data-async-target="#log-dir-sintel" data-async-push-state="false">
+                    
+                    <form class="download-dir js-archive-form" action="/download-dir" method="post" enctype="multipart/form-data" data-async-target="#log-dir-sintel" data-async-push-state="false" onclick="if(event.target!==this||this.dataset.busy)document.getElementById('progress-modal-dir-sintel').showModal()">
                         <input type="hidden" name="resource-id" value="08ada5a7a6183aae1e09d831df6748d566095a10" />
                         <input type="hidden" name="item-id" value="dir-sintel" />
                         <input type="hidden" name="archive-format" value="tar" />
-                        <button type="submit" class="btn btn-sm btn-ghost border border-w-line rounded-r-none relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-dir" data-umami-event-format="tar" onclick="document.getElementById('progress-modal-dir-sintel').showModal()">
+                        <button type="submit" class="btn btn-sm btn-ghost border border-w-line rounded-r-none relative hover:z-[1] text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="download-dir" data-umami-event-format="tar">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                             </svg>
@@ -138,11 +139,11 @@
                         </div>
                         <ul tabindex="0" class="dropdown-content menu bg-base-200 border border-w-line rounded-box z-[1] w-40 p-2 shadow-lg mt-2">
                             <li>
-                                <form class="download-dir js-archive-form" action="/download-dir" method="post" enctype="multipart/form-data" data-async-target="#log-dir-sintel" data-async-push-state="false">
+                                <form class="download-dir js-archive-form" action="/download-dir" method="post" enctype="multipart/form-data" data-async-target="#log-dir-sintel" data-async-push-state="false" onclick="if(event.target!==this||this.dataset.busy){document.getElementById('progress-modal-dir-sintel').showModal();document.activeElement.blur()}">
                                     <input type="hidden" name="resource-id" value="08ada5a7a6183aae1e09d831df6748d566095a10" />
                                     <input type="hidden" name="item-id" value="dir-sintel" />
                                     <input type="hidden" name="archive-format" value="zip" />
-                                    <button type="submit" class="w-full text-left whitespace-nowrap px-3 py-1.5 rounded-lg hover:bg-base-300 cursor-pointer" data-umami-event="download-dir" data-umami-event-format="zip" onclick="document.getElementById('progress-modal-dir-sintel').showModal();document.activeElement.blur()">
+                                    <button type="submit" class="w-full text-left whitespace-nowrap px-3 py-1.5 rounded-lg hover:bg-base-300 cursor-pointer" data-umami-event="download-dir" data-umami-event-format="zip">
                                         ZIP [<span class="js-archive-size">123 MB</span>]
                                     </button>
                                 </form>

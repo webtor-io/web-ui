@@ -35,6 +35,12 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
   the wait reads as the first step of the job and not as a dead button. The
   server's reply replaces the block: the job's log on success, the card on
   refusal. The live widget appears under that step.
+- A form that lives INSIDE its own job-log block -- the "Try again" of the
+  no-peers card, "Continue at slow speed" of the slow card -- gets no step:
+  replacing the block would detach the form, and `requestSubmit()` on a form
+  that is not connected does nothing (the HTML form submission algorithm:
+  such a form "cannot navigate"). The slot goes after the form instead. Until
+  2026-10-14 both buttons did nothing for anonymous visitors.
 - Signed-in accounts: the server does not check them, and neither does the
   client — `layouts/main` renders `#turnstile-action` only when `.User` has
   no auth, and the submit handler also steps aside when `window._userId` is

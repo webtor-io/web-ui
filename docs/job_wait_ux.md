@@ -19,7 +19,10 @@ where it is, under the buttons.
   (`docs/turnstile_actions.md`). A second submit of a busy form is swallowed there.
 - **Released** by the job log (`lib/progressLog.js`, first thing in `renderMessage`) on
   `close`, `error`, `rendertemplate`, `download`, `redirect`; by a failed request
-  (`async.js`); by `BUSY_MAX_MS` (15 min, a backstop for a lost SSE).
+  or a non-OK answer (`async.js`: a 400 -- Turnstile refused, bad arguments, the job did
+  not start -- renders `action/post`'s card with no job log, so nothing else would ever
+  release it; until 2026-10-14 the button stayed dead for the full backstop under a card
+  that said "try again"); by `BUSY_MAX_MS` (15 min, a backstop for a lost SSE).
 - **One target, one working button.** Watch and Download of a file card share
   `#log-<item>`; a new job's response replaces the log, so `markBusy` releases any other
   busy form with the same target — nothing else could any more.
@@ -28,6 +31,33 @@ where it is, under the buttons.
   "Общее состояние JS" row in `CLAUDE.md`).
 
 Not done on purpose: restoring the busy state across a page reload.
+
+### What the wait leaves behind — measured, 2026-10-14
+
+Umami, 7-day windows before (09-12..18) and after (10-06..12) the busy button and the
+sticky bar: a repeat Watch press on the same page within 120 s fell from 43.2% to 31.8%
+of streaming sessions (mobile 49.1 → 38.0%), Download from 34.4% to 27.1%, and has not
+moved since the first week. The feedback still renders below the buttons, under the fold
+on 768–844 px tall screens, and nothing brings it into view.
+
+Two measurements were added to follow it:
+
+- `busy-press` (Umami, `countBusyPress` in `lib/actionBusy.js`, bound by `lib/async.js`
+  to every action form): the first press on a working button in each busy spell, with
+  `action` and `wait` (seconds busy so far). A busy button has no pointer events, so the
+  press lands on its form and no `data-umami-event` sees it. The listener sits on the
+  form, not on document: iOS Safari sends no click for a tap on an element without a
+  click listener of its own (or an ancestor's below `<body>`) or `cursor: pointer`.
+- `download-start` (Umami, the "start download" link of `action/download_file`, props
+  `kind` file|dir, `cached`, `tier`) over `webui_download_ready_total{kind,cached}`
+  (Prometheus, counted where the job emits that card): how many finished downloads the
+  viewer actually starts. The card needs a second click and used to render off-screen.
+  Read the ratio as a trend per `kind` and `cached`, before and after a change, not as a
+  conversion rate: a replayed card (the same visitor pressing Download again inside the
+  job id's 10-minute bucket) sends another click and no counter, every click counts,
+  copying wget/curl/URL sends nothing, and blocked trackers are missing from the
+  numerator. Deduplicate the clicks on (session, url, kind, 10-minute bucket) and divide
+  by `sum by (kind, cached) (increase(webui_download_ready_total[1d]))`.
 
 ## Sticky torrent status — `lib/stickyStatus.js`
 

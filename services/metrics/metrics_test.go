@@ -244,6 +244,7 @@ func TestMetricNames(t *testing.T) {
 		"webui_vod_reroute_total":                  dto.MetricType_COUNTER,
 		"webui_trial_shortlink_total":              dto.MetricType_COUNTER,
 		"webui_status_view_total":                  dto.MetricType_COUNTER,
+		"webui_download_ready_total":               dto.MetricType_COUNTER,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]
@@ -496,6 +497,28 @@ func TestVODRerouteIsBounded(t *testing.T) {
 	}
 	if got := testutil.CollectAndCount(s.vodRoute); got != 5 {
 		t.Errorf("%d series, want 5", got)
+	}
+}
+
+// All four series exist at 0 from the start: a series born at 1 has no
+// earlier sample, and increase() would drop that first download.
+func TestDownloadReadyByKindAndCache(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	s := newSet(reg)
+	if got := testutil.CollectAndCount(s.dlReady); got != 4 {
+		t.Fatalf("%d series before any download, want 4", got)
+	}
+	s.downloadReady(false, true)
+	s.downloadReady(false, true)
+	s.downloadReady(true, false)
+	if got := testutil.ToFloat64(s.dlReady.WithLabelValues("file", "true")); got != 2 {
+		t.Errorf("file/cached = %v, want 2", got)
+	}
+	if got := testutil.ToFloat64(s.dlReady.WithLabelValues("dir", "false")); got != 1 {
+		t.Errorf("dir/uncached = %v, want 1", got)
+	}
+	if got := testutil.CollectAndCount(s.dlReady); got != 4 {
+		t.Errorf("%d series, want 4", got)
 	}
 }
 

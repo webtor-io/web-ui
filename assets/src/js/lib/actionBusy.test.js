@@ -6,7 +6,7 @@ const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://webtor.io/
 global.window = dom.window;
 global.document = dom.window.document;
 
-const { BUSY_MAX_MS, clearBusy, clearBusyFor, isActionForm, isBusy, markBusy } = await import('./actionBusy.js');
+const { BUSY_MAX_MS, clearBusy, clearBusyFor, isActionForm, isBusy, markBusy, countBusyPress } = await import('./actionBusy.js');
 
 function card({ action = '/ru/stream-video', label = 'Смотреть' } = {}) {
     document.body.innerHTML = `
@@ -128,4 +128,35 @@ test('a second job into the same log container releases the first button', () =>
     // And the job log now releases the one that is actually running.
     assert.equal(clearBusyFor(p.logTarget), true);
     assert.equal(isBusy(p.download), false);
+});
+
+test('a press on a working button is counted once per busy spell, and nothing else is', () => {
+    const events = [];
+    window.umami = { track: (name, data) => events.push([name, data]) };
+    const p = card();
+    // As lib/async.js binds it: on the form itself (iOS sends no click
+    // otherwise).
+    p.stream.addEventListener('click', countBusyPress);
+    const press = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+
+    // Idle: a click on the form (or its button) is not a busy press.
+    press(p.stream);
+    press(p.btn);
+    assert.equal(events.length, 0);
+
+    // .btn-busy takes the pointer off the button, so the press lands on the
+    // form: that is what counts.
+    markBusy(p.stream, { timeoutMs: 50 });
+    press(p.stream);
+    assert.deepEqual(events, [['busy-press', { action: 'stream-video', wait: 0 }]]);
+    press(p.stream);
+    assert.equal(events.length, 1, 'once per spell, however many presses');
+
+    // The next job's spell counts again.
+    clearBusy(p.stream);
+    markBusy(p.stream, { timeoutMs: 50 });
+    press(p.stream);
+    assert.equal(events.length, 2);
+    clearBusy(p.stream);
+    delete window.umami;
 });

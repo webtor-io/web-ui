@@ -76,30 +76,35 @@
     {{- end }}
     <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
         <div class="flex flex-wrap gap-1.5 mr-auto">
-            <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 wget
-            </a>
-            <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            </button>
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 curl
-            </a>
-            <a class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            </button>
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 URL
-            </a>
+            </button>
         </div>
-        <a class="btn btn-sm btn-ghost text-w-muted closeable-close">{{ t $.Lang "action.download.cancel" }}</a>
-        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close" data-transfer-download download href="{{ .Data.URL }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
+        <button type="button" class="btn btn-sm btn-ghost text-w-muted closeable-close">{{ t $.Lang "action.download.cancel" }}</button>
+        {{- /* download-start: the job's end is counted server-side
+             (webui_download_ready_total); this is how many of those cards
+             turn into a download. A `download` link is not held back by the
+             tracker (lib/umami.js treats it as external). */}}
+        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close" data-transfer-download download href="{{ .Data.URL }}"
+           data-umami-event="download-start" data-umami-event-kind="{{ if .Data.IsArchive }}dir{{ else }}file{{ end }}" data-umami-event-cached="{{ .Data.Cached }}" data-umami-event-tier="{{ .Data.TierName }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
             </svg>
