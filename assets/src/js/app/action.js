@@ -1,5 +1,6 @@
 import av from '../lib/av';
 import { clearBusyFor } from '../lib/actionBusy';
+import { reveal as bringIntoView } from '../lib/stickyStatus';
 
 // The button that started the job stays busy until the player is shown, not
 // until its template is rendered (lib/progressLog.js): in between the player
@@ -11,7 +12,9 @@ av(async function() {
     const self = this;
     if (self._actionTeardown) self._actionTeardown();
     const progress = self.querySelector('[data-async-progress-log]');
-    if (!progress) return;
+    // No job log: the request was refused (action/post's card). Into view,
+    // like everything else a press produces (lib/stickyStatus.js reveal).
+    if (!progress) { bringIntoView(self.firstElementChild); return; }
     const el = document.createElement('div');
     let gone = false;
     let rendered = false;
@@ -37,6 +40,7 @@ av(async function() {
         el.classList.remove('hidden');
         endPreparation();
         release();
+        bringIntoView(el);
     };
     const onClose = (ev) => {
         if (ev.target.closest('.closeable-close')) endPreparation();
@@ -58,6 +62,19 @@ av(async function() {
         if (gone) return;
         if (ev.level === 'error' || ev.level === 'download' || ev.level === 'redirect' || (ev.level === 'close' && !rendered)) {
             endPreparation();
+        }
+        // The log renders under the buttons, below the fold on most screens
+        // (2026-10-14): each new step, card or verdict is brought into view --
+        // never the per-second status ticks.
+        if (ev.level === 'inprogress' || ev.level === 'custom' || ev.level === 'error' || ev.level === 'warn' || (ev.level === 'done' && ev.message)) {
+            bringIntoView(progress);
+        }
+        // The download card: its "start download" is what the viewer came
+        // for, and the link needs a second click -- focused, so Enter starts
+        // it and a screen reader says where they are.
+        if (ev.level === 'custom') {
+            const start = progress.querySelector('[data-transfer-download]');
+            if (start) start.focus({ preventScroll: true });
         }
         if (ev.level !== 'rendertemplate') return;
         rendered = true;

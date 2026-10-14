@@ -125,3 +125,58 @@ test('a job that renders nothing to wait for (a download card) is released by it
     destroy.call(host);
     clearBusy(watch());
 });
+
+// What the job produces renders under the buttons, below the fold on most
+// screens (2026-10-14): app/action.js brings it into view
+// (lib/stickyStatus.js reveal) -- each step, card and verdict, the shown
+// player, a refusal; never the per-second status ticks.
+const { notePress } = await import('../stickyStatus.js');
+const scrolls = [];
+w.innerHeight = 844;
+w.matchMedia = () => ({ matches: false });
+w.scrollTo = (o) => scrolls.push(o);
+const below = (el) => { el.getBoundingClientRect = () => ({ top: 775, bottom: 869, height: 94 }); };
+
+test('each new step brings the log into view; the status ticks do not', async () => {
+    const host = w.document.getElementById('host');
+    notePress(w);
+    await init.call(host);
+    const progress = host.querySelector('.progress-alert');
+    below(progress);
+    scrolls.length = 0;
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'inprogress', tag: 'warmup', message: 'warming up' }) });
+    assert.equal(scrolls.length, 1, 'a step');
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'statusupdate', tag: 'warmup', status: '37%' }) });
+    assert.equal(scrolls.length, 1, 'not a tick');
+    destroy.call(host);
+});
+
+test('the player, once shown, is brought into view', async () => {
+    notePress(w);
+    const { el } = await start();
+    below(el);
+    scrolls.length = 0;
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    assert.equal(scrolls.length, 1);
+    destroy.call(w.document.getElementById('host'));
+});
+
+test('the download card focuses its "start download"', async () => {
+    const host = w.document.getElementById('host');
+    await init.call(host);
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'custom', tag: 'dl', body: '<a data-transfer-download href="/f" download>start</a>' }) });
+    assert.equal(w.document.activeElement, host.querySelector('[data-transfer-download]'));
+    destroy.call(host);
+});
+
+test('a refused start (no job log) brings its card into view', async () => {
+    const refused = w.document.createElement('div');
+    refused.innerHTML = '<div class="progress-alert" role="alert"><pre>refused</pre></div>';
+    w.document.body.appendChild(refused);
+    notePress(w);
+    below(refused.firstElementChild);
+    scrolls.length = 0;
+    await init.call(refused);
+    assert.equal(scrolls.length, 1);
+    refused.remove();
+});

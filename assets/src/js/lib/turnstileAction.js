@@ -31,6 +31,7 @@
 // stays silent gets SILENT_TIMEOUT_MS; a visible checkbox gets
 // INTERACTIVE_TIMEOUT_MS — a person needs time to click.
 import { isBusy, markBusy } from './actionBusy';
+import { reveal } from './stickyStatus';
 
 const ACTIONS = /\/(download-file|download-dir|preview-image|stream-audio|stream-video)$/;
 const SILENT_TIMEOUT_MS = 15000;
@@ -128,6 +129,12 @@ function renderLive(slot) {
             if (st.pending) st.pending.interactive();
         }));
         turnstile.execute(st.liveId);
+        // The checkbox waits for a click for up to two minutes: where the
+        // eye is. The widget's iframe sizes itself later, so the slot holds
+        // its height (65 px, Turnstile's normal size) from now.
+        slot.classList.remove('empty:hidden');
+        slot.style.minHeight = '65px';
+        reveal(slot.closest('.progress-alert') || slot);
     } catch (e) {
         st.liveId = null;
         if (st.pending) st.pending.finish('', 'live-render-failed');
@@ -163,7 +170,7 @@ function stepBlock(form) {
     }
     const label = (container() && container().dataset.label) || '';
     const block = document.createElement('div');
-    block.className = 'progress-alert progress-alert-block mt-6 mb-10';
+    block.className = 'progress-alert progress-alert-block';
     const lt = document.createElement('div');
     lt.className = 'log-target';
     const pre = document.createElement('pre');
@@ -180,6 +187,7 @@ function stepBlock(form) {
     lt.appendChild(slot);
     block.appendChild(lt);
     target.replaceChildren(block);
+    reveal(block);
     return { slot, line: pre, detach: () => {} };
 }
 

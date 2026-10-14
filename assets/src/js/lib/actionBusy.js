@@ -24,6 +24,8 @@
 // backstop passes (app/action.js), the request itself failed or was refused
 // (lib/async.js), or the safety timeout below expires.
 
+import { notePress } from './stickyStatus';
+
 // A job may legitimately run for minutes (p99 of a stream job is ~8 min), so
 // this is a backstop against a lost SSE, not a deadline.
 export const BUSY_MAX_MS = 15 * 60 * 1000;
@@ -68,6 +70,9 @@ export function markBusy(form, { now = Date.now, timeoutMs = BUSY_MAX_MS } = {})
     }
     form.dataset.busy = 'true';
     form.dataset.busySince = String(now());
+    // What the job produces is brought into view (stickyStatus.js reveal)
+    // unless the viewer scrolls away after this.
+    notePress(form.ownerDocument.defaultView);
     // The button keeps saying what it is (owner, 2026-09-19): the label and
     // its icon stay, and a spinner joins them. A button that renamed itself
     // to "preparing…" lost the one word that said which of the two buttons

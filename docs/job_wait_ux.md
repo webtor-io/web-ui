@@ -69,6 +69,36 @@ Two measurements were added to follow it:
   numerator. Deduplicate the clicks on (session, url, kind, 10-minute bucket) and divide
   by `sum by (kind, cached) (increase(webui_download_ready_total[1d]))`.
 
+## Where the result appears — `lib/stickyStatus.js` reveal
+
+Measured on prod 2026-10-14 (headless Chrome, 390x844 to 1920x1080): the buttons sit
+at y=640-680 on the unscrolled page and everything the job produced -- the Turnstile
+step and checkbox, the countdown and percent, the no-peers and slow cards, the download
+card, the player -- rendered in `#log-<item>` after the age footnote, at 736-775, under
+the fold on 768-844 px tall screens. Nothing moved the page toward it.
+
+- `#log-<item>` sits right under the button row (`partials/file.html`), the footnote
+  after it. It is closed explicitly: it was `<div … />`, which HTML does not
+  self-close, and the file list was parsed into it.
+- `reveal(el)` scrolls as little as possible: nothing when `el` is wholly between what
+  is fixed at the top (`stickyBottom`) and the window's bottom; otherwise its bottom to
+  the fold, but its top never under the bars (a player taller than the space shows from
+  its top). Nothing inside a `<dialog>`, and nothing once the viewer scrolled themselves
+  (wheel, touch, scroll keys) after the press -- `markBusy` notes the press
+  (`notePress`); order is kept as a sequence on `window.__reveal`, one record for every
+  bundle. Smooth unless `prefers-reduced-motion`.
+- Called by `app/action.js` on each new step, card, verdict (`inprogress`, `custom`,
+  `error`, `warn`, a `done` with a message -- never `statusupdate`), on the shown player,
+  and on a refused start's card; by `lib/turnstileAction.js` on its step and on the live
+  checkbox (whose slot keeps 65 px while the iframe sizes itself). The download card's
+  "start download" takes focus (`preventScroll`).
+- The buttons on a phone (owner, 2026-10-14: variant D on the design canvas): Watch and
+  Download share the width (`max-sm:flex-1` on their forms), the watched toggle is a
+  44 px icon at the end of the row (label `max-sm:sr-only`, `aria-pressed`, neutral
+  instead of pink), a file with only a download has it full width, and the size moves
+  from the Download label to a line under the file name. 40 px tall, as before. From
+  `sm` up the row is what it was.
+
 ## Sticky torrent status — `lib/stickyStatus.js`
 
 A fixed bar under the navbar (`resource/status_sticky` in `views/resource/get.html`,

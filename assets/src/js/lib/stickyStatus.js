@@ -162,3 +162,65 @@ export function fixedBottom(root = document) {
     if (!bar || bar.hidden || bar.classList.contains('-translate-y-full')) return NAVBAR_H;
     return bar.getBoundingClientRect().bottom;
 }
+
+// reveal brings what a job start just produced into view: the Turnstile step,
+// the job's log, its card, the player (app/action.js, lib/turnstileAction.js).
+// Measured on prod 2026-10-14: the buttons sit at y=640-680 on every screen
+// from 390x844 to 1920x1080 and all of that rendered below them, under the
+// fold at 768-844 px, with nothing moving the page toward it.
+//
+// As little as possible, and never against the viewer:
+//   - nothing when it is already wholly in view (between what is fixed at
+//     the top -- stickyBottom: the navbar, and the status bar once it will
+//     be up -- and the window's bottom);
+//   - otherwise its bottom to the fold, but its top never under the bars: a
+//     player taller than the space shows from its top;
+//   - nothing inside a <dialog> (its own box scrolls; TAR/ZIP);
+//   - nothing once the viewer has scrolled themselves since the press
+//     (wheel, touch, scroll keys): they went somewhere on purpose. Dragging
+//     the scrollbar is not seen.
+// Smooth, unless the viewer asked for reduced motion.
+const GAP = 12;
+const SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ']);
+
+// One record per page, on window: this module is in more than one bundle.
+// Order, not time: a press and a wheel in the same millisecond still have a
+// "before".
+function record(w) {
+    if (w.__reveal) return w.__reveal;
+    const r = w.__reveal = { seq: 0, pressAt: 0, scrollAt: 0 };
+    const mark = () => { r.scrollAt = ++r.seq; };
+    w.addEventListener('wheel', mark, { passive: true, capture: true });
+    w.addEventListener('touchmove', mark, { passive: true, capture: true });
+    w.addEventListener('keydown', (e) => {
+        if (!SCROLL_KEYS.has(e.key)) return;
+        const t = e.target;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+        mark();
+    }, { capture: true });
+    return r;
+}
+
+// notePress: a job start was pressed now (lib/actionBusy.js markBusy).
+export function notePress(w = window) {
+    const r = record(w);
+    r.pressAt = ++r.seq;
+}
+
+export function reveal(el, root = document) {
+    if (!el || !el.isConnected || el.closest('dialog')) return false;
+    const w = el.ownerDocument.defaultView;
+    const r = record(w);
+    if (r.scrollAt > r.pressAt) return false;
+    const box = el.getBoundingClientRect();
+    if (!box.height) return false;
+    const top = stickyBottom(root) + GAP;
+    const bottom = w.innerHeight - GAP;
+    let dy = 0;
+    if (box.bottom > bottom) dy = box.bottom - bottom;
+    if (box.top - dy < top) dy = box.top - top;
+    if (Math.abs(dy) < 1) return false;
+    const reduce = typeof w.matchMedia === 'function' && w.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    w.scrollTo({ top: w.scrollY + dy, behavior: reduce ? 'auto' : 'smooth' });
+    return true;
+}

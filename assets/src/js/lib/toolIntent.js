@@ -31,18 +31,9 @@ export function initToolIntent(root, doc = document) {
         // Nothing to press: let the #content anchor scroll.
         if (!target) return;
         e.preventDefault();
+        // The archive reports into its modal; a file's job log, right under
+        // its buttons, is brought into view by the job itself (app/action.js,
+        // lib/turnstileAction.js), like any press of that button.
         target.button.click();
-        // The archive reports into its modal. A file's job log opens at the
-        // bottom of its card, which on a phone is below the header this line
-        // sits in: bring the card into view (#file carries the scroll margin
-        // for the navbar), and leave it alone when it is already on screen.
-        // Decided by the kind, not by btn.closest('#file'): partials/file.html
-        // ends with a `<div … />`, which HTML does not self-close, so #file is
-        // left open and #list ends up inside it.
-        if (target.kind !== 'file') return;
-        const card = doc.getElementById('file');
-        if (card && typeof card.scrollIntoView === 'function') {
-            card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
     });
 }

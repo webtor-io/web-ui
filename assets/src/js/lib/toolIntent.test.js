@@ -39,10 +39,11 @@ function pressLine(doc, win) {
 
 test('a multi-file torrent: the line presses the TAR archive of the directory', () => {
     const { doc, win, scrolled } = page('multi');
-    // The server's markup as the browser parses it: file.html's trailing
-    // `<div … />` leaves #file open, so #list sits inside it. The script
-    // must not take the archive for the file because of that.
-    assert.ok(doc.querySelector('#file #list'), 'fixture reflects the real nesting');
+    // The server's markup as the browser parses it: #list beside the file
+    // card. It sat inside #file while file.html ended with a `<div … />`,
+    // which HTML does not self-close (fixed 2026-10-14).
+    assert.ok(doc.getElementById('list'), 'the fixture has the list');
+    assert.equal(doc.querySelector('#file #list'), null, 'and the file card is closed before it');
     const pressed = recordPresses(doc);
     initToolIntent(doc.body, doc);
     const ev = pressLine(doc, win);
@@ -51,16 +52,16 @@ test('a multi-file torrent: the line presses the TAR archive of the directory', 
     assert.deepEqual(scrolled, [], 'the archive reports into its modal, the page stays put');
 });
 
-test('a single-file torrent: the line presses the file download and brings its card into view', () => {
+test('a single-file torrent: the line presses the file download, and leaves the scrolling to its job', () => {
     const { doc, win, scrolled } = page('single');
     const pressed = recordPresses(doc);
     initToolIntent(doc.body, doc);
     const ev = pressLine(doc, win);
     assert.equal(ev.defaultPrevented, true);
     assert.deepEqual(pressed, ['download'], 'the file card\'s Download, not Watch');
-    assert.equal(scrolled.length, 1);
-    assert.equal(scrolled[0][0], 'file');
-    assert.equal(scrolled[0][1].block, 'nearest', 'no jump when the card is already on screen');
+    // The job's log renders under the buttons and is brought into view by
+    // app/action.js and lib/turnstileAction.js, as for a press of the button.
+    assert.deepEqual(scrolled, []);
 });
 
 test('the button is looked up at click time: a swapped #list is the one pressed', () => {

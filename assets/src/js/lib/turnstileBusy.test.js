@@ -93,3 +93,21 @@ test('a press dropped because another check is running closes the dialog it open
     await settle();
     clearBusy(watch);
 });
+
+test('the check is written under the button and brought into view', async () => {
+    const scrolls = [];
+    dom.window.innerHeight = 844;
+    dom.window.matchMedia = () => ({ matches: false });
+    dom.window.scrollTo = (o) => scrolls.push(o);
+    const proto = dom.window.HTMLElement.prototype;
+    const was = proto.getBoundingClientRect;
+    proto.getBoundingClientRect = function () {
+        return this.classList.contains('progress-alert') ? { top: 775, bottom: 869, height: 94 } : { top: 0, bottom: 0, height: 0 };
+    };
+    watch.requestSubmit();
+    assert.equal(scrolls.length, 1, 'the step block, below the fold, is brought up');
+    answer();
+    await settle();
+    proto.getBoundingClientRect = was;
+    clearBusy(watch);
+});
