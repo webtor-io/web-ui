@@ -38,7 +38,6 @@ const SILENT_TIMEOUT_MS = 15000;
 const INTERACTIVE_TIMEOUT_MS = 120000;
 const SCRIPT_WAIT_MS = 15000;
 const READY = 'turnstileReady';
-const STEP_TAG = 'turnstile';
 
 // One state per page, not one per copy of this module. splitChunks is off by
 // design (webpack.config.js: Go template helpers load entries independently),
@@ -130,11 +129,20 @@ function renderLive(slot) {
         }));
         turnstile.execute(st.liveId);
         // The checkbox waits for a click for up to two minutes: where the
-        // eye is. The widget's iframe sizes itself later, so the slot holds
-        // its height (65 px, Turnstile's normal size) from now.
+        // eye is, and the line says what to do -- the wait is the viewer's
+        // now, not ours (no spinner, no bar). The widget's iframe sizes
+        // itself later, so the slot holds its height (65 px, Turnstile's
+        // normal size) from now.
         slot.classList.remove('empty:hidden');
         slot.style.minHeight = '65px';
-        reveal(slot.closest('.progress-alert') || slot);
+        const block = slot.closest('.progress-alert');
+        const stage = block && block.querySelector('.job-stage');
+        const ask = container() && container().dataset.labelInteractive;
+        if (stage && ask) {
+            stage.querySelector('.job-stage-title').textContent = ask;
+            stage.classList.add('job-stage-done');
+        }
+        reveal(block || slot);
     } catch (e) {
         st.liveId = null;
         if (st.pending) st.pending.finish('', 'live-render-failed');
@@ -168,27 +176,31 @@ function stepBlock(form) {
         form.insertAdjacentElement('afterend', slot);
         return { slot, line: null, detach: () => slot.remove() };
     }
+    // The job log's own stage line (views/action/post.html, .job-stage): the
+    // check reads as the job's first step.
     const label = (container() && container().dataset.label) || '';
     const block = document.createElement('div');
     block.className = 'progress-alert progress-alert-block';
-    const lt = document.createElement('div');
-    lt.className = 'log-target';
-    const pre = document.createElement('pre');
-    pre.className = 'inprogress';
-    pre.setAttribute('task-tag', STEP_TAG);
-    const line = document.createElement('span');
-    line.className = 'line';
-    line.innerText = label;
-    const status = document.createElement('span');
-    status.className = 'task-status';
-    line.appendChild(status);
-    pre.appendChild(line);
-    lt.appendChild(pre);
-    lt.appendChild(slot);
-    block.appendChild(lt);
+    block.setAttribute('data-turnstile-step', '');
+    const stage = document.createElement('div');
+    stage.className = 'job-stage';
+    const row = document.createElement('div');
+    row.className = 'job-stage-row';
+    const spin = document.createElement('span');
+    spin.className = 'loading loading-spinner loading-sm job-stage-spin';
+    spin.setAttribute('aria-hidden', 'true');
+    const title = document.createElement('span');
+    title.className = 'job-stage-title';
+    title.textContent = label;
+    row.append(spin, title);
+    const bar = document.createElement('progress');
+    bar.className = 'progress job-stage-bar';
+    bar.max = 100;
+    stage.append(row, bar);
+    block.append(stage, slot);
     target.replaceChildren(block);
     reveal(block);
-    return { slot, line: pre, detach: () => {} };
+    return { slot, line: null, detach: () => {} };
 }
 
 // getToken resolves with a fresh token, or '' when the widget is missing,

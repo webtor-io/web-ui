@@ -60,7 +60,7 @@ const settle = () => new Promise((r) => setTimeout(r, 20));
 test('the button is busy from the press, through the check, and the token still goes out', async () => {
     watch.requestSubmit();
     assert.equal(isBusy(watch), true, 'busy while Turnstile checks -- not idle until the token');
-    assert.ok(document.querySelector('#log-1 pre[task-tag=turnstile]'), 'the check is written in the log');
+    assert.ok(document.querySelector('#log-1 [data-turnstile-step]'), 'the check is written in the log');
     assert.equal(posts.length, 0, 'nothing sent before the token');
     answer();
     await settle();

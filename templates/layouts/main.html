@@ -87,7 +87,7 @@
              button is pressed. On submit the script writes a "checking" step into the
              form's job-log block (data-label is that line); when Cloudflare wants a click
              a fresh widget is rendered inside that block, under the step. */}}
-        <div id="turnstile-action" class="hidden" data-sitekey="{{ actionTurnstileSiteKey }}" data-label="{{ t $.Lang "action.turnstileCheck" }}"></div>
+        <div id="turnstile-action" class="hidden" data-sitekey="{{ actionTurnstileSiteKey }}" data-label="{{ t $.Lang "action.turnstileCheck" }}" data-label-interactive="{{ t $.Lang "action.turnstileInteractive" }}"></div>
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
         {{ end }}
         {{ "layout.js" | asset }}

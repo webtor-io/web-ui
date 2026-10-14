@@ -91,18 +91,58 @@ class Renderer {
         this.el = el;
         this.func = func;
         this.lt = el.querySelector('.log-target');
+        // The action log's host (views/action/post.html) has a .job-stage:
+        // one line in plain words for the running step, with its countdown
+        // or percent and a bar; the steps folded under "Show steps"; cards
+        // and verdicts outside the fold. Other hosts (home, embed, donate)
+        // have none and keep the plain log.
+        this.stage = el.querySelector('.job-stage');
+        this.results = (this.stage && el.querySelector('.job-results')) || this.lt;
+        this.announcer = this.stage ? el.querySelector('[data-job-announce]') : null;
         for (const close of el.querySelectorAll('.closeable-close')) {
             close.addEventListener('click', () => {
                 el.classList.add('hidden');
             });
         }
     }
+    // setStage: the step now running is the line on top -- its words, no
+    // number yet, a bar without a value (indeterminate). Said once to a
+    // screen reader; the per-second numbers are not.
+    setStage(tag, title) {
+        if (!this.stage) return;
+        this.stageTag = tag;
+        this.stage.hidden = false;
+        this.stage.classList.remove('job-stage-done');
+        this.stage.querySelector('.job-stage-title').textContent = title;
+        this.stage.querySelector('.job-stage-meta').textContent = '';
+        this.stage.querySelector('.job-stage-bar').removeAttribute('value');
+        this.say(title);
+    }
+    // stageStatus: the running step's countdown or percent -- the percent
+    // fills the bar.
+    stageStatus(data) {
+        if (!this.stage || data.tag !== this.stageTag) return;
+        const status = data.status || '';
+        this.stage.querySelector('.job-stage-meta').textContent = status;
+        const bar = this.stage.querySelector('.job-stage-bar');
+        const pct = /(\d+)\s*%/.exec(status);
+        if (pct) bar.value = Number(pct[1]);
+        else bar.removeAttribute('value');
+    }
+    // endStage: a card or a verdict is the answer now -- the line goes.
+    endStage() {
+        if (this.stage) this.stage.hidden = true;
+    }
+    say(text) {
+        if (this.announcer && text) this.announcer.textContent = text;
+    }
     addCustom(data) {
-        const el = this.lt.querySelector(`*[task-custom='${data.tag}']`);
+        const el = this.results.querySelector(`*[task-custom='${data.tag}']`);
         if (el) return;
         const div = document.createElement('div');
         div.setAttribute('task-custom', data.tag);
-        this.lt.appendChild(div);
+        this.results.appendChild(div);
+        this.endStage();
         loadAsyncView(div, data.body);
         const closes = div.querySelectorAll('.closeable-close');
         for (const close of closes) {
@@ -120,7 +160,7 @@ class Renderer {
     }
     addSummary(data) {
         if (!data.message) return;
-        const el = this.lt.querySelector(`*[task-summary='${data.tag}']`);
+        const el = this.results.querySelector(`*[task-summary='${data.tag}']`);
         if (el) return;
         const pre = document.createElement('pre');
         const line = document.createElement('span');
@@ -132,7 +172,9 @@ class Renderer {
         for (const cl of classList) {
             pre.classList.add(cl);
         }
-        this.lt.appendChild(pre);
+        this.results.appendChild(pre);
+        this.endStage();
+        this.say(data.message);
     }
     addLine(data) {
         const el = this.lt.querySelector(`*[task-tag='${data.tag}']`);
@@ -153,6 +195,7 @@ class Renderer {
         status.classList.add('task-status');
         line.appendChild(status);
         this.lt.appendChild(pre);
+        if (data.level === 'inprogress') this.setStage(data.tag, data.message);
     }
 
     updateLine(data) {
@@ -170,6 +213,7 @@ class Renderer {
         } else {
             span.innerText = `${data.level}`;
         }
+        if (data.level === 'statusupdate') this.stageStatus(data);
     }
 
     showClose() {
@@ -205,6 +249,9 @@ class Renderer {
             this.disableError();
             this.inited = false;
             this.rendered = false;
+            if (this.results !== this.lt) this.results.innerText = '';
+            this.endStage();
+            this.stageTag = null;
         } else if (!this.inited) {
             this.inited = true;
             this.el.classList.remove('hidden');
@@ -227,6 +274,10 @@ class Renderer {
         }
         if (data.level === 'close') {
             this.showClose();
+            // Over with nothing to show: the line stops spinning. A rendered
+            // player is still loading (app/action.js hides the log when it
+            // can play), so its line keeps going.
+            if (this.stage && !this.rendered) this.stage.classList.add('job-stage-done');
         }
         if (data.level === 'redirect') {
             this.addSummary(data);

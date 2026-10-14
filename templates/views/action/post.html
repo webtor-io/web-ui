@@ -12,13 +12,30 @@
 {{/*
   div (not form) so custom partials emitted via j.Custom can host their own
   <form> elements — HTML5 forbids nested forms, and the cap-modal's
-  "Continue at slow speed" form needs to live inside .log-target. Action
+  "Continue at slow speed" form needs to live inside this host. Action
   jobs never emit j.Redirect (only load.go does, for magnet → resource), so
   the form-only requestSubmit() path in progressLog.js is unused here;
   redirect emissions still work via the window.location fallback.
 */}}
+{{/* One line in plain words for the step that is running, with its
+     countdown or percent and a bar; the full step list folded under "Show
+     steps"; cards and verdicts between them (lib/progressLog.js). The step list used to be all there was: a
+     monospace console of "retrieving stream url", "(37%)" a grey suffix. */}}
 <div class="hidden progress-alert progress-alert-block closeable" data-async-progress-log="{{ makeJobLogURL $.Lang .Data.Job }}">
-  <div class="log-target"></div>
+  <div class="job-stage" hidden>
+    <div class="job-stage-row">
+      <span class="loading loading-spinner loading-sm job-stage-spin" aria-hidden="true"></span>
+      <span class="job-stage-title"></span>
+      <span class="job-stage-meta"></span>
+    </div>
+    <progress class="progress job-stage-bar" max="100"></progress>
+  </div>
+  <div class="job-results"></div>
+  <details class="job-steps">
+    <summary>{{ t $.Lang "action.showSteps" }}</summary>
+    <div class="log-target"></div>
+  </details>
+  <p class="sr-only" role="status" data-job-announce></p>
 </div>
 {{ end }}
 {{ "action.js" | asset }}

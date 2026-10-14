@@ -99,6 +99,32 @@ the fold on 768-844 px tall screens. Nothing moved the page toward it.
   from the Download label to a line under the file name. 40 px tall, as before. From
   `sm` up the row is what it was.
 
+## The log in words — `lib/progressLog.js` with a `.job-stage`
+
+The action log (`views/action/post.html`) used to be a monospace console in the job's own
+jargon ("retrieving stream url", "probing content media info") with the only honest
+progress -- the countdown to the no-peers verdict, then the warm-up percent -- as a grey
+suffix "(37%)". Now:
+
+- One line for the running step (`.job-stage`): its words (`inprogress`), its
+  countdown or percent on the right (`statusupdate`), a native `<progress>` under it,
+  indeterminate until a percent arrives. A late tick of an earlier step is ignored.
+- The full step list is folded under "Show steps" (`<details class="job-steps">`), shown
+  only once there is a step.
+- Cards (`custom`) and verdicts (summaries) go to `.job-results`, outside the fold, and
+  take the line's place. On `close` with nothing rendered the line stops spinning; a
+  rendered player's line goes on until the player hides the log (app/action.js).
+- A screen reader hears each new step and each verdict once (`[data-job-announce]`,
+  role=status), never the per-second ticks.
+- The words are the `job.*` keys, rewritten as stages in all 11 locales on 2026-10-14
+  ("Loading the start of the file", status "looking for peers · 34 s left", then "37%").
+  Only action.go and hls.go use them; nothing (agents, alerts) matches their text.
+- Turnstile's check (`lib/turnstileAction.js`) draws the same line; when Cloudflare wants
+  a click it says "Tick the box to continue" (`data-label-interactive` on
+  `#turnstile-action`) and stops spinning: the wait is the viewer's then.
+- Other hosts of progressLog (home magnet load, embed, donate) have no `.job-stage` and
+  keep the plain log.
+
 ## Sticky torrent status — `lib/stickyStatus.js`
 
 A fixed bar under the navbar (`resource/status_sticky` in `views/resource/get.html`,

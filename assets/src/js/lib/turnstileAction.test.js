@@ -19,14 +19,19 @@ global.turnstile = {
 };
 
 document.body.innerHTML = `
-    <div id="turnstile-action" data-sitekey="k" data-label="Checking that you are not a robot"></div>
+    <div id="turnstile-action" data-sitekey="k" data-label="Checking that you are not a robot" data-label-interactive="Tick the box to continue"></div>
     <form id="watch" action="/stream-video" method="post" data-async-target="#log-1">
         <button type="submit">Watch</button>
     </form>
     <div id="log-1"></div>`;
 
 const { default: init } = await import('./turnstileAction.js');
+const { clearBusy } = await import('./actionBusy.js');
 init();
+// A press marks its form busy (lib/actionBusy.js) with a 15-minute backstop
+// timer; nothing here ends the job, so each test releases what it pressed --
+// a live timer kept this file's process up for the full 15 minutes.
+test.afterEach(() => { for (const f of document.querySelectorAll('form')) clearBusy(f); });
 
 // The second pass -- token attached -- is the one that reaches the form
 // (the first is stopped on document in the capture phase). Record whether the
@@ -46,7 +51,7 @@ test('a form outside its log gets the check written into the log, then goes out'
     const form = document.getElementById('watch');
     const seen = watchSecondPass(form);
     form.requestSubmit();
-    assert.ok(document.querySelector('#log-1 pre[task-tag=turnstile]'), 'the step is in the log');
+    assert.ok(document.querySelector('#log-1 [data-turnstile-step]'), 'the step is in the log');
     await settle();
     assert.deepEqual(seen, [{ ready: true, connected: true }]);
 });
@@ -66,7 +71,22 @@ test('a retry form inside its own log stays connected and goes out (anonymous "T
     const seen = watchSecondPass(form);
     form.requestSubmit(form.querySelector('button'));
     assert.ok(form.isConnected, 'the card is not wiped by the check');
-    assert.equal(document.querySelector('#log-1 pre[task-tag=turnstile]'), null, 'no step block over the card');
+    assert.equal(document.querySelector('#log-1 [data-turnstile-step]'), null, 'no step block over the card');
     await settle();
     assert.deepEqual(seen, [{ ready: true, connected: true }]);
+});
+
+test("the check is the job's first step in its own words; when Cloudflare wants a click, the line says so", async () => {
+    document.getElementById('log-1').innerHTML = '';
+    const form = document.getElementById('watch');
+    watchSecondPass(form);
+    form.requestSubmit();
+    const step = document.querySelector('#log-1 [data-turnstile-step]');
+    assert.equal(step.querySelector('.job-stage-title').textContent, 'Checking that you are not a robot');
+    assert.ok(step.querySelector('progress.job-stage-bar'), 'with the bar of every step');
+    // The warm widget asks for interaction: a live one is rendered here.
+    widgets[0]['before-interactive-callback']();
+    assert.equal(step.querySelector('.job-stage-title').textContent, 'Tick the box to continue');
+    assert.ok(step.querySelector('.job-stage').classList.contains('job-stage-done'), 'no spinner: the wait is the viewer\'s');
+    await settle();
 });
