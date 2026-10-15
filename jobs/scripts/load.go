@@ -187,6 +187,12 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 	started := time.Now()
 	res, err = s.api.StoreResource(magnetizeCtx, s.c.ApiClaims, []byte(query))
 	stop()
+	if errors.Is(err, api.ErrForbidden) {
+		// torrent-store refused the hash (stoplisted, banned): no peer will
+		// change that, so not the dead-magnet card and its ten-minute retry,
+		// but error.forbidden -- what the same hash reads once it is stored.
+		return nil, errors.Wrap(err, "failed to store resource by magnet")
+	}
 	if err != nil || res == nil {
 		kind := "dead"
 		if err != nil && strings.Contains(err.Error(), "failed to parse magnet") {
