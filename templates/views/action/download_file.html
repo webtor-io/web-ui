@@ -21,7 +21,7 @@
     {{- $target := "donate" }}{{ if $offer.TrialDays }}{{ $target = "trial" }}{{ else if $offer.URL }}{{ $target = "checkout" }}{{ end }}
     {{- /* data-upsell-surface: the resource status keeps its own button down
          while this nudge is on screen (lib/transferStatus.js). */}}
-    <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-center gap-4 flex-wrap" data-upsell-surface="download-nudge">
+    <div class="sm:mx-5 mt-1 p-3 sm:p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-center gap-4 flex-wrap" data-upsell-surface="download-nudge">
         <div class="flex items-start gap-3 flex-1 min-w-[240px]">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
@@ -59,7 +59,7 @@
     </script>
     {{- end }}
     {{- if .Data.IsArchive }}
-    <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
+    <div class="sm:mx-5 mt-1 p-3 sm:p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-cyan">
             <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
         </svg>
@@ -67,31 +67,34 @@
     </div>
     {{- end }}
     {{- if .Data.ZipWarning }}
-    <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
+    <div class="sm:mx-5 mt-1 p-3 sm:p-4 rounded-xl bg-base-300/20 border border-w-line/40 flex items-start gap-3">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-warning">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
         <div class="text-xs text-w-muted leading-relaxed">{{ t $.Lang "action.download.zipCrcWarning" }}</div>
     </div>
     {{- end }}
-    <div class="pt-3 px-5 flex flex-wrap gap-2 items-center">
-        <div class="flex flex-wrap gap-1.5 mr-auto">
+    {{- /* Always in a dialog (partials/file.html, list.html), whose box pads
+         it and hides cancel for its ✕. On a phone the four actions share one
+         row: the copies without their icon, the link with its short label. */}}
+    <div class="pt-3 sm:px-5 flex sm:flex-wrap gap-1.5 sm:gap-2 items-center">
+        <div class="flex gap-1.5 sm:mr-auto">
             <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 wget
             </button>
             <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 curl
             </button>
             <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
@@ -103,12 +106,13 @@
              (webui_download_ready_total); this is how many of those cards
              turn into a download. A `download` link is not held back by the
              tracker (lib/umami.js treats it as external). */}}
-        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close" data-transfer-download download href="{{ .Data.URL }}"
+        <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close flex-1 sm:flex-none" data-transfer-download download href="{{ .Data.URL }}"
            data-umami-event="download-start" data-umami-event-kind="{{ if .Data.IsArchive }}dir{{ else }}file{{ end }}" data-umami-event-cached="{{ .Data.Cached }}" data-umami-event-tier="{{ .Data.TierName }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
             </svg>
-            {{ t $.Lang "action.download.startDownload" }}
+            <span class="sm:hidden">{{ t $.Lang "resource.download" }}</span>
+            <span class="hidden sm:inline">{{ t $.Lang "action.download.startDownload" }}</span>
         </a>
     </div>
 {{ end }}

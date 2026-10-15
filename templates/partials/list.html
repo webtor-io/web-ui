@@ -248,7 +248,7 @@
         </div>
 
         <dialog id="progress-modal-{{ .List.ID }}" class="modal">
-            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
+            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl p-4 sm:p-6" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
                 <form method="dialog">
                     <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">✕</button>
                 </form>
@@ -258,7 +258,7 @@
                     </svg>
                     {{ t $.Lang "resource.preparingDownload" }}
                 </h3>
-                <div id="log-{{ .List.ID }}" class="mt-4" data-async-layout="{{`{{ template "main" . }}`}}">
+                <div id="log-{{ .List.ID }}" class="mt-3 sm:mt-4" data-async-layout="{{`{{ template "main" . }}`}}">
                     <div class="flex justify-center py-4">
                         <span class="loading loading-spinner loading-md text-w-cyan"></span>
                     </div>
