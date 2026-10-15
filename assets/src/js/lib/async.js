@@ -1,5 +1,5 @@
 import loadAsyncView from "./loadAsyncView";
-import { isActionForm, isBusy, markBusy, clearBusy, countBusyPress } from "./actionBusy";
+import { isActionForm, isBusy, markBusy, clearPress, countBusyPress } from "./actionBusy";
 import { seedInitialEntry } from "./historySeed";
 
 if (!window.__popstateFilters) window.__popstateFilters = [];
@@ -140,15 +140,19 @@ async function async(selector, params = {}, scope = null) {
                 if (isBusy(this) && !this.dataset.turnstileReady) return false;
                 markBusy(this);
             }
+            // Read now: a swap during the request can move the press to a
+            // form rendered anew (lib/loadAsyncView.js keepJobs, carryBusy).
+            const press = this.dataset.busyPress;
             let history = true;
             if (el.getAttribute('data-async-push-state') && el.getAttribute('data-async-push-state') === 'false') {
                 history = false;
             }
-            // Per-element opt-out for the scroll-to-top that `data-async-scroll-top`
-            // targets normally trigger. Useful for small in-place toggles that
-            // reload the whole main content but shouldn't jump the viewport.
-            const noScroll = el.getAttribute('data-async-no-scroll') === 'true';
-            const options = { noScroll };
+            // An in-place toggle (the watched mark, a rating): it reloads the
+            // whole main content around the viewer, who stays where they are
+            // -- no scroll-to-top of `data-async-scroll-top` targets -- and a
+            // job running there goes on (lib/loadAsyncView.js keepJobs).
+            const inPlace = el.getAttribute('data-async-no-scroll') === 'true';
+            const options = { noScroll: inPlace, keepJobs: inPlace };
             const targetSelector = this.getAttribute('data-async-target');
             const target = document.querySelector(targetSelector);
             const layout = target.getAttribute('data-async-layout');
@@ -172,13 +176,13 @@ async function async(selector, params = {}, scope = null) {
                         // card with no job log, so nothing else would ever
                         // release the button -- it stayed dead for the full
                         // BUSY_MAX_MS while the card said "try again".
-                        if (isActionForm(self) && res && !res.ok) clearBusy(self);
+                        if (isActionForm(self) && res && !res.ok) clearPress(self, press);
                         return res;
                     })
                     .catch((err) => {
                         // The job never started, so nothing will ever release
                         // the button: the request itself is the ending here.
-                        if (isActionForm(self)) clearBusy(self);
+                        if (isActionForm(self)) clearPress(self, press);
                         throw err;
                     });
             }

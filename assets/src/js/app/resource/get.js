@@ -5,6 +5,7 @@ import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initToolIntent } from '../../lib/toolIntent';
 import '../../lib/share/share';
 import { takesPart, whenDeclared, setPendingFallback } from '../../lib/player/decode-declaration';
+import { hasJob } from '../../lib/actionBusy';
 // Plot clamp: when the 3-line clamped paragraph overflows, cut the text
 // at the longest fitting prefix (shared findTextCut from lib/textClamp)
 // and append a clickable inline "\u2026" that expands the full plot; an
@@ -98,6 +99,13 @@ av( async function() {
     // nothing at all. Wait for the form instead (lib/waitForElement.js).
     const form = await waitForElement(findForm);
     if (!form) return;
+    // This view runs again on every swap of main, and #action stays in the
+    // address. A watched toggle or a rating keeps the job this link started
+    // (lib/loadAsyncView.js keepJobs): a second start would throw its player
+    // away.
+    const logSel = form.getAttribute('data-async-target');
+    const log = logSel && document.querySelector(logSel);
+    if (log && hasJob(log)) return;
     // Marked as the stream restart's fields (lib/player/stream-restart.js
     // PURGE_MARK; the literal here keeps the player's code out of this
     // page's bundle): they ride on this start, and on the viewer's next

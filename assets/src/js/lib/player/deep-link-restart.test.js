@@ -62,3 +62,26 @@ test('the restart\'s deep link starts the file past the job cache, with the "wat
     assert.equal(sent[0].purge, 'true');
     assert.equal(sent[0]['force-slow'], undefined);
 });
+
+test('the page re-rendered around the job this link started (a watched toggle keeps it) does not start it again', async () => {
+    // app/resource/get.js runs again on every swap of main, with #action still
+    // in the address: a second start would throw the kept player away.
+    const sent = [];
+    const form = w.document.querySelector('form');
+    form.setAttribute('data-async-target', '#log-ep2');
+    const log = w.document.createElement('div');
+    log.id = 'log-ep2';
+    log.setAttribute('data-async-view', '/assets/action');
+    w.document.body.appendChild(log);
+    const onSubmit = (e) => { e.preventDefault(); sent.push(1); };
+    form.addEventListener('submit', onSubmit);
+    const [, init] = w.av[0];
+    await init.call(w.document.getElementById('host'));
+    assert.equal(sent.length, 0);
+    log.removeAttribute('data-async-view');
+    await init.call(w.document.getElementById('host'));
+    assert.equal(sent.length, 1, 'an empty log: the link starts its file');
+    form.removeEventListener('submit', onSubmit);
+    form.removeAttribute('data-async-target');
+    log.remove();
+});

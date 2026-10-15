@@ -26,7 +26,9 @@ const { bindAsync } = await import('./async.js');
 const { isBusy, clearBusy } = await import('./actionBusy.js');
 bindAsync({
     async fetch(f, url) {
-        const res = new Response(answer.body, { status: answer.status });
+        const a = answer; // this request's, whatever the next one is told
+        if (a.gate) await a.gate;
+        const res = new Response(a.body, { status: a.status });
         Object.defineProperty(res, 'url', { value: url });
         return res;
     },
@@ -65,4 +67,36 @@ test('a started job keeps its button busy: the job log is what ends it', async (
     assert.deepEqual(events, ['busy-press']);
     delete window.umami;
     clearBusy(form); // its 15-min backstop would hold the runner
+});
+
+test('a refused start whose button a watched toggle re-rendered meanwhile releases the new one', async () => {
+    // The toggle (an in-place form: data-async-no-scroll) answers before the
+    // start does, and keeps the job's log (lib/loadAsyncView.js keepJobs):
+    // the press moves to the re-rendered Watch, and the refusal finds the
+    // form it was sent from detached.
+    const wrap = document.createElement('div');
+    wrap.id = 'wrap';
+    wrap.setAttribute('data-async-layout', '');
+    wrap.append(...document.body.childNodes);
+    wrap.insertAdjacentHTML('beforeend', '<form id="toggle" action="/library/movie/tt1/mark" method="post" data-async-target="#wrap" data-async-no-scroll="true" data-async-push-state="false"><button type="submit">Mark</button></form>');
+    document.body.appendChild(wrap);
+    window.dispatchEvent(new CustomEvent('async', { detail: { target: wrap } }));
+    let open;
+    answer = { status: 400, body: '<div class="progress-alert closeable" role="alert"><pre>refused</pre></div>', gate: new Promise((r) => { open = r; }) };
+    const pressed = document.querySelector('form.stream');
+    pressed.requestSubmit();
+    assert.equal(isBusy(pressed), true);
+    answer = { status: 200, body: wrap.innerHTML.replace('>Mark<', '>Watched<') };
+    document.getElementById('toggle').requestSubmit();
+    await settle();
+    const twin = document.querySelector('form.stream');
+    assert.equal(document.querySelector('#toggle button').textContent, 'Watched', 'the toggle re-rendered the page');
+    assert.notEqual(twin, pressed);
+    assert.equal(isBusy(twin), true, 'the press goes on in the new Watch');
+    open();
+    await settle();
+    assert.ok(document.querySelector('#log-1 [role=alert]'), 'the card lands in the kept log');
+    assert.equal(isBusy(twin), false, 'not left spinning for the 15-minute backstop');
+    clearBusy(twin);
+    clearBusy(pressed);
 });

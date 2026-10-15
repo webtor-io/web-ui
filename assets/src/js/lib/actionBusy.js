@@ -88,15 +88,26 @@ export function markBusy(form, { now = Date.now, timeoutMs = BUSY_MAX_MS } = {})
             if (page === form || host.contains(page) || isBusy(page)) continue;
             if (page.getAttribute('data-async-target') !== target || actionPath(page) !== path) continue;
             const pageBtn = submitButton(page);
-            if (pageBtn) show(page, pageBtn, now, timeoutMs);
+            if (pageBtn) show(page, pageBtn, now, timeoutMs, form.dataset.busyPress);
         }
     }
     return true;
 }
 
-function show(form, btn, now, timeoutMs) {
+// Which press a busy form is busy from: app/action.js releases the forms of
+// the press its job answers, a copy a swap rendered anew among them
+// (carryBusy). Not busySince: two presses can share a millisecond. Counted on
+// window, not here -- each bundle has its own copy of this module
+// (clearBusyFor).
+function nextPress() {
+    window.__busyPress = (window.__busyPress || 0) + 1;
+    return String(window.__busyPress);
+}
+
+function show(form, btn, now, timeoutMs, press = nextPress()) {
     form.dataset.busy = 'true';
     form.dataset.busySince = String(now());
+    form.dataset.busyPress = press;
     // The button keeps saying what it is (owner, 2026-09-19): the label and
     // its icon stay, and a spinner joins them. A button that renamed itself
     // to "preparing…" lost the one word that said which of the two buttons
@@ -130,6 +141,7 @@ export function clearBusy(form) {
     if (!form || !isBusy(form)) return false;
     delete form.dataset.busy;
     delete form.dataset.busySince;
+    delete form.dataset.busyPress;
     delete form.dataset.busyPressed;
     if (form._busyTimer) {
         clearTimeout(form._busyTimer);
@@ -175,6 +187,43 @@ export function clearBusyFor(el) {
         if (cleared) return true;
     }
     return false;
+}
+
+// hasJob: a job's log (#log-<item>) with a job in it -- the action view
+// (app/action.js marks the log itself), a player's view inside it (after a
+// quiet move to the next episode syncPage leaves only that, in a fresh log),
+// or a press still out for it.
+export function hasJob(log) {
+    if (log.hasAttribute('data-async-view') || log.querySelector('[data-async-view]')) return true;
+    return Array.from(log.ownerDocument.querySelectorAll('form[data-busy="true"]'))
+        .some((f) => f.getAttribute('data-async-target') === `#${log.id}`);
+}
+
+// clearPress: the forms busy from the press `form` made -- it, and the twin a
+// swap rendered since (carryBusy) -- when the request itself is the ending.
+export function clearPress(form, press) {
+    clearBusy(form);
+    if (!press) return;
+    for (const f of document.querySelectorAll('form[data-busy="true"]')) {
+        if (f.dataset.busyPress === press) clearBusy(f);
+    }
+}
+
+// carryBusy: a busy form rendered anew. A swap that keeps the running job's
+// log (lib/loadAsyncView.js) renders its start form again, and the fresh one
+// is busy from the same press -- released by the job (app/action.js), a press
+// on it still swallowed -- for what is left of the old one's timeout.
+export function carryBusy(from, to, { now = Date.now } = {}) {
+    if (!isBusy(from) || isBusy(to)) return false;
+    const btn = submitButton(to);
+    if (!btn) return false;
+    const { busySince, busyPress, busyPressed } = from.dataset;
+    const timeoutMs = from._busyTimer ? Math.max(1, BUSY_MAX_MS - (now() - Number(busySince))) : 0;
+    clearBusy(from);
+    show(to, btn, now, timeoutMs, busyPress);
+    to.dataset.busySince = busySince;
+    if (busyPressed) to.dataset.busyPressed = busyPressed;
+    return true;
 }
 
 // countBusyPress counts presses on a working button, which nothing else

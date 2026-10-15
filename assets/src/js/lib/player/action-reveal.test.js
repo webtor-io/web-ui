@@ -89,7 +89,7 @@ test('failed preparation does not latch viewer presence', async () => {
 // The Watch button that started the job (lib/actionBusy.js) stays busy until
 // the player is shown -- not when its template arrives: in between it buffers
 // out of sight, and a press there replayed the job over it.
-const { markBusy, isBusy, clearBusy } = await import('../actionBusy.js');
+const { markBusy, isBusy, clearBusy, carryBusy } = await import('../actionBusy.js');
 const watch = () => w.document.getElementById('watch');
 
 test('the button stays busy through the rendered template and the job\'s close, until the player is shown', async () => {
@@ -252,6 +252,21 @@ test('a newer press into the same log during its request is not released by the 
     clearBusy(dl);
     dl.remove();
     destroy.call(host);
+});
+
+test('a start form rendered anew while the job runs (the watched toggle) is released by that job', async () => {
+    markBusy(watch(), { timeoutMs: 0 });
+    await start();
+    // lib/loadAsyncView.js: the page around the log re-rendered, its Watch a
+    // new form, busy from the same press.
+    const old = watch();
+    const twin = old.cloneNode(true);
+    old.replaceWith(twin);
+    carryBusy(old, twin);
+    assert.equal(isBusy(twin), true);
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    assert.equal(isBusy(twin), false, 'not left spinning for the 15-minute backstop');
+    destroy.call(w.document.getElementById('host'));
 });
 
 test('in the archive dialog the "start download" takes focus from the dialog\'s own ✕', async () => {

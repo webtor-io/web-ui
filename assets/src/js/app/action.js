@@ -19,13 +19,16 @@ av(async function() {
     let gone = false;
     let rendered = false;
     let backstop = null;
-    // The forms this job answers to: busy for this log when its response came
-    // in (the pressed one, and the page's start form a card's retry marks).
-    // Released by this job only while still busy from that press -- a newer
-    // press into the same log (Download after Watch) is someone else's.
-    const owners = Array.from(document.querySelectorAll('form[data-busy="true"]'))
-        .filter((f) => f.getAttribute('data-async-target') === `#${self.id}`)
-        .map((f) => [f, f.dataset.busySince]);
+    // The press this job answers: the forms busy for this log when its
+    // response came in (the pressed one, and the page's start form a card's
+    // retry marks). Released by this job only while still busy from that
+    // press -- a newer press into the same log (Download after Watch) is
+    // someone else's -- wherever they are by then: a swap that keeps this log
+    // renders its start form anew, busy from the same press
+    // (lib/loadAsyncView.js, carryBusy).
+    const busyHere = () => Array.from(document.querySelectorAll('form[data-busy="true"]'))
+        .filter((f) => f.getAttribute('data-async-target') === `#${self.id}`);
+    const presses = new Set(busyHere().map((f) => f.dataset.busyPress));
     let sdk;
     const changed = () => document.dispatchEvent(new CustomEvent('transfer-activity'));
     const endPreparation = () => {
@@ -43,7 +46,7 @@ av(async function() {
         // the same #log replaces it (Turnstile's step) before this view is
         // torn down.
         if (!progress.isConnected) return;
-        for (const [f, since] of owners) if (f.dataset.busySince === since) clearBusy(f);
+        for (const f of busyHere()) if (presses.has(f.dataset.busyPress)) clearBusy(f);
     };
     const reveal = () => {
         unlisten();
