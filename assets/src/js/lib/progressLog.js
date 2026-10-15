@@ -277,18 +277,17 @@ class Renderer {
         }
         // The job is over, whichever way it went: the button that started it
         // goes back to being a button (actionBusy.js). Every ending counts --
-        // `error` (no peers, the cap modal), `download`, `redirect`, `close`
-        // -- except a rendered template: that is a player on its way, not on
-        // screen. app/action.js keeps it hidden until it can play and
-        // releases the button then; until 2026-10-14 the button came back
-        // here, live through the buffering, and a press replayed the job over
-        // the player. `close` follows `rendertemplate` in every job
-        // (services/job Run), so it releases only a job that rendered
-        // nothing. First in renderMessage, so a throw further down can never
-        // leave a button working for a job that has finished.
+        // `error` (no peers, the cap modal), `rendertemplate`, `download`,
+        // `redirect`, `close`. A rendered player too, before it can play:
+        // held until canplay (prod 2026-10-15 07:23-07:49Z), the button was
+        // dead while a player that never got there stayed hidden -- and on
+        // the build before, 11% of Watch sessions played only after a second
+        // press with no card in between. First in renderMessage, so a throw
+        // further down can never leave a button working for a job that has
+        // finished.
         if (data.level === 'rendertemplate') this.rendered = true;
         if (data.level === 'error' || data.level === 'download' || data.level === 'redirect'
-            || (data.level === 'close' && !this.rendered)) {
+            || data.level === 'rendertemplate' || (data.level === 'close' && !this.rendered)) {
             clearBusyFor(this.el);
         }
         if (data.level === 'close') {

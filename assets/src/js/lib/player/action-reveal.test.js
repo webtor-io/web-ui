@@ -86,31 +86,39 @@ test('failed preparation does not latch viewer presence', async () => {
     destroy.call(host);
 });
 
-// The Watch button that started the job (lib/actionBusy.js) stays busy until
-// the player is shown -- not when its template arrives: in between it buffers
-// out of sight, and a press there replayed the job over it.
+// The Watch button that started the job (lib/actionBusy.js) comes back with
+// the player's template, before the player can play: a player that never
+// gets to canplay stays hidden, and a press again is how the viewer gets a
+// new one (prod 2026-10-15 07:23-07:49Z, the build that held it).
 const { markBusy, isBusy, clearBusy, carryBusy } = await import('../actionBusy.js');
 const watch = () => w.document.getElementById('watch');
 
-test('the button stays busy through the rendered template and the job\'s close, until the player is shown', async () => {
+test('the button comes back with the player\'s template, before the player can play', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
     markBusy(watch(), { timeoutMs: 0 });
-    await start();
-    assert.equal(isBusy(watch()), true, 'a rendered player is not yet on screen');
-    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'close' }) });
-    assert.equal(isBusy(watch()), true, 'close follows rendertemplate in every job');
-    w.dispatchEvent(new w.CustomEvent('player_ready'));
-    assert.equal(isBusy(watch()), false, 'released when the player can play');
+    const { el } = await start();
+    assert.equal(el.classList.contains('hidden'), true, 'still loading out of sight');
+    assert.equal(isBusy(watch()), false, 'a press now starts it again');
+    t.mock.timers.tick(30 * 1000);
+    assert.equal(isBusy(watch()), false);
     destroy.call(w.document.getElementById('host'));
 });
 
-test('a player that never says it can play releases the button after the backstop', async (t) => {
+test('a player still hidden 30 s after its template is counted, with what its element was doing; a shown one is not', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    markBusy(watch(), { timeoutMs: 0 });
+    const events = [];
+    w.umami = { track: (name, data) => events.push([name, data]) };
+    t.after(() => { delete w.umami; });
     await start();
     t.mock.timers.tick(29 * 1000);
-    assert.equal(isBusy(watch()), true);
+    assert.deepEqual(events, []);
     t.mock.timers.tick(1000);
-    assert.equal(isBusy(watch()), false, '30 s after the template');
+    assert.deepEqual(events, [['player-not-ready', { kind: 'video', rs: 0, ns: 0, err: 0, paused: true, preload: '', resume: false, src: 'none' }]]);
+    events.length = 0;
+    await start();
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    t.mock.timers.tick(30 * 1000);
+    assert.deepEqual(events, [], 'shown in time');
     destroy.call(w.document.getElementById('host'));
 });
 
@@ -256,7 +264,9 @@ test('a newer press into the same log during its request is not released by the 
 
 test('a start form rendered anew while the job runs (the watched toggle) is released by that job', async () => {
     markBusy(watch(), { timeoutMs: 0 });
-    await start();
+    const host = w.document.getElementById('host');
+    host.querySelector('.progress-alert').classList.remove('hidden');
+    await init.call(host);
     // lib/loadAsyncView.js: the page around the log re-rendered, its Watch a
     // new form, busy from the same press.
     const old = watch();
@@ -264,9 +274,9 @@ test('a start form rendered anew while the job runs (the watched toggle) is rele
     old.replaceWith(twin);
     carryBusy(old, twin);
     assert.equal(isBusy(twin), true);
-    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'rendertemplate', tag: 'rendering action', body: '<div class="rendered-player"><video></video></div>' }) });
     assert.equal(isBusy(twin), false, 'not left spinning for the 15-minute backstop');
-    destroy.call(w.document.getElementById('host'));
+    destroy.call(host);
 });
 
 test('in the archive dialog the "start download" takes focus from the dialog\'s own ✕', async () => {

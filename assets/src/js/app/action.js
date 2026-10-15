@@ -2,12 +2,13 @@ import av from '../lib/av';
 import { clearBusy } from '../lib/actionBusy';
 import { reveal as bringIntoView, stillAtPress } from '../lib/stickyStatus';
 
-// The button that started the job stays busy until the player is shown, not
-// until its template is rendered (lib/progressLog.js): in between the player
-// buffers out of sight, and a press there threw it away and replayed the job.
-// A player that never says it can play (or has a card to show) must not hold
-// the button for BUSY_MAX_MS: this releases it anyway.
-const REVEAL_BACKSTOP_MS = 30 * 1000;
+// The button that started the job comes back with the player's template
+// (lib/progressLog.js), while the player still buffers out of sight: a press
+// there replays the job, and for a player that never gets to canplay that is
+// the way out (prod 2026-10-15: held until canplay, the button was dead and
+// the player hidden). A player still hidden after NOT_READY_MS is counted
+// (Umami player-not-ready), with what its element was doing.
+const NOT_READY_MS = 30 * 1000;
 av(async function() {
     const self = this;
     if (self._actionTeardown) self._actionTeardown();
@@ -56,6 +57,21 @@ av(async function() {
         release();
         bringIntoView(el);
     };
+    const notReady = () => {
+        backstop = null;
+        const m = el.querySelector('video, audio');
+        if (gone || !progress.isConnected || !m || !window.umami) return;
+        // Which way it went: nothing loading (preload none, no gesture to
+        // play), metadata only, stuck on the network, a decode error; the
+        // resume prompt up behind the fold; MSE (hls.js), native HLS or a file.
+        const src = m.currentSrc || '';
+        window.umami.track('player-not-ready', {
+            kind: m.tagName.toLowerCase(), rs: m.readyState, ns: m.networkState,
+            err: m.error ? m.error.code : 0, paused: m.paused, preload: m.preload,
+            resume: !!el.querySelector('.wt-resume-prompt'),
+            src: src.startsWith('blob:') ? 'mse' : src.includes('.m3u8') ? 'hls' : src ? 'file' : 'none',
+        });
+    };
     const onClose = (ev) => {
         if (ev.target.closest('.closeable-close')) endPreparation();
     };
@@ -99,13 +115,12 @@ av(async function() {
         }
         if (ev.level !== 'rendertemplate') return;
         rendered = true;
-        // A finished job is not yet a ready player. Keep preparation -- and
-        // the busy button -- until canplay, or a player card that needs to be
-        // shown (player_show).
+        // A finished job is not yet a ready player. Keep preparation until
+        // canplay, or a player card that needs to be shown (player_show).
         window.addEventListener('player_ready', reveal);
         window.addEventListener('player_show', reveal);
         clearTimeout(backstop);
-        backstop = setTimeout(release, REVEAL_BACKSTOP_MS);
+        backstop = setTimeout(notReady, NOT_READY_MS);
         el.classList.add('hidden', 'mb-5');
         self.appendChild(el);
         ev.render(el);
