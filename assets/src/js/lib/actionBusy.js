@@ -35,15 +35,17 @@ export const BUSY_MAX_MS = 15 * 60 * 1000;
 // would only flash.
 const ACTION_RE = /\/(download-file|download-dir|preview-image|stream-audio|stream-video)$/;
 
+function actionPath(form) {
+    try {
+        return new URL(form.getAttribute('action') || '', window.location.href).pathname;
+    } catch (e) {
+        return '';
+    }
+}
+
 export function isActionForm(form) {
     if (!form || form.tagName !== 'FORM') return false;
-    let path;
-    try {
-        path = new URL(form.getAttribute('action') || '', window.location.href).pathname;
-    } catch (e) {
-        return false;
-    }
-    return ACTION_RE.test(path);
+    return ACTION_RE.test(actionPath(form));
 }
 
 export function isBusy(form) {
@@ -68,13 +70,33 @@ export function markBusy(form, { now = Date.now, timeoutMs = BUSY_MAX_MS } = {})
             if (other !== form && other.getAttribute('data-async-target') === target) clearBusy(other);
         }
     }
-    form.dataset.busy = 'true';
-    form.dataset.busySince = String(now());
     // What the job produces is brought into view (stickyStatus.js reveal)
     // unless the viewer scrolls away after this. Not for a restart the player
     // makes on its own (resubmit): nobody pressed, and a viewer reading the
     // list under a playing file must not be pulled back up to it.
     if (!form._quietPress) notePress(form.ownerDocument.defaultView);
+    show(form, btn, now, timeoutMs);
+    // A form inside the log it targets -- the no-peers card's "try again",
+    // the slow card's "continue at slow speed": the response replaces the
+    // log and the form with it, and nothing on the page looked busy for the
+    // job it started; a press on Watch then threw that job away. The page's
+    // own start form for the same log and endpoint is busy with it.
+    const host = target ? document.querySelector(target) : null;
+    if (host && host.contains(form)) {
+        const path = actionPath(form);
+        for (const page of document.querySelectorAll('form[data-async-target]')) {
+            if (page === form || host.contains(page) || isBusy(page)) continue;
+            if (page.getAttribute('data-async-target') !== target || actionPath(page) !== path) continue;
+            const pageBtn = submitButton(page);
+            if (pageBtn) show(page, pageBtn, now, timeoutMs);
+        }
+    }
+    return true;
+}
+
+function show(form, btn, now, timeoutMs) {
+    form.dataset.busy = 'true';
+    form.dataset.busySince = String(now());
     // The button keeps saying what it is (owner, 2026-09-19): the label and
     // its icon stay, and a spinner joins them. A button that renamed itself
     // to "preparing…" lost the one word that said which of the two buttons
@@ -102,7 +124,6 @@ export function markBusy(form, { now = Date.now, timeoutMs = BUSY_MAX_MS } = {})
     // the full fifteen minutes instead of failing.
     if (form._busyTimer) clearTimeout(form._busyTimer);
     form._busyTimer = timeoutMs > 0 ? setTimeout(() => clearBusy(form), timeoutMs) : null;
-    return true;
 }
 
 export function clearBusy(form) {
@@ -145,9 +166,13 @@ export function clearBusyFor(el) {
     const busy = () => document.querySelectorAll('form[data-busy="true"]');
     for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
         if (!n.id) continue;
+        // Every form busy for it: a card's form and the page's start form it
+        // marked (markBusy) end with the same job.
+        let cleared = false;
         for (const form of busy()) {
-            if (form.getAttribute('data-async-target') === `#${n.id}`) return clearBusy(form);
+            if (form.getAttribute('data-async-target') === `#${n.id}`) cleared = clearBusy(form) || cleared;
         }
+        if (cleared) return true;
     }
     return false;
 }

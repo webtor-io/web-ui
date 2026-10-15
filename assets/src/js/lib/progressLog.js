@@ -157,12 +157,12 @@ class Renderer {
         this.results.appendChild(div);
         this.endStage();
         loadAsyncView(div, data.body);
-        // A card is a verdict too (no peers, too slow, the download link):
-        // its heading, or its first words, said once.
-        if (this.announcer) {
-            const h = div.querySelector('h1, h2, h3');
-            this.say(((h || div).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200));
-        }
+        // A card is a verdict too (no peers, too slow): its heading, said
+        // once. Only a heading -- the download card has none and starts with
+        // a <script> holding the link, api-key and token, which textContent
+        // would have read out; its verdict is the summary before it.
+        const h = div.querySelector('h1, h2, h3');
+        if (h) this.say(h.textContent.replace(/\s+/g, ' ').trim());
         const closes = div.querySelectorAll('.closeable-close');
         for (const close of closes) {
             close.addEventListener('click', () => {

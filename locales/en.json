@@ -860,6 +860,7 @@
     "job.downloading": "{{.Bytes}}",
     "job.waitingForPeers": "looking for peers",
     "job.warmupCountdown": "looking for peers · {{.Seconds}} s left",
+    "job.magnetCountdown": "{{.Seconds}} s",
     "toast.domainAdded": "Domain added",
     "toast.domainDeleted": "Domain deleted",
     "toast.addedToLibrary": "Added to library",

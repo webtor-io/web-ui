@@ -777,6 +777,7 @@
     "job.downloading": "{{.Bytes}}",
     "job.waitingForPeers": "eş aranıyor",
     "job.warmupCountdown": "eş aranıyor · {{.Seconds}} sn kaldı",
+    "job.magnetCountdown": "{{.Seconds}} sn",
     "toast.domainAdded": "Alan adı eklendi",
     "toast.domainDeleted": "Alan adı silindi",
     "toast.addedToLibrary": "Kütüphaneye eklendi",

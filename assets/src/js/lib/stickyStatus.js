@@ -198,9 +198,9 @@ function record(w) {
         if (!SCROLL_KEYS.has(e.key)) return;
         const t = e.target;
         if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-        // Space on a button or a link presses it -- the busy Watch pressed
-        // again -- and scrolls nothing.
-        if (e.key === ' ' && t && t.closest && t.closest('button, a[href], summary, [role=button]')) return;
+        // Space on a button presses it -- the busy Watch pressed again -- and
+        // scrolls nothing. Not on a link: Space there scrolls the page.
+        if (e.key === ' ' && t && t.closest && t.closest('button, summary, [role=button]')) return;
         mark();
     }, { capture: true });
     return r;

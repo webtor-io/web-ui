@@ -93,3 +93,30 @@ test("the check is the job's first step in its own words; when Cloudflare wants 
     assert.ok(step.querySelector('.job-stage').classList.contains('job-stage-done'), 'no spinner: the wait is the viewer\'s');
     await settle();
 });
+
+test('once ticked, the line goes back to working until the job answers', async () => {
+    document.getElementById('log-1').innerHTML = '';
+    const form = document.getElementById('watch');
+    form.requestSubmit();
+    const step = document.querySelector('#log-1 [data-turnstile-step]');
+    const warm = widgets.length - 1;
+    widgets[warm]['before-interactive-callback']();
+    assert.equal(step.querySelector('.job-stage-title').textContent, 'Tick the box to continue');
+    await settle(); // the live widget answers (the stub's execute)
+    assert.equal(step.querySelector('.job-stage-title').textContent, 'Checking that you are not a robot');
+    assert.equal(step.querySelector('.job-stage').classList.contains('job-stage-done'), false, 'spinning again');
+    assert.equal(step.lastElementChild.style.minHeight, '', 'no empty box held open');
+});
+
+test('on a narrow phone the live checkbox is the compact one', async () => {
+    document.getElementById('log-1').innerHTML = '';
+    const form = document.getElementById('watch');
+    form.requestSubmit();
+    const step = document.querySelector('#log-1 [data-turnstile-step]');
+    Object.defineProperty(step.lastElementChild, 'clientWidth', { value: 262, configurable: true });
+    const warm = widgets.length - 1;
+    widgets[warm]['before-interactive-callback']();
+    assert.equal(widgets.at(-1).size, 'compact');
+    assert.equal(step.lastElementChild.style.minHeight, '140px');
+    await settle();
+});

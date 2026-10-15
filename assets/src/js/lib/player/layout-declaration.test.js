@@ -46,11 +46,13 @@ test('with a throwing localStorage the layout still binds the async navigation a
     assert.equal(form._asyncBound, true, 'bindAsync ran: the start form is async');
     assert.equal(w.document.getElementById('nav')._asyncBound, true);
     // Turnstile's capture listener is in place: an anonymous start is held
-    // for a token (no script here -- it fails closed and says why).
+    // for a token -- with no script here yet, its step is on screen and the
+    // request waits for the script (it fails closed only SCRIPT_WAIT_MS after
+    // the page loaded).
     form.requestSubmit();
     await new Promise((r) => setTimeout(r, 50));
-    const reason = form.querySelector('input[name="cf-turnstile-reason"]');
-    assert.ok(reason, 'the submit went through Turnstile');
+    assert.ok(w.document.querySelector('#log-1 [data-turnstile-step]'), 'the submit went through Turnstile');
+    assert.equal(fetched.filter((f) => f.url.includes('stream-video')).length, 0, 'held for the token');
     // And the declaration took part (the switch held for the page).
     assert.equal(w.__wtDecode.optin, 'on');
 });

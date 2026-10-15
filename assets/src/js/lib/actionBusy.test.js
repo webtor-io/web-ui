@@ -173,3 +173,19 @@ test('a restart the player makes on its own is no press: it re-arms no reveal', 
     assert.equal(window.__reveal.pressAt, pressed, 'but noted no press');
     clearBusy(p.stream);
 });
+
+test('a card\'s retry inside the log marks the page\'s start form for that log too; the job\'s end releases both', () => {
+    const p = card();
+    const cardForm = document.createElement('form');
+    cardForm.setAttribute('action', '/ru/stream-video');
+    cardForm.setAttribute('data-async-target', '#log-1');
+    cardForm.innerHTML = '<button type="submit">Try again</button>';
+    p.logTarget.appendChild(cardForm);
+    assert.equal(markBusy(cardForm, { timeoutMs: 0 }), true);
+    assert.equal(isBusy(p.stream), true, 'Watch says the job is running');
+    assert.equal(isBusy(p.download), false, 'another endpoint is not this job');
+    // The response replaces the log, the card's form with it.
+    cardForm.remove();
+    assert.equal(clearBusyFor(p.logTarget), true);
+    assert.equal(isBusy(p.stream), false);
+});

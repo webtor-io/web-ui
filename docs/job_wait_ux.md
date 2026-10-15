@@ -33,6 +33,20 @@ where it is, under the buttons.
   not start -- renders `action/post`'s card with no job log, so nothing else would ever
   release it; until 2026-10-14 the button stayed dead for the full backstop under a card
   that said "try again"); by `BUSY_MAX_MS` (15 min, a backstop for a lost SSE).
+- **A card's form is the page's job too.** The no-peers card's "try again" and the slow
+  card's "continue at slow speed" live inside the log they target; the response
+  replaces the log and them with it. `markBusy` marks the page's own start form for that
+  log and endpoint with them, and `clearBusyFor` releases every form busy for the log.
+  `app/action.js` releases only the forms that were busy for its log when its response
+  came in, and only while still busy from that press -- a newer press into the same log
+  (Download after Watch) is not this job's to end.
+- **The Turnstile script may not be there yet** (async, deferred: a slow phone; the
+  `#action=stream` deep link presses at load). The press shows its step and waits until
+  `SCRIPT_WAIT_MS` after the page loaded before it fails closed -- on stage, 3 of 7
+  throttled loads used to be refused 0.5-3.4 s in. A check whose step went with its log
+  (another file picked) is ended at the next press instead of holding every press on the
+  page until its two-minute deadline. On a phone narrower than about 350 px the live
+  checkbox is the compact one; once ticked, the line goes back to "Checking…".
 - **One target, one working button.** Watch and Download of a file card share
   `#log-<item>`; a new job's response replaces the log, so `markBusy` releases any other
   busy form with the same target — nothing else could any more.
@@ -85,7 +99,8 @@ the fold on 768-844 px tall screens. Nothing moved the page toward it.
   is fixed at the top (`stickyBottom`) and the window's bottom; otherwise its bottom to
   the fold, but its top never under the bars (a player taller than the space shows from
   its top). Nothing inside a `<dialog>`, and nothing once the viewer scrolled themselves
-  (wheel, touch, scroll keys; not Space on a button, which presses it) after the press --
+  (wheel, touch, scroll keys; not Space on a button, which presses it -- Space on a link
+  scrolls, and counts) after the press --
   `markBusy` notes the press (`notePress`), except for the player's own restarts
   (`resubmit`); order is kept as a sequence on `window.__reveal`, one record for every
   bundle. Not seen: the scrollbar dragged, Tab, a wheel over the Turnstile iframe; and
@@ -121,8 +136,10 @@ suffix "(37%)". Now:
 - Cards (`custom`) and verdicts (summaries) go to `.job-results`, outside the fold, and
   take the line's place. On `close` with nothing rendered the line stops spinning; a
   rendered player's line goes on until the player hides the log (app/action.js).
-- A screen reader hears each new step and each verdict once -- a card by its heading
-  (`[data-job-announce]`, role=status), never the per-second ticks.
+- A screen reader hears each new step and each verdict once -- a card by its heading,
+  and only a heading: the download card has none and starts with a `<script>` holding
+  the link, api-key and token (`[data-job-announce]`, role=status), never the
+  per-second ticks.
 - A job's tag is its step's own words (services/job: `InProgress` tags by the message),
   so progressLog never builds a selector from it (`byAttr`): an apostrophe ("Getting the
   torrent's details", French "l'URL du flux", Italian "dell'inizio") made
@@ -131,7 +148,9 @@ suffix "(37%)". Now:
   ("Loading the start of the file", status "looking for peers · 34 s left", then "37%";
   "Speed test, 50 MB" for the bandwidth check; "Checking the file format", which audio
   and images go through too). Past the countdown with nothing yet the status is
-  "looking for peers" with no deadline, and seconds round up -- never "0 s left".
+  "looking for peers" with no deadline, and seconds round up -- never "0 s left". The
+  magnet wait on the home page keeps its short "43 s" (`job.magnetCountdown`, m:ss from
+  a minute, both rounded up).
   Only action.go and hls.go use them; nothing (agents, alerts) matches their text.
 - Turnstile's check (`lib/turnstileAction.js`) draws the same line; when Cloudflare wants
   a click it says "Tick the box to continue" (`data-label-interactive` on

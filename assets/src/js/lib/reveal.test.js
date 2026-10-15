@@ -106,6 +106,13 @@ test('a touch scroll is the viewer going somewhere; Space on a button and keys i
     w.document.body.appendChild(input);
     input.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }));
     assert.equal(reveal(log), true, 'keys in a field are typing');
+    fresh();
+    const link = w.document.createElement('a');
+    link.href = '/legal/tos';
+    w.document.body.appendChild(link);
+    link.dispatchEvent(new w.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    assert.equal(reveal(log), false, 'Space on a link scrolls the page');
+    link.remove();
     btn.remove();
     input.remove();
 });

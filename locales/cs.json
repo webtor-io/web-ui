@@ -807,6 +807,7 @@
     "job.downloading": "{{.Bytes}}",
     "job.waitingForPeers": "hledáme peery",
     "job.warmupCountdown": "hledáme peery · ještě {{.Seconds}} s",
+    "job.magnetCountdown": "{{.Seconds}} s",
     "toast.domainAdded": "Doména přidána",
     "toast.domainDeleted": "Doména smazána",
     "toast.addedToLibrary": "Přidáno do knihovny",

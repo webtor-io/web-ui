@@ -234,3 +234,37 @@ test('an image preview is brought into view once it has loaded (no height before
     assert.equal(scrolls.length, 1);
     destroy.call(host);
 });
+
+test('a newer press into the same log during its request is not released by the old job', async () => {
+    // Signed in: no Turnstile step replaces the log at the press, so the old
+    // job's log is still there while Download's POST is out.
+    const host = w.document.getElementById('host');
+    markBusy(watch(), { timeoutMs: 0 });
+    await start();
+    const dl = w.document.createElement('form');
+    dl.setAttribute('action', '/download-file');
+    dl.setAttribute('data-async-target', '#host');
+    dl.innerHTML = '<button type="submit">Download</button>';
+    w.document.body.appendChild(dl);
+    markBusy(dl, { timeoutMs: 0 });
+    w.dispatchEvent(new w.CustomEvent('player_ready'));
+    assert.equal(isBusy(dl), true, 'Watch\'s player is not Download\'s end');
+    clearBusy(dl);
+    dl.remove();
+    destroy.call(host);
+});
+
+test('in the archive dialog the "start download" takes focus from the dialog\'s own ✕', async () => {
+    const dialog = w.document.createElement('dialog');
+    dialog.setAttribute('open', '');
+    dialog.innerHTML = '<button id="x">✕</button><div id="dlog"><div class="progress-alert" data-async-progress-log="/l2"><div class="log-target"></div></div></div>';
+    w.document.body.appendChild(dialog);
+    const dlog = w.document.getElementById('dlog');
+    notePress(w);
+    await init.call(dlog);
+    w.document.getElementById('x').focus();
+    sources.at(-1).onmessage({ data: JSON.stringify({ level: 'custom', tag: 'dl', body: '<a data-transfer-download href="/f" download>start</a>' }) });
+    assert.equal(w.document.activeElement, dlog.querySelector('[data-transfer-download]'));
+    destroy.call(dlog);
+    dialog.remove();
+});

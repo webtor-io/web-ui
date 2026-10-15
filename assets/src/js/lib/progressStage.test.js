@@ -121,3 +121,11 @@ test('a card is said too: its heading, once', () => {
     sdk.push({ level: 'custom', tag: 'w', body: '<div><h3>The torrent has no active seeders</h3><p>Save it to Vault…</p></div>' });
     assert.equal(q('[data-job-announce]').textContent, 'The torrent has no active seeders');
 });
+
+test('a card without a heading is not read out -- the download card starts with a script holding its link', () => {
+    const { sdk, q } = stageHost();
+    sdk.inProgress('l', 'Getting the download link');
+    sdk.done('l', 'The file is ready to download');
+    sdk.push({ level: 'custom', tag: 'l', body: '<script>var url = "https://x/f?api-key=k&token=t";</script><div>start download</div>' });
+    assert.equal(q('[data-job-announce]').textContent, 'The file is ready to download', 'the verdict stands; no script, no key');
+});

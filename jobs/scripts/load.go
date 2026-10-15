@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -86,10 +87,13 @@ func magnetCountdown(tp func(string, map[string]any) string, left time.Duration)
 	if left <= 0 {
 		return ""
 	}
-	if left < time.Minute {
-		return formatWarmupLine(tp, 0, 0, left)
+	// Its own short key: the warm-up's countdown says "looking for peers ·
+	// 43 s left" since 2026-10-14, and the magnet line reads "magnetizing
+	// (43 s)". Rounded up in both forms, so 60 is "1:00" and never shown twice.
+	sec := int(math.Ceil(left.Seconds()))
+	if sec < 60 {
+		return tp("job.magnetCountdown", map[string]any{"Seconds": sec})
 	}
-	sec := int(left.Round(time.Second).Seconds())
 	return fmt.Sprintf("%d:%02d", sec/60, sec%60)
 }
 

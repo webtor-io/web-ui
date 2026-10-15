@@ -781,6 +781,7 @@
     "job.downloading": "{{.Bytes}}",
     "job.waitingForPeers": "procurando peers",
     "job.warmupCountdown": "procurando peers · faltam {{.Seconds}} s",
+    "job.magnetCountdown": "{{.Seconds}} s",
     "toast.domainAdded": "Domínio adicionado",
     "toast.domainDeleted": "Domínio excluído",
     "toast.addedToLibrary": "Adicionado à biblioteca",

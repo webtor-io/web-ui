@@ -1,5 +1,5 @@
 import av from '../lib/av';
-import { clearBusyFor } from '../lib/actionBusy';
+import { clearBusy } from '../lib/actionBusy';
 import { reveal as bringIntoView, stillAtPress } from '../lib/stickyStatus';
 
 // The button that started the job stays busy until the player is shown, not
@@ -19,6 +19,13 @@ av(async function() {
     let gone = false;
     let rendered = false;
     let backstop = null;
+    // The forms this job answers to: busy for this log when its response came
+    // in (the pressed one, and the page's start form a card's retry marks).
+    // Released by this job only while still busy from that press -- a newer
+    // press into the same log (Download after Watch) is someone else's.
+    const owners = Array.from(document.querySelectorAll('form[data-busy="true"]'))
+        .filter((f) => f.getAttribute('data-async-target') === `#${self.id}`)
+        .map((f) => [f, f.dataset.busySince]);
     let sdk;
     const changed = () => document.dispatchEvent(new CustomEvent('transfer-activity'));
     const endPreparation = () => {
@@ -34,8 +41,9 @@ av(async function() {
         backstop = null;
         // Only while this job's log is still on the page: a new press into
         // the same #log replaces it (Turnstile's step) before this view is
-        // torn down, and its form is the one busy for this target then.
-        if (progress.isConnected) clearBusyFor(self);
+        // torn down.
+        if (!progress.isConnected) return;
+        for (const [f, since] of owners) if (f.dataset.busySince === since) clearBusy(f);
     };
     const reveal = () => {
         unlisten();
@@ -80,8 +88,10 @@ av(async function() {
         if (ev.level === 'custom') {
             const start = progress.querySelector('[data-transfer-download]');
             const ae = document.activeElement;
+            const dialog = self.closest('dialog');
             const here = !ae || ae === document.body || self.contains(ae)
-                || (ae.form && ae.form.getAttribute('data-async-target') === `#${self.id}`);
+                || (ae.form && ae.form.getAttribute('data-async-target') === `#${self.id}`)
+                || (dialog && dialog.contains(ae)); // TAR/ZIP: the dialog's ✕ had it
             if (start && here && stillAtPress(window)) start.focus({ preventScroll: true });
         }
         if (ev.level !== 'rendertemplate') return;

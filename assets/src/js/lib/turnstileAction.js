@@ -38,6 +38,9 @@ const SILENT_TIMEOUT_MS = 15000;
 const INTERACTIVE_TIMEOUT_MS = 120000;
 const SCRIPT_WAIT_MS = 15000;
 const READY = 'turnstileReady';
+// When the page (and this module) loaded: a press waits for a script still
+// on its way until SCRIPT_WAIT_MS after this, not after the press.
+const LOADED_AT = Date.now();
 
 // One state per page, not one per copy of this module. splitChunks is off by
 // design (webpack.config.js: Go template helpers load entries independently),
@@ -123,10 +126,13 @@ function dropWarm() {
 
 function renderLive(slot) {
     if (!slot || !hasTurnstile()) { if (st.pending) st.pending.finish('', 'no-live-slot'); return; }
+    // The normal widget is 300 px wide: on a phone narrower than about 350 px
+    // it ran past the card and widened the page. Compact (150x140) there.
+    const narrow = slot.clientWidth > 0 && slot.clientWidth < 300;
     try {
-        st.liveId = turnstile.render(slot, widgetOptions(() => {
+        st.liveId = turnstile.render(slot, { ...widgetOptions(() => {
             if (st.pending) st.pending.interactive();
-        }));
+        }), size: narrow ? 'compact' : 'normal' });
         turnstile.execute(st.liveId);
         // The checkbox waits for a click for up to two minutes: where the
         // eye is, and the line says what to do -- the wait is the viewer's
@@ -134,7 +140,7 @@ function renderLive(slot) {
         // itself later, so the slot holds its height (65 px, Turnstile's
         // normal size) from now.
         slot.classList.remove('empty:hidden');
-        slot.style.minHeight = '65px';
+        slot.style.minHeight = narrow ? '140px' : '65px';
         const block = slot.closest('.progress-alert');
         const stage = block && block.querySelector('.job-stage');
         const ask = container() && container().dataset.labelInteractive;
@@ -203,7 +209,7 @@ function stepBlock(form) {
     block.append(stage, slot);
     target.replaceChildren(block);
     reveal(block);
-    return { slot, line: null, detach: () => {} };
+    return { slot, line: null, stage, label, detach: () => {} };
 }
 
 // getToken resolves with a fresh token, or '' when the widget is missing,
@@ -211,7 +217,31 @@ function stepBlock(form) {
 // success is replaced by the job's own log, a refusal by the server's card.
 function getToken(form) {
     return new Promise((resolve) => {
-        if (!hasTurnstile() || !container()) { form.dataset.turnstileReason = 'no-script:0'; resolve(''); return; }
+        if (!container()) { form.dataset.turnstileReason = 'no-script:0'; resolve(''); return; }
+        if (!hasTurnstile()) {
+            // The script is async/defer and may still be on its way: a slow
+            // phone, or a deep link that presses at load (#action=stream,
+            // app/resource/get.js) -- on stage, 3 of 7 throttled loads were
+            // refused 0.5-3.4 s in. The step on screen, the press held, until
+            // SCRIPT_WAIT_MS after the page loaded; only then fail closed.
+            const step = stepBlock(form);
+            let ended = false;
+            const end = () => { ended = true; st.pending = null; };
+            st.pending = { finish: () => { end(); resolve(''); }, interactive: () => {}, slot: step.slot };
+            const tick = () => {
+                if (ended) return;
+                if (hasTurnstile()) { end(); getToken(form).then(resolve); return; }
+                if (Date.now() - LOADED_AT >= SCRIPT_WAIT_MS) {
+                    end();
+                    form.dataset.turnstileReason = `no-script:${Date.now() - LOADED_AT}`;
+                    resolve('');
+                    return;
+                }
+                setTimeout(tick, 250);
+            };
+            tick();
+            return;
+        }
         const step = stepBlock(form);
         let done = false;
         let timer = null;
@@ -224,6 +254,14 @@ function getToken(form) {
             dropLive();
             form.dataset.turnstileReason = t ? '' : `${reason || 'unknown'}:${Date.now() - started}`;
             if (step.line) step.line.classList.replace('inprogress', t ? 'done' : 'error');
+            // Ticked: the line goes back to working until the job's log
+            // replaces it -- it said "tick the box" over an empty slot for
+            // the length of the request.
+            if (t && step.stage) {
+                step.stage.querySelector('.job-stage-title').textContent = step.label;
+                step.stage.classList.remove('job-stage-done');
+                step.slot.style.minHeight = '';
+            }
             step.detach();
             // A used warm widget is reset for the next start; one that
             // failed is dropped and rendered anew, an errored widget stays
@@ -341,6 +379,10 @@ export default function init() {
         // check would spend a token and write its step over the running
         // job's log.
         if (isBusy(form)) return;
+        // A check whose step went with its log (another file picked, the
+        // page swapped) has nobody waiting on it: ended here, or every press
+        // on the page was dropped until its two-minute deadline.
+        if (st.pending && st.pending.slot && !st.pending.slot.isConnected) st.pending.finish('', 'detached');
         if (st.pending) { // a check is already running for some form
             closeOwnDialog(form);
             return;
@@ -362,6 +404,7 @@ export default function init() {
             // The press then did nothing -- and with the button busy from
             // the press, it stayed dead for BUSY_MAX_MS.
             setTimeout(() => {
+                if (!form.isConnected) return; // swapped away meanwhile: nothing to send
                 form.dataset[READY] = '1';
                 if (submitter && form.contains(submitter)) form.requestSubmit(submitter);
                 else form.requestSubmit();
