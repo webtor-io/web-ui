@@ -121,10 +121,17 @@ suffix "(37%)". Now:
 - Cards (`custom`) and verdicts (summaries) go to `.job-results`, outside the fold, and
   take the line's place. On `close` with nothing rendered the line stops spinning; a
   rendered player's line goes on until the player hides the log (app/action.js).
-- A screen reader hears each new step and each verdict once (`[data-job-announce]`,
-  role=status), never the per-second ticks.
+- A screen reader hears each new step and each verdict once -- a card by its heading
+  (`[data-job-announce]`, role=status), never the per-second ticks.
+- A job's tag is its step's own words (services/job: `InProgress` tags by the message),
+  so progressLog never builds a selector from it (`byAttr`): an apostrophe ("Getting the
+  torrent's details", French "l'URL du flux", Italian "dell'inizio") made
+  `querySelector` throw and the message, a card included, was lost.
 - The words are the `job.*` keys, rewritten as stages in all 11 locales on 2026-10-14
-  ("Loading the start of the file", status "looking for peers · 34 s left", then "37%").
+  ("Loading the start of the file", status "looking for peers · 34 s left", then "37%";
+  "Speed test, 50 MB" for the bandwidth check; "Checking the file format", which audio
+  and images go through too). Past the countdown with nothing yet the status is
+  "looking for peers" with no deadline, and seconds round up -- never "0 s left".
   Only action.go and hls.go use them; nothing (agents, alerts) matches their text.
 - Turnstile's check (`lib/turnstileAction.js`) draws the same line; when Cloudflare wants
   a click it says "Tick the box to continue" (`data-label-interactive` on

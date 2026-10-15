@@ -2159,8 +2159,11 @@ input:-webkit-autofill:focus {
   flex: none;
   color: #00cec9;
 }
+/* A basis of its own: with `auto` a long title (German, a phone) took a line
+   of its own and left the spinner alone above it; now the title wraps
+   inside, and only the meta drops to a second line. */
 .job-stage-title {
-  flex: 1 1 auto;
+  flex: 1 1 10rem;
   min-width: 0;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -2204,7 +2207,7 @@ input:-webkit-autofill:focus {
   padding: 0.375rem 0 0;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #64748b;
+  color: #94a3b8; /* 6.9:1 on the alert; #64748b was 3.7:1 for 12 px text */
   cursor: pointer;
   list-style: none;
 }

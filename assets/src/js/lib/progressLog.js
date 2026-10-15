@@ -62,6 +62,19 @@ class SDK {
 import { rebindAsync } from './async';
 import { clearBusyFor } from './actionBusy';
 
+// byAttr: the element under root whose attribute is exactly value. A job's tag
+// is its step's own words (services/job: InProgress tags by the message), so
+// it never goes into a selector: an apostrophe -- "Getting the torrent's
+// details", French "l'URL du flux", Italian "dell'inizio" -- made
+// querySelector throw, and the whole message was lost, a no-peers or
+// download card included.
+function byAttr(root, name, value) {
+    for (const n of root.querySelectorAll(`[${name}]`)) {
+        if (n.getAttribute(name) === value) return n;
+    }
+    return null;
+}
+
 export function initProgressLog(el, func) {
     const r = new Renderer(el, func);
     function onMessage(data) {
@@ -137,13 +150,19 @@ class Renderer {
         if (this.announcer && text) this.announcer.textContent = text;
     }
     addCustom(data) {
-        const el = this.results.querySelector(`*[task-custom='${data.tag}']`);
+        const el = byAttr(this.results, 'task-custom', data.tag);
         if (el) return;
         const div = document.createElement('div');
         div.setAttribute('task-custom', data.tag);
         this.results.appendChild(div);
         this.endStage();
         loadAsyncView(div, data.body);
+        // A card is a verdict too (no peers, too slow, the download link):
+        // its heading, or its first words, said once.
+        if (this.announcer) {
+            const h = div.querySelector('h1, h2, h3');
+            this.say(((h || div).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200));
+        }
         const closes = div.querySelectorAll('.closeable-close');
         for (const close of closes) {
             close.addEventListener('click', () => {
@@ -160,7 +179,7 @@ class Renderer {
     }
     addSummary(data) {
         if (!data.message) return;
-        const el = this.results.querySelector(`*[task-summary='${data.tag}']`);
+        const el = byAttr(this.results, 'task-summary', data.tag);
         if (el) return;
         const pre = document.createElement('pre');
         const line = document.createElement('span');
@@ -177,7 +196,7 @@ class Renderer {
         this.say(data.message);
     }
     addLine(data) {
-        const el = this.lt.querySelector(`*[task-tag='${data.tag}']`);
+        const el = byAttr(this.lt, 'task-tag', data.tag);
         if (el) return;
         const pre = document.createElement('pre');
         const line = document.createElement('span');
@@ -199,7 +218,7 @@ class Renderer {
     }
 
     updateLine(data) {
-        const el = this.lt.querySelector(`*[task-tag='${data.tag}']`);
+        const el = byAttr(this.lt, 'task-tag', data.tag);
         if (!el) return;
         el.classList = [];
         const classList = [data.level];

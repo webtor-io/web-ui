@@ -29,7 +29,8 @@ func TestFormatWarmupLine(t *testing.T) {
 		want          string
 	}{
 		{"silent swarm counts down", 0, mb, 42 * time.Second, "job.warmupCountdown{Seconds=42}"},
-		{"countdown over, nothing arrived → keep previous line", 0, mb, -3 * time.Second, ""},
+		{"countdown over, nothing arrived → still looking, no deadline", 0, mb, -3 * time.Second, "job.waitingForPeers{}"},
+		{"under a second left reads 1 s, never 0", 0, mb, 400 * time.Millisecond, "job.warmupCountdown{Seconds=1}"},
 		{"bytes flowing → percent of the warm-up range", 384 * 1024, mb, 0, "38%"},
 		{"bytes flowing ignores a stale countdown", 384 * 1024, mb, 30 * time.Second, "38%"},
 		{"never above 99%: the step ends the warm-up", 3 * mb, mb, 0, "99%"},

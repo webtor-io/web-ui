@@ -97,3 +97,27 @@ test('a plain host (home page, embed) keeps the plain log', () => {
     assert.ok(lt.querySelector('pre.done-summary'));
     assert.ok(lt.querySelector('.card'));
 });
+
+test('a step whose words have an apostrophe (the tag is the words) still gets its line, its ticks and its card', () => {
+    // services/job tags every message with the step's own text; built into a
+    // selector, "torrent's" or "dell'inizio" made querySelector throw and the
+    // message -- the no-peers card here -- was lost.
+    const { sdk, q } = stageHost();
+    const step = 'Caricamento dell\'inizio del file, 12 MB';
+    sdk.inProgress(step, step);
+    sdk.updateStatus(step, '37%');
+    assert.equal(q('.job-stage-title').textContent, step);
+    assert.equal(q('.job-stage-bar').value, 37);
+    sdk.push({ level: 'error', tag: step });
+    sdk.push({ level: 'custom', tag: step, body: '<div class="card"><h3>No active seeders</h3></div>' });
+    assert.ok(q('.job-results .card'), 'the card is there');
+    sdk.inProgress('Getting the torrent\'s details', 'Getting the torrent\'s details');
+    assert.ok(q('.job-steps pre[task-tag]'));
+});
+
+test('a card is said too: its heading, once', () => {
+    const { sdk, q } = stageHost();
+    sdk.inProgress('w', 'Loading the start of the file, 10 MB');
+    sdk.push({ level: 'custom', tag: 'w', body: '<div><h3>The torrent has no active seeders</h3><p>Save it to Vault…</p></div>' });
+    assert.equal(q('[data-job-announce]').textContent, 'The torrent has no active seeders');
+});

@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"golang.org/x/text/language"
+	"math"
 	"net/url"
 	"path/filepath"
 	"sort"
@@ -2045,21 +2046,23 @@ func (l *speedLatch) speed(final int64, warmupStart, now time.Time) float64 {
 	return 0
 }
 
-// formatWarmupLine is the job status line during warm-up: "43 s" while
-// nothing has arrived (seconds left before the no-peers verdict, so a silent
-// swarm shows a countdown rather than a frozen spinner), "37%" of target once
-// bytes flow — the same shape as buffering's line. Never over 99%: the
-// warm-up ends with the step, not with its percent -- have reaches span
-// while the last pieces still wait for their hash checks (hash_wait), and
-// "100%" stood on a step that was still running. Empty when there is
-// nothing honest to show (no target, or the countdown is over): the
-// previous line then stays.
+// formatWarmupLine is the job status line during warm-up: "looking for peers
+// · 43 s left" while nothing has arrived (seconds left before the no-peers
+// verdict, rounded up -- never "0 s left" -- so a silent swarm shows a
+// countdown rather than a frozen spinner), "37%" of target once bytes flow —
+// the same shape as buffering's line. Never over 99%: the warm-up ends with
+// the step, not with its percent -- have reaches span while the last pieces
+// still wait for their hash checks (hash_wait), and "100%" stood on a step
+// that was still running. Past the countdown with nothing yet (peers that
+// hold back until the slow verdict at 120 s): "looking for peers", no
+// deadline -- the last "1 s left" stood for up to a minute. Empty when there
+// is no target: the previous line then stays.
 func formatWarmupLine(tp func(string, map[string]any) string, bytes, target int64, left time.Duration) string {
 	if bytes <= 0 {
 		if left <= 0 {
-			return ""
+			return tp("job.waitingForPeers", nil)
 		}
-		return tp("job.warmupCountdown", map[string]any{"Seconds": int(left.Round(time.Second).Seconds())})
+		return tp("job.warmupCountdown", map[string]any{"Seconds": int(math.Ceil(left.Seconds()))})
 	}
 	if target <= 0 {
 		return ""
