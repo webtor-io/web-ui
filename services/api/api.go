@@ -480,6 +480,12 @@ func (s *Api) doRequestRaw(ctx context.Context, c *Claims, url string, method st
 	return
 }
 
+// ErrForbidden is rest-api's 403: torrent-store refuses the hash (banned,
+// stoplisted). By identity, so a caller can tell a refusal from a failure
+// without reading text an upstream body may carry; the message stays the
+// one web.ClassifyError and the logs match.
+var ErrForbidden = errors.New("access is forbidden")
+
 func (s *Api) doRequest(ctx context.Context, c *Claims, url string, method string, data []byte, v any) error {
 	res, err := s.doRequestRaw(ctx, c, url, method, data)
 	if err != nil {
@@ -504,7 +510,7 @@ func (s *Api) doRequest(ctx context.Context, c *Claims, url string, method strin
 	} else if res.StatusCode == http.StatusNotFound {
 		return nil
 	} else if res.StatusCode == http.StatusForbidden {
-		return errors.Errorf("access is forbidden url=%v", url)
+		return fmt.Errorf("%w url=%v", ErrForbidden, url)
 	} else {
 		var e ra.ErrorResponse
 		err = json.Unmarshal(body, &e)
