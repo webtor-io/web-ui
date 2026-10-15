@@ -60,10 +60,10 @@ export function markBusy(form, { now = Date.now, timeoutMs = BUSY_MAX_MS } = {})
     if (!isActionForm(form) || isBusy(form)) return false;
     const btn = submitButton(form);
     if (!btn) return false;
-    // One target, one working button. Watch and Download of a file card
-    // share a log container (#log-<item>), and a new job's response replaces
-    // whatever log was in it -- so a form still busy for that target has just
-    // lost the only thing that could release it. Release it here.
+    // One target, one working button. A directory's TAR and ZIP share a log
+    // container (list.html), and a new job's response replaces whatever log
+    // was in it -- so a form still busy for that target has just lost the
+    // only thing that could release it. Release it here.
     const target = form.getAttribute('data-async-target');
     if (target) {
         for (const other of document.querySelectorAll('form[data-busy="true"]')) {

@@ -23,7 +23,7 @@ av(async function() {
     // The press this job answers: the forms busy for this log when its
     // response came in (the pressed one, and the page's start form a card's
     // retry marks). Released by this job only while still busy from that
-    // press -- a newer press into the same log (Download after Watch) is
+    // press -- a newer press into the same log (ZIP after TAR) is
     // someone else's -- wherever they are by then: a swap that keeps this log
     // renders its start form anew, busy from the same press
     // (lib/loadAsyncView.js, carryBusy).

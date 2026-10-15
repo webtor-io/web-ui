@@ -10,13 +10,24 @@ import { directDownload, initToolIntent } from './toolIntent.js';
 // templates, so a renamed form class fails here instead of on the page.
 function page(name) {
     const html = readFileSync(new URL(`./__fixtures__/tool-intent-${name}.html`, import.meta.url), 'utf8');
-    const dom = new JSDOM(`<!doctype html><body>${html}</body>`, { url: 'https://webtor.io/08ada5a7a6183aae1e09d831df6748d566095a10?tool=magnet-to-torrent' });
+    // runScripts: the forms' own inline handlers open their dialogs.
+    const dom = new JSDOM(`<!doctype html><body>${html}</body>`, { url: 'https://webtor.io/08ada5a7a6183aae1e09d831df6748d566095a10?tool=magnet-to-torrent', runScripts: 'dangerously' });
     const doc = dom.window.document;
     // jsdom does not navigate; a submit it cannot perform only logs noise.
     doc.addEventListener('submit', (e) => e.preventDefault());
     const scrolled = [];
     dom.window.Element.prototype.scrollIntoView = function (opts) { scrolled.push([this.id, opts]); };
-    return { doc, win: dom.window, scrolled };
+    // jsdom has no showModal. This one throws on an open dialog, as browsers
+    // did before 2023 -- the handlers must not call it twice.
+    const opened = [];
+    dom.window.HTMLDialogElement.prototype.showModal = function () {
+        if (this.open) throw new dom.window.DOMException('already open', 'InvalidStateError');
+        this.open = true;
+        opened.push(this.id);
+    };
+    const errors = [];
+    dom.window.addEventListener('error', (e) => errors.push(e.message));
+    return { doc, win: dom.window, scrolled, opened, errors };
 }
 
 // Every click that reaches a submit button, in order, by its umami event.
@@ -38,7 +49,7 @@ function pressLine(doc, win) {
 }
 
 test('a multi-file torrent: the line presses the TAR archive of the directory', () => {
-    const { doc, win, scrolled } = page('multi');
+    const { doc, win, scrolled, opened } = page('multi');
     // The server's markup as the browser parses it: #list beside the file
     // card. It sat inside #file while file.html ended with a `<div … />`,
     // which HTML does not self-close (fixed 2026-10-14).
@@ -50,18 +61,19 @@ test('a multi-file torrent: the line presses the TAR archive of the directory', 
     assert.equal(ev.defaultPrevented, true, 'the #content jump is replaced by the press');
     assert.deepEqual(pressed, ['download-dir:tar'], 'the directory archive, TAR (the default), and nothing else');
     assert.deepEqual(scrolled, [], 'the archive reports into its modal, the page stays put');
+    assert.deepEqual(opened, ['progress-modal-dir-sintel']);
 });
 
-test('a single-file torrent: the line presses the file download, and leaves the scrolling to its job', () => {
-    const { doc, win, scrolled } = page('single');
+test('a single-file torrent: the line presses the file download, which reports into its dialog', () => {
+    const { doc, win, scrolled, opened, errors } = page('single');
     const pressed = recordPresses(doc);
     initToolIntent(doc.body, doc);
     const ev = pressLine(doc, win);
     assert.equal(ev.defaultPrevented, true);
     assert.deepEqual(pressed, ['download'], 'the file card\'s Download, not Watch');
-    // The job's log renders under the buttons and is brought into view by
-    // app/action.js and lib/turnstileAction.js, as for a press of the button.
-    assert.deepEqual(scrolled, []);
+    assert.deepEqual(opened, ['download-modal-item-mp4']);
+    assert.deepEqual(scrolled, [], 'the page stays put');
+    assert.deepEqual(errors, []);
 });
 
 test('the button is looked up at click time: a swapped #list is the one pressed', () => {
@@ -96,18 +108,39 @@ test('a page without the line: nothing is bound, nothing throws', () => {
     assert.doesNotThrow(() => initToolIntent(doc.body, doc));
 });
 
-test('a file press brings its buttons into view at once -- a repeat press too, which starts nothing', () => {
-    const { doc, win } = page('single');
-    recordPresses(doc);
-    const scrolls = [];
-    win.innerHeight = 844;
-    win.matchMedia = () => ({ matches: false });
-    win.scrollTo = (o) => scrolls.push(o);
-    const btn = doc.querySelector('#file form.download button[type=submit]');
-    btn.getBoundingClientRect = () => ({ top: 1200, bottom: 1240, height: 40 });
-    initToolIntent(doc.body, doc);
-    pressLine(doc, win);
-    assert.equal(scrolls.length, 1);
-    pressLine(doc, win);
-    assert.equal(scrolls.length, 2, 'again');
+// Download used to share the card's log with Watch, and its job replaced
+// the playing player (P6, 2026-10-15).
+test('a file\'s download runs in its dialog, beside the player\'s log, never in it', () => {
+    const { doc } = page('single');
+    const form = doc.querySelector('#file form.download');
+    const log = doc.querySelector(form.getAttribute('data-async-target'));
+    assert.ok(log && log.closest('dialog#download-modal-item-mp4'), 'its log is in its dialog');
+    const watch = doc.querySelector('#file form.stream');
+    assert.ok(watch, 'the fixture has Watch');
+    assert.notEqual(watch.getAttribute('data-async-target'), form.getAttribute('data-async-target'));
+    // syncPage (lib/player/next-item-go.js) takes the first log-* in #file
+    // for the player's; a watched toggle keeps a log-* with a job whole
+    // (lib/loadAsyncView.js), so none may hold another.
+    assert.equal(doc.querySelector('#file [id^="log-"]').getAttribute('id'), watch.getAttribute('data-async-target').slice(1));
+    for (const l of doc.querySelectorAll('[id^="log-"]')) assert.equal(l.querySelector('[id^="log-"]'), null, l.id);
+});
+
+test('the dialog opens on any submit -- a #action=download link too -- and a press on the busy form reopens it; Watch opens nothing', () => {
+    const { doc, opened, errors } = page('single');
+    const form = doc.querySelector('#file form.download');
+    const dialog = doc.getElementById('download-modal-item-mp4');
+    form.requestSubmit();
+    assert.deepEqual(opened, ['download-modal-item-mp4'], 'resource/get.js submits a deep link with requestSubmit');
+    form.querySelector('button[type=submit]').click();
+    assert.deepEqual(opened, ['download-modal-item-mp4'], 'already open: not opened twice');
+    dialog.open = false;
+    form.click();
+    assert.deepEqual(opened, ['download-modal-item-mp4'], 'a click on an idle form outside its button submits nothing');
+    form.dataset.busy = 'true';
+    form.click();
+    assert.deepEqual(opened, ['download-modal-item-mp4', 'download-modal-item-mp4'], 'the busy button has no pointer events: the press lands on the form');
+    dialog.open = false;
+    doc.querySelector('#file form.stream button[type=submit]').click();
+    assert.deepEqual(opened.length, 2, 'Watch');
+    assert.deepEqual(errors, []);
 });

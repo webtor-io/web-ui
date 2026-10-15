@@ -53,6 +53,35 @@
          #content, so picking a file (a #content swap) wiped those modals.
          Empty before a press, its margin collapses into the footnote's. */}}
     <div id="log-{{ .Item.ID }}" class="mt-3" data-async-layout="{{`{{ template "main" . }}`}}"></div>
+    {{/* Download's job (partials/button.html), in a dialog of its own: a
+         press while the player above plays leaves it playing. After the
+         card's log, and not named log-*: syncPage (lib/player/next-item-go.js)
+         takes the first log-* in #file for the player's, and a log-* with a
+         log in it would be kept whole by a watched toggle (lib/loadAsyncView.js).
+         Closed by the card's actions, as list.html's TAR/ZIP: the link and
+         the copied commands are .closeable-close. */}}
+    <dialog id="download-modal-{{ .Item.ID }}" class="modal">
+        <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">✕</button>
+            </form>
+            <h3 class="text-lg font-bold tracking-tight flex items-center gap-2 pr-8">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 shrink-0 text-w-cyan">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                {{ t $.Lang "resource.preparingDownload" }}
+            </h3>
+            <p class="mt-1 text-xs text-w-muted truncate" title="{{ .Item.Name }}">{{ .Item.Name }}</p>
+            <div id="log-{{ .Item.ID }}-download" class="mt-4" data-async-layout="{{`{{ template "main" . }}`}}">
+                <div class="flex justify-center py-4">
+                    <span class="loading loading-spinner loading-md text-w-cyan"></span>
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button tabindex="-1" aria-hidden="true">close</button>
+        </form>
+    </dialog>
     {{/* Adult-content footnote.
          - Anonymous + adult: 18+ message REPLACES the generic 16+ ageGate
            (includes TOS/Privacy links so the legal hook isn't lost).

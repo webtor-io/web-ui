@@ -4,7 +4,20 @@
      swarm -- a cold file is a median 21 s of warm-up plus buffering -- and a
      live button through all of it had 59% of viewers pressing it again. */}}
 {{- /* On a phone the forms share the row's width (partials/file.html). */}}
-<form class="{{ .Data.Action }} max-sm:flex-1 max-sm:min-w-0" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#log-{{ .Data.ID }}" data-async-push-state="false">
+{{- /* Download reports into a dialog of its own (partials/file.html), not
+     the card's log: that log holds the player, and a Download pressed while
+     watching replaced it. Opened on submit -- a press, Enter, the tool line,
+     a #action=download link -- and on a press of the busy form, which
+     reopens one closed while the job runs: a busy button has no pointer
+     events, the press lands on the form (list.html's TAR/ZIP). */}}
+{{- $log := printf "log-%s" .Data.ID }}
+{{- $modal := "" }}
+{{- if eq .Data.Action "download" }}
+{{- $log = printf "log-%s-download" .Data.ID }}
+{{- $modal = printf "download-modal-%s" .Data.ID }}
+{{- end }}
+<form class="{{ .Data.Action }} max-sm:flex-1 max-sm:min-w-0" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
+      {{- if $modal }} onsubmit="var d=document.getElementById('{{ $modal }}');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('{{ $modal }}');if(d&&!d.open&&this.dataset.busy)d.showModal()"{{ end }}>
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
     <button type="submit" class="btn btn-soft whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="{{ .Data.Action }}">
