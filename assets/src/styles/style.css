@@ -2358,6 +2358,17 @@ input:-webkit-autofill:focus {
 .modal-box .progress-alert {
   margin-bottom: 0 !important;
 }
+/* A phone: the log's box inside the dialog's box only narrowed the card.
+   The log spans the dialog's box (-mx-5 in partials/file.html, list.html)
+   and loses its own, so its rows' 1.25rem insets line up with the title. */
+@media (width < 40rem) {
+  .modal-box .progress-alert {
+    padding-block: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+}
 
 /* trigger tailwind rescan */
 

@@ -70,7 +70,7 @@
     <div id="log-item-mp4" class="mt-3" data-async-layout="{{ template &#34;main&#34; . }}"></div>
     
     <dialog id="download-modal-item-mp4" class="modal">
-        <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl p-4 sm:p-6" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
+        <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl px-5 py-4 sm:p-6" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
             <form method="dialog">
                 <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">✕</button>
             </form>
@@ -81,7 +81,7 @@
                 Preparing Download
             </h3>
             <p class="mt-1 text-xs text-w-muted truncate" title="Sintel.mp4">Sintel.mp4</p>
-            <div id="log-item-mp4-download" class="mt-3 sm:mt-4" data-async-layout="{{ template &#34;main&#34; . }}">
+            <div id="log-item-mp4-download" class="mt-3 -mx-5 sm:mt-4 sm:mx-0" data-async-layout="{{ template &#34;main&#34; . }}">
                 <div class="flex justify-center py-4">
                     <span class="loading loading-spinner loading-md text-w-cyan"></span>
                 </div>
@@ -239,7 +239,7 @@
         </div>
 
         <dialog id="progress-modal-dir-sintel" class="modal">
-            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl p-4 sm:p-6" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
+            <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-3xl px-5 py-4 sm:p-6" onclick="if(event.target.closest('.closeable-close'))this.closest('dialog').close()">
                 <form method="dialog">
                     <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">✕</button>
                 </form>
@@ -249,7 +249,7 @@
                     </svg>
                     Preparing Download
                 </h3>
-                <div id="log-dir-sintel" class="mt-3 sm:mt-4" data-async-layout="{{ template &#34;main&#34; . }}">
+                <div id="log-dir-sintel" class="mt-3 -mx-5 sm:mt-4 sm:mx-0" data-async-layout="{{ template &#34;main&#34; . }}">
                     <div class="flex justify-center py-4">
                         <span class="loading loading-spinner loading-md text-w-cyan"></span>
                     </div>
