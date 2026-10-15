@@ -2115,6 +2115,33 @@ test('Play while the popup is up is the answer "continue"', async (t) => {
     assert.equal(p.events.filter((e) => e.name === 'grace-soft-cta-click').length, 1, 'one answer');
 });
 
+// P6: a file's Download opens a dialog of the page over the playing film
+// (partials/file.html). A key on its buttons is the button's, not Play's.
+test('a key in a dialog of the page is that dialog\'s: the film plays on, where it was', async (t) => {
+    const p = await mountPlayer();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'download-modal-x';
+    dlg.open = true;
+    dlg.innerHTML = '<form method="dialog"><button>x</button></form><a class="closeable-close" href="/dl">start download</a>';
+    document.body.appendChild(dlg);
+    t.after(() => { dlg.remove(); destroyPlayer(); });
+    const log = playback(p.video);
+    await playPast(p, 31);
+    const at = p.video.currentTime;
+    const pauses = log.pause;
+    const space = new dom.window.KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    dlg.querySelector('button').dispatchEvent(space);
+    dlg.querySelector('a').dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    await settle();
+    assert.equal(space.defaultPrevented, false, 'the button gets its press');
+    assert.equal(log.pause, pauses);
+    assert.equal(p.video.paused, false);
+    assert.equal(p.video.currentTime, at, 'no seek under it');
+    keydown(' ');
+    await settle();
+    assert.equal(p.video.paused, true, 'outside it, space is play/pause as ever');
+});
+
 // The popup is modal: the player's own keys stop at it -- the arrows moved
 // the film under it, back into the window too, with the popup still up --
 // but for Play (the answer "continue", above) and Next (the hold dropped,

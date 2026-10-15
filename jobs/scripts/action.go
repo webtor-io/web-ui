@@ -1804,11 +1804,21 @@ func (s *ErrorWrapperScript) resubmitContext(d *SlowDownloadData) {
 	d.ArchiveFormat = s.archiveFormat
 	d.SelectedPaths = s.selectedPaths
 	d.Purge = s.purge
-	// Streaming buttons (MakeAudio/MakeVideo) wire data-async-target to
-	// "#log-{ItemID}" because MakeButton sets ButtonItem.ID = Item.ID.
-	// Mirroring that here keeps the resubmit landing in the same
-	// progress-log container that just rendered this modal.
-	d.LogTargetID = s.itemId
+	d.LogTargetID = s.logTargetID()
+}
+
+// logTargetID: the log the start's card rendered into, which its resubmit
+// lands in again. The file card's buttons wire data-async-target to
+// "#log-{ItemID}" (MakeButton: ButtonItem.ID = Item.ID), except a file's
+// Download, which reports into its dialog's "#log-{ItemID}-download"
+// (partials/button.html, file.html): into the card's log, its "Try again"
+// replaced the player playing there. A directory's TAR/ZIP is a download
+// too, always with an archive format, into list.html's "#log-{ItemID}".
+func (s *ErrorWrapperScript) logTargetID() string {
+	if s.action == "download" && s.archiveFormat == "" {
+		return s.itemId + "-download"
+	}
+	return s.itemId
 }
 
 func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
@@ -1839,7 +1849,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 			Endpoint:      actionEndpoint(s.action),
 			ResourceID:    s.resourceId,
 			ItemID:        s.itemId,
-			LogTargetID:   s.itemId,
+			LogTargetID:   s.logTargetID(),
 			ArchiveFormat: s.archiveFormat,
 			SelectedPaths: s.selectedPaths,
 		}

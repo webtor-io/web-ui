@@ -155,3 +155,24 @@ test('the live checkbox itself is brought into view, holding its height while th
     await settle();
     clearBusy(watch);
 });
+
+// A file's Download reports into its dialog (partials/file.html), opened by
+// the form's onsubmit -- which this capture listener stops before it runs.
+test('a log in a closed dialog: the check opens it, and is written in it', async (t) => {
+    const shown = [];
+    dom.window.HTMLDialogElement.prototype.showModal = function () { this.open = true; shown.push(this.id); };
+    document.body.insertAdjacentHTML('beforeend', `
+        <form id="dl" action="/download-file" method="post" data-async-target="#log-1-download" data-async-push-state="false">
+            <button type="submit">Download</button>
+        </form>
+        <dialog id="dl-dlg"><div id="log-1-download" data-async-layout="x"></div></dialog>`);
+    const dl = document.getElementById('dl');
+    // Even when an assertion fails: a busy form's backstop holds the run.
+    t.after(() => clearBusy(dl));
+    dl.requestSubmit();
+    assert.deepEqual(shown, ['dl-dlg']);
+    assert.ok(document.querySelector('#log-1-download [data-turnstile-step]'), 'the check, in sight');
+    answer();
+    await settle();
+    assert.deepEqual(shown, ['dl-dlg'], 'not opened again by the re-submit');
+});

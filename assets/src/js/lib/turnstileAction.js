@@ -185,6 +185,12 @@ function stepBlock(form) {
         form.insertAdjacentElement('afterend', slot);
         return { slot, line: null, detach: () => slot.remove() };
     }
+    // A log in a dialog (a file's Download, partials/file.html) is opened
+    // here: the capture listener below stops the submit before the form's
+    // own onsubmit, which opens it for a signed-in viewer -- and the check,
+    // its checkbox too, would run in a closed dialog.
+    const dialog = target.closest('dialog');
+    if (dialog && !dialog.open) dialog.showModal();
     // The job log's own stage line (views/action/post.html, .job-stage): the
     // check reads as the job's first step.
     const label = (container() && container().dataset.label) || '';

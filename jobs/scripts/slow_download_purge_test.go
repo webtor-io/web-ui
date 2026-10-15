@@ -70,3 +70,23 @@ func TestActionCarriesPurgeToTheModalNotToTheID(t *testing.T) {
 		t.Errorf("resubmit context: %+v", d)
 	}
 }
+
+// A file's Download reports into its dialog (partials/button.html), and its
+// card's resubmit lands there too: into the card's log, the no-peers "Try
+// again" replaced the player playing in it. TAR/ZIP keep list.html's log.
+func TestResubmitLandsInTheLogTheStartRenderedInto(t *testing.T) {
+	pinClock(t)
+	for _, c := range []struct{ action, format, want string }{
+		{"stream-video", "", "item-1"},
+		{"download", "", "item-1-download"},
+		{"download", "tar", "item-1"},
+		{"download", "zip", "item-1"},
+	} {
+		r, _ := Action(nil, nil, nil, nil, nil, nil, nil, nil, jobKeyContext(), "08ada5a7a6183aae1e09d831df6748d566095a10", "item-1", c.action, &models.StreamSettings{}, nil, jobKeyVSUD(), WarmupSettings{}, GraceSettings{}, false, false, "", c.format, nil)
+		var d SlowDownloadData
+		r.(*ErrorWrapperScript).resubmitContext(&d)
+		if d.LogTargetID != c.want {
+			t.Errorf("%s %q: resubmit into #log-%s, want #log-%s", c.action, c.format, d.LogTargetID, c.want)
+		}
+	}
+}

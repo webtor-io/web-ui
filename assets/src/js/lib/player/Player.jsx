@@ -1076,6 +1076,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         function onKeyDown(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
             if (sessionSeeking) return;
+            // A key in a dialog of the page over the playing film -- a file's
+            // Download (partials/file.html), TAR/ZIP -- is that dialog's:
+            // space on its focused button pressed the button and paused the
+            // film. The player's own dialogs (subtitles, grace) are in its
+            // template, under trackContainer.
+            const dlg = e.target.closest && e.target.closest('dialog[open]');
+            if (dlg && trackContainer && !trackContainer.contains(dlg)) return;
             // The grace popup up, waiting for its answer: a modal over the
             // film. A key on one of its own buttons is that button's (space
             // on the close is the close), and of the player's keys only Play

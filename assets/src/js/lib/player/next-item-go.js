@@ -276,10 +276,20 @@ function inFullscreen() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
-function scheduleSync(url) {
+// A dialog the viewer has open on the page -- a file's Download
+// (partials/file.html), a directory's TAR/ZIP -- holds the sync as
+// fullscreen does: the swap took it away under them, its job with it. Not
+// the player's own dialogs, which live in its log and move with it.
+function dialogOpen() {
+    const stage = document.querySelector('.wt-player-stage');
+    const log = stage && stage.closest('[id^="log-"]');
+    return Array.from(document.querySelectorAll('#content dialog[open]')).some((d) => !log || !log.contains(d));
+}
+
+export function scheduleSync(url) {
     pendingSyncURL = url;
     const run = () => {
-        if (inFullscreen() || pendingSyncURL === null) return;
+        if (inFullscreen() || dialogOpen() || pendingSyncURL === null) return;
         const target = pendingSyncURL;
         pendingSyncURL = null;
         syncPage(target);
@@ -288,6 +298,8 @@ function scheduleSync(url) {
         syncListening = true;
         document.addEventListener('fullscreenchange', run);
         document.addEventListener('webkitfullscreenchange', run);
+        // `close` does not bubble: caught on its way down.
+        document.addEventListener('close', run, true);
     }
     run();
 }
