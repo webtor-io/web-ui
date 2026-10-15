@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	pkgerrors "github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/metrics/metricstest"
 )
@@ -163,6 +166,10 @@ func TestRun_ReportsOutcomeOnce(t *testing.T) {
 	run(NewScript(func(j *Job) error { return nil }), &NilStorage{})
 	run(NewScript(func(j *Job) error { return errors.New("boom: detail") }), &NilStorage{})
 	run(NewScript(func(j *Job) error { return errors.New("hash found in stoplist") }), &NilStorage{})
+	// rest-api's 403 for the same refusal: the client keeps no body text.
+	run(NewScript(func(j *Job) error {
+		return pkgerrors.Wrap(fmt.Errorf("%w url=u", api.ErrForbidden), "failed to store resource by magnet")
+	}), &NilStorage{})
 	run(panicScript{}, &NilStorage{})
 
 	if got := before(metrics.JobOK) - ok0; got != 1 {
@@ -171,8 +178,8 @@ func TestRun_ReportsOutcomeOnce(t *testing.T) {
 	if got := before(metrics.JobError) - err0; got != 2 {
 		t.Fatalf("error: got %v, want 2 (one failure, one panic)", got)
 	}
-	if got := before(metrics.JobRejected) - rej0; got != 1 {
-		t.Fatalf("rejected: got %v, want 1", got)
+	if got := before(metrics.JobRejected) - rej0; got != 2 {
+		t.Fatalf("rejected: got %v, want 2", got)
 	}
 	if got := metricstest.Gauge(t, "webui_jobs_in_flight"); got != 0 {
 		t.Fatalf("in-flight must return to 0, also after a panic: got %v", got)
