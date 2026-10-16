@@ -2306,6 +2306,28 @@ input:-webkit-autofill:focus {
   background-color: rgba(10, 14, 26, 0.9);
 }
 
+/* Focus on a film that has the window, a phone on its side
+   (lib/landscapeFocus.js): the navbar slides up out of it and what is left
+   of the screen around the stage is black -- in Safari, the strips beside
+   the notch paint the root's background. */
+.navbar-redesign {
+  transition: transform 200ms;
+}
+
+html.wt-focus .navbar-redesign {
+  transform: translateY(-100%);
+}
+
+html.wt-focus {
+  background-color: #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-redesign {
+    transition: none;
+  }
+}
+
 [data-theme="night"] .stat {
   border-color: rgba(255,255,255,0.07) !important;
 }

@@ -35,6 +35,12 @@
 // constant: the status view imports it too (two bundles, no state).
 export const NAVBAR_H = 72;
 
+// A phone on its side, where the player's stage takes the whole window
+// (player.css, lib/landscapeFocus.js). The same query in both: a window that
+// matches one and not the other would get a full-window stage without
+// focus, or focus without the stage.
+export const FOCUS_MEDIA = '(orientation: landscape) and (max-height: 500px) and (pointer: coarse)';
+
 // Matches `duration-200` on the bar: how long it takes to slide away before
 // `hidden` may take it out of the tree.
 const SLIDE_MS = 200;
@@ -58,7 +64,10 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     // and goes.
     const pad = () => { html.style.scrollPaddingTop = shown ? `${stickyBottom(root)}px` : ''; };
     const apply = () => {
-        const show = offScreen && moving;
+        // Not over a film that has the window (lib/landscapeFocus.js): there
+        // the player's own pill speaks for the stream, and the bar was most
+        // of the screen (owner, 2026-10-15).
+        const show = offScreen && moving && !html.classList.contains('wt-focus');
         if (show === shown) { pad(); return; }
         shown = show;
         pad();
@@ -115,6 +124,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
         apply();
     };
     document.addEventListener('torrent-status', onStatus);
+    document.addEventListener('landscape-focus', apply);
 
     // The status is an async view: its own token renewal reloads it, and any
     // async swap of the page around it can hand back a NEW #torrent-status.
@@ -135,6 +145,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
         html.style.scrollPaddingTop = '';
         io.disconnect();
         document.removeEventListener('torrent-status', onStatus);
+        document.removeEventListener('landscape-focus', apply);
         window.removeEventListener('async', onSwap);
     };
 }
@@ -180,6 +191,9 @@ export function fixedBottom(root = document) {
 //     (wheel, touch, scroll keys): they went somewhere on purpose. Not seen:
 //     dragging the scrollbar, Tab moving focus, a wheel over the Turnstile
 //     iframe -- and a press anywhere on the page counts for every job on it.
+//   - a player that takes the window (a phone on its side, FOCUS_MEDIA):
+//     its stage to the very top, under nothing -- the navbar slides away
+//     once it is there (lib/landscapeFocus.js).
 // Smooth, unless the viewer asked for reduced motion: then 'instant' -- not
 // 'auto', which defers to <html class="scroll-smooth"> and animates anyway.
 const GAP = 12;
@@ -222,15 +236,30 @@ export function reveal(el, root = document) {
     if (!el || !el.isConnected || el.closest('dialog')) return false;
     const w = el.ownerDocument.defaultView;
     if (!stillAtPress(w)) return false;
-    const box = el.getBoundingClientRect();
+    const stage = focusStage(el, w);
+    const box = (stage || el).getBoundingClientRect();
     if (!box.height) return false;
-    const top = stickyBottom(root) + GAP;
-    const bottom = w.innerHeight - GAP;
     let dy = 0;
-    if (box.bottom > bottom) dy = box.bottom - bottom;
-    if (box.top - dy < top) dy = box.top - top;
+    if (stage) {
+        dy = box.top;
+        stage.dataset.focusVia = 'reveal';
+    } else {
+        const top = stickyBottom(root) + GAP;
+        const bottom = w.innerHeight - GAP;
+        if (box.bottom > bottom) dy = box.bottom - bottom;
+        if (box.top - dy < top) dy = box.top - top;
+    }
     if (Math.abs(dy) < 1) return false;
     const reduce = typeof w.matchMedia === 'function' && w.matchMedia('(prefers-reduced-motion: reduce)').matches;
     w.scrollTo({ top: w.scrollY + dy, behavior: reduce ? 'instant' : 'smooth' });
     return true;
+}
+
+// focusStage: the video player's stage in (or at) el, when the window is a
+// phone on its side and the stage has the window (player.css) -- else null.
+function focusStage(el, w) {
+    if (typeof w.matchMedia !== 'function' || !w.matchMedia(FOCUS_MEDIA).matches) return null;
+    if (el.ownerDocument.body.hasAttribute('data-iframe-height')) return null;
+    const stage = el.closest('.wt-player-stage') || el.querySelector('.wt-player-stage');
+    return stage && stage.querySelector('.wt-player--video') ? stage : null;
 }

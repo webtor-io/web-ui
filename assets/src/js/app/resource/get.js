@@ -2,6 +2,7 @@ import av from '../../lib/av';
 import { waitForElement } from '../../lib/waitForElement';
 import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
+import { initLandscapeFocus } from '../../lib/landscapeFocus';
 import { initToolIntent } from '../../lib/toolIntent';
 import '../../lib/share/share';
 import { takesPart, whenDeclared, setPendingFallback } from '../../lib/player/decode-declaration';
@@ -55,6 +56,8 @@ av( async function() {
     // this page, not only the ones that arrive with #action=stream.
     const stopSticky = initStickyStatus(document);
     this._stickyStatusStop = stopSticky;
+    // A phone on its side: the film takes the window (lib/landscapeFocus.js).
+    this._landscapeFocusStop = initLandscapeFocus(document);
     // Picking a file swaps #content only (views/resource/get.html), so this
     // view is not re-run and nothing scrolls. The card that just changed is
     // ABOVE the list the viewer clicked in -- bring it into view, under the
@@ -170,5 +173,9 @@ av( async function() {
     if (this._stickyStatusStop) {
         this._stickyStatusStop();
         this._stickyStatusStop = null;
+    }
+    if (this._landscapeFocusStop) {
+        this._landscapeFocusStop();
+        this._landscapeFocusStop = null;
     }
 });
