@@ -2,9 +2,15 @@
 {{/* Visual primitives (.w-card-frame, .w-card-title, .w-card-badge, .w-card-badge-ghost)
      are shared with discover/components/ItemGrid.jsx — see assets/src/styles/style.css
      and docs/uikit.html section 7 "Video Card". */}}
-<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+{{/* isolate: the cards' overlays (the select-mode label, z-20; the 18+
+     badge, z-10) stack inside the grid, under the page's sticky bar (z-10),
+     whose buttons they otherwise cover once the list scrolls under it. */}}
+<div class="isolate grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
     {{ range $.Data }}
-    <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}" data-async-target="main" class="group flex">
+    {{/* flex-col + flex-1: the anchor stays as tall as the grid row, as it
+         was when it was the grid item itself. */}}
+    <div class="relative flex flex-col">
+    <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}" data-async-target="main" class="group flex flex-1">
         <div class="w-card-frame {{ if .UserWatched }}is-watched{{ end }}">
             <figure class="aspect-[2/3] overflow-hidden relative">
                 {{/* Placeholder layer (always rendered). The <img> on
@@ -98,6 +104,13 @@
             </div>
         </div>
     </a>
+    {{/* Select mode (partials/bulk_select.html): the whole card toggles,
+         over the watched and rating badges. Outside the anchor -- a checkbox
+         inside <a> would navigate on toggle. */}}
+    <label class="hidden group-data-[bulk-on]/bulk:block absolute inset-0 z-20 rounded-xl cursor-pointer has-[:checked]:ring-2 has-[:checked]:ring-w-purple has-[:checked]:bg-w-purple/10">
+        <input type="checkbox" class="js-bulk-box checkbox checkbox-sm absolute top-2 left-2 bg-base-100/80" value="{{ .ResourceID }}" aria-label="{{ . | getTitle }}" />
+    </label>
+    </div>
     {{ end }}
 </div>
 {{ end }}

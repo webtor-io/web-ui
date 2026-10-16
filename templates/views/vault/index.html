@@ -32,6 +32,13 @@
         {{ if .Resource }}
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors"{{ if .ShowProgress }} data-vault-progress data-resource-id="{{ .ResourceID }}" data-csrf="{{ $.CSRF }}" data-status-token="{{ statusToken .ResourceID }}" data-vault-saved-label="{{ t $.Lang "vault.pledges.saved" }}"{{ end }}>
           <td class="text-center">
+            {{/* Select mode (partials/bulk_select.html): the box takes the
+                 icon's place. A frozen pledge cannot be removed yet, so its
+                 box is there but disabled, saying why on hover. */}}
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer"{{ if .IsFrozen }} title="{{ t $.Lang "vault.pledges.frozenDesc" }}"{{ end }}>
+              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="{{ .ResourceID }}" aria-label="{{ .Resource.Name }}"{{ if .IsFrozen }} disabled{{ end }} />
+            </label>
+            <span class="group-data-[bulk-on]/bulk:hidden">
             {{ if .Resource.Vaulted }}
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL inline-block">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
@@ -41,6 +48,7 @@
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
               </svg>
             {{ end }}
+            </span>
           </td>
           <td class="text-left">
             <a href="{{ langPath $.Lang (printf "/%s" .ResourceID) }}" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
@@ -158,7 +166,18 @@
       </div>
     {{ end }}
 
-    <h2 class="text-base font-bold tracking-tight mb-3">{{ t $.Lang "vault.dashboard.pledgesTitle" }}</h2>
+    {{/* The root of "remove selected" (partials/bulk_select.html), offered
+         while at least one pledge is out of its freeze. In select mode the
+         title row sticks, so the buttons stay at hand down a long table. */}}
+    {{ $removable := false }}
+    {{ range .Data.Pledges }}{{ if and .Resource (not .IsFrozen) }}{{ $removable = true }}{{ end }}{{ end }}
+    <div class="group/bulk" data-bulk-confirm="{{ t $.Lang "vault.bulkRemoveConfirm" }}">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3 group-data-[bulk-on]/bulk:sticky group-data-[bulk-on]/bulk:top-[72px] group-data-[bulk-on]/bulk:z-10 group-data-[bulk-on]/bulk:py-2 group-data-[bulk-on]/bulk:bg-w-bg/90 group-data-[bulk-on]/bulk:backdrop-blur-lg">
+      <h2 class="text-base font-bold tracking-tight">{{ t $.Lang "vault.dashboard.pledgesTitle" }}</h2>
+      {{ if $removable }}<div class="flex items-center">{{ template "bulk_select/bar" (withContext $ "/vault/remove") }}</div>{{ end }}
+    </div>
+
+    {{ if $.ErrKey }}<p role="alert" class="text-sm text-error mb-3">{{ t $.Lang $.ErrKey }}</p>{{ end }}
 
     <!-- Pledges Table -->
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
@@ -202,6 +221,8 @@
           <a class="btn btn-soft btn-sm px-5" href="{{ langPath $.Lang "/" }}" data-async-target="main" data-umami-event="vault-empty-open-torrent">{{ t $.Lang "vault.dashboard.emptyCTA" }}</a>
         </div>
       {{ end }}
+    </div>
+    {{ if $removable }}{{ "bulk_select.js" | asset }}{{ end }}
     </div>
 
     <!-- Status Guide (collapsible) -->

@@ -13,7 +13,31 @@
 
     
 
-    <h2 class="text-base font-bold tracking-tight mb-3">Активные торренты</h2>
+    
+    
+    
+    <div class="group/bulk" data-bulk-confirm="Забрать выбранные вклады? Очки вернутся на баланс, а торренты, которым не хватит вкладов, могут быть удалены из Vault. Это действие необратимо.">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3 group-data-[bulk-on]/bulk:sticky group-data-[bulk-on]/bulk:top-[72px] group-data-[bulk-on]/bulk:z-10 group-data-[bulk-on]/bulk:py-2 group-data-[bulk-on]/bulk:bg-w-bg/90 group-data-[bulk-on]/bulk:backdrop-blur-lg">
+      <h2 class="text-base font-bold tracking-tight">Активные торренты</h2>
+      <div class="flex items-center">
+<button type="button" class="js-bulk-toggle hidden group-data-[bulk-on]/bulk:hidden btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap" data-umami-event="bulk-select" data-umami-event-path="/vault/remove">
+    Выбрать
+</button>
+<form id="bulk-remove" class="hidden group-data-[bulk-on]/bulk:flex flex-wrap items-center gap-1 sm:gap-2" method="post" enctype="multipart/form-data" action="/ru/vault/remove" data-async-target="main" data-async-push-state="false">
+    <input type="hidden" name="resource_ids" class="js-bulk-ids" />
+    <button type="button" class="js-bulk-all btn btn-sm btn-ghost text-w-sub whitespace-nowrap">Выбрать все</button>
+    <button type="submit" class="js-bulk-submit btn btn-sm btn-ghost text-w-pinkL hover:bg-w-pink/10 whitespace-nowrap" data-path="/vault/remove" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 hidden sm:inline">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+        </svg>
+        Убрать<span class="js-bulk-count"></span>
+    </button>
+    <button type="button" class="js-bulk-cancel btn btn-sm btn-ghost text-w-sub whitespace-nowrap">Отмена</button>
+</form>
+</div>
+    </div>
+
+    
 
     
     <div class="bg-base-300/50 border border-w-line rounded-2xl p-6 mb-6">
@@ -56,10 +80,16 @@
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors" data-vault-progress data-resource-id="4897aacef168307328e121694dcdb8407e6d62cc" data-csrf="csrf-token" data-status-token="status-token" data-vault-saved-label="Сохранён">
           <td class="text-center">
             
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer" title="Очки замораживаются сразу после сохранения в Vault и размораживаются после истечения периода заморозки">
+              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="4897aacef168307328e121694dcdb8407e6d62cc" aria-label="loading" disabled />
+            </label>
+            <span class="group-data-[bulk-on]/bulk:hidden">
+            
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block" data-vault-progress-icon>
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
               </svg>
             
+            </span>
           </td>
           <td class="text-left">
             <a href="/ru/4897aacef168307328e121694dcdb8407e6d62cc" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
@@ -86,10 +116,16 @@
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors">
           <td class="text-center">
             
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer">
+              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="08ada5a7a6183aae1e09d831df6748d566095a10" aria-label="vaulted" />
+            </label>
+            <span class="group-data-[bulk-on]/bulk:hidden">
+            
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL inline-block">
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
               </svg>
             
+            </span>
           </td>
           <td class="text-left">
             <a href="/ru/08ada5a7a6183aae1e09d831df6748d566095a10" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
@@ -113,6 +149,12 @@
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors">
           <td class="text-center">
             
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer">
+              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="c9e15763f722f23e98a29decdfae341b98d53056" aria-label="expiring" />
+            </label>
+            <span class="group-data-[bulk-on]/bulk:hidden">
+            
+            </span>
           </td>
           <td class="text-left">
             <a href="/ru/c9e15763f722f23e98a29decdfae341b98d53056" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
@@ -139,10 +181,16 @@
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors" data-vault-progress data-resource-id="5d0c1a9e3b7f2e4a6c8d0f1b3a5c7e9f2b4d6a8c" data-csrf="csrf-token" data-status-token="status-token" data-vault-saved-label="Сохранён">
           <td class="text-center">
             
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer">
+              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="5d0c1a9e3b7f2e4a6c8d0f1b3a5c7e9f2b4d6a8c" aria-label="second" />
+            </label>
+            <span class="group-data-[bulk-on]/bulk:hidden">
+            
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-w-pinkL vault-pulse inline-block" data-vault-progress-icon>
                 <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd" />
               </svg>
             
+            </span>
           </td>
           <td class="text-left">
             <a href="/ru/5d0c1a9e3b7f2e4a6c8d0f1b3a5c7e9f2b4d6a8c" class="text-w-pinkL hover:underline truncate block" data-async-target="main">
@@ -169,6 +217,8 @@
 
         </div>
       
+    </div>
+    <script src="/assets/bulk_select.js"></script>
     </div>
 
     

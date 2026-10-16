@@ -166,10 +166,16 @@ func AddTorrentToLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, resource
 	return lib, nil
 }
 
-func RemoveFromLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, rID string) error {
+// RemoveFromLibrary removes the user's entries for every given resource in one
+// statement. No resources is a no-op: pg.In renders an empty slice as "IN ()",
+// which is a syntax error.
+func RemoveFromLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, rIDs ...string) error {
+	if len(rIDs) == 0 {
+		return nil
+	}
 	_, err := db.Model((*Library)(nil)).
 		Context(ctx).
-		Where("user_id = ? AND resource_id = ?", uID, rID).
+		Where("user_id = ? AND resource_id IN (?)", uID, pg.In(rIDs)).
 		Delete()
 	if err != nil {
 		return errors.Wrap(err, "failed to remove from library")

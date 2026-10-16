@@ -54,7 +54,8 @@ func parseVaultWith(t *testing.T, statusToken func(string) string) *template.Tem
 		},
 		"statusToken": statusToken,
 		"statusBadge": wr.NewHelper(testSecret).StatusBadge,
-	}).ParseFiles("../../templates/views/vault/index.html", "../../templates/partials/status/badge.html")
+		"withContext": func(ctx, data any) any { return map[string]any{"Ctx": ctx, "Data": data} },
+	}).ParseFiles("../../templates/views/vault/index.html", "../../templates/partials/status/badge.html", "../../templates/partials/bulk_select.html")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -62,8 +63,8 @@ func parseVaultWith(t *testing.T, statusToken func(string) string) *template.Tem
 }
 
 type vaultView struct {
-	Lang, CSRF string
-	Data       *PledgeListData
+	Lang, CSRF, ErrKey string
+	Data               *PledgeListData
 }
 
 func pledgeData() *PledgeListData {
@@ -341,5 +342,65 @@ func TestVaultPageFixtureIsCurrent(t *testing.T) {
 	}
 	if !bytes.Equal(want, got) {
 		t.Errorf("%s is stale. Regenerate it, then run `npm test`:\n\n    %s", path, vaultFixtureRegen)
+	}
+}
+
+var bulkBoxRe = regexp.MustCompile(`<input type="checkbox" class="js-bulk-box [^>]*>`)
+
+// "Remove selected" (partials/bulk_select.html): every pledge on the table
+// gets a box holding its resource id, a frozen one's disabled (the server
+// would refuse it), none with a name -- the selection goes as one field,
+// resource_ids, never a part per box; the bar and its script are there while
+// one pledge is out of its freeze, and gone when none is -- a select mode
+// with nothing to select; a failed removal's ?err= is said on the page.
+func TestVaultBulkRemove(t *testing.T) {
+	tpl := parseVault(t)
+	render := func(d *PledgeListData) string {
+		var page bytes.Buffer
+		if err := tpl.ExecuteTemplate(&page, "main", vaultView{Lang: "en", CSRF: "csrf", Data: d}); err != nil {
+			t.Fatal(err)
+		}
+		return page.String()
+	}
+
+	d := fixturePledges()
+	out := render(d)
+	boxes := bulkBoxRe.FindAllString(out, -1)
+	if len(boxes) != len(d.Pledges) {
+		t.Fatalf("%d boxes, want one per pledge (%d)", len(boxes), len(d.Pledges))
+	}
+	for i, p := range d.Pledges {
+		b := boxes[i]
+		if !strings.Contains(b, `value="`+p.ResourceID+`"`) || strings.Contains(b, "name=") {
+			t.Errorf("%s: box %s does not hold its resource id, or would post itself as a part", p.Resource.Name, b)
+		}
+		if disabled := strings.Contains(b, " disabled"); disabled != p.IsFrozen {
+			t.Errorf("%s: frozen %v, box disabled %v", p.Resource.Name, p.IsFrozen, disabled)
+		}
+	}
+	if !strings.Contains(out, `<form id="bulk-remove" `) || !strings.Contains(out, `action="/vault/remove"`) ||
+		!strings.Contains(out, `<input type="hidden" name="resource_ids"`) {
+		t.Error("no remove form posting resource_ids to /vault/remove")
+	}
+	// The root's last script: lib/asyncView.js names the view after it, and
+	// the table's progress.js sits inside the root too.
+	if i := strings.Index(out, `src="/assets/bulk_select.js"`); i < 0 || i < strings.Index(out, `src="/assets/vault/progress.js"`) {
+		t.Error("bulk_select.js is not rendered after the table's script")
+	}
+
+	var failed bytes.Buffer
+	if err := tpl.ExecuteTemplate(&failed, "main", vaultView{Lang: "en", ErrKey: "error.pledge_frozen", Data: d}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(failed.String(), `role="alert"`) || strings.Contains(out, `role="alert"`) {
+		t.Error("?err= is not said on the page, or an alert shows without one")
+	}
+
+	for i := range d.Pledges {
+		d.Pledges[i].IsFrozen = true
+	}
+	out = render(d)
+	if strings.Contains(out, `id="bulk-remove"`) || strings.Contains(out, "bulk_select.js") {
+		t.Error("all pledges frozen, but the select mode is offered")
 	}
 }

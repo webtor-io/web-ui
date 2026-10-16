@@ -2696,6 +2696,51 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
 
   <hr class="uikit-divider">
 
+  <div class="uikit-section">
+    <h2>23. Remove selected (library, Vault)</h2>
+    <p class="desc">
+      One component for both lists: <code>templates/partials/bulk_select.html</code> (the bar) and
+      <code>assets/src/js/app/bulk_select.js</code>. The page wraps its bar and its list in a root with
+      <code>group/bulk</code> and <code>data-bulk-confirm</code>, and ends the root with the script (its last script:
+      <code>lib/asyncView.js</code> names the view after it). "Select" (outlined ghost, JS-only &mdash; rendered
+      <code>hidden</code>, shown by the script) sets <code>data-bulk-on</code> on the root; nothing else is toggled by
+      script &mdash; every element that changes with the mode carries a <code>group-data-[bulk-on]/bulk:</code> class, so a
+      list re-rendered inside the root comes back in the right mode. Each item gets a DaisyUI checkbox
+      <code>.js-bulk-box</code> holding its resource id and <strong>no name</strong> (the script sends the selection as
+      one comma-joined field, <code>resource_ids</code>: a multipart part per box is cut off at 1000 parts without a
+      word), in a label <strong>outside</strong> its anchor (a checkbox inside
+      <code>&lt;a&gt;</code> navigates on toggle): over the whole card in the library's grid
+      (<code>has-[:checked]:ring-2 ring-w-purple</code>; the grid is <code>isolate</code>, so these overlays stay
+      under the page's sticky bar), over the whole row in the torrent list where it takes the
+      bookmark's place, in the first cell on the Vault table where it takes the icon's place. Remove is the library
+      button's tertiary pink (<code>btn-ghost text-w-pinkL</code>), disabled at zero, with the count in parentheses, and
+      asks <code>confirm()</code> on the button's click &mdash; not the form's submit, which <code>lib/async.js</code> takes
+      without looking at <code>defaultPrevented</code>.
+    </p>
+    <div class="uikit-card">
+      <div class="flex items-center gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm btn-ghost border border-w-line text-w-sub">Select</button>
+        <span class="text-w-muted text-xs">&rarr; select mode:</span>
+        <button type="button" class="btn btn-sm btn-ghost text-w-sub">Select all</button>
+        <button type="button" class="btn btn-sm btn-ghost text-w-pinkL hover:bg-w-pink/10">Remove (3)</button>
+        <button type="button" class="btn btn-sm btn-ghost text-w-sub">Cancel</button>
+      </div>
+    </div>
+    <div class="uikit-label">.group/bulk[data-bulk-confirm] button.js-bulk-toggle + form#bulk-remove &gt; input.js-bulk-ids + .js-bulk-all + .js-bulk-submit + .js-bulk-cancel; .js-bulk-submit &gt; .js-bulk-count</div>
+    <div class="uikit-rule">
+      <strong>Rules:</strong> in the library the bar takes the place of filter and sort (a phone's row has no room for
+      both); on the Vault page the title row sticks under the nav in select mode. A disabled box is an item that cannot
+      go (a frozen pledge) and says why in its title. Keys: <code>bulk.select</code>, <code>bulk.selectAll</code>,
+      <code>bulk.remove</code>, <code>bulk.cancel</code>, <code>library.bulkRemoveConfirm</code>,
+      <code>vault.bulkRemoveConfirm</code>. Events: <code>bulk-select</code> (the toggle), <code>bulk-remove</code>
+      (<code>path</code>: the endpoint, <code>count</code>; sent by the script after the confirmation's "yes", not by a
+      <code>data-umami-event</code>, which would count the declined presses too). The trash icon is <code>sm:</code>
+      and up and the bar wraps: at 360px the longest locale (nl, "(12)") still fits.
+    </div>
+  </div>
+
+  <hr class="uikit-divider">
+
   <p class="text-center text-w-muted text-sm py-8">
     Webtor UIKit Reference &middot; Generated from <code>tailwind.config.js</code> and <code>assets/src/styles/style.css</code>
   </p>

@@ -9,14 +9,18 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-// removePledge handles HTTP request for removing a pledge (Level 1: HTTP interaction)
+// removePledge handles HTTP request for removing pledges (Level 1: HTTP
+// interaction). One resource_id comes from the resource page's remove modal,
+// several from the Vault page's "remove selected" (partials/bulk_select.html).
 func (h *Handler) removePledge(c *gin.Context) {
 	// Extract parameters from form
-	resourceID := c.PostForm("resource_id")
+	resourceIDs, err := web.FormBulkIDs(c)
 	user := auth.GetUserFromContext(c)
 
 	// Call business logic
-	err := h.deletePledge(c.Request.Context(), resourceID, user)
+	if err == nil {
+		err = h.deletePledges(c.Request.Context(), resourceIDs, user)
+	}
 	if err != nil {
 		web.RedirectWithError(c, err)
 		return
@@ -24,6 +28,32 @@ func (h *Handler) removePledge(c *gin.Context) {
 
 	// Redirect with success
 	web.RedirectWithSuccessAndMessage(c, "toast.removedFromVault")
+}
+
+// deletePledges removes every pledge it is given (Level 2: Business logic).
+// One that fails does not stop the rest: each removal is its own transaction,
+// so the ones before it are already done, and the user is better served by
+// as many as can go than by a selection cut at an arbitrary row. The first
+// failure is what the user is told (the dashboard shows ?err=, index.go);
+// the table they land on shows what is left.
+func (h *Handler) deletePledges(ctx context.Context, resourceIDs []string, user *auth.User) error {
+	if len(resourceIDs) == 0 {
+		return errors.New("resource_id is required")
+	}
+	var first error
+	failed := 0
+	for _, id := range resourceIDs {
+		if err := h.deletePledge(ctx, id, user); err != nil {
+			failed++
+			if first == nil {
+				first = err
+			}
+		}
+	}
+	if first != nil && len(resourceIDs) > 1 {
+		return errors.Wrapf(first, "failed to remove %d of %d pledges", failed, len(resourceIDs))
+	}
+	return first
 }
 
 // deletePledge contains the core business logic for pledge removal (Level 2: Business logic)

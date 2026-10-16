@@ -148,7 +148,12 @@ func (s *Handler) index(c *gin.Context) {
 		}
 	}
 
-	s.tb.Build("library/index").HTML(http.StatusOK, web.NewContext(c).WithData(indexData))
+	wctx := web.NewContext(c)
+	// A failed "remove selected" comes back here with ?err= (remove.go).
+	if c.Query("status") == "error" {
+		wctx = wctx.WithErrKey(c.Query("err"))
+	}
+	s.tb.Build("library/index").HTML(http.StatusOK, wctx.WithData(indexData))
 }
 
 func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared.IndexArgs) (items []any, err error) {

@@ -38,6 +38,10 @@ func (h *Handler) index(c *gin.Context) {
 	}
 
 	ctx := web.NewContext(c)
+	// A failed "remove selected" comes back here with ?err= (remove.go).
+	if c.Query("status") == "error" {
+		ctx = ctx.WithErrKey(c.Query("err"))
+	}
 	data := &PledgeListData{
 		Pledges:               buildPledgeDisplay(enriched, h.vault.GetExpirePeriod()),
 		Stats:                 stats,

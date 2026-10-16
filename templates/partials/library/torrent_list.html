@@ -1,9 +1,10 @@
 {{ define "library/torrent_list" }}
 <div class="bg-base-200/50 rounded-xl divide-y divide-w-line">
     {{ range $.Data }}
+    <div class="relative">
     <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}" data-async-target="main"
        class="flex items-center gap-4 p-4 hover:bg-base-300/30 transition-colors group">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-w-purpleL shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-w-purpleL shrink-0 group-data-[bulk-on]/bulk:invisible">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
         </svg>
         <div class="flex-1 min-w-0">
@@ -14,6 +15,13 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
     </a>
+    {{/* Select mode (partials/bulk_select.html): the whole row toggles, and
+         its box takes the bookmark's place. Outside the anchor -- a checkbox
+         inside <a> would navigate on toggle. */}}
+    <label class="hidden group-data-[bulk-on]/bulk:flex absolute inset-0 items-center pl-4 cursor-pointer has-[:checked]:bg-w-purple/10">
+        <input type="checkbox" class="js-bulk-box checkbox checkbox-sm" value="{{ .ResourceID }}" aria-label="{{ .Torrent.Name }}" />
+    </label>
+    </div>
     {{ end }}
 </div>
 {{ end }}

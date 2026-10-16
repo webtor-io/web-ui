@@ -269,11 +269,11 @@ Creates a new pledge. Auth required.
 
 ### POST /vault/remove
 
-Removes a pledge. Auth required (middleware).
+Removes pledges. Auth required (middleware).
 
-- Form: `resource_id` (required)
-- Checks freeze status, returns error if frozen
-- Calls `RemovePledge`
+- Form: `resource_id` (the resource page's remove modal) and/or `resource_ids`, comma-joined (the dashboard's "remove selected"). One field rather than a box per field: `lib/async.js` posts multipart, Go's multipart reader stops at 1000 parts and gin swallows that error, so a part per box arrived cut to nothing or to a tail. `web.FormBulkIDs` reads both, drops empty and repeated values (a repeat would fail its second removal as "pledge not found") and refuses more than `web.MaxBulkIDs` (1000; the page's "Select all" stops there)
+- Per id (`deletePledge`): checks freeze status, error if frozen; calls `RemovePledge` — one transaction per pledge, as before
+- One failure does not stop the rest (`deletePledges`): the ones before it are already committed, and the user gets as many as can go rather than a selection cut at an arbitrary row. The first failure is the one reported, wrapped as `failed to remove N of M pledges: …` — `ClassifyError` matches by substring, so `frozen` still reads as `error.pledge_frozen`. The dashboard says it: `GET /vault` reads `status=error&err=` into `ErrKey` and draws it above the table (the resource page's modal reads its own, `from=/vault/remove`)
 - Redirects with `status=success` or `status=error&err=<message>`
 
 ### GET /vault
@@ -282,12 +282,13 @@ Removes a pledge. Auth required (middleware).
 
 Reachable from the top nav via the dedicated Vault button (`templates/partials/nav.html`, layered-diamond icon matching the canonical Vault icon used in profile and the Save-to-Vault button, visible to everyone — `aria-label="Vault"`). The library button next to it shortened from "My Library" → "Library" (key `nav.library`) to make room.
 
-Dashboard shows three blocks:
+Dashboard shows three blocks (the third with its "remove selected"):
 1. **Content stats** (primary): Saved (vaulted), Loading (funded, transfer in progress — hidden when 0), Expiring (lost backing). Numbers tinted purple/cyan/pink to mirror the badge palette.
 2. **Vault Points stats** (secondary, compact): Total / Available / Funded / Frozen.
 3. **Active torrents table** with per-pledge status badges. When the table is empty, what gets rendered depends on tier:
    - **Free tier** (`Claims.Context.Tier.Id == 0`, mirrors `services/claims.IsPaid`): inline upsell card — vault icon + `vault.dashboard.upsellTitle`/`upsellSub` on the left, `btn-soft` CTA "Get a plan" linking to `/donate` (`data-umami-event="donate-vault"`, `data-umami-event-tier="free"`). Replaces the empty-state hint because a free user has zero VP and can't act on it.
    - **Paid tier**: empty-state illustration with hint pointing back to the "Save to Vault" CTA on resource pages.
+   - **Remove selected** (`templates/partials/bulk_select.html`, `assets/src/js/app/bulk_select.js` — the same component as the library's, `docs/uikit.html` §23). "Select" beside the table's title puts the table in select mode: each row's first cell trades its icon for a checkbox, the title row sticks under the nav with "Select all / Remove (N) / Cancel", and Remove asks `vault.bulkRemoveConfirm` (points come back; a torrent left underfunded may be removed) before posting the checked ids, comma-joined as `resource_ids`, to `POST /vault/remove`. A **frozen** pledge's box is rendered disabled with `vault.pledges.frozenDesc` as its title — "Select all" skips it, and the server would refuse it anyway. Offered only while at least one pledge is out of its freeze (`$removable` in the view): otherwise select mode would have nothing to select. JS-only: without it the toggle stays hidden and single removal stays in the resource page's modal. The selection survives the table's own reload when its status tokens are renewed (the ids are put back on the rows still there).
 
 Data structures:
 
