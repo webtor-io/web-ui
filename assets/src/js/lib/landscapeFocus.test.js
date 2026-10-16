@@ -242,60 +242,17 @@ test('fullscreen: a turn in it waits for its end, and the end is taken as the tu
     assert.deepEqual(scrolls, [{ top: 300, behavior: 'instant' }]);
 });
 
-test('in by a scroll of the viewer\'s own: the last px to the top once it rests, not under a finger', (t) => {
+test('in by a scroll of the viewer\'s own: the script scrolls nothing, the snap is the browser\'s (player.css)', (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     fresh();
-    touch('touchstart', 1);
     seen(0.95);
     top = 20;
-    w.dispatchEvent(new w.Event('scroll'));
-    t.mock.timers.tick(200);
-    assert.deepEqual(scrolls, [], 'a finger is down');
     touch('touchend', 0);
-    for (let i = 0; i < 3; i++) {
-        t.mock.timers.tick(100);
-        w.dispatchEvent(new w.Event('scroll')); // momentum
-    }
-    assert.deepEqual(scrolls, [], 'still moving');
-    t.mock.timers.tick(150);
-    assert.deepEqual(scrolls, [{ top: 20, behavior: 'smooth' }]);
-    scrolls.length = 0;
     w.dispatchEvent(new w.Event('scroll'));
-    t.mock.timers.tick(200);
-    assert.deepEqual(scrolls, [], 'once per entry: a small scroll in focus is not pulled back');
-});
-
-test('the scroll that crossed in was the last one: pulled all the same', (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] });
-    fresh();
-    seen(0.95);
-    top = -27;
-    t.mock.timers.tick(150);
-    assert.deepEqual(scrolls, [{ top: -27, behavior: 'smooth' }]);
-});
-
-test('the pull is instant for who asked for less motion', (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] });
-    fresh();
-    reduced = true;
-    seen(0.95);
-    top = 20;
-    t.mock.timers.tick(150);
-    assert.deepEqual(scrolls, [{ top: 20, behavior: 'instant' }]);
-});
-
-test('one finger lifted of two is still a finger down', (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] });
-    fresh();
-    touch('touchstart', 2);
-    seen(0.95);
-    top = 20;
-    touch('touchend', 1);
-    t.mock.timers.tick(200);
+    t.mock.timers.tick(1000);
+    flush();
+    assert.ok(on());
     assert.deepEqual(scrolls, []);
-    touch('touchend', 0);
-    t.mock.timers.tick(150);
-    assert.deepEqual(scrolls, [{ top: 20, behavior: 'smooth' }]);
 });
 
 test('the status bar stays down while focus is on, and comes back after', () => {
@@ -372,6 +329,10 @@ test('player.css sizes the stage under the very query the script watches; the na
     assert.ok(s, 'the stage rule, the embed left out');
     assert.equal(s.width, '100vw');
     assert.equal(s.height, '100dvh');
+    assert.equal(s['scroll-snap-align'], 'start', 'a scroll that ends near it ends with it at the top');
+    const root = findRule(rules, 'html:has(body:not([data-iframe-height]) .wt-player-stage .wt-player--video)', at);
+    assert.equal(root['scroll-snap-type'], 'y proximity', 'not mandatory: the page could rest nowhere else');
+    assert.equal(root['scroll-padding-top'], '0 !important', 'over the navbar\'s 72 px and the bar\'s inline padding');
     const m = findRule(rules, 'body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player-mount', at);
     assert.equal(m.margin, '0', 'all of it: the phone rule\'s side bleed would pan the page');
     assert.equal(m.width, '100%');

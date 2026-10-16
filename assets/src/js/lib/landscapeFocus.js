@@ -28,9 +28,8 @@
 //     reveal() would put it;
 //   - the player shown while the phone is already on its side: reveal()
 //     puts the stage at the top (stickyStatus.js);
-//   - the viewer scrolled in by hand: once the scroll comes to rest and no
-//     finger is down, the last few px to the top -- once per entry, so a
-//     small scroll in focus is not pulled back;
+//   - a scroll of the viewer's own that ends near the stage at the top ends
+//     there: CSS scroll snap (player.css), not this module;
 //   - a swap that carried the playing film over (the next episode, quietly:
 //     lib/player/next-item-go.js syncPage) puts it back at the top;
 //   - real fullscreen is left alone: a turn while in it is taken up when it
@@ -46,7 +45,6 @@ const OFF = 0.7;
 // How much of the player has to be on screen for a turn of the phone to
 // bring it to the top: it was what the viewer was looking at.
 const LOOKING = 0.5;
-const REST_MS = 150;
 
 export function initLandscapeFocus(doc = document) {
     const w = doc.defaultView;
@@ -59,10 +57,7 @@ export function initLandscapeFocus(doc = document) {
     let ratio = 0;
     let via = '';
     let since = 0;
-    // The one-shot pull to the top after a scroll in (rest() below).
-    let settleArmed = false;
     let touching = false;
-    let restTimer = null;
     const isOn = () => html.classList.contains('wt-focus');
     // A video player, or -- for a focus already on -- the moment between two
     // of them (next episode, a stream restart: player-stage.js holds the
@@ -82,11 +77,7 @@ export function initLandscapeFocus(doc = document) {
             if (stage) delete stage.dataset.focusVia;
             since = Date.now();
             track('player-focus', { via, h: Math.round(w.innerHeight / 10) * 10 });
-            // Armed and the rest timer started now: the scroll that crossed
-            // in may have been the last scroll event.
-            if (via === 'scroll') { settleArmed = true; onScroll(); }
         } else {
-            settleArmed = false;
             if (stage) delete stage.dataset.focusVia;
             track('player-focus-exit', { via, exit, sec: Math.round((Date.now() - since) / 1000) });
         }
@@ -162,21 +153,6 @@ export function initLandscapeFocus(doc = document) {
     mq.addEventListener('change', onRotate);
     for (const ev of FS) doc.addEventListener(ev, onFullscreen);
 
-    // In by the viewer's own scroll: the rest of the way once it settles.
-    const rest = () => {
-        restTimer = null;
-        if (!settleArmed || touching || !isOn() || !film()) return;
-        settleArmed = false;
-        const top = stage.getBoundingClientRect().top;
-        if (Math.abs(top) < 1) return;
-        const reduce = w.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        w.scrollTo({ top: w.scrollY + top, behavior: reduce ? 'instant' : 'smooth' });
-    };
-    const onScroll = () => {
-        if (!settleArmed) return;
-        w.clearTimeout(restTimer);
-        restTimer = w.setTimeout(rest, REST_MS);
-    };
     // The viewer took over: a pending realign after a turn would yank them
     // back, and a reveal they stopped half-way is no longer what they do.
     const onTouch = (e) => {
@@ -185,21 +161,17 @@ export function initLandscapeFocus(doc = document) {
             if (unalign) unalign();
             if (stage && !isOn()) delete stage.dataset.focusVia;
         }
-        if (!touching) onScroll();
     };
     const TOUCH = ['touchstart', 'touchend', 'touchcancel'];
-    w.addEventListener('scroll', onScroll, { passive: true });
     for (const ev of TOUCH) w.addEventListener(ev, onTouch, { passive: true });
 
     watch();
     return () => {
         if (unalign) unalign();
-        w.clearTimeout(restTimer);
         io.disconnect();
         mq.removeEventListener('change', onRotate);
         for (const ev of FS) doc.removeEventListener(ev, onFullscreen);
         for (const ev of WATCHED) w.removeEventListener(ev, watch);
-        w.removeEventListener('scroll', onScroll);
         for (const ev of TOUCH) w.removeEventListener(ev, onTouch);
         if (isOn()) set(false, 'gone');
     };

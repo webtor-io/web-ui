@@ -70,12 +70,26 @@ body:not([data-iframe-height]) .wt-preview-mount {
    letterboxed by object-fit like in fullscreen; the UA's fullscreen rules
    override all of this while fullscreen. An audio player keeps its card. */
 @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) and (min-aspect-ratio: 3/2) {
+    /* And it sticks there (owner, 2026-10-16): a scroll that ends near the
+       stage at the window's top ends exactly there -- the browser's own snap,
+       which catches a fling as it slows, where a script could only pull after
+       it stopped. Proximity: one snap point under mandatory would leave the
+       page nowhere else to rest. Padding 0 over style.css's 72 px and the
+       sticky bar's inline one (lib/stickyStatus.js pad()): those would snap
+       the stage under the navbar, short of focus -- the navbar slides away
+       once the stage has the window. */
+    html:has(body:not([data-iframe-height]) .wt-player-stage .wt-player--video) {
+        scroll-snap-type: y proximity;
+        scroll-padding-top: 0 !important;
+    }
+
     body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) {
         width: 100vw;
         height: 100vh;
         height: 100dvh;
         margin: 1.5rem calc(50% - 50vw) 0;
         background: #000;
+        scroll-snap-align: start;
     }
 
     /* All of the margin and the width: under 640 px wide the phone rule
