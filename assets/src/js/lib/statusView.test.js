@@ -934,7 +934,7 @@ test('the block changing height: what is under it scrolled away, or a film playi
     const under = (top) => () => ({ top: top + (box().hidden ? 0 : 128), bottom: top + 450 + (box().hidden ? 0 : 128) });
     const scrolls = [];
     const realScrollBy = window.scrollBy;
-    window.scrollBy = (x, y) => scrolls.push(y);
+    window.scrollBy = (o) => { assert.equal(o.behavior, 'instant', 'no slide: the film must not drift'); scrolls.push(o.top); };
     t.after(() => {
         window.scrollBy = realScrollBy;
         delete video.dataset.statusOverCap;
@@ -1006,7 +1006,7 @@ test('the block changing height under the sticky bar: kept at its distance below
     bar.classList.remove('-translate-y-full');
     const scrolls = [];
     const realScrollBy = window.scrollBy;
-    window.scrollBy = (x, y) => scrolls.push(y);
+    window.scrollBy = (o) => { assert.equal(o.behavior, 'instant', 'no slide: the film must not drift'); scrolls.push(o.top); };
     t.after(() => {
         window.scrollBy = realScrollBy;
         bar.hidden = wasHidden;
@@ -1093,7 +1093,7 @@ test('another file picked at the cap: the old box goes with the swap, and nothin
     content.getBoundingClientRect = () => ({ top: 200 + (box().hidden ? 0 : 128), bottom: 650 + (box().hidden ? 0 : 128) });
     const scrolls = [];
     const realScrollBy = window.scrollBy;
-    window.scrollBy = (x, y) => scrolls.push(y);
+    window.scrollBy = (o) => { assert.equal(o.behavior, 'instant', 'no slide: the film must not drift'); scrolls.push(o.top); };
     try {
         const n = sources.length;
         document.getElementById('file').dataset.statusFile = '/Sintel/Extras/Trailer.mkv';

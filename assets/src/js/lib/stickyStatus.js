@@ -38,8 +38,11 @@ export const NAVBAR_H = 72;
 // A phone on its side, where the player's stage takes the whole window
 // (player.css, lib/landscapeFocus.js). The same query in both: a window that
 // matches one and not the other would get a full-window stage without
-// focus, or focus without the stage.
-export const FOCUS_MEDIA = '(orientation: landscape) and (max-height: 500px) and (pointer: coarse)';
+// focus, or focus without the stage. The aspect ratio because orientation is
+// the window's, not the phone's: an upright phone whose keyboard shrinks the
+// window (an in-app browser that resizes for it) reads ~360x330, "landscape";
+// a phone really on its side is 1.78-2.5.
+export const FOCUS_MEDIA = '(orientation: landscape) and (max-height: 500px) and (pointer: coarse) and (min-aspect-ratio: 3/2)';
 
 // Matches `duration-200` on the bar: how long it takes to slide away before
 // `hidden` may take it out of the tree.

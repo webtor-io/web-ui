@@ -2342,6 +2342,11 @@ export async function initPlayer(target, opts = {}) {
     // bottom, jumped up and back (owner, 2026-09-20). Episodes of a series
     // share their shape; if this one does not, canplay corrects it.
     if (opts.aspectRatio) playerContainer.style.aspectRatio = opts.aspectRatio;
+    // Its kind at once, not first in the component's effect (after a painted
+    // frame): the stage's full-window size on a phone on its side keys on
+    // .wt-player--video (player.css), and between two episodes it dropped for
+    // that frame. The effect writes the same, plus --fixed.
+    playerContainer.className = `wt-player ${videoEl.tagName === 'VIDEO' ? 'wt-player--video' : 'wt-player--audio'}`;
     mountEl.appendChild(playerContainer);
     playerContainer.appendChild(videoEl);
 

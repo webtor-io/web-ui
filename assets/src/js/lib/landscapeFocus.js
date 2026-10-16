@@ -11,8 +11,9 @@
 // fullscreen on.
 //
 // So in landscape on a touch phone the player's stage is the window's size,
-// in the page's flow (player.css, FOCUS_MEDIA): its size never depends on
-// the scroll, so nothing jumps under the finger. What this module adds is
+// in the page's flow (player.css, FOCUS_MEDIA): it follows the window and
+// nothing else the scroll does, so the film does not move under the finger
+// -- and focus coming or going changes no layout. What this module adds is
 // "focus": while the stage covers the window, html.wt-focus slides the
 // navbar away and keeps the status bar down (stickyStatus.js), and the
 // stage's black runs to the window's edges. Scrolling on is what leaves
@@ -29,7 +30,11 @@
 //     puts the stage at the top (stickyStatus.js);
 //   - the viewer scrolled in by hand: once the scroll comes to rest and no
 //     finger is down, the last few px to the top -- once per entry, so a
-//     small scroll in focus is not pulled back.
+//     small scroll in focus is not pulled back;
+//   - a swap that carried the playing film over (the next episode, quietly:
+//     lib/player/next-item-go.js syncPage) puts it back at the top;
+//   - real fullscreen is left alone: a turn while in it is taken up when it
+//     ends, as a turn would be.
 //
 // Counted in Umami: `player-focus` {via, h} on the way in, and
 // `player-focus-exit` {via, exit, sec} on the way out -- how many get here,
@@ -59,11 +64,13 @@ export function initLandscapeFocus(doc = document) {
     let touching = false;
     let restTimer = null;
     const isOn = () => html.classList.contains('wt-focus');
-    // A video player, or the moment between two of them (next episode, a
-    // stream restart: player-stage.js holds the stage's height meanwhile) --
-    // focus does not blink between episodes.
+    // A video player, or -- for a focus already on -- the moment between two
+    // of them (next episode, a stream restart: player-stage.js holds the
+    // stage's height meanwhile), so focus does not blink between episodes.
+    // Not a way in: an audio player switching tracks is no film.
     const film = () => !!(stage && stage.isConnected
-        && (stage.querySelector('.wt-player--video') || stage.classList.contains('wt-player-stage--switching')));
+        && (stage.querySelector('.wt-player--video') || (isOn() && stage.classList.contains('wt-player-stage--switching'))));
+    const fs = () => !!(doc.fullscreenElement || doc.webkitFullscreenElement);
     const track = (name, props) => { if (w.umami) w.umami.track(name, props); };
 
     const set = (on, exit) => {
@@ -75,13 +82,18 @@ export function initLandscapeFocus(doc = document) {
             if (stage) delete stage.dataset.focusVia;
             since = Date.now();
             track('player-focus', { via, h: Math.round(w.innerHeight / 10) * 10 });
-            if (via === 'scroll') settleArmed = true;
+            // Armed and the rest timer started now: the scroll that crossed
+            // in may have been the last scroll event.
+            if (via === 'scroll') { settleArmed = true; onScroll(); }
         } else {
             settleArmed = false;
+            if (stage) delete stage.dataset.focusVia;
             track('player-focus-exit', { via, exit, sec: Math.round((Date.now() - since) / 1000) });
         }
     };
-    const update = (exit) => set(mq.matches && film() && ratio >= (isOn() ? OFF : ON), exit);
+    // Not while fullscreen: the stage is the whole screen there anyway, and
+    // what comes after is decided when it ends (onTurn).
+    const update = (exit) => { if (!fs()) set(mq.matches && film() && ratio >= (isOn() ? OFF : ON), exit); };
 
     const io = new w.IntersectionObserver((entries) => {
         for (const e of entries) if (e.target === stage) ratio = e.isIntersecting ? e.intersectionRatio : 0;
@@ -92,7 +104,7 @@ export function initLandscapeFocus(doc = document) {
     // elsewhere (a #content swap): looked up again whenever either may have
     // happened. Hidden until the player is ready (app/action.js), so the
     // observer's first word is "not on screen" and the next one is real.
-    const watch = () => {
+    const watch = (e) => {
         const s = doc.querySelector('.wt-player-stage');
         if (s !== stage) {
             if (stage) io.unobserve(stage);
@@ -101,6 +113,13 @@ export function initLandscapeFocus(doc = document) {
             if (stage) io.observe(stage);
         }
         update('gone');
+        // The swap moved what it carried over (the card above it changed),
+        // and nothing anchors the scroll to a node it re-parented.
+        const target = e && e.detail && e.detail.target;
+        if (isOn() && !touching && stage && target && target.contains && target.contains(stage)) {
+            const top = stage.getBoundingClientRect().top;
+            if (Math.abs(top) >= 1) w.scrollTo({ top: w.scrollY + top, behavior: 'instant' });
+        }
     };
     const WATCHED = ['player_ready', 'player_show', 'player_replaced', 'async'];
     for (const ev of WATCHED) w.addEventListener(ev, watch);
@@ -123,19 +142,25 @@ export function initLandscapeFocus(doc = document) {
         w.requestAnimationFrame(go);
     };
     // The change event comes before the observer has seen the new layout:
-    // `ratio` is still what the viewer had on screen before the turn.
-    const onTurn = () => {
+    // `ratio` is still what the viewer had on screen before the turn. The
+    // end of fullscreen is taken the same way (the stage read 1 in it).
+    const onTurn = (why) => {
+        if (fs()) return;
         const looking = film() && ratio >= LOOKING;
         const was = isOn();
         // Before update(): a player wholly in view upright reads 1 still, and
         // focus comes in on this very call -- by the turn.
-        if (looking && mq.matches) stage.dataset.focusVia = 'rotate';
-        update('rotate');
+        if (looking && mq.matches && !was) stage.dataset.focusVia = why;
+        update(why);
         if (!looking && !was) return;
         if (mq.matches) align((top) => top);
         else align((top) => top - (stickyBottom(doc) + 12));
     };
-    mq.addEventListener('change', onTurn);
+    const onRotate = () => onTurn('rotate');
+    const onFullscreen = () => onTurn('fullscreen');
+    const FS = ['fullscreenchange', 'webkitfullscreenchange'];
+    mq.addEventListener('change', onRotate);
+    for (const ev of FS) doc.addEventListener(ev, onFullscreen);
 
     // In by the viewer's own scroll: the rest of the way once it settles.
     const rest = () => {
@@ -152,8 +177,14 @@ export function initLandscapeFocus(doc = document) {
         w.clearTimeout(restTimer);
         restTimer = w.setTimeout(rest, REST_MS);
     };
+    // The viewer took over: a pending realign after a turn would yank them
+    // back, and a reveal they stopped half-way is no longer what they do.
     const onTouch = (e) => {
-        touching = e.type === 'touchstart';
+        touching = e.touches ? e.touches.length > 0 : e.type === 'touchstart';
+        if (e.type === 'touchstart') {
+            if (unalign) unalign();
+            if (stage && !isOn()) delete stage.dataset.focusVia;
+        }
         if (!touching) onScroll();
     };
     const TOUCH = ['touchstart', 'touchend', 'touchcancel'];
@@ -165,7 +196,8 @@ export function initLandscapeFocus(doc = document) {
         if (unalign) unalign();
         w.clearTimeout(restTimer);
         io.disconnect();
-        mq.removeEventListener('change', onTurn);
+        mq.removeEventListener('change', onRotate);
+        for (const ev of FS) doc.removeEventListener(ev, onFullscreen);
         for (const ev of WATCHED) w.removeEventListener(ev, watch);
         w.removeEventListener('scroll', onScroll);
         for (const ev of TOUCH) w.removeEventListener(ev, onTouch);

@@ -70,6 +70,10 @@ av( async function() {
         if (!e.detail || !e.detail.target || e.detail.target.id !== 'content') return;
         const file = document.getElementById('file');
         if (!file) return;
+        // A film that has the window (lib/landscapeFocus.js) came over into
+        // the new card -- the next episode, quietly: it stays where it is,
+        // and landscapeFocus puts it back at the top if the swap moved it.
+        if (document.documentElement.classList.contains('wt-focus')) return;
         const top = stickyBottom(document) + 12;
         const r = file.getBoundingClientRect();
         if (r.top >= top && r.top < window.innerHeight / 2) return;

@@ -2307,19 +2307,27 @@ input:-webkit-autofill:focus {
 }
 
 /* Focus on a film that has the window, a phone on its side
-   (lib/landscapeFocus.js): the navbar slides up out of it and what is left
-   of the screen around the stage is black -- in Safari, the strips beside
-   the notch paint the root's background. */
+   (lib/landscapeFocus.js): the navbar slides up out of it -- and, once out,
+   out of the tab order and the screen reader's reach too (visibility, after
+   the slide). The root goes black for what is outside the page: in Safari,
+   the strips beside the notch paint the root's background; the page itself
+   keeps its colour on the body. */
 .navbar-redesign {
-  transition: transform 200ms;
+  transition: transform 200ms, visibility 0s;
 }
 
 html.wt-focus .navbar-redesign {
   transform: translateY(-100%);
+  visibility: hidden;
+  transition: transform 200ms, visibility 0s 200ms;
 }
 
 html.wt-focus {
   background-color: #000;
+}
+
+html.wt-focus body {
+  background-color: var(--color-base-100);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -60,15 +60,16 @@ body:not([data-iframe-height]) .wt-preview-mount {
    (owner, 2026-10-15) -- edge to edge, and as tall as the window, in the
    page's flow. Measured on stage: the inline film was taller than the
    window on every landscape phone, its controls under the fold, and the
-   fixed navbar and status bar over 32-82% of it. The size depends on the
-   orientation only, never on the scroll, so nothing moves under the finger;
-   lib/landscapeFocus.js slides the navbar and the status bar away while the
+   fixed navbar and status bar over 32-82% of it. The size follows the
+   window -- the browser's own bars included (dvh: no strip of page under
+   the film once they hide) -- and nothing else the scroll does, so the
+   film does not move under the finger; lib/landscapeFocus.js slides the navbar and the status bar away while the
    stage covers the window ("focus"), and a scroll on leaves it. The query
    is FOCUS_MEDIA in lib/stickyStatus.js. Both sizes set, so the player's own
    aspect-ratio (Player.jsx, from the video) stands down and the film is
    letterboxed by object-fit like in fullscreen; the UA's fullscreen rules
    override all of this while fullscreen. An audio player keeps its card. */
-@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) and (min-aspect-ratio: 3/2) {
     body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) {
         width: 100vw;
         height: 100vh;
@@ -77,9 +78,13 @@ body:not([data-iframe-height]) .wt-preview-mount {
         background: #000;
     }
 
+    /* All of the margin and the width: under 640 px wide the phone rule
+       above stretches the mount 1.25rem past both sides, which here put the
+       controls off the window and panned the page sideways. */
     body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player-mount {
+        width: 100%;
         height: 100%;
-        margin-top: 0;
+        margin: 0;
     }
 
     body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player--video {

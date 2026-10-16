@@ -136,7 +136,12 @@ av(async function() {
         write();
         if (!ref) return;
         const d = ref.getBoundingClientRect().top - fixedBottom() - before;
-        if (d) window.scrollBy(0, d);
+        // Instant: a plain scrollBy is 'auto', which <html class="scroll-smooth">
+        // turns into a slide -- the film painted pushed down by the box and
+        // drifting back over ~230 ms where nothing anchors the scroll (iOS),
+        // long enough to drop a phone on its side out of focus
+        // (lib/landscapeFocus.js; review 2026-10-16).
+        if (d) window.scrollBy({ top: d, behavior: 'instant' });
     };
     const render = () => {
         if (!last || !last.view) return;
