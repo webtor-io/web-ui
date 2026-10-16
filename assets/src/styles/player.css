@@ -1055,6 +1055,12 @@ button.wt-buffering-pill:focus-visible {
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Its own width, not the shrink-to-fit one: with left: 50% an absolute
+       box may only fill the half of the picture right of its left edge, so
+       without this the pill wrapped at half the player's width -- two lines
+       for "Перевести на русский" on a 375px phone -- and max-width below
+       never came into play. */
+    width: max-content;
     max-width: calc(100% - 24px);
     padding: 6px 12px;
     border-radius: 999px;

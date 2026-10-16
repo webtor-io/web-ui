@@ -1034,6 +1034,14 @@ Under 600 px the catch-up pill drops the cue count (a sibling `.wt-catchup-text-
 `…Short` copy; CSS shows exactly one of the two), and shrinks type and paddings. The count made it
 three lines tall over the picture.
 
+Both pills (`.wt-catchup`, and the offer `.wt-catchup.wt-offer`) carry `width: max-content` under
+their `max-width`. Centred by `left: 50%` + `translateX(-50%)`, an absolute box with an automatic
+width may only fill the half of the picture right of its left edge, so until 2026-10-16 every pill
+wrapped at half the player's width — "✦ AI Перевести на русский" was two lines on a 375 px phone
+(capped at 188 px), and the `max-width` never applied. Measured in headless Chrome against
+`player.css` at 320/375/414 px: two lines (three for the Czech offer at 320) before, one line at
+206–244 px after; a 200 px player still wraps inside its edges.
+
 ## Deploy order
 
 Three things dated "2026-09-16" here are **client-side halves of contracts the other services had
