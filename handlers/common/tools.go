@@ -103,6 +103,36 @@ var Tools = []Tool{
 		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Alt: true, Paras: []string{"text"}},
 	}},
+	// "utorrent web" / "utorrent online" / "bittorrent web" — people who want
+	// a torrent client that works in the browser and ask what else does that.
+	// GSC, 28 days to 2026-10-13, all landing on the home page or the iOS
+	// page: the cluster is 16.7k impressions, 1396 clicks, avg position 9.9
+	// ("utorrent web" 1194 impr. at 11.8, "utorrent online" 1184 at 7.2,
+	// "utorrent online downloader" 346 at 3.6 with 29.5% CTR, "bittorrent
+	// web" 248 at 17.4); by country IN 2824, ES 444, US 438, RU 351, BR 238.
+	// DataForSEO monthly volume for "utorrent web": IN 27100, BR 18100,
+	// ES 8100, US 5400, FR 4400. The US SERP (2026-10-16) is weak — an AI
+	// overview, superuser, reddit, a clone page, the vendor's forum. "utorrent
+	// for iphone" stays with /watch-torrents-ios. The uTorrent Web column
+	// says only what utorrent.com and its help center say (checked
+	// 2026-10-16); recheck utorrent.com before editing it. The system-tray
+	// sentence comes from help.utorrent.com/en/support/solutions/articles/
+	// 29000022700 ("As long as µTorrent Web is running and available in
+	// your system tray, your downloads will continue"). The devices
+	// subtitle names uTorrent Lite because utorrent.com lists it for
+	// Windows, macOS, ChromeOS, iPadOS and Android — so "no uTorrent Web
+	// for Chromebook" alone would mislead. BitTorrent Web is described
+	// without naming its maker: neither site says it is the same company.
+	{Url: "utorrent-web-alternative", Title: "tool.utorrentWebAlternative.title", Benefit: "tool.utorrentWebAlternative.benefit", Description: "tool.utorrentWebAlternative.description", Sections: []AboutSection{
+		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
+		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"},
+			// The generic "no client" page answers the same need without the brand.
+			Link: &AboutLink{Url: "/online-torrent-downloader", TitleKey: "tool.onlineTorrentDownloader.title"}},
+		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"webtor", "utorrentweb"}, Cap: "cap", Footer: true},
+		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Alt: true, Items: 4},
+		{Kind: AboutChecklist, Key: "devices", Badge: "devices", Accent: "pink", Items: 4},
+		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Alt: true, Paras: []string{"text"}},
+	}},
 	// Question-shaped landings. GSC, 28 days: the "how to open/download a
 	// torrent file" queries bring ~7k impressions a month, land on the home
 	// page at positions 6-8 and convert at 1-3%, while the one question that
@@ -153,7 +183,9 @@ var Tools = []Tool{
 	}},
 	{Url: "web-torrent-client", Title: "tool.webTorrentClient.title", Benefit: "tool.webTorrentClient.benefit", Description: "tool.webTorrentClient.description", Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
-		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
+		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"},
+			// p2 ends on devices that cannot run a torrent app; the brand page is the next step.
+			Link: &AboutLink{Url: "/utorrent-web-alternative", TitleKey: "tool.utorrentWebAlternative.title"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
 	}},
 	{Url: "cloud-torrent-client", Title: "tool.cloudTorrentClient.title", Benefit: "tool.cloudTorrentClient.benefit", Description: "tool.cloudTorrentClient.description", Sections: []AboutSection{

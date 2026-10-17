@@ -27,7 +27,7 @@
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "{{ t $.Lang .Tool.Title | seoFriendly }}",
+        "name": "Webtor – {{ t $.Lang .Tool.Benefit | seoFriendly }}",
         "description": "{{ t $.Lang .Tool.Description }}",
         "url": "{{ canonicalURL $.Lang (printf "/%s" .Tool.Url) }}",
         "applicationCategory": "UtilitiesApplication",
