@@ -68,6 +68,11 @@ export function init(window, config) {
         url: encode(currentUrl),
         referrer: encode(currentRef),
         tag: tag ? tag : undefined,
+        // Same id on pageviews, events and identify, like the upstream
+        // tracker: Umami keys the session by payload.id when present, else by
+        // ip+UA+month — without it session_data and events land in two
+        // different sessions.
+        id: identity || undefined,
     });
 
     /* Event handlers */
@@ -232,14 +237,24 @@ export function init(window, config) {
         }
 
         try {
+            const sentFor = identity;
             const res = await fetch(endpoint, {
                 method: 'POST',
                 body: JSON.stringify({ type, payload }),
                 headers,
             });
-            const text = await res.text();
+            // Umami 3 answers { cache, sessionId, visitId } (bots: { beep }).
+            // The token carries sessionId + visitId: with it the server skips
+            // the session lookup and keeps the 30-minute visit; without it
+            // every hit re-creates the session and the visit becomes the
+            // hour bucket.
+            const data = await res.json();
+            // Only the identity this hit was sent for may keep its token: a
+            // reply that lands after identify() switched sessions would put
+            // the old session's token in front of the new id.
+            if (data && identity === sentFor) cache = data.cache;
 
-            return (cache = text);
+            return data;
         } catch (e) {
             /* empty */
         }
@@ -270,7 +285,8 @@ export function init(window, config) {
         return Object.keys(defaults).length ? defaults : undefined;
     };
 
-    const track = (obj, data) => {
+    const track = async (obj, data) => {
+        await identityReady;
         if (typeof obj === 'string') {
             return send({
                 ...getPayload(),
@@ -317,11 +333,18 @@ export function init(window, config) {
         } else if (idOrData && typeof idOrData === 'object') {
             data = idOrData;
         }
-        const payload = { ...getPayload() };
+        await identityReady;
         if (rawId) {
             const id = await uuidV5(rawId);
-            if (id) payload.id = id;
+            if (id !== identity) {
+                // The cache token names the previous session; with it the
+                // server would skip creating the new one and write events
+                // under a session id that has no row (upstream resets too).
+                identity = id;
+                cache = undefined;
+            }
         }
+        const payload = { ...getPayload() };
         const merged = mergeData(data);
         if (merged) payload.data = merged;
         return send(payload, 'identify');
@@ -341,6 +364,10 @@ export function init(window, config) {
     let title = document.title;
     let cache;
     let initialized;
+    // config.id (the gin session id) hashed once; track() waits for it so the
+    // first pageview carries the id too. No config.id → no id, ip+UA session.
+    let identity;
+    const identityReady = uuidV5(config.id).then(id => { identity = id; }, () => {});
 
     if (autoTrack && !trackingDisabled()) {
         if (document.readyState === 'complete') {

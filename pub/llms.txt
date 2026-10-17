@@ -50,6 +50,7 @@ As of September 2026, the site shows no third-party ads.
 - [Torrent → MP4](https://webtor.io/torrent-to-mp4): why a .torrent file needs no converter, and how to play or download the video inside it.
 - [Watch torrents online](https://webtor.io/watch-torrents-online): playing a torrent's video in the browser without downloading it first.
 - [Watch torrents on iOS](https://webtor.io/watch-torrents-ios): playing and downloading torrents on iPhone and iPad without an app.
+- [uTorrent Web alternative](https://webtor.io/utorrent-web-alternative): a torrent client that runs in any browser with nothing to install; how it compares with uTorrent Web.
 - [How to open a .torrent file](https://webtor.io/open-torrent-file): opening a .torrent file without installing a client.
 - [How to download torrented files](https://webtor.io/how-to-download-torrent-files): getting the files out of a torrent from the browser.
 - [How to open torrents on a PC](https://webtor.io/open-torrents-on-pc): opening torrents on Windows without installing a client.

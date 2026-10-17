@@ -24,8 +24,9 @@ av(async function() {
     const self = this;
     window.addEventListener('auth', function() {
         // Re-identify so the now-authed tier/is_authed/user_id props refresh
-        // in session_data under the same server session id (which stays stable
-        // across the anon→authed transition).
+        // in session_data; the session is keyed by the hashed _sessionID that
+        // every pageview and event also carries (lib/umami.js), so it is the
+        // same Umami session before and after auth.
         if (window.umami && window._sessionID) {
             window.umami.identify(window._sessionID);
         }
