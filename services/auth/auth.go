@@ -668,9 +668,10 @@ func (s *Auth) RegisterHandler(r *gin.Engine, corsExemptPrefixes ...string) {
 	// is set, so it echoes the caller's Origin into
 	// Access-Control-Allow-Origin and always emits
 	// Access-Control-Allow-Credentials: true. Since the gin session cookie
-	// is deliberately SameSite=None (see handlers/session, the embed flow
-	// needs it), that cookie rides a cross-site fetch — so any website could
-	// read the body of a page served under it, window._CSRF included.
+	// is deliberately SameSite=None on an https DOMAIN (see handlers/session,
+	// the embed flow needs it), that cookie rides a cross-site fetch — so any
+	// website could read the body of a page served under it, window._CSRF
+	// included.
 	//
 	// The site is its own only legitimate credentialed origin: APIDomain and
 	// WebsiteDomain are the same host here, and nothing cross-origin needs
@@ -743,7 +744,8 @@ func IsOpenInstance(c *gin.Context) bool {
 
 // AdminSessionKey is the session entry that records a successful password
 // login. It lives in the session store already configured in
-// handlers/session, so it inherits that cookie's HttpOnly/Secure settings.
+// handlers/session, so it inherits that cookie's settings: always HttpOnly,
+// Secure only when DOMAIN is https.
 const AdminSessionKey = "admin-authenticated"
 
 func adminSessionActive(c *gin.Context) bool {

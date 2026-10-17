@@ -63,19 +63,19 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 	} else {
 		store = cookie.NewStore([]byte(c.String(common.SessionSecretFlag)))
 	}
-	// SameSite=None + Secure is required so the session cookie survives
-	// POSTs from a cross-origin iframe (embed flow) — without it modern
-	// browsers default to SameSite=Lax which strips the cookie on POST,
-	// breaking CSRF validation on /embed. CSRF still protects us because
-	// the token itself is unguessable. Safari ITP refuses third-party
-	// cookies regardless of SameSite, so the _sessionID form-field
-	// fallback below is kept as a safety net for that case. In debug
-	// mode we stay on Lax because Secure+None is rejected on plain http.
-	sameSite := http.SameSiteNoneMode
-	secure := true
-	if gin.IsDebugging() {
-		sameSite = http.SameSiteLaxMode
-		secure = false
+	// A cross-site iframe (the embed flow) only keeps the session if the
+	// cookie is SameSite=None, which browsers accept only with Secure -- and
+	// a Secure cookie is stored only on https and localhost. So the mode
+	// follows the scheme of the configured public origin: on an http
+	// instance opened by LAN address a Secure cookie is dropped, every
+	// request starts a new session and every CSRF-checked form answers 400
+	// (self-hosted#116). Configuration, not the request: behind a TLS
+	// terminator the request reaches us as plain http.
+	sameSite, secure := http.SameSiteLaxMode, false
+	if domain := c.String(common.DomainFlag); servedOverHTTPS(domain) {
+		sameSite, secure = http.SameSiteNoneMode, true
+	} else {
+		log.Infof("DOMAIN %q is not https: the session cookie is SameSite=Lax and not Secure, so a player embedded on another site cannot keep a session; if this instance is served over https, set DOMAIN=https://...", domain)
 	}
 	store.Options(sessions.Options{
 		Path:     "/",
@@ -123,6 +123,12 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 		}))
 	})
 	return
+}
+
+// servedOverHTTPS answers whether the instance is configured to be served
+// over https -- from DOMAIN, never from a probe or the request scheme.
+func servedOverHTTPS(domain string) bool {
+	return strings.HasPrefix(strings.ToLower(domain), "https://")
 }
 
 func GetFromContext(c *gin.Context) *Session {
