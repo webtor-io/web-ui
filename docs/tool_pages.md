@@ -94,6 +94,49 @@ FAQ в `templates/partials/about.html` один на главную и все to
 ссылки на остальные гайды остаются. Новая ссылка из FAQ на гайд —
 только через этот шаблон.
 
+На гайде общий how-to пункт, полный ответ на который живёт на этом гайде,
+не рендерится вовсе — ни в списке, ни в схеме: собственный FAQ гайда задаёт
+тот же вопрос, а две `Question` с одним `name` в FAQPage позволяют Google
+взять короткий ответ. В `about.html` пара ключей каждого из четырёх пунктов
+лежит в переменной (`$openTorrent`, `$openTorrentApp` → /open-torrent-file,
+`$downloadTorrented` → /how-to-download-torrent-files, `$unzipTorrent` →
+/open-torrents-on-pc); на своём гайде она обнуляется, и одна переменная
+гасит и collapse, и пару в `faqSchema` (пустую пару он пропускает). Новый
+общий вопрос, дублирующий вопрос гайда, — по тому же образцу.
+
+Ссылка под `openTorrentApp` («What can I use to open a torrent file?») с
+2026-10-17 ведёт на /open-torrent-file, а не на /open-torrents-on-pc: тот же
+вопрос задаёт q1 этого гайда, а ответ не привязан к ПК. Это меняет главную и
+все tool-страницы, не только четыре how-to ответа.
+
+Четыре how-to ответа общего FAQ (`about.faq.openTorrent.a`,
+`openTorrentApp.a`, `downloadTorrented.a`, `unzipTorrent.a`) — **одно
+предложение плюс ссылка на гайд, намеренно** (2026-10-17). GSC за 28 дней
+до 2026-10-13: общий FAQ отвечал на вопрос целиком на главной, и Google
+отдавал под эти запросы ГЛАВНУЮ на позиции ~8 с CTR 1–2% («how to download
+torrented files» 1602 показа / 36 кликов / поз. 7.9, «how to open torrent
+files» 719, «how to open a torrent file» 718, «how to open torrented files
+on pc» 375 / поз. 8.0), а гайды получали ~35 показов каждый (ранжировался
+только /open-torrent-file, 184 клика). Полный ответ живёт только на гайде —
+в его собственном FAQ (ниже). Исключение: «how to open torrented files
+online» (130 показов, поз. 1.4, CTR 53%) главная выигрывает сама, её
+короткий ответ остаётся. Проверить расклад страниц по запросам в GSC через
+4 недели после выката.
+
+## FAQ страницы (Tool.FAQ)
+
+Страница добавляет свои вопросы под общими через `FAQ: N` в `Tools`
+(2026-10-17; до этого пять вопросов /torrent-to-ddl были захардкожены
+в `about.html` веткой `torrent_to_ddl`). Ключи —
+`<AboutKey>.faq.qN.question` / `.answer`, N = 1..FAQ (`Tool.FaqPairs`).
+Рендерятся **после** общих, одинаково в списке и в JSON-LD FAQPage:
+`toolFaq $.Data.Tool` отдаёт пары и в `faqSchema` (параметр `more`), и в
+`range` разметки — один источник, расходиться нечему. Ответ идёт через
+`tHTML`: допустим только `<strong>`, в схеме теги вырезаются. Ссылок в
+ответах не ставить: `about_faq_guide_link` и его тест считают href в
+секции FAQ. Вопрос — формулировка реального запроса из GSC, ответ — 2–3
+предложения по делу. Сейчас FAQ: 5 у /torrent-to-ddl и трёх гайдов.
+
 ## /watch-torrents-ios: сравнение с uTorrent Lite
 
 Секция `utorrent` отвечает на «utorrent for iphone»: приложения uTorrent в
@@ -140,7 +183,8 @@ iOS-странице (см. выше).
 
 1. Запись в `Tools` с `Sections`.
 2. Ключи `tool.<camelUrl>.*` во **всех** локалях (`locales/*.json`):
-   `title`, `benefit`, `description` плюс всё, что просят секции.
+   `title`, `benefit`, `description` плюс всё, что просят секции, и
+   `about.faq.qN.question/.answer`, если задан `FAQ: N`.
 3. `go test ./handlers/common/ ./services/template/` — тесты скажут, чего не
    хватает, поимённо и по каждому языку.
 4. `-update` снапшотов не требуется: новая страница добавляет свой файл сама.
@@ -158,6 +202,10 @@ iOS-странице (см. выше).
 | `services/template.TestToolHeadingIsUnchangedOutsideGuides` | H1 обычной tool-страницы отличается от прежней разметки (`Benefit`, байт в байт) |
 | `services/template.TestFreeCapLineFollowsTheCatalog` | строка `Cap` рендерится без каталога, без планов или без лимита у free-тарифа, либо цитирует не число из каталога |
 | `services/template.TestFAQDoesNotLinkAGuideToItself` | FAQ на гайде ссылается на сам гайд, или пропала ссылка на другой гайд. Рендерит весь `about.html`, а не только секции |
+| `services/template.TestFAQSectionSnapshots` | секция FAQ (разметка и пары JSON-LD) главной и каждой страницы отличается от снапшота в `services/template/testdata/faq/`. Снапшоты сняты **после** перехода на `Tool.FAQ` (2026-10-17) и пинят текущее состояние; сверка с рендером `about.html` из main сделана вручную: главная, /torrent-to-ddl и 17 страниц без своего FAQ отличаются от прежнего вывода только href под `openTorrentApp` (см. выше), три гайда — ещё снятыми с них how-to пунктами и своими вопросами. `-update` — только для файлов, которые тест назвал, и **читать диф** |
+| `services/template.TestFAQAsksEachQuestionOnce` | на какой-то странице два вопроса FAQ дают один и тот же текст в `en.json` (общий how-to пункт не снят с гайда, который на него отвечает), или список вопросов в схеме разошёлся с разметкой |
+| `services/template.TestToolFAQItemsFollowTheTool` | вопросы страницы не совпадают с `Tool.FaqPairs` в схеме или в списке, стоят не после общих, либо страница с `FAQ: 0` (главная в том числе) рендерит лишние |
+| `handlers/common.TestEveryToolHasItsCopyInEveryLocale` | ключ `title`/`benefit`/`description` или пары FAQ нет в какой-то локали — `FaqSchema` молча выкинет такой вопрос из схемы |
 
 Снапшоты, которыми обложен рефакторинг 2026-08-15, сняты **до** него: все 18
 страниц после перехода на секции рендерятся байт-в-байт (с точностью до

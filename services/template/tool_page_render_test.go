@@ -90,18 +90,44 @@ func TestToolHeadingIsUnchangedOutsideGuides(t *testing.T) {
 // registers (web.Helper, i18n.Helper, recommendations.Helper).
 func aboutPageTemplates(t *testing.T) *template.Template {
 	t.Helper()
+	return parseAboutTemplates(t, aboutPageFuncs(),
+		"../../templates/partials/about.html",
+		"../../templates/partials/about/*.html")
+}
+
+// aboutPageFuncs are aboutFuncs plus the stubs about.html itself calls.
+// faqSchema echoes its pairs as an HTML comment so a rendered FAQ section
+// shows which questions went into the JSON-LD, in order; like the real one
+// it skips an empty pair.
+func aboutPageFuncs() template.FuncMap {
 	funcs := aboutFuncs()
 	funcs["kebabToSnake"] = func(s string) string { return strings.ReplaceAll(s, "-", "_") }
-	funcs["faqSchema"] = func(lang string, pairs ...string) template.HTML { return "" }
+	funcs["faqSchema"] = func(lang string, more [][2]string, pairs ...string) template.HTML {
+		var kept []string
+		for _, p := range pairs {
+			if p != "" {
+				kept = append(kept, p)
+			}
+		}
+		for _, p := range more {
+			kept = append(kept, p[0]+"|"+p[1])
+		}
+		return template.HTML("<!--faq: " + strings.Join(kept, " ") + "-->")
+	}
+	// web.Helper.ToolFaq: nil-safe Tool.FaqPairs.
+	funcs["toolFaq"] = func(tool *hc.Tool) [][2]string {
+		if tool == nil {
+			return nil
+		}
+		return tool.FaqPairs()
+	}
 	funcs["aiEnabled"] = func() bool { return true }
 	funcs["aiFreeQuota"] = func() int { return 0 }
 	funcs["aiPaidQuota"] = func() int { return 0 }
 	funcs["blogLang"] = func(lang string) string { return lang }
 	funcs["tools"] = func() []hc.Tool { return hc.Tools }
 	funcs["apiDocsURL"] = func() string { return "" }
-	return parseAboutTemplates(t, funcs,
-		"../../templates/partials/about.html",
-		"../../templates/partials/about/*.html")
+	return funcs
 }
 
 var faqSectionRe = regexp.MustCompile(`(?s)<section id="faq".*?</section>`)
@@ -232,21 +258,15 @@ func TestFreeCapLineFollowsTheCatalog(t *testing.T) {
 // serves embeds; without it the API card spans the row it leaves.
 func TestAboutSDKCardFollowsEmbed(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
-		funcs := aboutFuncs()
-		funcs["kebabToSnake"] = func(s string) string { return strings.ReplaceAll(s, "-", "_") }
-		funcs["faqSchema"] = func(lang string, pairs ...string) template.HTML { return "" }
-		funcs["aiEnabled"] = func() bool { return true }
-		funcs["aiFreeQuota"] = func() int { return 0 }
-		funcs["aiPaidQuota"] = func() int { return 0 }
-		funcs["blogLang"] = func(lang string) string { return lang }
-		funcs["tools"] = func() []hc.Tool { return hc.Tools }
+		funcs := aboutPageFuncs()
 		funcs["apiDocsURL"] = func() string { return "/api/v1/docs/index.html" }
 		funcs["embedEnabled"] = func() bool { return enabled }
 		tpl := parseAboutTemplates(t, funcs,
 			"../../templates/partials/about.html",
 			"../../templates/partials/about/*.html")
 		var buf bytes.Buffer
-		ctx := map[string]interface{}{"Lang": "en", "Data": map[string]interface{}{"Tool": nil, "Instruction": ""}}
+		// A typed nil, as handlers/index passes it: Data.Tool is a *common.Tool.
+		ctx := map[string]interface{}{"Lang": "en", "Data": map[string]interface{}{"Tool": (*hc.Tool)(nil), "Instruction": ""}}
 		if err := tpl.ExecuteTemplate(&buf, "about", ctx); err != nil {
 			t.Fatal(err)
 		}

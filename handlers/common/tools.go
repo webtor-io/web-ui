@@ -15,12 +15,17 @@ type Tool struct {
 	// Sections is the page body, rendered by
 	// templates/partials/about/sections.html. See about.go.
 	Sections []AboutSection
+	// FAQ is how many question/answer pairs the page adds under the shared
+	// FAQ, read as <AboutKey>.faq.qN.question / .answer, N = 1..FAQ (see
+	// FaqPairs). They render after the shared questions, in the collapse
+	// list and in the FAQPage JSON-LD alike; answers go through tHTML.
+	FAQ int
 }
 
 // Tools contains the list of all available tool pages.
 // Title, Benefit, and Description are i18n message keys.
 var Tools = []Tool{
-	{Url: "torrent-to-ddl", Title: "tool.torrentToDdl.title", Benefit: "tool.torrentToDdl.benefit", Description: "tool.torrentToDdl.description", Sections: []AboutSection{
+	{Url: "torrent-to-ddl", Title: "tool.torrentToDdl.title", Benefit: "tool.torrentToDdl.benefit", Description: "tool.torrentToDdl.description", FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
 		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"torrent", "ddl"}, Footer: true},
@@ -139,21 +144,35 @@ var Tools = []Tool{
 	// has its own page (/watch-torrents-ios) converts at 7-10% from
 	// position 4. The titles are phrased as the question for that reason —
 	// what loses the click is a product headline answering a how-to query.
-	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description", Guide: true, Sections: []AboutSection{
+	//
+	// Each guide carries its own FAQ (FAQ: 5), the question being the query
+	// as people type it. GSC, 28 days to 2026-10-13: the shared FAQ answered
+	// these questions in full on the home page, so Google served the HOME
+	// page for them — "how to download torrented files" 1602 impr. / 36
+	// clicks / pos 7.9, "how to open torrent files" 719, "how to open a
+	// torrent file" 718, "how to open torrented files on pc" 375 at pos 8.0,
+	// all at 1-2% CTR — while the guides got ~35 impressions each (only
+	// /open-torrent-file ranked, 184 clicks). Since 2026-10-17 the four
+	// shared how-to answers are one sentence plus the guide link, and the
+	// full answer lives here only. The home page keeps "how to open
+	// torrented files online" (130 impr., pos 1.4, 53% CTR) with its short
+	// answer. Measure the per-query page split in GSC four weeks after
+	// deploy.
+	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description", Guide: true, FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
 		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
-	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description", Guide: true, Sections: []AboutSection{
+	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description", Guide: true, FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
 		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
-	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description", Guide: true, Sections: []AboutSection{
+	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description", Guide: true, FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
