@@ -64,17 +64,16 @@ if (window._umami) {
         const { eventDefaults, firstTouch } = await import('../lib/trackContext');
         const umami = (await import('../lib/umami')).init(window, {
             ...window._umami,
+            // Gin session cookie id, rendered in <head> before this script; the
+            // tracker hashes it to a UUID and sends it as payload.id on every
+            // pageview, event and identify, so Umami keys the session by it
+            // (same value across anon → auth → Patreon → return).
+            id: window._sessionID,
             defaultData: eventDefaults,
         });
         window.umami = umami;
-        // Identify the session here, once, before any view-specific script (nav,
-        // discover, action/*, …) fires its own track events. Server-side gin
-        // session cookie ID is rendered to window._sessionID — same value across
-        // anon → auth → Patreon → return, so the resulting distinct_id ties the
-        // whole funnel together. umami.identify hashes it to a UUID under the
-        // hood (Umami v2 validation requirement) — see lib/umami.js.
-        // The first touch goes with it as session data, not on every event
-        // (docs/analytics.md).
+        // Identify once, before any view-specific script tracks: the first
+        // touch goes as session data, not on every event (docs/analytics.md).
         if (window._sessionID) {
             umami.identify(window._sessionID, firstTouch());
         }
