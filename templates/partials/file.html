@@ -1,6 +1,8 @@
 {{ define "file" }}
 {{ with .Data }}
-<div class="bg-base-200/40 rounded-2xl p-4 sm:p-6 border border-w-line/50 mb-3">
+{{- /* group/card: the stream button reads its player's state from here
+     (partials/button.html, lib/streamToggle.js). */}}
+<div class="group/card bg-base-200/40 rounded-2xl p-4 sm:p-6 border border-w-line/50 mb-3">
     <h2 class="text-base font-semibold line-clamp-2" title="{{ .Item.Name }}">{{ .Item.Name }}</h2>
     {{- $dl := makeFileDownload $ . }}
     {{/* The buttons on a phone (owner, 2026-10-14, variant D): Watch and

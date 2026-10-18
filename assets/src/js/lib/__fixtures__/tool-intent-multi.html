@@ -17,7 +17,7 @@
     <div id="file" class="scroll-mt-18" data-status-file="/Sintel/Sintel.mp4" data-async-layout="{{ template &#34;file&#34; . }}">
       
 
-<div class="bg-base-200/40 rounded-2xl p-4 sm:p-6 border border-w-line/50 mb-3">
+<div class="group/card bg-base-200/40 rounded-2xl p-4 sm:p-6 border border-w-line/50 mb-3">
     <h2 class="text-base font-semibold line-clamp-2" title="Sintel.mp4">Sintel.mp4</h2>
     
     <p class="sm:hidden mt-0.5 text-xs text-w-muted">123 MB</p>
@@ -33,13 +33,23 @@
     <input type="hidden" name="item-id" value="item-mp4" />
     <button type="submit" class="btn btn-soft max-sm:w-full max-sm:px-2 whitespace-nowrap" data-umami-event="stream">
         <span class="inline-flex max-sm:group-data-crowded/actions:hidden">
+            <span class="inline-flex group-has-[.player[data-playing]]/card:hidden">
 
 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
     <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
 </svg>
 
 </span>
-        <span class="max-sm:truncate">Stream</span>
+            <span class="hidden group-has-[.player[data-playing]]/card:inline-flex">
+
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+</svg>
+
+</span>
+        </span>
+        <span class="max-sm:truncate group-has-[.player[data-playing]]/card:hidden">Stream</span>
+        <span class="max-sm:truncate hidden group-has-[.player[data-playing]]/card:inline">Pause</span>
     </button>
 </form>
 

@@ -442,6 +442,8 @@
     "resource.select": "Sélectionner des fichiers",
     "resource.selectCancel": "Annuler la sélection",
     "resource.stream": "Diffuser",
+    "resource.listen": "Écouter",
+    "resource.pause": "Pause",
     "resource.preview": "Aperçu",
     "resource.fileInfo": "Infos fichier",
     "resource.status.idle": "Inactif",

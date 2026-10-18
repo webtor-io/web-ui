@@ -442,6 +442,8 @@
     "resource.select": "Bestanden selecteren",
     "resource.selectCancel": "Selectie annuleren",
     "resource.stream": "Streamen",
+    "resource.listen": "Luisteren",
+    "resource.pause": "Pauzeren",
     "resource.preview": "Preview",
     "resource.fileInfo": "Bestandsinfo",
     "resource.status.idle": "Inactief",

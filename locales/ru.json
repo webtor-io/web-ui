@@ -442,6 +442,8 @@
     "resource.select": "Выбрать файлы",
     "resource.selectCancel": "Отменить выбор",
     "resource.stream": "Смотреть",
+    "resource.listen": "Слушать",
+    "resource.pause": "Пауза",
     "resource.status.idle": "Ожидает",
     "resource.status.caching": "Кэширование",
     "resource.status.cached": "В кэше",

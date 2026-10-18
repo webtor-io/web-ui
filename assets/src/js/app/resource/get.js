@@ -4,6 +4,7 @@ import { findTextCut, trimTextCut } from '../../lib/textClamp';
 import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initLandscapeFocus } from '../../lib/landscapeFocus';
 import { initToolIntent } from '../../lib/toolIntent';
+import { initStreamToggle } from '../../lib/streamToggle';
 import '../../lib/share/share';
 import { takesPart, whenDeclared, setPendingFallback } from '../../lib/player/decode-declaration';
 import { hasJob } from '../../lib/actionBusy';
@@ -52,6 +53,9 @@ av( async function() {
     // The line under the .torrent button for a visitor from a tool page
     // (partials/resource/tool_intent) — before the #action early return.
     initToolIntent(this);
+    // Watch / Listen pressed while its player plays pauses it (once per
+    // page: lib/streamToggle.js guards a second wiring).
+    initStreamToggle(document);
     // Before the early return below: the status mirror is for every visit to
     // this page, not only the ones that arrive with #action=stream.
     const stopSticky = initStickyStatus(document);

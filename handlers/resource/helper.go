@@ -89,8 +89,10 @@ func (s *Helper) MakeImage(ctx *w.Context, gd *GetData) *ButtonItem {
 	return s.MakeButton(ctx, gd, "resource.preview", "preview", "/preview-image")
 }
 
+// MakeAudio is Listen: "Watch" read wrong on a song in the languages whose
+// stream label is about watching (owner, 2026-10-18).
 func (s *Helper) MakeAudio(ctx *w.Context, gd *GetData) *ButtonItem {
-	return s.MakeButton(ctx, gd, "resource.stream", "stream", "/stream-audio")
+	return s.MakeButton(ctx, gd, "resource.listen", "stream", "/stream-audio")
 }
 
 func (s *Helper) MakeVideo(ctx *w.Context, gd *GetData) *ButtonItem {

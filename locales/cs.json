@@ -442,6 +442,8 @@
     "resource.select": "Vybrat soubory",
     "resource.selectCancel": "Zrušit výběr",
     "resource.stream": "Streamovat",
+    "resource.listen": "Poslouchat",
+    "resource.pause": "Pozastavit",
     "resource.preview": "Náhled",
     "resource.fileInfo": "Info o souboru",
     "resource.status.idle": "Nečinné",

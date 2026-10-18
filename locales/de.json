@@ -442,6 +442,8 @@
     "resource.select": "Dateien auswählen",
     "resource.selectCancel": "Auswahl aufheben",
     "resource.stream": "Streamen",
+    "resource.listen": "Anhören",
+    "resource.pause": "Pause",
     "resource.status.idle": "Bereit",
     "resource.status.caching": "Zwischenspeicherung",
     "resource.status.cached": "Zwischengespeichert",

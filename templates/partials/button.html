@@ -40,8 +40,20 @@
         {{ template "icons" .Data.Action }}
         <span class="max-sm:sr-only">{{ t .Ctx.Lang .Data.Name }}</span>
         {{- else }}
+        {{- if eq .Data.Action "stream" }}
+        {{- /* Watch / Listen pressed while its player plays pauses it, and
+             says so (lib/streamToggle.js): the player carries data-playing,
+             and the file card (file.html, group/card) swaps icon and label. */}}
+        <span class="inline-flex max-sm:group-data-crowded/actions:hidden">
+            <span class="inline-flex group-has-[.player[data-playing]]/card:hidden">{{ template "icons" .Data.Action }}</span>
+            <span class="hidden group-has-[.player[data-playing]]/card:inline-flex">{{ template "icons" "pause" }}</span>
+        </span>
+        <span class="max-sm:truncate group-has-[.player[data-playing]]/card:hidden">{{ t .Ctx.Lang .Data.Name }}</span>
+        <span class="max-sm:truncate hidden group-has-[.player[data-playing]]/card:inline">{{ t .Ctx.Lang "resource.pause" }}</span>
+        {{- else }}
         <span class="inline-flex max-sm:group-data-crowded/actions:hidden">{{ template "icons" .Data.Action }}</span>
         <span class="max-sm:truncate">{{ t .Ctx.Lang .Data.Name }}</span>{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
+        {{- end }}
         {{- end }}
     </button>
 </form>

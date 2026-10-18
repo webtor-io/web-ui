@@ -442,6 +442,8 @@
     "resource.select": "Wybierz pliki",
     "resource.selectCancel": "Anuluj wybór",
     "resource.stream": "Oglądaj",
+    "resource.listen": "Słuchaj",
+    "resource.pause": "Pauza",
     "resource.preview": "Podgląd",
     "resource.fileInfo": "Info o pliku",
     "resource.status.idle": "Bezczynny",

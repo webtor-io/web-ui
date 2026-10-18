@@ -442,6 +442,8 @@
     "resource.select": "Dosya seç",
     "resource.selectCancel": "Seçimi iptal et",
     "resource.stream": "İzle",
+    "resource.listen": "Dinle",
+    "resource.pause": "Duraklat",
     "resource.preview": "Önizleme",
     "resource.fileInfo": "Dosya bilgisi",
     "resource.status.idle": "Boşta",

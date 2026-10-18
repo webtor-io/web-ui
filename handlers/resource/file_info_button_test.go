@@ -58,3 +58,31 @@ func TestFileCardFileInfoButton(t *testing.T) {
 		}
 	}
 }
+
+// Watch on a video, Listen on an audio file (owner, 2026-10-18), and on both
+// the Pause pair the card swaps in while the player plays
+// (lib/streamToggle.js): hidden until the card has a playing .player.
+func TestFileCardStreamButtonLabels(t *testing.T) {
+	tpl := resourceTemplates(t)
+	for _, c := range []struct {
+		format     ra.MediaFormat
+		label, not string
+	}{{ra.Video, "Смотреть", "Слушать"}, {ra.Audio, "Слушать", "Смотреть"}} {
+		gd := intentPage("", false)
+		gd.Item.MediaFormat = c.format
+		out := execute(t, tpl, "file", pageContext("ru", gd))
+		for _, w := range []string{
+			`<div class="group/card `,
+			`<span class="max-sm:truncate group-has-[.player[data-playing]]/card:hidden">` + c.label + `</span>`,
+			`<span class="max-sm:truncate hidden group-has-[.player[data-playing]]/card:inline">Пауза</span>`,
+			`d="M15.75 5.25v13.5m-7.5-13.5v13.5"`,
+		} {
+			if !strings.Contains(out, w) {
+				t.Errorf("%q: missing %q", c.format, w)
+			}
+		}
+		if strings.Contains(out, ">"+c.not+"</span>") {
+			t.Errorf("%q: says %q", c.format, c.not)
+		}
+	}
+}
