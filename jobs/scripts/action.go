@@ -1870,7 +1870,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		if terr != nil {
 			return terr
 		}
-		log.WithError(err).WithField("reason", data.Reason).WithField("peers", data.Peers).WithField("bytes", data.BytesRaw).WithField("elapsed_s", data.ElapsedSec).Warn("no peers / warmup deadline — surfacing CTA")
+		log.WithError(err).WithField("action", s.action).WithField("reason", data.Reason).WithField("peers", data.Peers).WithField("bytes", data.BytesRaw).WithField("elapsed_s", data.ElapsedSec).Warn("no peers / warmup deadline — surfacing CTA")
 		// The card's "Try again" -- and the page's own button -- mean a fresh
 		// warm-up. The run returns nil, so without this its log stayed in
 		// storage for the rest of the job's life: a press later than the 60 s
