@@ -16,13 +16,17 @@
 {{- $log = printf "log-%s-download" .Data.ID }}
 {{- $modal = printf "download-modal-%s" .Data.ID }}
 {{- end }}
-<form class="{{ .Data.Action }} max-sm:flex-1 max-sm:min-w-0" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
+{{- /* File info is the third action of the row: on a phone an icon beside
+     Watch and Download, like the watched toggle, its label for screen
+     readers and the tooltip -- three labels do not fit 360 px. */}}
+{{- $icon := eq .Data.Action "file-info" }}
+<form class="{{ .Data.Action }} {{ if $icon }}shrink-0{{ else }}max-sm:flex-1 max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
       {{- if $modal }} onsubmit="var d=document.getElementById('{{ $modal }}');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('{{ $modal }}');if(d&&!d.open&&this.dataset.busy)d.showModal()"{{ end }}>
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
-    <button type="submit" class="btn btn-soft whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="{{ .Data.Action }}">
+    <button type="submit" class="btn btn-soft whitespace-nowrap {{ if $icon }}max-sm:w-11 max-sm:px-0{{ else }}max-sm:w-full max-sm:px-3{{ end }}" data-umami-event="{{ .Data.Action }}"{{ if $icon }} title="{{ t .Ctx.Lang .Data.Name }}"{{ end }}>
         {{ template "icons" .Data.Action }}
-        {{ t .Ctx.Lang .Data.Name }}{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
+        {{ if $icon }}<span class="max-sm:sr-only">{{ t .Ctx.Lang .Data.Name }}</span>{{ else }}{{ t .Ctx.Lang .Data.Name }}{{ end }}{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
     </button>
 </form>
 {{ end }}

@@ -1,17 +1,82 @@
 package scripts
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/pkg/errors"
+	ra "github.com/webtor-io/rest-api/services"
 	"golang.org/x/text/language"
 
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/statusview"
+	"github.com/webtor-io/web-ui/services/web"
 )
+
+// fileInfoProbeTimeout bounds the probe as streamContent bounds its own.
+const fileInfoProbeTimeout = time.Minute
+
+// fileInfo is the "File info" job (docs/file_info.md): export, then the ~cp
+// probe, then the card. No warm-up, the way services/thumbnail probes: a
+// probe content-prober already holds costs nothing, and since content-prober
+// 030c8ee a probe this job gives up on is not cached as the file's failure,
+// so it cannot break the next Watch. No thumbnail, no transcoder session,
+// nothing stored -- and no URL in the card: the job log is public (ACAO *).
+func (s *ActionScript) fileInfo(ctx context.Context, j *job.Job, c *web.Context, resourceID string, itemID string) error {
+	j.InProgress(s.t("job.retrievingDownloadLink"))
+	exportCtx, exportCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer exportCancel()
+	resp, err := s.api.ExportResourceContent(exportCtx, c.ApiClaims, resourceID, itemID, "")
+	if err != nil {
+		// A stoplisted file is refused here (403, error.forbidden).
+		return errors.Wrap(err, "failed to retrieve download link")
+	}
+	// rest-api's 404 comes back as no error and no exports (api.doRequest).
+	if resp == nil || resp.ExportItems["download"].URL == "" {
+		return errors.New("resource not found: no download link")
+	}
+	// The button is only on video and audio; this is a hand-made POST.
+	if f := resp.Source.MediaFormat; f != ra.Video && f != ra.Audio {
+		return web.NewUserError("error.probe_failed", errors.Errorf("file info for media format %q", f))
+	}
+	j.Done()
+	j.InProgress(s.t("job.probingMedia"))
+	probeCtx, probeCancel := context.WithTimeout(ctx, fileInfoProbeTimeout)
+	defer probeCancel()
+	mp, err := s.api.GetMediaProbe(probeCtx, contentProbeURL(resp.ExportItems["download"].URL))
+	if err != nil {
+		return probeError(err)
+	}
+	j.Done()
+	return s.renderActionTemplate(j, c, buildFileInfo(mp), "file_info")
+}
+
+// probeError says whose failure a failed probe is:
+//   - content-prober's 500 "probing failed" is the file's (error.probe_failed)
+//     -- unless ffprobe was cut off (canceled, deadline), which says nothing
+//     about the file;
+//   - anything else is ours (error.upstream_unavailable): thp's 502 when
+//     content-prober is down, thp's empty 500 when it cannot resolve the
+//     source, a transport error. error.probe_failed would blame the file.
+//
+// Our own 60 s deadline (the swarm did not deliver the head in time) still
+// reaches ErrorWrapperScript as a deadline through UserError's Unwrap, and
+// becomes the no-peers "timeout" card with a retry
+// (TestFileInfoProbeError).
+func probeError(err error) error {
+	msg := err.Error()
+	if strings.Contains(msg, "probing failed") &&
+		!strings.Contains(msg, "context canceled") && !strings.Contains(msg, "deadline exceeded") {
+		return errors.Wrap(err, "failed to get probe data")
+	}
+	return web.NewUserError("error.upstream_unavailable", errors.Wrap(err, "media prober unavailable"))
+}
 
 // FileInfo is what the "File info" card (action/file_info) shows of a
 // file's probe: what the FILE declares, for someone about to download it and

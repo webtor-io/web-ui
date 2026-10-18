@@ -1099,10 +1099,10 @@ func (s *ActionScript) streamVideo(ctx context.Context, j *job.Job, c *web.Conte
 	return s.streamContent(ctx, j, c, resourceID, itemID, "stream_video", settings, vsud, dsd)
 }
 
-func (s *ActionScript) renderActionTemplate(j *job.Job, c *web.Context, sc *StreamContent, name string) error {
+func (s *ActionScript) renderActionTemplate(j *job.Job, c *web.Context, data any, name string) error {
 	actionTemplate := "action/" + name
 	tpl := s.tb.Build(actionTemplate).WithLayoutBody(`{{ template "main" . }}`)
-	str, err := tpl.ToString(c.WithData(sc))
+	str, err := tpl.ToString(c.WithData(data))
 	if err != nil {
 		return err
 	}
@@ -1759,6 +1759,8 @@ func (s *ActionScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return s.streamAudio(ctx, j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
 	case "stream-video":
 		return s.streamVideo(ctx, j, s.c, s.resourceId, s.itemId, s.settings, s.vsud, s.dsd)
+	case "file-info":
+		return s.fileInfo(ctx, j, s.c, s.resourceId, s.itemId)
 	}
 	return
 }
@@ -1789,6 +1791,8 @@ func actionEndpoint(action string) string {
 		return "/preview-image"
 	case "download":
 		return "/download-file"
+	case "file-info":
+		return "/file-info"
 	}
 	return ""
 }

@@ -1,0 +1,78 @@
+{{ define "main" }}
+{{/* File info (jobs/scripts/file_info.go, docs/file_info.md): what the file
+     declares, for a viewer about to download it. Read-only facts, so static
+     labels (Discover's cyan label), not the player's clickable track chips.
+     The job log replaying this is public (Access-Control-Allow-Origin *): no
+     URL may ever appear here. Titles are free text from the file -- escaped
+     like everything else, never |safe. */}}
+{{ $lang := $.Lang }}
+{{- /* A language the file names: its name in the page's language
+     (langDisplayIn; a bare code outside the 45 it knows). None named: said
+     so, never guessed. */}}
+{{ with .Data }}
+<div class="rounded-xl bg-base-300/20 border border-w-line/40 p-4 text-sm" data-file-info>
+    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h3 class="font-semibold text-base text-base-content flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 shrink-0 text-w-cyan" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+            {{ t $lang "resource.fileInfo" }}
+        </h3>
+        {{- with .Duration }}
+        <span class="text-xs text-w-sub tabular-nums">{{ t $lang "action.fileInfo.duration" }}: {{ . }}</span>
+        {{- end }}
+    </div>
+
+    {{- if .Video }}
+    <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.fileInfo.video" }}</h4>
+    <ul class="mt-1.5 space-y-1">
+        {{- range .Video }}
+        <li class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span class="font-medium">{{ .Codec }}</span>
+            {{- if .Width }}<span class="text-w-sub tabular-nums">{{ .Width }}×{{ .Height }}</span>{{ end }}
+            {{- with .HDR }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ . }}</span>{{ end }}
+            {{- with .BitrateLabel $lang }}<span class="text-w-sub tabular-nums">{{ tp $lang "resource.status.mbps" "N" . }}</span>{{ end }}
+        </li>
+        {{- end }}
+    </ul>
+    {{- end }}
+
+    <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.stream.audio" }}</h4>
+    {{- if .Audio }}
+    <ul class="mt-1.5 space-y-1.5">
+        {{- range .Audio }}
+        <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-audio>
+            <span class="font-medium">{{ if .Lang }}{{ $d := langDisplayIn $lang .Lang }}{{ or $d.Localized $d.Code }}{{ else }}<span class="text-w-muted">{{ t $lang "action.fileInfo.langUnknown" }}</span>{{ end }}</span>
+            {{- if .Default }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium" data-file-info-default>{{ t $lang "action.fileInfo.default" }}</span>{{ end }}
+            <span class="text-w-sub">{{ .Codec }}{{ with .Channels }} · {{ . }}{{ end }}</span>
+            {{- with .Title }}<span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]" title="{{ . }}">{{ . }}</span>{{ end }}
+        </li>
+        {{- end }}
+    </ul>
+    {{- else }}
+    <p class="mt-1.5 text-w-sub">{{ t $lang "action.fileInfo.noAudio" }}</p>
+    {{- end }}
+
+    <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.stream.subtitles" }}</h4>
+    {{- if .Subtitles }}
+    <ul class="mt-1.5 space-y-1.5">
+        {{- range .Subtitles }}
+        <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-subtitle>
+            <span class="font-medium">{{ if .Lang }}{{ $d := langDisplayIn $lang .Lang }}{{ or $d.Localized $d.Code }}{{ else }}<span class="text-w-muted">{{ t $lang "action.fileInfo.langUnknown" }}</span>{{ end }}</span>
+            {{- if .Default }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium" data-file-info-default>{{ t $lang "action.fileInfo.default" }}</span>{{ end }}
+            {{- if .SDH }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.fileInfo.sdh" }}</span>{{ end }}
+            {{- if .Forced }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.stream.badge.forced" }}</span>{{ end }}
+            <span class="text-w-sub">{{ .Codec }}</span>
+            {{- if .Picture }}<span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.fileInfo.picture" }}</span>{{ end }}
+            {{- with .Title }}<span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]" title="{{ . }}">{{ . }}</span>{{ end }}
+        </li>
+        {{- end }}
+    </ul>
+    {{- else }}
+    <p class="mt-1.5 text-w-sub">{{ t $lang "action.fileInfo.noSubtitles" }}</p>
+    {{- end }}
+
+    <p class="mt-4 text-xs text-w-muted leading-relaxed">{{ t $lang "action.fileInfo.hint" }}</p>
+</div>
+{{ end }}
+{{ end }}

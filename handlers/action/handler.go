@@ -107,6 +107,11 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], jobs *j.
 	r.POST("/stream-video", func(c *gin.Context) {
 		h.post(c, "stream-video")
 	})
+	// What is inside the file, before a download (docs/file_info.md): a job
+	// start like the others -- Turnstile for anonymous starts included.
+	r.POST("/file-info", func(c *gin.Context) {
+		h.post(c, "file-info")
+	})
 	r.PUT("/stream-video/subtitle", func(c *gin.Context) {
 		if err := putTrackChoice(c, trackSubtitle); err != nil {
 			_ = c.Error(err)

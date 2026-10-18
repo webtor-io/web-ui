@@ -14,6 +14,13 @@
     <div class="flex gap-2 mt-3 sm:mt-4 sm:flex-wrap sm:gap-3">
         {{ template "stream_button" $ }}
         {{ template "button" withContext $ $dl }}
+        {{/* What is inside the file before a download: audio tracks,
+             embedded subtitles, video (docs/file_info.md). Its card goes to
+             the card's log below, the player's: it replaces a playing
+             player, and Watch replaces it. */}}
+        {{ if or (eq .Item.MediaFormat "video") (eq .Item.MediaFormat "audio") }}
+        {{ template "button" withContext $ (makeFileInfo $ .) }}
+        {{ end }}
         {{/* Watched toggle for movies / episodes. Shown only for enriched files.
              Targets "main" so the file-list toggle and header button stay in sync
              after click (they all read the same user_video_status state). */}}
