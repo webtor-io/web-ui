@@ -702,6 +702,7 @@
     "action.fileInfo.langUnknown": "Dil belirtilmemiş",
     "action.fileInfo.noAudio": "Dosyada ses parçası yok",
     "action.fileInfo.noSubtitles": "Dosyada gömülü altyazı yok",
+    "action.fileInfo.cc": "Video akışında gizli altyazı (CC)",
     "action.fileInfo.hint": "“Varsayılan”, tercih edilen dil ayarlanmamış bir oynatıcının başladığı parçadır; dil ayarlıysa başka bir parça seçebilir.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Daha fazla dil",

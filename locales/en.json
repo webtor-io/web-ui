@@ -789,6 +789,8 @@
     "action.fileInfo.langUnknown": "Language not specified",
     "action.fileInfo.noAudio": "No audio tracks in the file",
     "action.fileInfo.noSubtitles": "No subtitles inside the file",
+    "@action.fileInfo.cc": "Row under Subtitles in the File info card: the file has no subtitle track, but its VIDEO stream carries closed captions (CEA-608/708) that a desktop player like VLC can show. 'CC' stays as is.",
+    "action.fileInfo.cc": "Closed captions (CC) in the video stream",
     "action.fileInfo.hint": "“Default” is the track a player starts with when no preferred language is set in it; a player set to a language may pick another one.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "More languages",

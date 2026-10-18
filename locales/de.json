@@ -702,6 +702,7 @@
     "action.fileInfo.langUnknown": "Sprache nicht angegeben",
     "action.fileInfo.noAudio": "Die Datei hat keine Tonspuren",
     "action.fileInfo.noSubtitles": "Keine eingebetteten Untertitel in der Datei",
+    "action.fileInfo.cc": "Closed Captions (CC) im Videostream",
     "action.fileInfo.hint": "„Standard“ ist die Spur, mit der ein Player ohne bevorzugte Sprache startet; ist eine Sprache eingestellt, kann er eine andere wählen.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Weitere Sprachen",

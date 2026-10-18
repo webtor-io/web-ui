@@ -702,6 +702,7 @@
     "action.fileInfo.langUnknown": "Taal niet opgegeven",
     "action.fileInfo.noAudio": "Het bestand heeft geen audiosporen",
     "action.fileInfo.noSubtitles": "Geen ingebouwde ondertitels in het bestand",
+    "action.fileInfo.cc": "Closed captions (CC) in de videostream",
     "action.fileInfo.hint": "‘Standaard’ is het spoor waarmee een speler zonder voorkeurstaal begint; met een ingestelde taal kan hij een ander kiezen.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Meer talen",

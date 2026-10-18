@@ -256,7 +256,10 @@ type MediaProbe struct {
 		// (jobs/scripts/file_info.go); the player still guesses "forced"
 		// from the title (handlers/action/helper.go).
 		ColorTransfer string `json:"color_transfer,omitempty"`
-		Disposition   struct {
+		// ClosedCaptions is 1 on a video stream carrying CEA-608/708
+		// captions: they are not a subtitle stream of their own.
+		ClosedCaptions int `json:"closed_captions,omitempty"`
+		Disposition    struct {
 			Default         int `json:"default"`
 			Forced          int `json:"forced"`
 			HearingImpaired int `json:"hearing_impaired"`

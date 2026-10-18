@@ -13,7 +13,9 @@ import (
 // (`audioDefault < 0 &&`) removed, "every track flagged" goes red -- the last
 // track wins; with the no-flag fallback removed, "no flag" goes red; without
 // the SDH title fallback the subtitles case, without the attached_pic skip
-// the cover-art case.
+// the cover-art case. Without the denied-word guard (titleSays) or the "."
+// in sdhTitleRe's boundary, the denied-word case goes red; without the
+// closed_captions read, the captions case.
 func TestBuildFileInfo(t *testing.T) {
 	type tr = FileInfoTrack
 	cases := []struct {
@@ -73,6 +75,35 @@ func TestBuildFileInfo(t *testing.T) {
 				{Title: "Unforced Accessible", Codec: "SRT"},
 				{Codec: "HDMV_TEXT_SUBTITLE"},
 			}},
+		},
+		{
+			name: "a denied word is no badge; a .cc domain is not CC",
+			probe: `{"streams":[
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English (Non-SDH)"}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"No SDH"}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English SDH (no forced)"}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"Non-Forced"}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"Subs by site.cc"}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English [CC]"}}]}`,
+			want: FileInfo{Subtitles: []tr{
+				{Lang: "en", Title: "English (Non-SDH)", Codec: "SRT"},
+				{Lang: "en", Title: "No SDH", Codec: "SRT"},
+				{Lang: "en", Title: "English SDH (no forced)", Codec: "SRT", SDH: true},
+				{Lang: "en", Title: "Non-Forced", Codec: "SRT"},
+				{Lang: "en", Title: "Subs by site.cc", Codec: "SRT"},
+				{Lang: "en", Title: "English [CC]", Codec: "SRT", SDH: true},
+			}},
+		},
+		{
+			name: "captions inside the video stream (CEA-608/708) are said, with no subtitle stream",
+			probe: `{"streams":[
+				{"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"closed_captions":1},
+				{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}}]}`,
+			want: FileInfo{
+				Video:          []FileInfoVideo{{Codec: "H264", Width: 1920, Height: 1080}},
+				Audio:          []tr{{Lang: "en", Codec: "AAC", Default: true}},
+				ClosedCaptions: true,
+			},
 		},
 		{
 			name: "cover art is not a video stream; HLG; container bitrate is not the stream's",

@@ -732,6 +732,7 @@
     "action.fileInfo.langUnknown": "Jazyk neuveden",
     "action.fileInfo.noAudio": "Soubor nemá žádné zvukové stopy",
     "action.fileInfo.noSubtitles": "Soubor nemá vložené titulky",
+    "action.fileInfo.cc": "Skryté titulky (CC) ve video streamu",
     "action.fileInfo.hint": "„Výchozí“ je stopa, kterou přehrávač spustí, když v něm není nastaven preferovaný jazyk; s nastaveným jazykem může vybrat jinou.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Další jazyky",

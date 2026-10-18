@@ -92,6 +92,13 @@ func TestFileInfoCardRenders(t *testing.T) {
 		}
 	}
 
+	// Captions in the video stream and no subtitle track: the row, not "no
+	// subtitles".
+	cc := renderModal(t, tpl, "en", &ctx{Lang: "en", Data: &FileInfo{ClosedCaptions: true}})
+	if !strings.Contains(cc, "Closed captions (CC) in the video stream") || strings.Contains(cc, "No subtitles") {
+		t.Errorf("closed captions:\n%s", cc)
+	}
+
 	ru := renderModal(t, tpl, "ru", &ctx{Lang: "ru", Data: full})
 	for _, w := range []string{"О файле", "русский", "Язык не указан", "8,4\u00a0Мбит/с", "по умолчанию"} {
 		if !strings.Contains(ru, w) {
@@ -99,7 +106,7 @@ func TestFileInfoCardRenders(t *testing.T) {
 		}
 	}
 	for _, lang := range i18n.SupportedLangs {
-		for _, d := range []*FileInfo{full, {}} {
+		for _, d := range []*FileInfo{full, {}, {ClosedCaptions: true}} {
 			if o := renderModal(t, tpl, lang, &ctx{Lang: lang, Data: d}); strings.Contains(o, "fileInfo.") || strings.Contains(o, "action.stream.") || strings.Contains(o, "resource.status.") {
 				t.Errorf("lang=%s: unresolved key:\n%s", lang, o)
 			}

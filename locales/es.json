@@ -702,6 +702,7 @@
     "action.fileInfo.langUnknown": "Idioma no indicado",
     "action.fileInfo.noAudio": "El archivo no tiene pistas de audio",
     "action.fileInfo.noSubtitles": "El archivo no tiene subtítulos incrustados",
+    "action.fileInfo.cc": "Subtítulos ocultos (CC) en la pista de vídeo",
     "action.fileInfo.hint": "«Por defecto» es la pista con la que empieza un reproductor sin idioma preferido; si tiene uno configurado, puede elegir otra.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Más idiomas",

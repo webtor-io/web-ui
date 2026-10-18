@@ -706,6 +706,7 @@
     "action.fileInfo.langUnknown": "Lingua non indicata",
     "action.fileInfo.noAudio": "Il file non ha tracce audio",
     "action.fileInfo.noSubtitles": "Nessun sottotitolo incorporato nel file",
+    "action.fileInfo.cc": "Sottotitoli CC nel flusso video",
     "action.fileInfo.hint": "«Predefinita» è la traccia con cui parte un player senza lingua preferita; se ne ha una impostata, può sceglierne un'altra.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Altre lingue",

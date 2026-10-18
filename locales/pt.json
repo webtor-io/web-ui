@@ -706,6 +706,7 @@
     "action.fileInfo.langUnknown": "Idioma não indicado",
     "action.fileInfo.noAudio": "O arquivo não tem faixas de áudio",
     "action.fileInfo.noSubtitles": "Nenhuma legenda embutida no arquivo",
+    "action.fileInfo.cc": "Legendas ocultas (CC) no fluxo de vídeo",
     "action.fileInfo.hint": "“Padrão” é a faixa com que um player começa sem idioma preferido definido; com um idioma definido, ele pode escolher outra.",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Mais idiomas",

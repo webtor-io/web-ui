@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
 	"golang.org/x/text/language"
 
@@ -75,8 +76,19 @@ func probeError(err error) error {
 		!strings.Contains(msg, "context canceled") && !strings.Contains(msg, "deadline exceeded") {
 		return errors.Wrap(err, "failed to get probe data")
 	}
+	// UserError's Error() is its key, so the top-level "user error shown"
+	// line would carry only error.upstream_unavailable: the status, body or
+	// transport error that tells these cases apart is logged here. Capped:
+	// an unparsable 200 quotes the probe body, whose format.filename is the
+	// source URL, after the streams.
+	if len(msg) > probeErrorLogMax {
+		msg = msg[:probeErrorLogMax]
+	}
+	log.WithField("cause", msg).Warn("file info: media prober unavailable")
 	return web.NewUserError("error.upstream_unavailable", errors.Wrap(err, "media prober unavailable"))
 }
+
+const probeErrorLogMax = 200
 
 // FileInfo is what the "File info" card (action/file_info) shows of a
 // file's probe: what the FILE declares, for someone about to download it and
@@ -90,6 +102,9 @@ type FileInfo struct {
 	Video     []FileInfoVideo
 	Audio     []FileInfoTrack
 	Subtitles []FileInfoTrack
+	// ClosedCaptions: a video stream carries CEA-608/708 captions -- no
+	// subtitle stream, yet VLC shows them.
+	ClosedCaptions bool
 }
 
 type FileInfoVideo struct {
@@ -114,7 +129,9 @@ func (v FileInfoVideo) BitrateLabel(lang string) string {
 
 type FileInfoTrack struct {
 	// Lang is the canonical tag ("en" for "eng"); "" when the file does not
-	// say. Never guessed: an untagged track is not English.
+	// say. Never guessed by us: an untagged track is not English. (The
+	// Matroska spec defaults an absent Language element to "eng"; whether
+	// ffprobe then reports "eng" is not checked.)
 	Lang  string
 	Title string
 	Codec string
@@ -152,9 +169,22 @@ var subtitleCodecNames = map[string]string{
 // word of its own, underscores counting as separators.
 var forcedTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])forced($|[^a-z0-9])`)
 
-// sdhTitleRe: "SDH" or "CC" as a word of its own. 27 of 303 live probes
-// (2026-10-18) named SDH in the title, 19 set the disposition flag.
-var sdhTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])(sdh|cc)($|[^a-z0-9])`)
+// sdhTitleRe: "SDH" or "CC" as a word of its own -- not a ".cc" domain. 27
+// of 303 live probes (2026-10-18) named SDH in the title, 19 set the
+// disposition flag.
+var sdhTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9.])(sdh|cc)($|[^a-z0-9])`)
+
+// The same words denied: "Non-SDH", "No SDH", "not forced" name the track
+// a viewer has to rule out. (The player's forcedTitleRe has no such guard.)
+var (
+	forcedDeniedRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])(non|no|not)[\s_-]*forced($|[^a-z0-9])`)
+	sdhDeniedRe    = regexp.MustCompile(`(?i)(^|[^a-z0-9])(non|no|not)[\s_-]*(sdh|cc)($|[^a-z0-9])`)
+)
+
+// titleSays: the title names the word and does not deny it.
+func titleSays(title string, re, denied *regexp.Regexp) bool {
+	return re.MatchString(title) && !denied.MatchString(title)
+}
 
 // buildFileInfo turns a probe into the card. The default rule is what a
 // player with no preferred language does: the first track flagged default,
@@ -170,6 +200,9 @@ func buildFileInfo(mp *api.MediaProbe) *FileInfo {
 		case "video":
 			if s.Disposition.AttachedPic == 1 {
 				continue
+			}
+			if s.ClosedCaptions == 1 {
+				fi.ClosedCaptions = true
 			}
 			fi.Video = append(fi.Video, FileInfoVideo{
 				Codec:  strings.ToUpper(s.CodecName),
@@ -201,8 +234,8 @@ func buildFileInfo(mp *api.MediaProbe) *FileInfo {
 				Title:   s.Tags.Title,
 				Codec:   codec,
 				Picture: pictureSubtitleCodecs[s.CodecName],
-				Forced:  s.Disposition.Forced == 1 || forcedTitleRe.MatchString(s.Tags.Title),
-				SDH:     s.Disposition.HearingImpaired == 1 || sdhTitleRe.MatchString(s.Tags.Title),
+				Forced:  s.Disposition.Forced == 1 || titleSays(s.Tags.Title, forcedTitleRe, forcedDeniedRe),
+				SDH:     s.Disposition.HearingImpaired == 1 || titleSays(s.Tags.Title, sdhTitleRe, sdhDeniedRe),
 			})
 		}
 	}
