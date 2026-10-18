@@ -49,7 +49,12 @@ value would be a series kept for the life of the process.
   `context.Canceled` and is counted here too. During a DB incident, 499s that
   rise with `pg: connection pool timeout` errors are the incident's tail.
 - `job` is the queue name: `load`, `enrich`, `embded`, `payment`, and the
-  action names (`stream-video`, `stream-audio`, `download`, `preview-image`).
+  action names (`stream-video`, `stream-audio`, `download`, `preview-image`,
+  `file-info`). For `file-info`, `error` is how often the probe without a
+  warm-up fails for the file or the prober (docs/file_info.md); a probe that
+  ran out of time ends in the no-peers card, which returns nil and counts as
+  `ok` -- that share is not in this counter (Loki:
+  `{app="web-ui"} |= "no peers / warmup deadline" |= "action=file-info"`).
 - `lang` on the paywall counter is one of the locale codes a clip was rendered
   for (the English fallback included), never the account's raw setting;
   `campaign` on the trial counter collapses every `utm_campaign` but

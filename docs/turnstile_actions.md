@@ -1,7 +1,8 @@
 # Turnstile on job starts
 
 Since 2026-09-09 an anonymous start of a job — `POST /download-file`,
-`/download-dir`, `/preview-image`, `/stream-audio`, `/stream-video` — must
+`/download-dir`, `/preview-image`, `/stream-audio`, `/stream-video`, and
+since 2026-10 `/file-info` (docs/file_info.md) — must
 carry a Cloudflare Turnstile token in `cf-turnstile-response`. Signed-in users
 are not asked. Without the action key pair (`TURNSTILE_ACTION_SITE_KEY` /
 `TURNSTILE_ACTION_SECRET_KEY`) nothing is checked and no widget is rendered —
@@ -22,7 +23,7 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
   client address from `CF-Connecting-IP` (the ingress does not restore it).
   Failure answers the usual card, `error.turnstile_failed`, 400.
 - `assets/src/js/lib/turnstileAction.js`: capture-phase interception of the
-  five forms, token into a hidden input, re-submit. Two widgets: a *warm*
+  six forms, token into a hidden input, re-submit. Two widgets: a *warm*
   one rendered at page load into the hidden `#turnstile-action`
   (layouts/main), so the silent path costs one `execute()`; and, when
   Cloudflare wants a click, a *live* one rendered fresh inside the form's

@@ -8,8 +8,8 @@ page has to say "working" where the eye is.
 
 ## Busy job-start buttons — `lib/actionBusy.js`
 
-The five job starts (`/download-file`, `/download-dir`, `/preview-image`, `/stream-audio`,
-`/stream-video`). While the job runs the form carries `data-busy="true"`; its button keeps
+The six job starts (`/download-file`, `/download-dir`, `/preview-image`, `/stream-audio`,
+`/stream-video`, `/file-info`). While the job runs the form carries `data-busy="true"`; its button keeps
 its label, swaps its icon for a spinner and gets `.btn-busy` (dimmed, `pointer-events:
 none`, `aria-busy`) — **not** `disabled`: it is working, not refusing. The job log stays
 where it is, under the buttons.
