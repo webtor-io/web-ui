@@ -170,7 +170,8 @@ func TestFileInfoBitrateLabel(t *testing.T) {
 // The raw view is ffprobe's JSON minus the one field that is ours, not the
 // file's: format.filename, the ~cp source URL with its credentials.
 // Negative control (run 2026-10-18): without the delete, the filename case
-// goes red; without RedactURL, the tag case.
+// goes red; without RedactURL, the tag case; with the map's own order, the
+// order case.
 func TestRawProbeJSON(t *testing.T) {
 	got := rawProbeJSON([]byte(`{"streams":[{"index":0,"codec_name":"h264","tags":{"comment":"see https://x.example/?token=abc123"}}],
 		"format":{"filename":"https://thp.example/h/f.mkv~cp?api-key=k1&token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl","format_name":"matroska,webm","bit_rate":"4000000"}}`))
@@ -183,6 +184,14 @@ func TestRawProbeJSON(t *testing.T) {
 		if strings.Contains(got, leak) {
 			t.Errorf("leaks %q:\n%s", leak, got)
 		}
+	}
+	// ffprobe's order: the tracks first, then chapters, then format.
+	if s, c, f := strings.Index(got, `"streams"`), strings.Index(got, `"chapters"`), strings.Index(got, `"format"`); !(s < f) {
+		t.Errorf("streams after format (streams %d, chapters %d, format %d):\n%s", s, c, f, got)
+	}
+	ordered := rawProbeJSON([]byte(`{"format":{},"chapters":[],"streams":[],"programs":[]}`))
+	if s, c, f, p := strings.Index(ordered, `"streams"`), strings.Index(ordered, `"chapters"`), strings.Index(ordered, `"format"`), strings.Index(ordered, `"programs"`); !(s < c && c < f && f < p) {
+		t.Errorf("order: %s", ordered)
 	}
 	if got := rawProbeJSON([]byte(`{"format":"https://thp.example/?token=x","streams":[]}`)); strings.Contains(got, "thp.example") {
 		t.Errorf("a format that is not an object stays: %s", got)

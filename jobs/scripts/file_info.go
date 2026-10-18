@@ -1,11 +1,13 @@
 package scripts
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -285,9 +287,11 @@ func buildFileInfo(mp *api.MediaProbe) *FileInfo {
 const rawProbeLimit = 32 << 10
 
 // rawProbeJSON is the probe as ffprobe printed it, for the card's raw view:
-// indented, format.filename -- the ~cp source URL, credentials and all --
-// dropped (the whole format when it is not an object), anything else that
-// names a credential redacted, capped. "" when the body is not a JSON object.
+// in ffprobe's order (streams, chapters, format -- the tracks first, not
+// last as a map would sort them), indented, format.filename -- the ~cp
+// source URL, credentials and all -- dropped (the whole format when it is
+// not an object), anything else that names a credential redacted, capped.
+// "" when the body is not a JSON object.
 func rawProbeJSON(raw []byte) string {
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &top); err != nil {
@@ -306,11 +310,41 @@ func rawProbeJSON(raw []byte) string {
 			top["format"] = b
 		}
 	}
-	b, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
+	keys := make([]string, 0, len(top))
+	for k := range top {
+		keys = append(keys, k)
+	}
+	rank := map[string]int{"streams": 1, "chapters": 2, "format": 3}
+	sort.Slice(keys, func(i, j int) bool {
+		ri, rj := rank[keys[i]], rank[keys[j]]
+		if ri == 0 {
+			ri = len(rank) + 1
+		}
+		if rj == 0 {
+			rj = len(rank) + 1
+		}
+		if ri != rj {
+			return ri < rj
+		}
+		return keys[i] < keys[j]
+	})
+	var flat bytes.Buffer
+	flat.WriteByte('{')
+	for i, k := range keys {
+		if i > 0 {
+			flat.WriteByte(',')
+		}
+		kb, _ := json.Marshal(k)
+		flat.Write(kb)
+		flat.WriteByte(':')
+		flat.Write(top[k])
+	}
+	flat.WriteByte('}')
+	var b bytes.Buffer
+	if err := json.Indent(&b, flat.Bytes(), "", "  "); err != nil {
 		return ""
 	}
-	out := helpers.RedactURL(string(b))
+	out := helpers.RedactURL(b.String())
 	if len(out) > rawProbeLimit {
 		out = strings.ToValidUTF8(out[:rawProbeLimit], "") + "\n…"
 	}

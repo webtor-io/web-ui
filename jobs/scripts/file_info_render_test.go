@@ -68,7 +68,7 @@ func TestFileInfoCardRenders(t *testing.T) {
 		"English", "French", "IS", "SDH", "signs only", "picture-based · external player only",
 		"&lt;script&gt;alert(1)&lt;/script&gt;",
 		"external player",
-		"<details data-file-info-raw>", "Raw probe data (ffprobe)", "&lt;b&gt;x&lt;/b&gt;",
+		"<details data-file-info-raw>", "Raw data", "&lt;b&gt;x&lt;/b&gt;",
 	} {
 		if !strings.Contains(out, w) {
 			t.Errorf("missing %q:\n%s", w, out)
@@ -104,7 +104,7 @@ func TestFileInfoCardRenders(t *testing.T) {
 	}
 
 	ru := renderModal(t, tpl, "ru", &ctx{Lang: "ru", Data: full})
-	for _, w := range []string{"Длительность", "русский", "Язык не указан", "8,4\u00a0Мбит/с", "по умолчанию", "Сырые данные пробы (ffprobe)"} {
+	for _, w := range []string{"Длительность", "русский", "Язык не указан", "8,4\u00a0Мбит/с", "по умолчанию", "Сырые данные"} {
 		if !strings.Contains(ru, w) {
 			t.Errorf("ru: missing %q", w)
 		}

@@ -24,14 +24,15 @@
      button table has it -- pink read as a third primary button on a phone
      (file.html, the watched toggle). On a phone it is a 44 px icon at the
      end of the one-line row (owner, 2026-10-18), its name for screen readers
-     and the tooltip. Watch and Download drop their icons there (file.html,
-     data-crowded): two labels with icons and two 44 px icons do not fit
-     360 px -- ru Watch alone needs 118 px of the 95 left, and the icons were
-     squashed to slivers -- their padding narrows to 8 px, and a label
-     longer than what is left ends in an ellipsis rather than crossing the
-     border (at 360 px with the watched toggle: de, fr, nl Download). */}}
+     and the tooltip. Two labels with icons and two 44 px icons do not fit
+     360 px, so in that row (file.html, data-crowded) Download drops its icon
+     -- Watch keeps its own, the only sign of play/pause there -- their
+     padding narrows to 8 px, the two share the width by their labels
+     (flex-auto: ru Watch with its icon needs 110 px, Download 73), and a
+     label longer than what is left ends in an ellipsis rather than crossing
+     the border (at 360 px, beside the watched toggle: de, fr, es, cs, nl). */}}
 {{- $icon := eq .Data.Action "file-info" }}
-<form class="{{ .Data.Action }} {{ if $icon }}shrink-0{{ else }}max-sm:flex-1 max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
+<form class="{{ .Data.Action }} {{ if $icon }}shrink-0{{ else }}max-sm:flex-auto max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
       {{- if $modal }} onsubmit="var d=document.getElementById('{{ $modal }}');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('{{ $modal }}');if(d&&!d.open&&this.dataset.busy)d.showModal()"{{ end }}>
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
@@ -41,15 +42,17 @@
         <span class="max-sm:sr-only">{{ t .Ctx.Lang .Data.Name }}</span>
         {{- else }}
         {{- if eq .Data.Action "stream" }}
-        {{- /* Watch / Listen pressed while its player plays pauses it, and
-             says so (lib/streamToggle.js): the player carries data-playing,
-             and the file card (file.html, group/card) swaps icon and label. */}}
-        <span class="inline-flex max-sm:group-data-crowded/actions:hidden">
+        {{- /* Watch / Listen pressed while its player plays pauses it
+             (lib/streamToggle.js), and its icon says so: play, or pause
+             while the player plays -- the label stays (owner, 2026-10-18).
+             The player carries data-playing, the file card (file.html,
+             group/card) swaps the icons. Kept on a phone too: the icon is
+             the only sign of the state there. */}}
+        <span class="inline-flex shrink-0">
             <span class="inline-flex group-has-[.player[data-playing]]/card:hidden">{{ template "icons" .Data.Action }}</span>
             <span class="hidden group-has-[.player[data-playing]]/card:inline-flex">{{ template "icons" "pause" }}</span>
         </span>
-        <span class="max-sm:truncate group-has-[.player[data-playing]]/card:hidden">{{ t .Ctx.Lang .Data.Name }}</span>
-        <span class="max-sm:truncate hidden group-has-[.player[data-playing]]/card:inline">{{ t .Ctx.Lang "resource.pause" }}</span>
+        <span class="max-sm:truncate">{{ t .Ctx.Lang .Data.Name }}</span>
         {{- else }}
         <span class="inline-flex max-sm:group-data-crowded/actions:hidden">{{ template "icons" .Data.Action }}</span>
         <span class="max-sm:truncate">{{ t .Ctx.Lang .Data.Name }}</span>{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}

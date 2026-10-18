@@ -120,16 +120,19 @@ the fold on 768-844 px tall screens. Nothing moved the page toward it.
   instead of pink), a file with only a download has it full width, and the size moves
   from the Download label to a line under the file name. 40 px tall, as before. File
   info (docs/file_info.md) is a 44 px outlined icon at the row's end (owner,
-  2026-10-18: one line). With it the row is `data-crowded`, which drops Watch's and
-  Download's icons and narrows their padding to 8 px -- two labels with icons beside two
-  44 px icons squashed those icons to slivers -- and a label too long for what is left
-  ends in an ellipsis. From `sm` up the row is what it was, File info last and outlined.
+  2026-10-18: one line). With it the row is `data-crowded`: Download drops its icon
+  (Watch keeps its own, the only sign of play/pause on a phone), both narrow their padding
+  to 8 px and share the width by their labels (`flex-auto`), and a label too long for what
+  is left ends in an ellipsis -- measured in 11 locales, at 360 px only beside the watched
+  toggle in de/fr/es/cs/nl. From `sm` up the row is what it was, File info last and
+  outlined.
 - Watch / Listen pressed again while that file's player is on the page plays or pauses it
-  instead of starting the stream anew (owner, 2026-10-18; `lib/streamToggle.js`). The
-  button says what a press will do: Pause with the pause icon while the player plays. The
-  player carries `data-playing` (set on `play`, cleared on `pause`/`ended`/`emptied`/`error`)
-  and the file card (`group/card`) swaps the button's spans with `:has()`, so a card rendered
-  anew around a kept log reads the state from the player. Only a press toggles: restarts by
+  instead of starting the stream anew (owner, 2026-10-18; `lib/streamToggle.js`). Its
+  icon says what a press will do: pause while the player plays, play otherwise; the label
+  stays (owner, 2026-10-18: a changing label read oddly and moved the row). The player
+  carries `data-playing` (set on `play`, cleared on `pause`/`ended`/`emptied`/`error`) and
+  the file card (`group/card`) swaps the icons with `:has()`, so a card rendered anew
+  around a kept log reads the state from the player. Only a press toggles: restarts by
   code (Turnstile's pass, a preferred-language or passthrough restart) go through
   `requestSubmit()`, which clicks no button, and a busy form, a player without a source or a
   failed one mean a new stream. An audio file's button says Listen (`resource.listen`).

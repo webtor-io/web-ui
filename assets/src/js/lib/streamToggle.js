@@ -1,6 +1,7 @@
 // Watch / Listen pressed again while that file's player is on the page plays
-// or pauses it instead of starting the stream anew (owner, 2026-10-18). The
-// button says what a press will do: Pause while the player plays.
+// or pauses it instead of starting the stream anew (owner, 2026-10-18). Its
+// icon says what a press will do: pause while the player plays; the label
+// stays.
 //
 // Only a press: the stream form is also submitted by code -- Turnstile's
 // re-submit, a restart for a preferred language or a passthrough fallback,
@@ -10,8 +11,8 @@
 // Turnstile's pass, while the form is busy). The tool line's "Watch here"
 // (lib/toolIntent.js) clicks the button for a person and is a press.
 //
-// The label is not kept here: the player gets data-playing, and the file
-// card swaps the button's spans with :has() (partials/button.html). A card
+// The icon is not kept here: the player gets data-playing, and the file
+// card swaps the button's icons with :has() (partials/button.html). A card
 // rendered anew around a kept log (the watched toggle, lib/loadAsyncView.js)
 // so reads the state from the player itself.
 

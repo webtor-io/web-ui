@@ -21,9 +21,9 @@ Free for everyone; anonymous starts pass Turnstile like every job start
   `handlers/resource` `MakeFileInfo` (`partials/button.html`, action
   `file-info`). The row's last button, outlined and neutral. On a phone the
   row stays one line (owner, 2026-10-18): File info is a 44 px icon at its
-  end, and the row's `data-crowded` drops Watch's and Download's icons and
-  narrows their padding to 8 px; a label longer than what is left ends in an
-  ellipsis (at 360 px only de/fr/nl Download beside the watched toggle). The
+  end, and the row's `data-crowded` drops Download's icon, narrows the two
+  labelled buttons' padding to 8 px and sizes them by their labels; a label
+  longer than what is left ends in an ellipsis (docs/job_wait_ux.md). The
   deep link
   `#action=file-info` and the Umami click event `file-info` come from the
   form's class and `data-umami-event` with no code of their own.
@@ -86,7 +86,7 @@ footnote (owner, 2026-10-18).
   `≈` the container's bitrate less what the other streams record — high by
   whatever an untagged audio carries; not with two video streams.
 - **Raw data** (`rawProbeJSON`): ffprobe's JSON as content-prober sent it
-  (`api.GetMediaProbeRaw`), indented, in a collapsed `<details>`. Without
+  (`api.GetMediaProbeRaw`), in ffprobe's order (streams first), indented, in a collapsed `<details>`. Without
   `format.filename` — the `~cp` source URL with its credentials — and through
   `helpers.RedactURL`, capped at 32 KiB (the card is replayed from the job's
   storage and logged with it).

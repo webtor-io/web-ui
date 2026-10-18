@@ -28,11 +28,11 @@
 
 
 
-<form class="stream max-sm:flex-1 max-sm:min-w-0" action="/stream-video" method="post" enctype="multipart/form-data" data-async-target="#log-item-mp4" data-async-push-state="false">
+<form class="stream max-sm:flex-auto max-sm:min-w-0" action="/stream-video" method="post" enctype="multipart/form-data" data-async-target="#log-item-mp4" data-async-push-state="false">
     <input type="hidden" name="resource-id" value="08ada5a7a6183aae1e09d831df6748d566095a10" />
     <input type="hidden" name="item-id" value="item-mp4" />
     <button type="submit" class="btn btn-soft max-sm:w-full max-sm:px-2 whitespace-nowrap" data-umami-event="stream">
-        <span class="inline-flex max-sm:group-data-crowded/actions:hidden">
+        <span class="inline-flex shrink-0">
             <span class="inline-flex group-has-[.player[data-playing]]/card:hidden">
 
 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
@@ -43,13 +43,13 @@
             <span class="hidden group-has-[.player[data-playing]]/card:inline-flex">
 
 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+    <rect x="6.25" y="5.25" width="3.75" height="13.5" rx="1" stroke-linejoin="round" />
+    <rect x="14" y="5.25" width="3.75" height="13.5" rx="1" stroke-linejoin="round" />
 </svg>
 
 </span>
         </span>
-        <span class="max-sm:truncate group-has-[.player[data-playing]]/card:hidden">Stream</span>
-        <span class="max-sm:truncate hidden group-has-[.player[data-playing]]/card:inline">Pause</span>
+        <span class="max-sm:truncate">Stream</span>
     </button>
 </form>
 
@@ -58,7 +58,7 @@
 
         
 
-<form class="download max-sm:flex-1 max-sm:min-w-0" action="/download-file" method="post" enctype="multipart/form-data" data-async-target="#log-item-mp4-download" data-async-push-state="false" onsubmit="var d=document.getElementById('download-modal-item-mp4');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('download-modal-item-mp4');if(d&&!d.open&&this.dataset.busy)d.showModal()">
+<form class="download max-sm:flex-auto max-sm:min-w-0" action="/download-file" method="post" enctype="multipart/form-data" data-async-target="#log-item-mp4-download" data-async-push-state="false" onsubmit="var d=document.getElementById('download-modal-item-mp4');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('download-modal-item-mp4');if(d&&!d.open&&this.dataset.busy)d.showModal()">
     <input type="hidden" name="resource-id" value="08ada5a7a6183aae1e09d831df6748d566095a10" />
     <input type="hidden" name="item-id" value="item-mp4" />
     <button type="submit" class="btn btn-soft max-sm:w-full max-sm:px-2 whitespace-nowrap" data-umami-event="download">

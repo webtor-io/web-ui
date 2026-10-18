@@ -2780,10 +2780,11 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
           </ul>
         </section>
         <details>
-          <summary class="cursor-pointer select-none text-xs text-w-muted hover:text-w-sub">Raw probe data (ffprobe)</summary>
+          <summary class="cursor-pointer select-none text-xs text-w-muted hover:text-w-sub">Raw data</summary>
           <pre class="mt-2 max-h-80 overflow-auto rounded-lg bg-base-300/40 p-3 font-mono text-[11px] leading-snug text-w-sub">{
-  "format": { "bit_rate": "9012345", "format_name": "matroska,webm" },
-  "streams": [ … ]
+  "streams": [ … ],
+  "chapters": [],
+  "format": { "bit_rate": "9012345", "format_name": "matroska,webm" }
 }</pre>
         </details>
       </div>
@@ -2799,7 +2800,7 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       names the file. A bitrate the file does not record is the container's less the other streams', shown with
       <code>≈</code>. The raw JSON never carries <code>format.filename</code> (our source URL). The button is the row's
       last, outlined and neutral; on a phone a 44&nbsp;px icon at the end of the one-line row, whose
-      <code>data-crowded</code> drops Watch's and Download's icons there. Keys: <code>resource.fileInfo</code>, <code>action.fileInfo.*</code>, reused
+      <code>data-crowded</code> drops Download's icon there (Watch keeps its play/pause icon). Keys: <code>resource.fileInfo</code>, <code>action.fileInfo.*</code>, reused
       <code>action.stream.audio</code>, <code>action.stream.subtitles</code>, <code>action.stream.badge.forced</code>,
       <code>resource.status.mbps</code>. Event: the button's <code>data-umami-event="file-info"</code>, nothing else.
     </div>
