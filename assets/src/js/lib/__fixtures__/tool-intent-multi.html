@@ -21,7 +21,7 @@
     <h2 class="text-base font-semibold line-clamp-2" title="Sintel.mp4">Sintel.mp4</h2>
     
     <p class="sm:hidden mt-0.5 text-xs text-w-muted">123 MB</p>
-    <div class="flex gap-2 mt-3 sm:mt-4 sm:flex-wrap sm:gap-3">
+    <div class="flex flex-wrap gap-2 mt-3 sm:mt-4 sm:gap-3">
         
 
 
@@ -66,10 +66,10 @@
         
         
 
-<form class="file-info shrink-0" action="/file-info" method="post" enctype="multipart/form-data" data-async-target="#log-item-mp4" data-async-push-state="false">
+<form class="file-info max-sm:basis-full max-sm:order-last" action="/file-info" method="post" enctype="multipart/form-data" data-async-target="#log-item-mp4-info" data-async-push-state="false" onsubmit="var d=document.getElementById('info-modal-item-mp4');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('info-modal-item-mp4');if(d&&!d.open&&this.dataset.busy)d.showModal()">
     <input type="hidden" name="resource-id" value="08ada5a7a6183aae1e09d831df6748d566095a10" />
     <input type="hidden" name="item-id" value="item-mp4" />
-    <button type="submit" class="btn btn-soft whitespace-nowrap max-sm:w-11 max-sm:px-0" data-umami-event="file-info" title="File info">
+    <button type="submit" class="btn btn-ghost border border-w-line whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="file-info">
         
 
 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
@@ -77,7 +77,7 @@
 </svg>
 
 
-        <span class="max-sm:sr-only">File info</span>
+        File info
     </button>
 </form>
 
@@ -111,6 +111,25 @@
             <button tabindex="-1" aria-hidden="true">close</button>
         </form>
     </dialog>
+    
+    
+    <dialog id="info-modal-item-mp4" class="modal">
+        <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl px-5 py-4 sm:p-6">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">✕</button>
+            </form>
+            <p class="pr-8 text-xs text-w-muted truncate" title="Sintel.mp4">Sintel.mp4</p>
+            <div id="log-item-mp4-info" class="mt-3 -mx-5 sm:mx-0" data-async-layout="{{ template &#34;main&#34; . }}">
+                <div class="flex justify-center py-4">
+                    <span class="loading loading-spinner loading-md text-w-cyan"></span>
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button tabindex="-1" aria-hidden="true">close</button>
+        </form>
+    </dialog>
+    
     
     
     <p class="text-xs text-w-muted leading-relaxed mt-3">

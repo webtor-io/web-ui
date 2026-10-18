@@ -97,8 +97,9 @@ func (s *Helper) MakeVideo(ctx *w.Context, gd *GetData) *ButtonItem {
 	return s.MakeButton(ctx, gd, "resource.stream", "stream", "/stream-video")
 }
 
-// MakeFileInfo is the "File info" button: the file's probe as a card in the
-// file's log (jobs/scripts/file_info.go). Video and audio only (file.html).
+// MakeFileInfo is the "File info" button: the file's probe as a card in a
+// dialog of the file card (jobs/scripts/file_info.go). Video and audio only
+// (file.html).
 func (s *Helper) MakeFileInfo(ctx *w.Context, gd *GetData) *ButtonItem {
 	return s.MakeButton(ctx, gd, "resource.fileInfo", "file-info", "/file-info")
 }

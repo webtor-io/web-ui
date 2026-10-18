@@ -81,6 +81,7 @@ func TestResubmitLandsInTheLogTheStartRenderedInto(t *testing.T) {
 		{"download", "", "item-1-download"},
 		{"download", "tar", "item-1"},
 		{"download", "zip", "item-1"},
+		{"file-info", "", "item-1-info"},
 	} {
 		r, _ := Action(nil, nil, nil, nil, nil, nil, nil, nil, jobKeyContext(), "08ada5a7a6183aae1e09d831df6748d566095a10", "item-1", c.action, &models.StreamSettings{}, nil, jobKeyVSUD(), WarmupSettings{}, GraceSettings{}, false, false, "", c.format, nil)
 		var d SlowDownloadData

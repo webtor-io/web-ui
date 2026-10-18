@@ -1816,11 +1816,16 @@ func (s *ErrorWrapperScript) resubmitContext(d *SlowDownloadData) {
 // "#log-{ItemID}" (MakeButton: ButtonItem.ID = Item.ID), except a file's
 // Download, which reports into its dialog's "#log-{ItemID}-download"
 // (partials/button.html, file.html): into the card's log, its "Try again"
-// replaced the player playing there. A directory's TAR/ZIP is a download
-// too, always with an archive format, into list.html's "#log-{ItemID}".
+// replaced the player playing there. File info reports into its own dialog's
+// "#log-{ItemID}-info" for the same reason. A directory's TAR/ZIP is a
+// download too, always with an archive format, into list.html's
+// "#log-{ItemID}".
 func (s *ErrorWrapperScript) logTargetID() string {
 	if s.action == "download" && s.archiveFormat == "" {
 		return s.itemId + "-download"
+	}
+	if s.action == "file-info" {
+		return s.itemId + "-info"
 	}
 	return s.itemId
 }

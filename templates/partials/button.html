@@ -15,18 +15,25 @@
 {{- if eq .Data.Action "download" }}
 {{- $log = printf "log-%s-download" .Data.ID }}
 {{- $modal = printf "download-modal-%s" .Data.ID }}
+{{- else if eq .Data.Action "file-info" }}
+{{- /* File info too: its card in the card's log replaced a playing player. */}}
+{{- $log = printf "log-%s-info" .Data.ID }}
+{{- $modal = printf "info-modal-%s" .Data.ID }}
 {{- end }}
-{{- /* File info is the third action of the row: on a phone an icon beside
-     Watch and Download, like the watched toggle, its label for screen
-     readers and the tooltip -- three labels do not fit 360 px. */}}
-{{- $icon := eq .Data.Action "file-info" }}
-<form class="{{ .Data.Action }} {{ if $icon }}shrink-0{{ else }}max-sm:flex-1 max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
+{{- /* File info is the row's secondary action: outlined and neutral, as the
+     button table has it -- pink read as a third primary button on a phone
+     (file.html, the watched toggle). On a phone it takes a line of its own
+     under Watch and Download: as a third icon in the row it squashed their
+     icons to 0 px at 360 px and pushed de "Herunterladen" past its border
+     (measured 2026-10-18). */}}
+{{- $secondary := eq .Data.Action "file-info" }}
+<form class="{{ .Data.Action }} {{ if $secondary }}max-sm:basis-full max-sm:order-last{{ else }}max-sm:flex-1 max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
       {{- if $modal }} onsubmit="var d=document.getElementById('{{ $modal }}');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('{{ $modal }}');if(d&&!d.open&&this.dataset.busy)d.showModal()"{{ end }}>
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
-    <button type="submit" class="btn btn-soft whitespace-nowrap {{ if $icon }}max-sm:w-11 max-sm:px-0{{ else }}max-sm:w-full max-sm:px-3{{ end }}" data-umami-event="{{ .Data.Action }}"{{ if $icon }} title="{{ t .Ctx.Lang .Data.Name }}"{{ end }}>
+    <button type="submit" class="btn {{ if $secondary }}btn-ghost border border-w-line{{ else }}btn-soft{{ end }} whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="{{ .Data.Action }}">
         {{ template "icons" .Data.Action }}
-        {{ if $icon }}<span class="max-sm:sr-only">{{ t .Ctx.Lang .Data.Name }}</span>{{ else }}{{ t .Ctx.Lang .Data.Name }}{{ end }}{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
+        {{ t .Ctx.Lang .Data.Name }}{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
     </button>
 </form>
 {{ end }}

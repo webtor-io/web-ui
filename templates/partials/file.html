@@ -11,13 +11,13 @@
     {{- if $dl.Size }}
     <p class="sm:hidden mt-0.5 text-xs text-w-muted">{{ $dl.Size }}</p>
     {{- end }}
-    <div class="flex gap-2 mt-3 sm:mt-4 sm:flex-wrap sm:gap-3">
+    <div class="flex flex-wrap gap-2 mt-3 sm:mt-4 sm:gap-3">
         {{ template "stream_button" $ }}
         {{ template "button" withContext $ $dl }}
         {{/* What is inside the file before a download: audio tracks,
              embedded subtitles, video (docs/file_info.md). Its card goes to
-             the card's log below, the player's: it replaces a playing
-             player, and Watch replaces it. */}}
+             a dialog of its own, as Download's: the player keeps playing.
+             On a phone a line of its own, last (partials/button.html). */}}
         {{ if or (eq .Item.MediaFormat "video") (eq .Item.MediaFormat "audio") }}
         {{ template "button" withContext $ (makeFileInfo $ .) }}
         {{ end }}
@@ -89,6 +89,27 @@
             <button tabindex="-1" aria-hidden="true">close</button>
         </form>
     </dialog>
+    {{/* File info's job (partials/button.html), in a dialog of its own for
+         the same reasons and under the same naming rule as Download's. Its
+         card has no action to close it: the ✕ and the backdrop do. */}}
+    {{ if or (eq .Item.MediaFormat "video") (eq .Item.MediaFormat "audio") }}
+    <dialog id="info-modal-{{ .Item.ID }}" class="modal">
+        <div class="modal-box bg-w-card border border-w-line/50 rounded-2xl max-w-2xl px-5 py-4 sm:p-6">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2 text-w-muted hover:text-base-content">✕</button>
+            </form>
+            <p class="pr-8 text-xs text-w-muted truncate" title="{{ .Item.Name }}">{{ .Item.Name }}</p>
+            <div id="log-{{ .Item.ID }}-info" class="mt-3 -mx-5 sm:mx-0" data-async-layout="{{`{{ template "main" . }}`}}">
+                <div class="flex justify-center py-4">
+                    <span class="loading loading-spinner loading-md text-w-cyan"></span>
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button tabindex="-1" aria-hidden="true">close</button>
+        </form>
+    </dialog>
+    {{ end }}
     {{/* Adult-content footnote.
          - Anonymous + adult: 18+ message REPLACES the generic 16+ ageGate
            (includes TOS/Privacy links so the legal hook isn't lost).

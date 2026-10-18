@@ -8,9 +8,10 @@ import (
 )
 
 // File info sits on the file card of a video or an audio file only, posts to
-// /file-info into the card's log (where the deep link #action=file-info and
-// the Umami click event find it by the action's name), and is an icon on a
-// phone with its name kept for screen readers.
+// /file-info into a dialog of its own (a press while watching leaves the
+// player playing), is found by the deep link #action=file-info and the Umami
+// click event by the action's name, and is a neutral, labelled line of its
+// own on a phone.
 func TestFileCardFileInfoButton(t *testing.T) {
 	tpl := resourceTemplates(t)
 	for _, c := range []struct {
@@ -26,14 +27,18 @@ func TestFileCardFileInfoButton(t *testing.T) {
 			continue
 		}
 		if !has {
+			if strings.Contains(out, "info-modal-") {
+				t.Errorf("%q: a dialog without its button", c.format)
+			}
 			continue
 		}
 		for _, w := range []string{
-			`class="file-info shrink-0"`,
-			`data-async-target="#log-item-mp4"`,
-			`data-umami-event="file-info"`,
-			`title="О файле"`,
-			`<span class="max-sm:sr-only">О файле</span>`,
+			`class="file-info max-sm:basis-full max-sm:order-last"`,
+			`data-async-target="#log-item-mp4-info"`,
+			`getElementById('info-modal-item-mp4')`,
+			`<dialog id="info-modal-item-mp4"`,
+			`<div id="log-item-mp4-info"`,
+			`class="btn btn-ghost border border-w-line whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="file-info"`,
 		} {
 			if !strings.Contains(out, w) {
 				t.Errorf("%q: missing %q", c.format, w)
