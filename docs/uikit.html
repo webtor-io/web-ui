@@ -2753,42 +2753,53 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       the player's clickable track chips. Language names in the page's language (<code>langDisplayIn</code>), no flags.
     </p>
     <div class="uikit-card">
-      <div class="rounded-xl bg-base-300/20 border border-w-line/40 p-4 text-sm max-w-xl">
-        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h3 class="font-semibold text-base text-base-content flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 shrink-0 text-w-cyan" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
-            File info
-          </h3>
-          <span class="text-xs text-w-sub tabular-nums">Duration: 1:52:03</span>
-        </div>
-        <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">Video</h4>
-        <ul class="mt-1.5 space-y-1">
-          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">HEVC</span><span class="text-w-sub tabular-nums">3840×2160</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">HDR10</span><span class="text-w-sub tabular-nums">8.4&nbsp;Mbps</span></li>
-        </ul>
-        <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">Audio</h4>
-        <ul class="mt-1.5 space-y-1.5">
-          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">default</span><span class="text-w-sub">EAC3 · 5.1(side)</span></li>
-          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium"><span class="text-w-muted">Language not specified</span></span><span class="text-w-sub">AC3 · stereo</span><span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]">Commentary</span></li>
-        </ul>
-        <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">Subtitles</h4>
-        <ul class="mt-1.5 space-y-1.5">
-          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">Closed captions (CC) in the video stream</span></li>
-          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">SDH</span><span class="text-w-sub">SRT</span><span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]">English SDH</span></li>
-          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">signs only</span><span class="text-w-sub">PGS</span><span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium">picture-based · external player only</span></li>
-        </ul>
-        <p class="mt-4 text-xs text-w-muted leading-relaxed">“Default” is the track a player starts with when no preferred language is set in it; a player set to a language may pick another one.</p>
+      <div class="rounded-xl bg-base-300/20 border border-w-line/40 p-4 text-sm max-w-xl space-y-4">
+        <section>
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">Duration</h4>
+          <p class="mt-1.5 font-medium tabular-nums">1:52:03</p>
+        </section>
+        <section>
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">Video</h4>
+          <ul class="mt-1.5 space-y-1">
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">HEVC</span><span class="text-w-sub tabular-nums">3840×2160</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">HDR10</span><span class="text-w-sub tabular-nums">≈&nbsp;8.4&nbsp;Mbps</span></li>
+          </ul>
+        </section>
+        <section>
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">Audio</h4>
+          <ul class="mt-1.5 space-y-1.5">
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">default</span><span class="text-w-sub">EAC3 · 5.1(side)</span></li>
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium"><span class="text-w-muted">Language not specified</span></span><span class="text-w-sub">AC3 · stereo</span><span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]">Commentary</span></li>
+          </ul>
+        </section>
+        <section>
+          <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">Subtitles</h4>
+          <ul class="mt-1.5 space-y-1.5">
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">Closed captions (CC) in the video stream</span></li>
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">SDH</span><span class="text-w-sub">SRT</span><span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]">English SDH</span></li>
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">signs only</span><span class="text-w-sub">PGS</span><span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium">picture-based · external player only</span></li>
+          </ul>
+        </section>
+        <details>
+          <summary class="cursor-pointer select-none text-xs text-w-muted hover:text-w-sub">Raw probe data (ffprobe)</summary>
+          <pre class="mt-2 max-h-80 overflow-auto rounded-lg bg-base-300/40 p-3 font-mono text-[11px] leading-snug text-w-sub">{
+  "format": { "bit_rate": "9012345", "format_name": "matroska,webm" },
+  "streams": [ … ]
+}</pre>
+        </details>
       </div>
     </div>
-    <div class="uikit-label">[data-file-info] &gt; h3 + h4 + ul &gt; li[data-file-info-cc|data-file-info-audio|data-file-info-subtitle] &gt; label badges; the button: form.file-info.max-sm:basis-full.max-sm:order-last &gt; button.btn.btn-ghost.border.border-w-line.max-sm:w-full &gt; svg + label; the card goes to dialog#info-modal-&lt;item&gt; &gt; #log-&lt;item&gt;-info</div>
+    <div class="uikit-label">[data-file-info] &gt; h3 + h4 + ul &gt; section &gt; h4 + ul &gt; li[data-file-info-cc|data-file-info-audio|data-file-info-subtitle] &gt; label badges; details[data-file-info-raw] &gt; pre; the button: form.file-info.shrink-0 &gt; button.btn.btn-ghost.border.border-w-line.max-sm:w-11 &gt; svg + span.max-sm:sr-only, last in .group/actions[data-crowded]; the card goes to dialog#info-modal-&lt;item&gt; &gt; #log-&lt;item&gt;-info</div>
     <div class="uikit-rule">
       <strong>Rules:</strong> no URL anywhere in the card (the job log is public with <code>Access-Control-Allow-Origin: *</code>);
       track titles are the file's free text, escaped and truncated, never <code>|safe</code>. A section with nothing in it
       says so (<code>action.fileInfo.noAudio</code>, <code>action.fileInfo.noSubtitles</code>) &mdash; for a viewer who needs
       subtitles, &ldquo;none inside&rdquo; is the answer. A track whose language the file does not name reads
       <code>action.fileInfo.langUnknown</code>, never a guess. Captions carried in the video stream get their own row
-      (<code>action.fileInfo.cc</code>), so a file with them never reads &ldquo;no subtitles&rdquo;. The button is the row's
-      secondary action, outlined and neutral; on a phone a full-width line under Watch and Download (as a third icon in
-      the row it squashed their icons to 0&nbsp;px at 360&nbsp;px). Keys: <code>resource.fileInfo</code>, <code>action.fileInfo.*</code>, reused
+      (<code>action.fileInfo.cc</code>), so a file with them never reads &ldquo;no subtitles&rdquo;. No heading and no footnote: the dialog
+      names the file. A bitrate the file does not record is the container's less the other streams', shown with
+      <code>≈</code>. The raw JSON never carries <code>format.filename</code> (our source URL). The button is the row's
+      last, outlined and neutral; on a phone a 44&nbsp;px icon at the end of the one-line row, whose
+      <code>data-crowded</code> drops Watch's and Download's icons there. Keys: <code>resource.fileInfo</code>, <code>action.fileInfo.*</code>, reused
       <code>action.stream.audio</code>, <code>action.stream.subtitles</code>, <code>action.stream.badge.forced</code>,
       <code>resource.status.mbps</code>. Event: the button's <code>data-umami-event="file-info"</code>, nothing else.
     </div>

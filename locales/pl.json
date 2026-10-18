@@ -733,7 +733,7 @@
     "action.fileInfo.noAudio": "Plik nie ma ścieżek dźwiękowych",
     "action.fileInfo.noSubtitles": "Brak wbudowanych napisów w pliku",
     "action.fileInfo.cc": "Napisy ukryte (CC) w strumieniu wideo",
-    "action.fileInfo.hint": "„Domyślna” to ścieżka, od której odtwarzacz zaczyna, gdy nie ustawiono w nim preferowanego języka; z ustawionym językiem może wybrać inną.",
+    "action.fileInfo.raw": "Surowe dane analizy (ffprobe)",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Więcej języków",
     "action.stream.preferredLangHint": "Według niego dobierane są napisy i proponowane tłumaczenie AI. Pochodzi z profilu, a gdy go tam nie ma — z przeglądarki.",

@@ -3,84 +3,99 @@
      declares, for a viewer about to download it. Read-only facts, so static
      labels (Discover's cyan label), not the player's clickable track chips.
      The job log replaying this is public (Access-Control-Allow-Origin *): no
-     URL may ever appear here. Titles are free text from the file -- escaped
-     like everything else, never |safe. */}}
+     URL of ours may ever appear here (the raw view drops format.filename).
+     Titles and tags are free text from the file -- escaped like everything
+     else, never |safe. */}}
 {{ $lang := $.Lang }}
 {{- /* A language the file names: its name in the page's language
      (langDisplayIn; a bare code outside the 45 it knows). None named: said
      so, never guessed. */}}
 {{ with .Data }}
-<div class="rounded-xl bg-base-300/20 border border-w-line/40 p-4 text-sm" data-file-info>
-    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 class="font-semibold text-base text-base-content flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5 shrink-0 text-w-cyan" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-            </svg>
-            {{ t $lang "resource.fileInfo" }}
-        </h3>
-        {{- with .Duration }}
-        <span class="text-xs text-w-sub tabular-nums">{{ t $lang "action.fileInfo.duration" }}: {{ . }}</span>
-        {{- end }}
-    </div>
+{{- /* One column of sections, Duration first (owner, 2026-10-18): no
+     heading of its own -- the dialog names the file -- and no footnote. */}}
+<div class="rounded-xl bg-base-300/20 border border-w-line/40 p-4 text-sm space-y-4" data-file-info>
+    {{- with .Duration }}
+    <section>
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.fileInfo.duration" }}</h4>
+        <p class="mt-1.5 font-medium tabular-nums">{{ . }}</p>
+    </section>
+    {{- end }}
 
     {{- if .Video }}
-    <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.fileInfo.video" }}</h4>
-    <ul class="mt-1.5 space-y-1">
-        {{- range .Video }}
-        <li class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span class="font-medium">{{ .Codec }}</span>
-            {{- if .Width }}<span class="text-w-sub tabular-nums">{{ .Width }}×{{ .Height }}</span>{{ end }}
-            {{- with .HDR }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ . }}</span>{{ end }}
-            {{- with .BitrateLabel $lang }}<span class="text-w-sub tabular-nums">{{ tp $lang "resource.status.mbps" "N" . }}</span>{{ end }}
-        </li>
-        {{- end }}
-    </ul>
+    <section>
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.fileInfo.video" }}</h4>
+        <ul class="mt-1.5 space-y-1">
+            {{- range .Video }}
+            {{- $v := . }}
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span class="font-medium">{{ .Codec }}</span>
+                {{- if .Width }}<span class="text-w-sub tabular-nums">{{ .Width }}×{{ .Height }}</span>{{ end }}
+                {{- with .HDR }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ . }}</span>{{ end }}
+                {{- /* "≈": the file records no bitrate for the video, so it is
+                     the container's less the other streams' (buildFileInfo). */}}
+                {{- with .BitrateLabel $lang }}<span class="text-w-sub tabular-nums" data-file-info-bitrate>{{ if $v.Approx }}≈&nbsp;{{ end }}{{ tp $lang "resource.status.mbps" "N" . }}</span>{{ end }}
+            </li>
+            {{- end }}
+        </ul>
+    </section>
     {{- end }}
 
-    <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.stream.audio" }}</h4>
-    {{- if .Audio }}
-    <ul class="mt-1.5 space-y-1.5">
-        {{- range .Audio }}
-        <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-audio>
-            <span class="font-medium">{{ if .Lang }}{{ $d := langDisplayIn $lang .Lang }}{{ or $d.Localized $d.Code }}{{ else }}<span class="text-w-muted">{{ t $lang "action.fileInfo.langUnknown" }}</span>{{ end }}</span>
-            {{- if .Default }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium" data-file-info-default>{{ t $lang "action.fileInfo.default" }}</span>{{ end }}
-            <span class="text-w-sub">{{ .Codec }}{{ with .Channels }} · {{ . }}{{ end }}</span>
-            {{- with .Title }}<span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]" title="{{ . }}">{{ . }}</span>{{ end }}
-        </li>
+    <section>
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.stream.audio" }}</h4>
+        {{- if .Audio }}
+        <ul class="mt-1.5 space-y-1.5">
+            {{- range .Audio }}
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-audio>
+                <span class="font-medium">{{ if .Lang }}{{ $d := langDisplayIn $lang .Lang }}{{ or $d.Localized $d.Code }}{{ else }}<span class="text-w-muted">{{ t $lang "action.fileInfo.langUnknown" }}</span>{{ end }}</span>
+                {{- if .Default }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium" data-file-info-default>{{ t $lang "action.fileInfo.default" }}</span>{{ end }}
+                <span class="text-w-sub">{{ .Codec }}{{ with .Channels }} · {{ . }}{{ end }}</span>
+                {{- with .Title }}<span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]" title="{{ . }}">{{ . }}</span>{{ end }}
+            </li>
+            {{- end }}
+        </ul>
+        {{- else }}
+        <p class="mt-1.5 text-w-sub">{{ t $lang "action.fileInfo.noAudio" }}</p>
         {{- end }}
-    </ul>
-    {{- else }}
-    <p class="mt-1.5 text-w-sub">{{ t $lang "action.fileInfo.noAudio" }}</p>
-    {{- end }}
+    </section>
 
-    <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.stream.subtitles" }}</h4>
-    {{- if or .Subtitles .ClosedCaptions }}
-    <ul class="mt-1.5 space-y-1.5">
-        {{- /* CEA-608/708 captions ride in the video stream, not in a
-             subtitle track of their own: without this row the card said
-             "no subtitles" of a file VLC shows captions for. */}}
-        {{- if .ClosedCaptions }}
-        <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-cc>
-            <span class="font-medium">{{ t $lang "action.fileInfo.cc" }}</span>
-        </li>
+    <section>
+        <h4 class="text-xs font-semibold uppercase tracking-wide text-w-muted">{{ t $lang "action.stream.subtitles" }}</h4>
+        {{- if or .Subtitles .ClosedCaptions }}
+        <ul class="mt-1.5 space-y-1.5">
+            {{- /* CEA-608/708 captions ride in the video stream, not in a
+                 subtitle track of their own: without this row the card said
+                 "no subtitles" of a file VLC shows captions for. */}}
+            {{- if .ClosedCaptions }}
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-cc>
+                <span class="font-medium">{{ t $lang "action.fileInfo.cc" }}</span>
+            </li>
+            {{- end }}
+            {{- range .Subtitles }}
+            <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-subtitle>
+                <span class="font-medium">{{ if .Lang }}{{ $d := langDisplayIn $lang .Lang }}{{ or $d.Localized $d.Code }}{{ else }}<span class="text-w-muted">{{ t $lang "action.fileInfo.langUnknown" }}</span>{{ end }}</span>
+                {{- if .Default }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium" data-file-info-default>{{ t $lang "action.fileInfo.default" }}</span>{{ end }}
+                {{- if .SDH }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.fileInfo.sdh" }}</span>{{ end }}
+                {{- if .Forced }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.stream.badge.forced" }}</span>{{ end }}
+                <span class="text-w-sub">{{ .Codec }}</span>
+                {{- if .Picture }}<span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.fileInfo.picture" }}</span>{{ end }}
+                {{- with .Title }}<span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]" title="{{ . }}">{{ . }}</span>{{ end }}
+            </li>
+            {{- end }}
+        </ul>
+        {{- else }}
+        <p class="mt-1.5 text-w-sub">{{ t $lang "action.fileInfo.noSubtitles" }}</p>
         {{- end }}
-        {{- range .Subtitles }}
-        <li class="flex flex-wrap items-center gap-x-2 gap-y-1" data-file-info-subtitle>
-            <span class="font-medium">{{ if .Lang }}{{ $d := langDisplayIn $lang .Lang }}{{ or $d.Localized $d.Code }}{{ else }}<span class="text-w-muted">{{ t $lang "action.fileInfo.langUnknown" }}</span>{{ end }}</span>
-            {{- if .Default }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium" data-file-info-default>{{ t $lang "action.fileInfo.default" }}</span>{{ end }}
-            {{- if .SDH }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.fileInfo.sdh" }}</span>{{ end }}
-            {{- if .Forced }}<span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.stream.badge.forced" }}</span>{{ end }}
-            <span class="text-w-sub">{{ .Codec }}</span>
-            {{- if .Picture }}<span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium">{{ t $lang "action.fileInfo.picture" }}</span>{{ end }}
-            {{- with .Title }}<span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]" title="{{ . }}">{{ . }}</span>{{ end }}
-        </li>
-        {{- end }}
-    </ul>
-    {{- else }}
-    <p class="mt-1.5 text-w-sub">{{ t $lang "action.fileInfo.noSubtitles" }}</p>
-    {{- end }}
+    </section>
 
-    <p class="mt-4 text-xs text-w-muted leading-relaxed">{{ t $lang "action.fileInfo.hint" }}</p>
+    {{- /* ffprobe's own JSON, for whoever wants what the card leaves out
+         (rawProbeJSON: no format.filename, credentials redacted, capped).
+         Escaped like the titles: it is the file's free text. */}}
+    {{- with .Raw }}
+    <details data-file-info-raw>
+        <summary class="cursor-pointer select-none text-xs text-w-muted hover:text-w-sub">{{ t $lang "action.fileInfo.raw" }}</summary>
+        <pre class="mt-2 max-h-80 overflow-auto rounded-lg bg-base-300/40 p-3 font-mono text-[11px] leading-snug text-w-sub">{{ . }}</pre>
+    </details>
+    {{- end }}
 </div>
 {{ end }}
 {{ end }}

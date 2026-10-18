@@ -703,7 +703,7 @@
     "action.fileInfo.noAudio": "Die Datei hat keine Tonspuren",
     "action.fileInfo.noSubtitles": "Keine eingebetteten Untertitel in der Datei",
     "action.fileInfo.cc": "Closed Captions (CC) im Videostream",
-    "action.fileInfo.hint": "„Standard“ ist die Spur, mit der ein Player ohne bevorzugte Sprache startet; ist eine Sprache eingestellt, kann er eine andere wählen.",
+    "action.fileInfo.raw": "Rohdaten der Analyse (ffprobe)",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Weitere Sprachen",
     "action.stream.preferredLangHint": "Danach werden Untertitel gewählt und die KI-Übersetzung angeboten. Aus deinem Profil oder, wenn dort nichts steht, aus dem Browser.",

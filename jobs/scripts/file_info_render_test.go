@@ -47,7 +47,7 @@ func TestFileInfoCardRenders(t *testing.T) {
 	}
 	full := &FileInfo{
 		Duration: "1:52:03",
-		Video:    []FileInfoVideo{{Codec: "HEVC", Width: 3840, Height: 2160, HDR: "HDR10", Mbps: 8.44}},
+		Video:    []FileInfoVideo{{Codec: "HEVC", Width: 3840, Height: 2160, HDR: "HDR10", Mbps: 8.44, Approx: true}},
 		Audio: []FileInfoTrack{
 			{Lang: "ru", Title: "Dub", Codec: "EAC3", Channels: "5.1(side)", Default: true},
 			{Codec: "AC3", Channels: "stereo"},
@@ -58,15 +58,17 @@ func TestFileInfoCardRenders(t *testing.T) {
 			{Lang: "fr", Codec: "SRT", Forced: true},
 			{Lang: "is", Codec: "SRT"},
 		},
+		Raw: "{\n  \"streams\": [{\"tags\": {\"title\": \"<b>x</b>\"}}]\n}",
 	}
 	out := renderModal(t, tpl, "en", &ctx{Lang: "en", Data: full})
 	for _, w := range []string{
-		"File info", "Duration: 1:52:03",
-		"HEVC", "3840×2160", "HDR10", "8.4\u00a0Mbps",
+		">Duration</h4>", ">1:52:03</p>",
+		"HEVC", "3840×2160", "HDR10", "≈&nbsp;8.4\u00a0Mbps",
 		"Russian", "EAC3 · 5.1(side)", "Language not specified",
 		"English", "French", "IS", "SDH", "signs only", "picture-based · external player only",
 		"&lt;script&gt;alert(1)&lt;/script&gt;",
 		"external player",
+		"<details data-file-info-raw>", "Raw probe data (ffprobe)", "&lt;b&gt;x&lt;/b&gt;",
 	} {
 		if !strings.Contains(out, w) {
 			t.Errorf("missing %q:\n%s", w, out)
@@ -75,7 +77,8 @@ func TestFileInfoCardRenders(t *testing.T) {
 	if n := strings.Count(out, "data-file-info-default"); n != 2 {
 		t.Errorf("default badges: %d, want one audio and one subtitle", n)
 	}
-	for _, b := range []string{"<script>", "https://", "token", "No subtitles", "No audio"} {
+	// No heading of its own (the dialog names the file), no footnote.
+	for _, b := range []string{"<script>", "<b>x", "https://", "token", "No subtitles", "No audio", "File info", "<h3", "a player set to a language"} {
 		if strings.Contains(out, b) {
 			t.Errorf("must not contain %q", b)
 		}
@@ -87,7 +90,7 @@ func TestFileInfoCardRenders(t *testing.T) {
 			t.Errorf("empty probe: missing %q", w)
 		}
 	}
-	for _, b := range []string{">Video<", "Duration"} {
+	for _, b := range []string{">Video<", "Duration", "<details"} {
 		if strings.Contains(empty, b) {
 			t.Errorf("empty probe: must not contain %q", b)
 		}
@@ -101,7 +104,7 @@ func TestFileInfoCardRenders(t *testing.T) {
 	}
 
 	ru := renderModal(t, tpl, "ru", &ctx{Lang: "ru", Data: full})
-	for _, w := range []string{"О файле", "русский", "Язык не указан", "8,4\u00a0Мбит/с", "по умолчанию"} {
+	for _, w := range []string{"Длительность", "русский", "Язык не указан", "8,4\u00a0Мбит/с", "по умолчанию", "Сырые данные пробы (ffprobe)"} {
 		if !strings.Contains(ru, w) {
 			t.Errorf("ru: missing %q", w)
 		}

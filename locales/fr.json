@@ -707,7 +707,7 @@
     "action.fileInfo.noAudio": "Le fichier n'a aucune piste audio",
     "action.fileInfo.noSubtitles": "Aucun sous-titre intégré au fichier",
     "action.fileInfo.cc": "Sous-titres codés (CC) dans le flux vidéo",
-    "action.fileInfo.hint": "« Par défaut » : la piste qu'un lecteur lance quand aucune langue préférée n'y est réglée ; s'il en a une, il peut en choisir une autre.",
+    "action.fileInfo.raw": "Données brutes de l’analyse (ffprobe)",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Plus de langues",
     "action.stream.preferredLangHint": "Sert à choisir les sous-titres et à proposer la traduction par IA. Vient de votre profil ou, à défaut, du navigateur.",

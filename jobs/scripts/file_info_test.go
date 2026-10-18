@@ -2,6 +2,7 @@ package scripts
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -15,7 +16,8 @@ import (
 // the SDH title fallback the subtitles case, without the attached_pic skip
 // the cover-art case. Without the denied-word guard (titleSays) or the "."
 // in sdhTitleRe's boundary, the denied-word case goes red; without the
-// closed_captions read, the captions case.
+// closed_captions read, the captions case; without the bitrate estimate,
+// both approximate cases, and without its one-video guard, the two-video one.
 func TestBuildFileInfo(t *testing.T) {
 	type tr = FileInfoTrack
 	cases := []struct {
@@ -106,7 +108,7 @@ func TestBuildFileInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "cover art is not a video stream; HLG; container bitrate is not the stream's",
+			name: "cover art is not a video stream; HLG; no stream bitrate: the container's, approximate",
 			probe: `{"format":{"duration":"59.6","bit_rate":"9000000"},"streams":[
 				{"codec_type":"video","codec_name":"mjpeg","width":600,"height":600,"disposition":{"attached_pic":1}},
 				{"codec_type":"video","codec_name":"hevc","width":1920,"height":1080,"color_transfer":"arib-std-b67"},
@@ -114,9 +116,27 @@ func TestBuildFileInfo(t *testing.T) {
 				{"codec_type":"data","codec_name":"bin_data"}]}`,
 			want: FileInfo{
 				Duration: "0:01:00",
-				Video:    []FileInfoVideo{{Codec: "HEVC", Width: 1920, Height: 1080, HDR: "HLG"}},
+				Video:    []FileInfoVideo{{Codec: "HEVC", Width: 1920, Height: 1080, HDR: "HLG", Mbps: 9000000.0 / (1 << 20), Approx: true}},
 				Audio:    []tr{{Lang: "ja", Codec: "OPUS", Channels: "stereo", Default: true}},
 			},
+		},
+		{
+			name: "no video bitrate: the container's less what the audio records",
+			probe: `{"format":{"bit_rate":"4000000"},"streams":[
+				{"codec_type":"video","codec_name":"h264","width":1280,"height":720},
+				{"codec_type":"audio","codec_name":"ac3","bit_rate":"448000","tags":{"language":"rus"},"disposition":{"default":1}},
+				{"codec_type":"audio","codec_name":"ac3","bit_rate":"448000","tags":{"language":"eng"}}]}`,
+			want: FileInfo{
+				Video: []FileInfoVideo{{Codec: "H264", Width: 1280, Height: 720, Mbps: 3104000.0 / (1 << 20), Approx: true}},
+				Audio: []tr{{Lang: "ru", Codec: "AC3", Default: true}, {Lang: "en", Codec: "AC3"}},
+			},
+		},
+		{
+			name: "two videos without bitrates: no estimate (the file does not say how they share it)",
+			probe: `{"format":{"bit_rate":"4000000"},"streams":[
+				{"codec_type":"video","codec_name":"h264","width":1280,"height":720},
+				{"codec_type":"video","codec_name":"h264","width":640,"height":360}]}`,
+			want: FileInfo{Video: []FileInfoVideo{{Codec: "H264", Width: 1280, Height: 720}, {Codec: "H264", Width: 640, Height: 360}}},
 		},
 		{
 			name:  "nothing inside: empty lists, no duration",
@@ -144,5 +164,34 @@ func TestFileInfoBitrateLabel(t *testing.T) {
 	}
 	if got := (FileInfoVideo{}).BitrateLabel("en"); got != "" {
 		t.Errorf("no bitrate: %q", got)
+	}
+}
+
+// The raw view is ffprobe's JSON minus the one field that is ours, not the
+// file's: format.filename, the ~cp source URL with its credentials.
+// Negative control (run 2026-10-18): without the delete, the filename case
+// goes red; without RedactURL, the tag case.
+func TestRawProbeJSON(t *testing.T) {
+	got := rawProbeJSON([]byte(`{"streams":[{"index":0,"codec_name":"h264","tags":{"comment":"see https://x.example/?token=abc123"}}],
+		"format":{"filename":"https://thp.example/h/f.mkv~cp?api-key=k1&token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl","format_name":"matroska,webm","bit_rate":"4000000"}}`))
+	for _, w := range []string{`"codec_name": "h264"`, `"format_name": "matroska,webm"`, `"bit_rate": "4000000"`, "\n  \"streams\": ["} {
+		if !strings.Contains(got, w) {
+			t.Errorf("missing %q in\n%s", w, got)
+		}
+	}
+	for _, leak := range []string{"filename", "thp.example", "k1", "eyJhbGciOiJIUzI1NiJ9", "abc123"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("leaks %q:\n%s", leak, got)
+		}
+	}
+	if got := rawProbeJSON([]byte(`{"format":"https://thp.example/?token=x","streams":[]}`)); strings.Contains(got, "thp.example") {
+		t.Errorf("a format that is not an object stays: %s", got)
+	}
+	if got := rawProbeJSON([]byte(`not json`)); got != "" {
+		t.Errorf("not JSON: %q", got)
+	}
+	big := rawProbeJSON([]byte(`{"streams":[{"tags":{"title":"` + strings.Repeat("x", rawProbeLimit) + `"}}]}`))
+	if len(big) > rawProbeLimit+len("\n…") || !strings.HasSuffix(big, "…") {
+		t.Errorf("not capped: %d bytes", len(big))
 	}
 }

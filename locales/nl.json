@@ -703,7 +703,7 @@
     "action.fileInfo.noAudio": "Het bestand heeft geen audiosporen",
     "action.fileInfo.noSubtitles": "Geen ingebouwde ondertitels in het bestand",
     "action.fileInfo.cc": "Closed captions (CC) in de videostream",
-    "action.fileInfo.hint": "‘Standaard’ is het spoor waarmee een speler zonder voorkeurstaal begint; met een ingestelde taal kan hij een ander kiezen.",
+    "action.fileInfo.raw": "Ruwe analysegegevens (ffprobe)",
     "action.stream.badge.ai": "AI",
     "action.stream.moreLanguages": "Meer talen",
     "action.stream.preferredLangHint": "Hiermee worden ondertitels gekozen en wordt de AI-vertaling aangeboden. Komt uit je profiel of, als daar niets staat, uit je browser.",

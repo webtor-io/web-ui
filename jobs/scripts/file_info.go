@@ -2,6 +2,7 @@ package scripts
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -51,12 +52,14 @@ func (s *ActionScript) fileInfo(ctx context.Context, j *job.Job, c *web.Context,
 	j.InProgress(s.t("job.probingMedia"))
 	probeCtx, probeCancel := context.WithTimeout(ctx, fileInfoProbeTimeout)
 	defer probeCancel()
-	mp, err := s.api.GetMediaProbe(probeCtx, contentProbeURL(resp.ExportItems["download"].URL))
+	mp, raw, err := s.api.GetMediaProbeRaw(probeCtx, contentProbeURL(resp.ExportItems["download"].URL))
 	if err != nil {
 		return probeError(err)
 	}
 	j.Done()
-	return s.renderActionTemplate(j, c, buildFileInfo(mp), "file_info")
+	fi := buildFileInfo(mp)
+	fi.Raw = rawProbeJSON(raw)
+	return s.renderActionTemplate(j, c, fi, "file_info")
 }
 
 // probeError says whose failure a failed probe is:
@@ -107,6 +110,8 @@ type FileInfo struct {
 	// ClosedCaptions: a video stream carries CEA-608/708 captions -- no
 	// subtitle stream, yet VLC shows them.
 	ClosedCaptions bool
+	// Raw is ffprobe's JSON for the card's raw view (rawProbeJSON).
+	Raw string
 }
 
 type FileInfoVideo struct {
@@ -117,6 +122,9 @@ type FileInfoVideo struct {
 	// unknown. Dolby Vision needs side_data_list and is not read yet.
 	HDR  string
 	Mbps float64
+	// Approx: the file records no bitrate for this stream; Mbps is the
+	// container's less the other streams' (buildFileInfo).
+	Approx bool
 }
 
 // BitrateLabel is the stream's bitrate printed as the transfer status prints
@@ -250,7 +258,63 @@ func buildFileInfo(mp *api.MediaProbe) *FileInfo {
 	if subDefault >= 0 {
 		fi.Subtitles[subDefault].Default = true
 	}
+	// A Matroska video without mkvmerge's statistics tags records no bitrate
+	// of its own. The container's is the whole file's; less what the other
+	// streams record it is the video's, high by whatever an untagged one
+	// carries -- hence approximate. One video stream only: two would share
+	// the remainder in a way the file does not say.
+	if len(fi.Video) == 1 && fi.Video[0].Mbps == 0 {
+		if total := parseBitrate(mp.Format.BitRate); total > 0 {
+			var rest int64
+			for i, s := range mp.Streams {
+				if s.CodecType != "video" {
+					rest += streamBitrate(mp, i)
+				}
+			}
+			if v := total - rest; v > 0 {
+				fi.Video[0].Mbps = statusview.BitsToMbps(float64(v))
+				fi.Video[0].Approx = true
+			}
+		}
+	}
 	return fi
+}
+
+// rawProbeLimit caps the raw view: the card is replayed from the job's
+// storage and its body logged with the job (services/job logToLogger).
+const rawProbeLimit = 32 << 10
+
+// rawProbeJSON is the probe as ffprobe printed it, for the card's raw view:
+// indented, format.filename -- the ~cp source URL, credentials and all --
+// dropped (the whole format when it is not an object), anything else that
+// names a credential redacted, capped. "" when the body is not a JSON object.
+func rawProbeJSON(raw []byte) string {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return ""
+	}
+	if f, ok := top["format"]; ok {
+		var format map[string]json.RawMessage
+		if err := json.Unmarshal(f, &format); err != nil {
+			delete(top, "format")
+		} else {
+			delete(format, "filename")
+			b, err := json.Marshal(format)
+			if err != nil {
+				return ""
+			}
+			top["format"] = b
+		}
+	}
+	b, err := json.MarshalIndent(top, "", "  ")
+	if err != nil {
+		return ""
+	}
+	out := helpers.RedactURL(string(b))
+	if len(out) > rawProbeLimit {
+		out = strings.ToValidUTF8(out[:rawProbeLimit], "") + "\n…"
+	}
+	return out
 }
 
 // canonicalLang is "en" for "eng" (the canonizeSrcLangs rule of

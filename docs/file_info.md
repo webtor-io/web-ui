@@ -19,9 +19,12 @@ Free for everyone; anonymous starts pass Turnstile like every job start
 
 - Button: `partials/file.html`, video and audio only, built by
   `handlers/resource` `MakeFileInfo` (`partials/button.html`, action
-  `file-info`). Outlined and neutral (the row's secondary action); on a
-  phone a full-width line of its own under Watch and Download (as a third
-  icon in the row it squashed their icons to 0 px at 360 px). The deep link
+  `file-info`). The row's last button, outlined and neutral. On a phone the
+  row stays one line (owner, 2026-10-18): File info is a 44 px icon at its
+  end, and the row's `data-crowded` drops Watch's and Download's icons and
+  narrows their padding to 8 px; a label longer than what is left ends in an
+  ellipsis (at 360 px only de/fr/nl Download beside the watched toggle). The
+  deep link
   `#action=file-info` and the Umami click event `file-info` come from the
   form's class and `data-umami-event` with no code of their own.
 - `POST /file-info` → `h.post(c, "file-info")`: CSRF, Turnstile for
@@ -47,6 +50,10 @@ Free for everyone; anonymous starts pass Turnstile like every job start
   transcoded file. Deploy content-prober first.
 
 ## What the card says (`buildFileInfo`, a pure function)
+
+One column of sections — Duration, Video, Audio, Subtitles — then the raw
+data, collapsed. No heading of its own (the dialog names the file) and no
+footnote (owner, 2026-10-18).
 
 - **Default audio**: the first audio track with `disposition.default=1`, else
   the first audio track — what a player with no preferred language starts
@@ -74,7 +81,15 @@ Free for everyone; anonymous starts pass Turnstile like every job start
   checked.)
 - **Video**: cover art (`attached_pic`) skipped; HDR10 for `smpte2084`, HLG for
   `arib-std-b67` (Dolby Vision needs `side_data_list`, not read yet); bitrate
-  from the stream (or mkvmerge's BPS tags), in the status's megabit.
+  from the stream (or mkvmerge's BPS tags), in the status's megabit. A video
+  that records none (a Matroska without mkvmerge's statistics tags) shows
+  `≈` the container's bitrate less what the other streams record — high by
+  whatever an untagged audio carries; not with two video streams.
+- **Raw data** (`rawProbeJSON`): ffprobe's JSON as content-prober sent it
+  (`api.GetMediaProbeRaw`), indented, in a collapsed `<details>`. Without
+  `format.filename` — the `~cp` source URL with its credentials — and through
+  `helpers.RedactURL`, capped at 32 KiB (the card is replayed from the job's
+  storage and logged with it).
 - Not shown: chapters, container tags (free text, no use here), OpenSubtitles
   or sidecar subtitles, a "for your language" verdict (44% of a live sample had
   an untagged audio track).
@@ -104,7 +119,9 @@ probe.
 ## Privacy and policy
 
 - The job log replaying the card is public (`Access-Control-Allow-Origin: *`):
-  the card holds no URL. Track titles are escaped (`html/template`).
+  the card holds no URL of ours (the raw view drops `format.filename`; a URL
+  in a file's own tags is the file's). Titles, tags and the raw JSON are
+  escaped (`html/template`).
 - Nothing is stored or aggregated: no table, no index, no Discover filter
   (the no-content-indexing policy). Like every action's, the rendered card
   lives in the job's Redis storage until the job's 30-minute deadline and its

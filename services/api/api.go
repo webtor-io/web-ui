@@ -928,13 +928,21 @@ func (s *Api) GetOpenSubtitles(ctx context.Context, u string) ([]OpenSubtitleTra
 }
 
 func (s *Api) GetMediaProbe(ctx context.Context, u string) (*MediaProbe, error) {
+	mp, _, err := s.GetMediaProbeRaw(ctx, u)
+	return mp, err
+}
+
+// GetMediaProbeRaw is GetMediaProbe with the body content-prober sent: the
+// ~cp path hands ffprobe's JSON through whole, every field (File info's raw
+// view). Its format.filename is the source URL, credentials and all.
+func (s *Api) GetMediaProbeRaw(ctx context.Context, u string) (*MediaProbe, []byte, error) {
 	req, err := s.makeTorrentHTTPProxyRequest(ctx, u)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to make new request")
+		return nil, nil, errors.Wrap(err, "failed to make new request")
 	}
 	res, err := s.do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to do request")
+		return nil, nil, errors.Wrap(err, "failed to do request")
 	}
 	b := res.Body
 	defer func(b io.ReadCloser) {
@@ -945,18 +953,18 @@ func (s *Api) GetMediaProbe(ctx context.Context, u string) (*MediaProbe, error) 
 	// data=404 page not found" and hid the status the caller needed.
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		body, _ := io.ReadAll(io.LimitReader(b, 256))
-		return nil, errors.Errorf("media probe status=%v body=%q", res.StatusCode, strings.TrimSpace(string(body)))
+		return nil, nil, errors.Errorf("media probe status=%v body=%q", res.StatusCode, strings.TrimSpace(string(body)))
 	}
 	mb := MediaProbe{}
 	data, err := io.ReadAll(b)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read data")
+		return nil, nil, errors.Wrap(err, "failed to read data")
 	}
 	err = json.Unmarshal(data, &mb)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal data=%v", string(data))
+		return nil, nil, errors.Wrapf(err, "failed to unmarshal data=%v", string(data))
 	}
-	return &mb, nil
+	return &mb, data, nil
 }
 
 func (s *Api) Stats(ctx context.Context, u string) (chan EventData, error) {
