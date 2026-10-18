@@ -1294,6 +1294,14 @@ html {
       &::before { content: none; }
     }
 
+    /* A job's note under the stage line (lib/progressLog.js addNote). */
+    &.info-summary {
+      @apply px-5 py-1.5 rounded-lg mx-5 mt-1;
+      background-color: rgba(148, 163, 184, 0.08);
+      color: #cbd5e1;
+      &::before { content: none; }
+    }
+
     &.inprogress,
     &.statusupdate {
       color: #00cec9;
@@ -2192,6 +2200,12 @@ input:-webkit-autofill:focus {
 }
 .job-results:not(:empty) {
   margin-top: 0.25rem;
+}
+/* A long address ("Login link sent to …") breaks inside the box instead of
+   running out of it on a phone. */
+.job-stage-title,
+.job-results pre {
+  overflow-wrap: anywhere;
 }
 .job-steps {
   padding: 0 1.25rem;

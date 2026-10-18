@@ -15,7 +15,7 @@
     </div>
 
     <form class="progress-alert progress-alert-block hidden closeable">
-      <div class="log-target"></div>
+      {{ template "job/log" .Ctx.Lang }}
       <div class="pt-3 flex justify-end hidden alert-close-wrapper">
         <div class="error hidden">
           <a data-async-target="main" class="close" href="{{ langPath .Ctx.Lang "/login" }}">{{ t .Ctx.Lang "auth.logout.loginAgain" }}</a>

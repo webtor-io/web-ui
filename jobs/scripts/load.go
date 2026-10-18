@@ -88,8 +88,9 @@ func magnetCountdown(tp func(string, map[string]any) string, left time.Duration)
 		return ""
 	}
 	// Its own short key: the warm-up's countdown says "looking for peers ·
-	// 43 s left" since 2026-10-14, and the magnet line reads "magnetizing
-	// (43 s)". Rounded up in both forms, so 60 is "1:00" and never shown twice.
+	// 43 s left" since 2026-10-14, and the magnet line reads "Getting the
+	// torrent from peers   43 s". Rounded up in both forms, so 60 is "1:00"
+	// and never shown twice.
 	sec := int(math.Ceil(left.Seconds()))
 	if sec < 60 {
 		return tp("job.magnetCountdown", map[string]any{"Seconds": sec})

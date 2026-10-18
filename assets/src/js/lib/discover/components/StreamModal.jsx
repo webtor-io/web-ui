@@ -278,11 +278,25 @@ function ProgressView({ logUrl, title, poster, fileIdx }) {
                     // Same host shape as partials/load/progress.html: a div (cards
                     // emitted by the job carry their own forms) inside #log-load,
                     // so the dead-magnet card's retry re-renders the log here
-                    // instead of navigating "main" away from the modal.
+                    // instead of navigating "main" away from the modal. Inside,
+                    // what partials/job_log.html renders.
                     <div id="log-load" data-async-layout={'{{ template "load/progress" $ }}'}>
                         <div class="progress-alert" data-async-progress-log={logUrl} data-async-target="main">
                             {fileIdx != null && <input type="hidden" name="file-idx" value={fileIdx} />}
-                            <div class="log-target"></div>
+                            <div class="job-stage" hidden>
+                                <div class="job-stage-row">
+                                    <span class="loading loading-spinner loading-sm job-stage-spin" aria-hidden="true"></span>
+                                    <span class="job-stage-title"></span>
+                                    <span class="job-stage-meta"></span>
+                                </div>
+                                <progress class="progress job-stage-bar" max="100"></progress>
+                            </div>
+                            <div class="job-results"></div>
+                            <details class="job-steps">
+                                <summary>{t('discover.showSteps')}</summary>
+                                <div class="log-target"></div>
+                            </details>
+                            <p class="sr-only" role="status" data-job-announce></p>
                         </div>
                     </div>
                 ) : (

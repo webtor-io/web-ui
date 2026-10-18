@@ -654,6 +654,14 @@
       with colored dot prefixes (pulsing on in-progress) and tinted summary rows (no dots).
       See live demos at <code>/tests/progress_log</code>.
     </p>
+    <p class="desc">
+      <strong>A host on the site renders <code>{{ template "job/log" $.Lang }}</code></strong> (<code>templates/partials/job_log.html</code>)
+      inside it instead of a bare <code>.log-target</code>: one line in plain words for the running step
+      (<code>.job-stage</code>, its countdown or percent, a bar), notes (<code>info-summary</code>), cards and verdicts
+      under it (<code>.job-results</code>), and the lines below folded under "Show steps" (<code>.job-steps</code>).
+      Download/Watch, the home page and Discover magnet load, the crypto payment wait, sign-in and sign-out
+      all use it (docs/job_wait_ux.md). Only the embed keeps the plain log the demos below show.
+    </p>
 
     <!-- 9.1 Log Line States -->
     <h3 class="text-sm font-semibold text-w-muted uppercase tracking-widest mb-4">Log Line States</h3>
@@ -787,7 +795,7 @@ log
     <div class="uikit-card bg-w-surface mb-6">
       <pre style="color:#94a3b8;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;line-height:1.6">&lt;!-- Block variant (standard) --&gt;
 &lt;form class="hidden progress-alert progress-alert-block closeable"&gt;
-    &lt;div class="log-target"&gt;&lt;/div&gt;
+    {{ template "job/log" $.Lang }}
     &lt;div class="pt-3 flex justify-end hidden alert-close-wrapper"&gt;
         &lt;div class="error hidden"&gt;
             &lt;a class="close closeable-close"&gt;error action&lt;/a&gt;
@@ -802,11 +810,11 @@ log
     &lt;a class="closeable-close close"&gt;ok&lt;/a&gt;
 &lt;/div&gt;
 
-&lt;!-- With SSE auto-connect --&gt;
+&lt;!-- With SSE auto-connect: the stage line, notes and verdicts, the folded steps --&gt;
 &lt;form class="hidden progress-alert progress-alert-block closeable"
       data-async-progress-log="/job/log/url"
       data-async-target="main"&gt;
-    &lt;div class="log-target"&gt;&lt;/div&gt;
+    {{ template "job/log" $.Lang }}
 &lt;/form&gt;</pre>
       <div class="uikit-label mt-4">
         <code>.log-target</code> = where JS appends <code>&lt;pre&gt;</code> lines<br>

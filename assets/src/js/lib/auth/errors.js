@@ -48,8 +48,10 @@ export async function describeAuthError(err, {t, tf}, env = {}) {
         }
         return {message: t('auth.progress.sessionExpired'), reloading: false};
     }
-    if (err?.statusText) return {message: err.statusText.toLowerCase(), reloading: false};
-    if (err?.message) return {message: err.message.toLowerCase(), reloading: false};
+    // As they come: the log reads in sentences (lib/progressLog.js), not as
+    // a lowercase console.
+    if (err?.statusText) return {message: err.statusText, reloading: false};
+    if (err?.message) return {message: err.message, reloading: false};
     if (err?.status) return {message: tf('auth.progress.requestFailed', err.status), reloading: false};
     return {message: t('auth.progress.unknownError'), reloading: false};
 }

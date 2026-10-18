@@ -19,11 +19,11 @@
      infohash + language and its log is replayed to everyone who loads the
      same torrent, so a slug baked into the stored redirect would follow the
      first visitor's page to all the others. See docs/tool_pages.md. */}}
-<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px]" data-async-progress-log="{{ makeJobLogURL .Lang .Data.Job }}" data-async-target="main">
+<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px] text-left" data-async-progress-log="{{ makeJobLogURL .Lang .Data.Job }}" data-async-target="main">
     {{- with .Data }}{{ if has . "Tool" }}{{ with .Tool }}
     <input type="hidden" name="tool" value="{{ .Url }}" />
     {{- end }}{{ end }}{{ end }}
-    <div class="log-target"></div>
+    {{ template "job/log" .Lang }}
     <div class="pt-3 justify-end flex hidden alert-close-wrapper">
         <a class="closeable-close close">{{ t .Lang "home.gotIt" }}</a>
     </div>

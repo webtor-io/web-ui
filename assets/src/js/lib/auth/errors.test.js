@@ -65,7 +65,7 @@ test('any other status says the status, not "unknown error"', async () => {
 });
 
 test('messages and status texts pass through as before', async () => {
-    assert.equal((await describeAuthError(new Error('Network Error'), i18n)).message, 'network error');
-    assert.equal((await describeAuthError({status: 500, statusText: 'Internal'}, i18n)).message, 'internal');
+    assert.equal((await describeAuthError(new Error('Network Error'), i18n)).message, 'Network Error');
+    assert.equal((await describeAuthError({status: 500, statusText: 'Internal'}, i18n)).message, 'Internal');
     assert.equal((await describeAuthError({}, i18n)).message, 'auth.progress.unknownError');
 });

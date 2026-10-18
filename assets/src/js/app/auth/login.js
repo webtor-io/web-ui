@@ -2,6 +2,10 @@ import { init as initI18n, t, tf } from '../../lib/auth/i18n';
 
 const EMAIL_KEY = 'auth.loginEmail';
 
+// "Opening Google", not "opening google": the log names the provider the way
+// its button does.
+const PROVIDERS = {google: 'Google', patreon: 'Patreon'};
+
 (function restoreEmail() {
     try {
         const email = sessionStorage.getItem(EMAIL_KEY);
@@ -49,18 +53,19 @@ window.signInWith = function(e, provider) {
         const initProgressLog = (await import('../../lib/progressLog')).initProgressLog;
         const pl = initProgressLog(document.querySelector('.progress-alert'));
         pl.clear();
-        const progressEntry = pl.inProgress('login', tf('auth.progress.redirectingTo', provider));
+        const name = PROVIDERS[provider] || provider;
+        const progressEntry = pl.inProgress('login', tf('auth.progress.redirectingTo', name));
         const supertokens = (await import('../../lib/supertokens'));
         try {
             await supertokens.signInWith(window._CSRF, provider);
         } catch (err) {
             console.error(err);
             if (err.statusText) {
-                progressEntry.error(err.statusText.toLowerCase());
+                progressEntry.error(err.statusText);
             } else if (err.message) {
-                progressEntry.error(err.message.toLowerCase());
+                progressEntry.error(err.message);
             } else {
-                progressEntry.error(tf('auth.progress.redirectFailed', provider));
+                progressEntry.error(tf('auth.progress.redirectFailed', name));
             }
             progressEntry.close();
         }

@@ -104,11 +104,12 @@ class Renderer {
         this.el = el;
         this.func = func;
         this.lt = el.querySelector('.log-target');
-        // The action log's host (views/action/post.html) has a .job-stage:
-        // one line in plain words for the running step, with its countdown
-        // or percent and a bar; the steps folded under "Show steps"; cards
-        // and verdicts outside the fold. Other hosts (home, embed, donate)
-        // have none and keep the plain log.
+        // A host rendered with partials/job_log.html has a .job-stage: one
+        // line in plain words for the running step, with its countdown or
+        // percent and a bar; the steps folded under "Show steps"; notes,
+        // cards and verdicts outside the fold. Every host has it but the
+        // embed's (embed off on prod from 2026-11-01), which keeps the plain
+        // log.
         this.stage = el.querySelector('.job-stage');
         this.results = (this.stage && el.querySelector('.job-results')) || this.lt;
         this.announcer = this.stage ? el.querySelector('[data-job-announce]') : null;
@@ -195,6 +196,25 @@ class Renderer {
         this.endStage();
         this.say(data.message);
     }
+    // addNote: a job's info line is something to read, not a step -- "we
+    // don't have this torrent yet", "still waiting, you can close this
+    // page". With a stage it goes under the line, and the line stays: a note
+    // is not the answer. Its words tell one from another: services/job tags
+    // an info with the step before it, which is also why addLine drops it
+    // as that step's repeat -- in the plain log nobody ever saw one.
+    addNote(data) {
+        if (!this.stage || !data.message) return;
+        if (byAttr(this.results, 'task-note', data.message)) return;
+        const pre = document.createElement('pre');
+        const line = document.createElement('span');
+        line.classList.add('line');
+        pre.appendChild(line);
+        line.textContent = data.message;
+        pre.classList.add('info-summary');
+        pre.setAttribute('task-note', data.message);
+        this.results.appendChild(pre);
+        this.say(data.message);
+    }
     addLine(data) {
         const el = byAttr(this.lt, 'task-tag', data.tag);
         if (el) return;
@@ -262,13 +282,13 @@ class Renderer {
 
     renderMessage(data) {
         if (data.level === 'clear') {
-            this.lt.innerText = '';
+            this.lt.textContent = '';
             this.el.classList.add('hidden');
             this.hideClose();
             this.disableError();
             this.inited = false;
             this.rendered = false;
-            if (this.results !== this.lt) this.results.innerText = '';
+            if (this.results !== this.lt) this.results.textContent = '';
             this.endStage();
             this.stageTag = null;
         } else if (!this.inited) {
@@ -343,6 +363,7 @@ class Renderer {
         }
         if (data.level === 'info') {
             this.addLine(data);
+            this.addNote(data);
         }
         if (data.level === 'inprogress') {
             this.addLine(data);

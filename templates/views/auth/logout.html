@@ -29,7 +29,7 @@
          a failed fetch -- against another host entirely when DOMAIN does not
          match where the page was served from. */}}
     <form class="progress-alert progress-alert-block hidden closeable">
-      <div class="log-target"></div>
+      {{ template "job/log" $.Lang }}
       <div class="pt-3 flex justify-end hidden alert-close-wrapper">
         <a data-async-target="main" class="close" href="{{ langPath $.Lang "/login" }}">{{ t $.Lang "auth.logout.loginAgain" }}</a>
         <a data-async-target="main" class="close closeable-close" href="{{ langPath $.Lang "/" }}">{{ t $.Lang "auth.logout.goHome" }}</a>

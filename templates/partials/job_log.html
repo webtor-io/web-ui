@@ -1,0 +1,22 @@
+{{ define "job/log" }}
+{{/* The inside of every job log host (.progress-alert with a .log-target):
+     one line in plain words for the step that is running, with its countdown
+     or percent and a bar; notes, cards and verdicts under it; the full step
+     list folded under "Show steps" (lib/progressLog.js, docs/job_wait_ux.md).
+     Called with the language: {{ template "job/log" $.Lang }}. The Discover
+     stream modal draws the same markup in JSX (StreamModal.jsx). */}}
+<div class="job-stage" hidden>
+  <div class="job-stage-row">
+    <span class="loading loading-spinner loading-sm job-stage-spin" aria-hidden="true"></span>
+    <span class="job-stage-title"></span>
+    <span class="job-stage-meta"></span>
+  </div>
+  <progress class="progress job-stage-bar" max="100"></progress>
+</div>
+<div class="job-results"></div>
+<details class="job-steps">
+  <summary>{{ t . "action.showSteps" }}</summary>
+  <div class="log-target"></div>
+</details>
+<p class="sr-only" role="status" data-job-announce></p>
+{{ end }}

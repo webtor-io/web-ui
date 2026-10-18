@@ -65,7 +65,7 @@
         <button type="submit" class="btn btn-soft join-item" data-umami-event="login-magic-link">{{ t $.Lang "auth.login.send" }}</button>
       </form>
       <form class="hidden progress-alert progress-alert-block mt-5 closeable">
-        <div class="log-target"></div>
+        {{ template "job/log" $.Lang }}
         <div class="pt-3 flex justify-end hidden alert-close-wrapper">
           <a class="close closeable-close">{{ t $.Lang "auth.gotIt" }}</a>
         </div>

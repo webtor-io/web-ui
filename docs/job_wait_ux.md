@@ -171,8 +171,18 @@ suffix "(37%)". Now:
 - Turnstile's check (`lib/turnstileAction.js`) draws the same line; when Cloudflare wants
   a click it says "Tick the box to continue" (`data-label-interactive` on
   `#turnstile-action`) and stops spinning: the wait is the viewer's then.
-- Other hosts of progressLog (home magnet load, embed, donate) have no `.job-stage` and
-  keep the plain log.
+- Every log on the site looks like this one (owner, 2026-10-18): Download/Watch and the
+  TAR/ZIP dialog, the magnet load on the home page and in Discover's stream modal, the
+  crypto payment wait, sign-in, the login-link check and sign-out. Their hosts render
+  `partials/job_log.html`; `StreamModal.jsx` draws the same markup (a test in
+  `lib/progressStage.test.js` compares the classes), a retry in the modal swaps in the
+  server's. Their words were rewritten as stages too ("Getting the torrent from peers",
+  "Checking the payment", "Logging out"; provider and network errors no longer
+  lowercased). A job's `info` line -- "we don't have this torrent yet", "still waiting,
+  you can close this page" -- is a note under the line (`.info-summary`, the line stays).
+  Until 2026-10-18 nobody ever saw one: services/job tags an info with the step before
+  it, and the log took it for a repeat of that step and dropped it. Only the embed keeps
+  the plain log: off on prod from 2026-11-01, and its own stylesheet.
 
 ## Sticky torrent status — `lib/stickyStatus.js`
 

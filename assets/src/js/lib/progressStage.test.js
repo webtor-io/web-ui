@@ -1,8 +1,9 @@
-// lib/progressLog.js on the action log's host (views/action/post.html, with
-// a .job-stage): one line for the running step, the steps folded, cards
-// and verdicts outside the fold. Other hosts keep the plain log.
+// lib/progressLog.js on a host rendered with partials/job_log.html (a
+// .job-stage): one line for the running step, the steps folded, notes, cards
+// and verdicts outside the fold. The embed's host keeps the plain log.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://webtor.io/' });
@@ -13,19 +14,13 @@ global.HTMLElement = dom.window.HTMLElement;
 
 const { initProgressLog } = await import('./progressLog.js');
 
-// The markup of views/action/post.html, without the SSE url: the test feeds
-// the messages through the SDK.
+// partials/job_log.html itself, its template actions dropped, in a host
+// without the SSE url: the test feeds the messages through the SDK.
+const partial = readFileSync(new URL('../../../../templates/partials/job_log.html', import.meta.url), 'utf8');
+const jobLog = partial.replace(/\{\{[\s\S]*?\}\}/g, (a) => (a.includes('showSteps') ? 'Show steps' : ''));
+
 function stageHost() {
-    document.body.innerHTML = `
-        <div class="hidden progress-alert">
-          <div class="job-stage" hidden>
-            <div class="job-stage-row"><span class="job-stage-spin"></span><span class="job-stage-title"></span><span class="job-stage-meta"></span></div>
-            <progress class="job-stage-bar" max="100"></progress>
-          </div>
-          <div class="job-results"></div>
-          <details class="job-steps"><summary>Show steps</summary><div class="log-target"></div></details>
-          <p class="sr-only" role="status" data-job-announce></p>
-        </div>`;
+    document.body.innerHTML = `<div class="hidden progress-alert">${jobLog}</div>`;
     const el = document.querySelector('.progress-alert');
     const sdk = initProgressLog(el);
     const q = (s) => el.querySelector(s);
@@ -85,17 +80,52 @@ test('over with nothing rendered: the line stops; a rendered player keeps it goi
     assert.equal(h.q('.job-stage').classList.contains('job-stage-done'), false, 'the player is still loading');
 });
 
-test('a plain host (home page, embed) keeps the plain log', () => {
+test('a note is read under the line, and the line stays', () => {
+    // The home page's "we don't have this torrent yet" before the magnet
+    // step; the payment page's "still waiting, you can close this page".
+    // As the server sends it: services/job tags an info with the step before
+    // it, so the folded list takes it for that step and drops it.
+    const note = { level: 'info', tag: 'check', message: 'We don\'t have this torrent yet, so we\'re getting it from peers' };
+    const { sdk, q } = stageHost();
+    sdk.inProgress('check', 'Checking the link');
+    sdk.done('check');
+    sdk.push(note);
+    assert.equal(q('.job-results pre.info-summary').textContent, note.message);
+    assert.equal(q('.job-stage').hidden, false, 'a note is not the answer');
+    assert.equal(q('.job-stage-title').textContent, 'Checking the link');
+    sdk.inProgress('peers', 'Getting the torrent from peers');
+    assert.equal(q('.job-stage-title').textContent, 'Getting the torrent from peers');
+    // A replayed log (EventSource reconnects and gets it from the start)
+    // brings the same note again: one is enough.
+    sdk.push(note);
+    assert.equal(q('.job-results').querySelectorAll('pre.info-summary').length, 1);
+    sdk.clear();
+    assert.equal(q('.job-results pre'), null, 'a new run starts clean');
+});
+
+test('the embed\'s plain host keeps the plain log', () => {
     document.body.innerHTML = '<div class="progress-alert"><div class="log-target"></div></div>';
     const el = document.querySelector('.progress-alert');
     const sdk = initProgressLog(el);
     sdk.inProgress('a', 'checking magnet');
+    sdk.info('a note');
     sdk.done('a', 'success! redirecting');
     sdk.push({ level: 'custom', tag: 'c', body: '<div class="card">card</div>' });
     const lt = el.querySelector('.log-target');
     assert.ok(lt.querySelector('pre[task-tag=a]'));
     assert.ok(lt.querySelector('pre.done-summary'));
     assert.ok(lt.querySelector('.card'));
+    assert.equal(lt.querySelectorAll('pre.info-summary').length, 0, 'its notes are lines of the log');
+});
+
+test('the Discover stream modal draws what partials/job_log.html renders', () => {
+    // StreamModal.jsx cannot call the Go partial; a retry inside the modal
+    // swaps in the server's version (load/progress), so the two must match.
+    const jsx = readFileSync(new URL('./discover/components/StreamModal.jsx', import.meta.url), 'utf8');
+    const host = jsx.slice(jsx.indexOf('<div class="job-stage"'), jsx.indexOf('data-job-announce') + 1);
+    const classes = (src) => [...src.matchAll(/class="([^"]+)"/g)].map((m) => m[1]).join('|');
+    assert.ok(host.length > 1, 'the modal has a stage');
+    assert.equal(classes(host), classes(partial.slice(partial.indexOf('<div class="job-stage"'))));
 });
 
 test('a step whose words have an apostrophe (the tag is the words) still gets its line, its ticks and its card', () => {

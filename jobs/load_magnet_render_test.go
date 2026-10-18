@@ -80,7 +80,7 @@ func TestLoadProgressPartialRenders(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	out := buf.String()
-	for _, w := range []string{`data-async-progress-log="/ru/queue/load/job/x/log"`, "home.gotIt", "load.js", `class="log-target"`} {
+	for _, w := range []string{`data-async-progress-log="/ru/queue/load/job/x/log"`, "home.gotIt", "load.js", `class="log-target"`, `class="job-stage"`, "action.showSteps"} {
 		if !strings.Contains(out, w) {
 			t.Errorf("missing %q in\n%s", w, out)
 		}
@@ -141,7 +141,7 @@ func progressPartial(t *testing.T) *template.Template {
 		"makeJobLogURL": func(lang string, j interface{}) string { return "/" + lang + "/queue/load/job/x/log" },
 		"asset":         func(p string) template.HTML { return template.HTML("<script src=\"" + p + "\"></script>") },
 		"has":           (&web.Helper{}).Has,
-	}).ParseFiles("../templates/partials/load/progress.html")
+	}).ParseFiles("../templates/partials/load/progress.html", "../templates/partials/job_log.html")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
