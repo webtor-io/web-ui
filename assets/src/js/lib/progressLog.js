@@ -143,9 +143,14 @@ class Renderer {
         if (pct) bar.value = Number(pct[1]);
         else bar.removeAttribute('value');
     }
-    // endStage: a card or a verdict is the answer now -- the line goes.
+    // endStage: a card or a verdict is the answer now -- the line goes, and
+    // the notes about the wait with it: "we're getting it from peers" over
+    // "nobody is sharing this torrent" said two things at once (stage,
+    // 2026-10-18).
     endStage() {
-        if (this.stage) this.stage.hidden = true;
+        if (!this.stage) return;
+        this.stage.hidden = true;
+        for (const n of this.results.querySelectorAll('pre.info-summary')) n.remove();
     }
     say(text) {
         if (this.announcer && text) this.announcer.textContent = text;

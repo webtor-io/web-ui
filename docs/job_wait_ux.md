@@ -179,7 +179,8 @@ suffix "(37%)". Now:
   server's. Their words were rewritten as stages too ("Getting the torrent from peers",
   "Checking the payment", "Logging out"; provider and network errors no longer
   lowercased). A job's `info` line -- "we don't have this torrent yet", "still waiting,
-  you can close this page" -- is a note under the line (`.info-summary`, the line stays).
+  you can close this page" -- is a note under the line (`.info-summary`, the line stays);
+  a card or verdict takes it away with the line.
   Until 2026-10-18 nobody ever saw one: services/job tags an info with the step before
   it, and the log took it for a repeat of that step and dropped it. Only the embed keeps
   the plain log: off on prod from 2026-11-01, and its own stylesheet.

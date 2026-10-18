@@ -103,6 +103,25 @@ test('a note is read under the line, and the line stays', () => {
     assert.equal(q('.job-results pre'), null, 'a new run starts clean');
 });
 
+test('the answer takes the notes about the wait with it', () => {
+    // The dead-magnet card under "we're getting it from peers" said two
+    // things at once.
+    const { sdk, q } = stageHost();
+    sdk.inProgress('peers', 'Getting the torrent from peers');
+    sdk.push({ level: 'info', tag: 'peers', message: 'We don\'t have this torrent yet' });
+    sdk.push({ level: 'custom', tag: 'peers', body: '<div class="card"><h3>Nobody is sharing this torrent right now</h3></div>' });
+    assert.ok(q('.job-results .card'));
+    assert.equal(q('.job-results pre.info-summary'), null);
+    // A note after the last step stays: the payment page's "still waiting,
+    // you can close this page" is the answer there.
+    const h = stageHost();
+    h.sdk.inProgress('wait', 'Waiting for your payment');
+    h.sdk.done('wait');
+    h.sdk.push({ level: 'info', tag: 'wait', message: 'Still waiting' });
+    h.sdk.close();
+    assert.equal(h.q('.job-results pre.info-summary').textContent, 'Still waiting');
+});
+
 test('the embed\'s plain host keeps the plain log', () => {
     document.body.innerHTML = '<div class="progress-alert"><div class="log-target"></div></div>';
     const el = document.querySelector('.progress-alert');
