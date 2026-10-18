@@ -119,10 +119,11 @@ the fold on 768-844 px tall screens. Nothing moved the page toward it.
   44 px icon at the end of the row (label `max-sm:sr-only`, `aria-pressed`, neutral
   instead of pink), a file with only a download has it full width, and the size moves
   from the Download label to a line under the file name. 40 px tall, as before. File
-  info (docs/file_info.md) is a full-width, outlined line of its own under the row
-  (`max-sm:basis-full max-sm:order-last`): a third icon in the row squashed the two
-  labels' icons to 0 px at 360 px (2026-10-18). From `sm` up the row is what it was,
-  File info last and outlined.
+  info (docs/file_info.md) is a 44 px outlined icon at the row's end (owner,
+  2026-10-18: one line). With it the row is `data-crowded`, which drops Watch's and
+  Download's icons and narrows their padding to 8 px -- two labels with icons beside two
+  44 px icons squashed those icons to slivers -- and a label too long for what is left
+  ends in an ellipsis. From `sm` up the row is what it was, File info last and outlined.
 
 ## The log in words — `lib/progressLog.js` with a `.job-stage`
 

@@ -20,20 +20,29 @@
 {{- $log = printf "log-%s-info" .Data.ID }}
 {{- $modal = printf "info-modal-%s" .Data.ID }}
 {{- end }}
-{{- /* File info is the row's secondary action: outlined and neutral, as the
+{{- /* File info is the row's last action, outlined and neutral, as the
      button table has it -- pink read as a third primary button on a phone
-     (file.html, the watched toggle). On a phone it takes a line of its own
-     under Watch and Download: as a third icon in the row it squashed their
-     icons to 0 px at 360 px and pushed de "Herunterladen" past its border
-     (measured 2026-10-18). */}}
-{{- $secondary := eq .Data.Action "file-info" }}
-<form class="{{ .Data.Action }} {{ if $secondary }}max-sm:basis-full max-sm:order-last{{ else }}max-sm:flex-1 max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
+     (file.html, the watched toggle). On a phone it is a 44 px icon at the
+     end of the one-line row (owner, 2026-10-18), its name for screen readers
+     and the tooltip. Watch and Download drop their icons there (file.html,
+     data-crowded): two labels with icons and two 44 px icons do not fit
+     360 px -- ru Watch alone needs 118 px of the 95 left, and the icons were
+     squashed to slivers -- their padding narrows to 8 px, and a label
+     longer than what is left ends in an ellipsis rather than crossing the
+     border (at 360 px with the watched toggle: de, fr, nl Download). */}}
+{{- $icon := eq .Data.Action "file-info" }}
+<form class="{{ .Data.Action }} {{ if $icon }}shrink-0{{ else }}max-sm:flex-1 max-sm:min-w-0{{ end }}" action="{{ langPath .Ctx.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data" data-async-target="#{{ $log }}" data-async-push-state="false"
       {{- if $modal }} onsubmit="var d=document.getElementById('{{ $modal }}');if(d&&!d.open)d.showModal()" onclick="var d=document.getElementById('{{ $modal }}');if(d&&!d.open&&this.dataset.busy)d.showModal()"{{ end }}>
     <input type="hidden" name="resource-id" value="{{ .Data.ResourceID }}" />
     <input type="hidden" name="item-id" value="{{ .Data.ItemID }}" />
-    <button type="submit" class="btn {{ if $secondary }}btn-ghost border border-w-line{{ else }}btn-soft{{ end }} whitespace-nowrap max-sm:w-full max-sm:px-3" data-umami-event="{{ .Data.Action }}">
+    <button type="submit" class="btn {{ if $icon }}btn-ghost border border-w-line max-sm:w-11 max-sm:px-0{{ else }}btn-soft max-sm:w-full max-sm:px-2{{ end }} whitespace-nowrap" data-umami-event="{{ .Data.Action }}"{{ if $icon }} title="{{ t .Ctx.Lang .Data.Name }}"{{ end }}>
+        {{- if $icon }}
         {{ template "icons" .Data.Action }}
-        {{ t .Ctx.Lang .Data.Name }}{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
+        <span class="max-sm:sr-only">{{ t .Ctx.Lang .Data.Name }}</span>
+        {{- else }}
+        <span class="inline-flex max-sm:group-data-crowded/actions:hidden">{{ template "icons" .Data.Action }}</span>
+        <span class="max-sm:truncate">{{ t .Ctx.Lang .Data.Name }}</span>{{ if .Data.Size }}<span class="max-sm:hidden">[{{ .Data.Size }}]</span>{{ end }}
+        {{- end }}
     </button>
 </form>
 {{ end }}
