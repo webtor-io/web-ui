@@ -248,6 +248,21 @@ type MediaProbe struct {
 		Channels      int    `json:"channels,omitempty"`
 		ChannelLayout string `json:"channel_layout,omitempty"`
 		SampleRate    string `json:"sample_rate,omitempty"`
+		// ColorTransfer and Disposition are ffprobe's own fields, which the
+		// ~cp path hands through untouched (content-prober returns raw
+		// ffprobe JSON). The probe the transcoder's index.json serves (the
+		// media_probe export) goes through content-prober's gRPC proto and
+		// has neither: zero there. Read by File info
+		// (jobs/scripts/file_info.go); the player still guesses "forced"
+		// from the title (handlers/action/helper.go).
+		ColorTransfer string `json:"color_transfer,omitempty"`
+		Disposition   struct {
+			Default         int `json:"default"`
+			Forced          int `json:"forced"`
+			HearingImpaired int `json:"hearing_impaired"`
+			// AttachedPic marks cover art an MP4 carries as a video stream.
+			AttachedPic int `json:"attached_pic"`
+		} `json:"disposition"`
 	} `json:"streams"`
 }
 

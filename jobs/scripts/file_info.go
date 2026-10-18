@@ -1,0 +1,192 @@
+package scripts
+
+import (
+	"fmt"
+	"math"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"golang.org/x/text/language"
+
+	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/statusview"
+)
+
+// FileInfo is what the "File info" card (action/file_info) shows of a
+// file's probe: what the FILE declares, for someone about to download it and
+// play it elsewhere (VLC). It is not the player's view: the player's
+// "default" is the viewer's own pick or language match
+// (handlers/action/helper.go GetAudioTracks), and its picker hides picture
+// subtitles the browser cannot draw. Nothing of it is stored (docs/file_info.md).
+type FileInfo struct {
+	// Duration is the container's, as H:MM:SS; "" when the probe has none.
+	Duration  string
+	Video     []FileInfoVideo
+	Audio     []FileInfoTrack
+	Subtitles []FileInfoTrack
+}
+
+type FileInfoVideo struct {
+	Codec  string
+	Width  int
+	Height int
+	// HDR is "HDR10" (PQ) or "HLG" from color_transfer; "" for SDR or
+	// unknown. Dolby Vision needs side_data_list and is not read yet.
+	HDR  string
+	Mbps float64
+}
+
+// BitrateLabel is the stream's bitrate printed as the transfer status prints
+// a speed ("8.4", ru "8,4"); "" when the file records none.
+func (v FileInfoVideo) BitrateLabel(lang string) string {
+	q := statusview.Quantize(v.Mbps)
+	if q == 0 {
+		return ""
+	}
+	return statusview.FormatNumber(lang, q)
+}
+
+type FileInfoTrack struct {
+	// Lang is the canonical tag ("en" for "eng"); "" when the file does not
+	// say. Never guessed: an untagged track is not English.
+	Lang  string
+	Title string
+	Codec string
+	// Channels is the audio channel layout ("5.1(side)"); audio only.
+	Channels string
+	// Picture: a picture-based subtitle (PGS, VobSub, DVB) -- an external
+	// player shows it, the browser player does not.
+	Picture bool
+	Default bool
+	Forced  bool
+	SDH     bool
+}
+
+// pictureSubtitleCodecs is handlers/action's bitmapSubtitleCodecs (that
+// package cannot be imported from here).
+var pictureSubtitleCodecs = map[string]bool{
+	"hdmv_pgs_subtitle": true,
+	"dvd_subtitle":      true,
+	"dvb_subtitle":      true,
+	"xsub":              true,
+}
+
+var subtitleCodecNames = map[string]string{
+	"subrip":            "SRT",
+	"ass":               "ASS",
+	"ssa":               "SSA",
+	"hdmv_pgs_subtitle": "PGS",
+	"dvd_subtitle":      "VobSub",
+	"dvb_subtitle":      "DVB",
+	"mov_text":          "TX3G",
+	"webvtt":            "WebVTT",
+}
+
+// forcedTitleRe is handlers/action's regex of the same name: "forced" as a
+// word of its own, underscores counting as separators.
+var forcedTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])forced($|[^a-z0-9])`)
+
+// sdhTitleRe: "SDH" or "CC" as a word of its own. 27 of 303 live probes
+// (2026-10-18) named SDH in the title, 19 set the disposition flag.
+var sdhTitleRe = regexp.MustCompile(`(?i)(^|[^a-z0-9])(sdh|cc)($|[^a-z0-9])`)
+
+// buildFileInfo turns a probe into the card. The default rule is what a
+// player with no preferred language does: the first track flagged default,
+// and for audio, where something always plays, the first track when none is
+// flagged. Matroska's FlagDefault defaults to 1, so "every track default" is
+// common (5 of 51 multi-audio files, 2026-10-18): only the first wins. A
+// subtitle nobody flagged is not shown by default, so it gets no fallback.
+func buildFileInfo(mp *api.MediaProbe) *FileInfo {
+	fi := &FileInfo{Duration: formatDuration(mp.Format.Duration)}
+	audioDefault, subDefault := -1, -1
+	for i, s := range mp.Streams {
+		switch s.CodecType {
+		case "video":
+			if s.Disposition.AttachedPic == 1 {
+				continue
+			}
+			fi.Video = append(fi.Video, FileInfoVideo{
+				Codec:  strings.ToUpper(s.CodecName),
+				Width:  s.Width,
+				Height: s.Height,
+				HDR:    hdrKind(s.ColorTransfer),
+				Mbps:   statusview.BitsToMbps(float64(streamBitrate(mp, i))),
+			})
+		case "audio":
+			if audioDefault < 0 && s.Disposition.Default == 1 {
+				audioDefault = len(fi.Audio)
+			}
+			fi.Audio = append(fi.Audio, FileInfoTrack{
+				Lang:     canonicalLang(s.Tags.Language),
+				Title:    s.Tags.Title,
+				Codec:    strings.ToUpper(s.CodecName),
+				Channels: s.ChannelLayout,
+			})
+		case "subtitle":
+			if subDefault < 0 && s.Disposition.Default == 1 {
+				subDefault = len(fi.Subtitles)
+			}
+			codec, ok := subtitleCodecNames[s.CodecName]
+			if !ok {
+				codec = strings.ToUpper(s.CodecName)
+			}
+			fi.Subtitles = append(fi.Subtitles, FileInfoTrack{
+				Lang:    canonicalLang(s.Tags.Language),
+				Title:   s.Tags.Title,
+				Codec:   codec,
+				Picture: pictureSubtitleCodecs[s.CodecName],
+				Forced:  s.Disposition.Forced == 1 || forcedTitleRe.MatchString(s.Tags.Title),
+				SDH:     s.Disposition.HearingImpaired == 1 || sdhTitleRe.MatchString(s.Tags.Title),
+			})
+		}
+	}
+	if audioDefault < 0 && len(fi.Audio) > 0 {
+		audioDefault = 0
+	}
+	if audioDefault >= 0 {
+		fi.Audio[audioDefault].Default = true
+	}
+	if subDefault >= 0 {
+		fi.Subtitles[subDefault].Default = true
+	}
+	return fi
+}
+
+// canonicalLang is "en" for "eng" (the canonizeSrcLangs rule of
+// handlers/action), "" for a track that does not say. A tag x/text cannot
+// read is kept as written: it is still what the file says.
+func canonicalLang(tag string) string {
+	tag = strings.TrimSpace(tag)
+	if tag == "" || strings.EqualFold(tag, "und") {
+		return ""
+	}
+	t, err := language.Parse(tag)
+	if err != nil {
+		return strings.ToLower(tag)
+	}
+	if s := t.String(); s != "und" {
+		return s
+	}
+	return ""
+}
+
+func hdrKind(colorTransfer string) string {
+	switch colorTransfer {
+	case "smpte2084":
+		return "HDR10"
+	case "arib-std-b67":
+		return "HLG"
+	}
+	return ""
+}
+
+// formatDuration prints ffprobe's seconds ("6723.4") as H:MM:SS ("1:52:03").
+func formatDuration(sec string) string {
+	f, err := strconv.ParseFloat(sec, 64)
+	if err != nil || !(f > 0) || math.IsInf(f, 0) {
+		return ""
+	}
+	n := int64(math.Round(f))
+	return fmt.Sprintf("%d:%02d:%02d", n/3600, n/60%60, n%60)
+}

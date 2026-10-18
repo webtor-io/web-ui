@@ -1,0 +1,117 @@
+package scripts
+
+import (
+	"reflect"
+	"testing"
+)
+
+// buildFileInfo is the whole of what the card claims about a file. The rules
+// a hard-of-hearing viewer decides on -- which audio starts, which subtitles
+// are inside, which of them are SDH or signs only -- each have a case here.
+//
+// Negative control (run 2026-10-18): with the "first flagged wins" guard
+// (`audioDefault < 0 &&`) removed, "every track flagged" goes red -- the last
+// track wins; with the no-flag fallback removed, "no flag" goes red; without
+// the SDH title fallback the subtitles case, without the attached_pic skip
+// the cover-art case.
+func TestBuildFileInfo(t *testing.T) {
+	type tr = FileInfoTrack
+	cases := []struct {
+		name  string
+		probe string
+		want  FileInfo
+	}{
+		{
+			name: "every track flagged default: only the first is the default",
+			probe: `{"format":{"duration":"6723.4"},"streams":[
+				{"codec_type":"video","codec_name":"hevc","width":3840,"height":2160,"color_transfer":"smpte2084","tags":{"BPS":"8800000"},"disposition":{"default":1}},
+				{"codec_type":"audio","codec_name":"eac3","channel_layout":"5.1(side)","tags":{"language":"rus","title":"Dub"},"disposition":{"default":1}},
+				{"codec_type":"audio","codec_name":"ac3","channel_layout":"stereo","tags":{"language":"eng"},"disposition":{"default":1}}]}`,
+			want: FileInfo{
+				Duration: "1:52:03",
+				Video:    []FileInfoVideo{{Codec: "HEVC", Width: 3840, Height: 2160, HDR: "HDR10", Mbps: 8800000.0 / (1 << 20)}},
+				Audio: []tr{
+					{Lang: "ru", Title: "Dub", Codec: "EAC3", Channels: "5.1(side)", Default: true},
+					{Lang: "en", Codec: "AC3", Channels: "stereo"},
+				},
+			},
+		},
+		{
+			name: "the flag on the second track moves the default there",
+			probe: `{"streams":[
+				{"codec_type":"audio","codec_name":"aac","tags":{"language":"ger"},"disposition":{"default":0}},
+				{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"},"disposition":{"default":1}}]}`,
+			want: FileInfo{Audio: []tr{{Lang: "de", Codec: "AAC"}, {Lang: "en", Codec: "AAC", Default: true}}},
+		},
+		{
+			name: "no flag: the first audio plays, no subtitle is default",
+			probe: `{"streams":[
+				{"codec_type":"audio","codec_name":"aac"},
+				{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng"}}]}`,
+			want: FileInfo{
+				Audio:     []tr{{Codec: "AAC", Default: true}, {Lang: "en", Codec: "AAC"}},
+				Subtitles: []tr{{Lang: "en", Codec: "SRT"}},
+			},
+		},
+		{
+			name: "subtitles: picture-based kept and marked, SDH and forced by flag or by title",
+			probe: `{"streams":[
+				{"codec_type":"subtitle","codec_name":"hdmv_pgs_subtitle","tags":{"language":"eng"},"disposition":{"default":1}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"English SDH"}},
+				{"codec_type":"subtitle","codec_name":"ass","tags":{"language":"eng"},"disposition":{"hearing_impaired":1,"default":1}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"language":"eng","title":"eng_forced"}},
+				{"codec_type":"subtitle","codec_name":"dvd_subtitle","tags":{"language":"fre"},"disposition":{"forced":1}},
+				{"codec_type":"subtitle","codec_name":"subrip","tags":{"title":"Unforced Accessible"}},
+				{"codec_type":"subtitle","codec_name":"hdmv_text_subtitle","tags":{"language":"und"}}]}`,
+			want: FileInfo{Subtitles: []tr{
+				{Lang: "en", Codec: "PGS", Picture: true, Default: true},
+				{Lang: "en", Title: "English SDH", Codec: "SRT", SDH: true},
+				{Lang: "en", Codec: "ASS", SDH: true},
+				{Lang: "en", Title: "eng_forced", Codec: "SRT", Forced: true},
+				{Lang: "fr", Codec: "VobSub", Picture: true, Forced: true},
+				{Title: "Unforced Accessible", Codec: "SRT"},
+				{Codec: "HDMV_TEXT_SUBTITLE"},
+			}},
+		},
+		{
+			name: "cover art is not a video stream; HLG; container bitrate is not the stream's",
+			probe: `{"format":{"duration":"59.6","bit_rate":"9000000"},"streams":[
+				{"codec_type":"video","codec_name":"mjpeg","width":600,"height":600,"disposition":{"attached_pic":1}},
+				{"codec_type":"video","codec_name":"hevc","width":1920,"height":1080,"color_transfer":"arib-std-b67"},
+				{"codec_type":"audio","codec_name":"opus","channel_layout":"stereo","tags":{"language":"jpn"}},
+				{"codec_type":"data","codec_name":"bin_data"}]}`,
+			want: FileInfo{
+				Duration: "0:01:00",
+				Video:    []FileInfoVideo{{Codec: "HEVC", Width: 1920, Height: 1080, HDR: "HLG"}},
+				Audio:    []tr{{Lang: "ja", Codec: "OPUS", Channels: "stereo", Default: true}},
+			},
+		},
+		{
+			name:  "nothing inside: empty lists, no duration",
+			probe: `{"format":{"duration":"N/A"},"streams":[]}`,
+			want:  FileInfo{},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := buildFileInfo(probeJSON(t, c.probe))
+			if !reflect.DeepEqual(*got, c.want) {
+				t.Errorf("got  %+v\nwant %+v", *got, c.want)
+			}
+		})
+	}
+}
+
+func TestFileInfoBitrateLabel(t *testing.T) {
+	v := FileInfoVideo{Mbps: 8.44}
+	if got := v.BitrateLabel("en"); got != "8.4" {
+		t.Errorf("en: %q", got)
+	}
+	if got := v.BitrateLabel("ru"); got != "8,4" {
+		t.Errorf("ru: %q", got)
+	}
+	if got := (FileInfoVideo{}).BitrateLabel("en"); got != "" {
+		t.Errorf("no bitrate: %q", got)
+	}
+}
