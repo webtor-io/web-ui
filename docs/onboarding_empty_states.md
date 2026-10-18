@@ -118,8 +118,8 @@ tool-страницы терял контекст. Фрагмент `#stremio` �
 ## CTA на tool-странице
 
 `templates/partials/stremio_cta.html` — по образцу `discover_cta`, ключи
-`tool.stremioCta.*`, событие `stremio-cta-click`. Используется на новой странице
-`/webtor-stremio-addon`. На `/stremio-addons-online` его ставить нельзя: та
+`tool.stremioCta.*`, событие `stremio-cta-click`. Используется на страницах
+`/webtor-stremio-addon` и `/debrid-alternative` (2026-10-17). На `/stremio-addons-online` его ставить нельзя: та
 страница обещает «Stremio без установки приложения». Подробности и данные —
 [seo_stremio_pages.md](./seo_stremio_pages.md).
 

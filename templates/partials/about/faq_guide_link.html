@@ -5,7 +5,9 @@
     The FAQ in about.html is shared by the home page and every tool page,
     the guides included, so on a guide the link to that same guide pointed
     at the page the reader was already on. It is left out there; every
-    other page, the home page among them, keeps it.
+    other page, the home page among them, keeps it. Since the four items
+    that carry a link are left off their own guide altogether (about.html),
+    this is a guard for the next link rather than a path that runs today.
 */}}
 {{ define "about_faq_guide_link" }}
 {{- $tool := $.Ctx.Data.Tool }}

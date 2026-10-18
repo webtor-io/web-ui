@@ -273,8 +273,23 @@
 
 <!-- FAQ -->
 <section id="faq" class="py-24 px-3 sm:px-6">
-    {{ if eq $instruction "torrent_to_ddl" }}
-    {{ faqSchema $.Lang
+    {{/* The page's own questions (Tool.FAQ) follow the shared ones, in the
+         schema and in the list below alike. See docs/tool_pages.md. */}}
+    {{ $toolFaq := toolFaq $.Data.Tool }}
+    {{/* The four how-to items whose full answer lives on a guide are left
+         out on that guide: its own FAQ asks the same question, and two
+         Questions with one name in a FAQPage let Google pick the short
+         answer. Each variable gates the collapse and the schema pair alike;
+         empty means "not on this page" (faqSchema skips an empty pair). */}}
+    {{- $self := "" }}{{ with $.Data.Tool }}{{ $self = .Url }}{{ end }}
+    {{- $openTorrent := "about.faq.openTorrent.q|about.faq.openTorrent.a" }}
+    {{- $openTorrentApp := "about.faq.openTorrentApp.q|about.faq.openTorrentApp.a" }}
+    {{- $downloadTorrented := "about.faq.downloadTorrented.q|about.faq.downloadTorrented.a" }}
+    {{- $unzipTorrent := "about.faq.unzipTorrent.q|about.faq.unzipTorrent.a" }}
+    {{- if eq $self "open-torrent-file" }}{{ $openTorrent = "" }}{{ $openTorrentApp = "" }}{{ end }}
+    {{- if eq $self "how-to-download-torrent-files" }}{{ $downloadTorrented = "" }}{{ end }}
+    {{- if eq $self "open-torrents-on-pc" }}{{ $unzipTorrent = "" }}{{ end }}
+    {{ faqSchema $.Lang $toolFaq
         "about.faq.free.q|about.faq.free.a"
         "about.faq.vpn.q|about.faq.vpn.a"
         "about.faq.mobile.q|about.faq.mobile.a"
@@ -283,44 +298,17 @@
         "about.faq.smarttv.q|about.faq.smarttv.a"
         "about.faq.indexers.q|about.faq.indexers.a"
         "about.faq.releaseSubs.q|about.faq.releaseSubs.a"
-        "about.faq.openTorrent.q|about.faq.openTorrent.a"
-        "about.faq.openTorrentApp.q|about.faq.openTorrentApp.a"
+        $openTorrent
+        $openTorrentApp
         "about.faq.magnetDownload.q|about.faq.magnetDownload.a"
         "about.faq.magnetUse.q|about.faq.magnetUse.a"
-        "about.faq.downloadTorrented.q|about.faq.downloadTorrented.a"
-        "about.faq.unzipTorrent.q|about.faq.unzipTorrent.a"
-        "about.faq.expire.q|about.faq.expire.a"
-        "about.faq.zip.q|about.faq.zip.a"
-        "about.faq.speed.q|about.faq.speed.a1"
-        "about.faq.streamVsDownload.q|about.faq.streamVsDownload.a"
-        "tool.torrentToDdl.about.faq.q1.question|tool.torrentToDdl.about.faq.q1.answer"
-        "tool.torrentToDdl.about.faq.q2.question|tool.torrentToDdl.about.faq.q2.answer"
-        "tool.torrentToDdl.about.faq.q3.question|tool.torrentToDdl.about.faq.q3.answer"
-        "tool.torrentToDdl.about.faq.q4.question|tool.torrentToDdl.about.faq.q4.answer"
-        "tool.torrentToDdl.about.faq.q5.question|tool.torrentToDdl.about.faq.q5.answer"
-    }}
-    {{ else }}
-    {{ faqSchema $.Lang
-        "about.faq.free.q|about.faq.free.a"
-        "about.faq.vpn.q|about.faq.vpn.a"
-        "about.faq.mobile.q|about.faq.mobile.a"
-        "about.faq.formats.q|about.faq.formats.a"
-        "about.faq.opensource.q|about.faq.opensource.a"
-        "about.faq.smarttv.q|about.faq.smarttv.a"
-        "about.faq.indexers.q|about.faq.indexers.a"
-        "about.faq.releaseSubs.q|about.faq.releaseSubs.a"
-        "about.faq.openTorrent.q|about.faq.openTorrent.a"
-        "about.faq.openTorrentApp.q|about.faq.openTorrentApp.a"
-        "about.faq.magnetDownload.q|about.faq.magnetDownload.a"
-        "about.faq.magnetUse.q|about.faq.magnetUse.a"
-        "about.faq.downloadTorrented.q|about.faq.downloadTorrented.a"
-        "about.faq.unzipTorrent.q|about.faq.unzipTorrent.a"
+        $downloadTorrented
+        $unzipTorrent
         "about.faq.expire.q|about.faq.expire.a"
         "about.faq.zip.q|about.faq.zip.a"
         "about.faq.speed.q|about.faq.speed.a1"
         "about.faq.streamVsDownload.q|about.faq.streamVsDownload.a"
     }}
-    {{ end }}
     <div class="max-w-[1100px] mx-auto">
         <div class="text-center mb-14">
             <div class="badge badge-lg bg-w-pink/10 border-w-pink/30 text-w-pinkL gap-2 px-4 py-3 mb-5 text-xs font-semibold tracking-widest uppercase">
@@ -381,6 +369,7 @@
                 <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.releaseSubs.a" }}</p></div>
             </div>
 
+            {{ if $openTorrent }}
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.openTorrent.q" }}</div>
@@ -389,15 +378,18 @@
                     {{ template "about_faq_guide_link" (withContext $ "open-torrent-file") }}
                 </div>
             </div>
+            {{ end }}
 
+            {{ if $openTorrentApp }}
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.openTorrentApp.q" }}</div>
                 <div class="collapse-content">
                     <p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.openTorrentApp.a" }}</p>
-                    {{ template "about_faq_guide_link" (withContext $ "open-torrents-on-pc") }}
+                    {{ template "about_faq_guide_link" (withContext $ "open-torrent-file") }}
                 </div>
             </div>
+            {{ end }}
 
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
@@ -411,6 +403,7 @@
                 <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.magnetUse.a" }}</p></div>
             </div>
 
+            {{ if $downloadTorrented }}
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.downloadTorrented.q" }}</div>
@@ -419,7 +412,9 @@
                     {{ template "about_faq_guide_link" (withContext $ "how-to-download-torrent-files") }}
                 </div>
             </div>
+            {{ end }}
 
+            {{ if $unzipTorrent }}
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.unzipTorrent.q" }}</div>
@@ -428,6 +423,7 @@
                     {{ template "about_faq_guide_link" (withContext $ "open-torrents-on-pc") }}
                 </div>
             </div>
+            {{ end }}
 
             {{ if aiEnabled }}
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
@@ -476,35 +472,11 @@
                 <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.streamVsDownload.a" }} <a class="link text-w-cyan" href="https://blog.webtor.io/{{ blogLang $.Lang }}/post/torrent-streaming-vs-downloading/" target="_blank" rel="noopener">{{ t $.Lang "about.faq.streamVsDownload.link" }}</a></p></div>
             </div>
 
-            {{ if eq $instruction "torrent_to_ddl" }}
+            {{ range $toolFaq }}
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
-                <div class="collapse-title text-base font-semibold">{{ t $.Lang "tool.torrentToDdl.about.faq.q1.question" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q1.answer" }}</p></div>
-            </div>
-
-            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
-                <input type="checkbox">
-                <div class="collapse-title text-base font-semibold">{{ t $.Lang "tool.torrentToDdl.about.faq.q2.question" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q2.answer" }}</p></div>
-            </div>
-
-            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
-                <input type="checkbox">
-                <div class="collapse-title text-base font-semibold">{{ t $.Lang "tool.torrentToDdl.about.faq.q3.question" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q3.answer" }}</p></div>
-            </div>
-
-            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
-                <input type="checkbox">
-                <div class="collapse-title text-base font-semibold">{{ t $.Lang "tool.torrentToDdl.about.faq.q4.question" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q4.answer" }}</p></div>
-            </div>
-
-            <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
-                <input type="checkbox">
-                <div class="collapse-title text-base font-semibold">{{ t $.Lang "tool.torrentToDdl.about.faq.q5.question" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Lang "tool.torrentToDdl.about.faq.q5.answer" }}</p></div>
+                <div class="collapse-title text-base font-semibold">{{ t $.Lang (index . 0) }}</div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ tHTML $.Lang (index . 1) }}</p></div>
             </div>
             {{ end }}
 

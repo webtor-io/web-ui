@@ -389,6 +389,15 @@ func (s *Helper) Tools() []hc.Tool {
 	return hc.Tools
 }
 
+// ToolFaq is the page's own FAQ pairs (Tool.FaqPairs), nil on the home page,
+// where $.Data.Tool is a nil pointer a template cannot call a method on.
+func (s *Helper) ToolFaq(t *hc.Tool) [][2]string {
+	if t == nil {
+		return nil
+	}
+	return t.FaqPairs()
+}
+
 // Duration formats a time.Duration into a human-readable string
 func (s *Helper) Duration(d time.Duration) string {
 	return durafmt.Parse(d).LimitFirstN(2).String()

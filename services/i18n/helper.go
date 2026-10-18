@@ -154,22 +154,31 @@ func (h *Helper) TpHTML(lang string, key string, args ...any) template.HTML {
 var faqStripTagsRe = regexp.MustCompile(`<[^>]+>`)
 
 // FaqSchema renders a schema.org/FAQPage JSON-LD block from the given
-// (question_key, answer_key) pairs. Each argument is a single string
-// in the form "qkey|akey" so templates can pass an arbitrary number
-// of pairs without nested map literals. Use `|` (not `:`) because some
-// answer keys carry colons in their values and using `|` keeps the
+// (question_key, answer_key) pairs. Each variadic argument is a single
+// string in the form "qkey|akey" so templates can pass an arbitrary
+// number of pairs without nested map literals. Use `|` (not `:`) because
+// some answer keys carry colons in their values and using `|` keeps the
 // separator outside the i18n key namespace as well.
+//
+// more is a page's own {qkey, akey} list (Tool.FaqPairs via toolFaq),
+// appended after the literal pairs: a Go template cannot spread a slice
+// into a variadic, so the dynamic part is a parameter of its own. nil
+// on pages without one.
+//
+// An empty pair is skipped without a warning: a template drops a shared
+// question from one page by passing "" in its place (about.html leaves a
+// how-to item off the guide that answers it in full).
 //
 // Template usage:
 //
-//	{{ faqSchema $.Lang
+//	{{ faqSchema $.Lang (toolFaq $.Data.Tool)
 //	  "about.faq.free.q|about.faq.free.a"
 //	  "about.faq.vpn.q|about.faq.vpn.a" }}
 //
 // Output is a ready-to-embed <script type="application/ld+json"> tag.
 // Google ignores blocks where Question.name is empty, so missing
 // translations degrade gracefully rather than emitting broken schema.
-func (h *Helper) FaqSchema(lang string, pairs ...string) template.HTML {
+func (h *Helper) FaqSchema(lang string, more [][2]string, pairs ...string) template.HTML {
 	type answer struct {
 		Type string `json:"@type"`
 		Text string `json:"text"`
@@ -185,8 +194,18 @@ func (h *Helper) FaqSchema(lang string, pairs ...string) template.HTML {
 		MainEntity []question `json:"mainEntity"`
 	}
 
-	items := make([]question, 0, len(pairs))
-	for _, p := range pairs {
+	items := make([]question, 0, len(pairs)+len(more))
+	// A fresh slice: appending to the variadic parameter could write into
+	// a Go caller's backing array when it passes slice... with spare capacity.
+	all := make([]string, 0, len(pairs)+len(more))
+	all = append(all, pairs...)
+	for _, p := range more {
+		all = append(all, p[0]+"|"+p[1])
+	}
+	for _, p := range all {
+		if p == "" {
+			continue
+		}
 		parts := strings.SplitN(p, "|", 2)
 		if len(parts) != 2 {
 			log.WithField("pair", p).Warn("faqSchema: malformed pair, want \"qkey|akey\"")

@@ -15,12 +15,17 @@ type Tool struct {
 	// Sections is the page body, rendered by
 	// templates/partials/about/sections.html. See about.go.
 	Sections []AboutSection
+	// FAQ is how many question/answer pairs the page adds under the shared
+	// FAQ, read as <AboutKey>.faq.qN.question / .answer, N = 1..FAQ (see
+	// FaqPairs). They render after the shared questions, in the collapse
+	// list and in the FAQPage JSON-LD alike; answers go through tHTML.
+	FAQ int
 }
 
 // Tools contains the list of all available tool pages.
 // Title, Benefit, and Description are i18n message keys.
 var Tools = []Tool{
-	{Url: "torrent-to-ddl", Title: "tool.torrentToDdl.title", Benefit: "tool.torrentToDdl.benefit", Description: "tool.torrentToDdl.description", Sections: []AboutSection{
+	{Url: "torrent-to-ddl", Title: "tool.torrentToDdl.title", Benefit: "tool.torrentToDdl.benefit", Description: "tool.torrentToDdl.description", FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
 		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"torrent", "ddl"}, Footer: true},
@@ -139,21 +144,35 @@ var Tools = []Tool{
 	// has its own page (/watch-torrents-ios) converts at 7-10% from
 	// position 4. The titles are phrased as the question for that reason —
 	// what loses the click is a product headline answering a how-to query.
-	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description", Guide: true, Sections: []AboutSection{
+	//
+	// Each guide carries its own FAQ (FAQ: 5), the question being the query
+	// as people type it. GSC, 28 days to 2026-10-13: the shared FAQ answered
+	// these questions in full on the home page, so Google served the HOME
+	// page for them — "how to download torrented files" 1602 impr. / 36
+	// clicks / pos 7.9, "how to open torrent files" 719, "how to open a
+	// torrent file" 718, "how to open torrented files on pc" 375 at pos 8.0,
+	// all at 1-2% CTR — while the guides got ~35 impressions each (only
+	// /open-torrent-file ranked, 184 clicks). Since 2026-10-17 the four
+	// shared how-to answers are one sentence plus the guide link, and the
+	// full answer lives here only. The home page keeps "how to open
+	// torrented files online" (130 impr., pos 1.4, 53% CTR) with its short
+	// answer. Measure the per-query page split in GSC four weeks after
+	// deploy.
+	{Url: "open-torrent-file", Title: "tool.openTorrentFile.title", Benefit: "tool.openTorrentFile.benefit", Description: "tool.openTorrentFile.description", Guide: true, FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
 		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
-	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description", Guide: true, Sections: []AboutSection{
+	{Url: "how-to-download-torrent-files", Title: "tool.howToDownloadTorrentFiles.title", Benefit: "tool.howToDownloadTorrentFiles.benefit", Description: "tool.howToDownloadTorrentFiles.description", Guide: true, FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
 		{Kind: AboutChecklist, Key: "formats", Badge: "formats", Accent: "cyan", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
-	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description", Guide: true, Sections: []AboutSection{
+	{Url: "open-torrents-on-pc", Title: "tool.openTorrentsOnPc.title", Benefit: "tool.openTorrentsOnPc.benefit", Description: "tool.openTorrentsOnPc.description", Guide: true, FAQ: 5, Sections: []AboutSection{
 		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "discover"},
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4},
@@ -209,6 +228,50 @@ var Tools = []Tool{
 		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Items: 4, Extra: "indexers"},
 		{Kind: AboutChecklist, Key: "devices", Badge: "devices", Accent: "pink", Alt: true, Items: 4},
+		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
+	}},
+	// Stremio users who use or want a debrid service — cached torrents served
+	// over HTTP, so the device does not torrent — and look for another option.
+	// DataForSEO, Google Ads monthly, 2026-10-17, US: "real debrid stremio"
+	// 1900, "torbox stremio" 1000, "real debrid alternative" 880 +
+	// "real-debrid alternative" 880, "best debrid service" 720, "what is
+	// debrid" 720, "stremio debrid" 590, "free debrid" 480, "debrid
+	// service(s)" 2400 each (navigational), "real debrid vs torbox" 390,
+	// "torbox alternative" 90, "stremio without real debrid" 50, "stremio
+	// without debrid" 40; GB: "real debrid stremio" 880, "real debrid
+	// alternative" 390+390, "torbox stremio" 390. The live US SERP for "real
+	// debrid alternative" (2026-10-16) is an AI overview, reddit, a forums
+	// block, facebook posts, one listicle and YouTube — no product page. GSC
+	// today: only the blog post real-debrid-and-torbox-integration ranks
+	// (~500 impr., pos. ~10, "torbox vs real debrid"); the vs-comparison
+	// stays with it. One generic slug: the demand splits across two brands
+	// and a generic head of the same size, and a brand in the URL would
+	// frame a service we ask users to connect as the thing to replace.
+	//
+	// Access model (owner, 2026-09-23; verified in services/link_resolver,
+	// ResolveLink): the user's own enabled backends are tried first, in
+	// profile order, with no tier check — a file they report cached plays
+	// through them at no charge from Webtor, on any account; a backend error
+	// or "not cached" falls through to Webtor's servers, which need a paid
+	// plan (ErrPlanRequired, the paywall clip). ResolveLink's only caller is
+	// the addon's /resolve handler, so backends matter in Stremio alone — the
+	// web player never consults them. The page says "Playing through
+	// Webtor's servers needs a paid Webtor plan." verbatim, quotes no trial
+	// length, speed or price, and does not mention the site's free speed
+	// cap (it does not apply to the addon) — hence no Cap line here. The
+	// debrid column describes what any debrid is, never Real-Debrid or
+	// TorBox in particular; the two are named only as services compared
+	// with or connected to. Webtor is not a debrid: it resolves infohash +
+	// file index only, supplies no catalog and "finds" nothing.
+	{Url: "debrid-alternative", Title: "tool.debridAlternative.title", Benefit: "tool.debridAlternative.benefit", Description: "tool.debridAlternative.description", FAQ: 4, Sections: []AboutSection{
+		{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink", CTA: "stremio"},
+		{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2", "p3"},
+			// The install steps live on the addon page; this page is the "why".
+			Link: &AboutLink{Url: "/webtor-stremio-addon", TitleKey: "tool.webtorStremioAddon.title"}},
+		{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Cols: []string{"webtor", "debrid"}, Footer: true},
+		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Alt: true, Items: 4},
+		// No devices section: it would be a verbatim copy of the addon page's,
+		// which the explained Link already points to.
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
 	// Release-subscriptions landing. Keyword research 2026-08-16 (DataForSEO):

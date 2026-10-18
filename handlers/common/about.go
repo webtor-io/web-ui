@@ -92,6 +92,19 @@ func (t Tool) AboutKey() string {
 	return "tool." + out + ".about"
 }
 
+// FaqPairs are the i18n keys of the page's own FAQ, one {question, answer}
+// per item: {"tool.torrentToDdl.about.faq.q1.question", "…q1.answer"}. The
+// template renders them and i18n.Helper.FaqSchema puts them in the JSON-LD,
+// so the two cannot drift apart. Empty when FAQ is 0.
+func (t Tool) FaqPairs() [][2]string {
+	out := make([][2]string, 0, t.FAQ)
+	for i := 1; i <= t.FAQ; i++ {
+		q := t.AboutKey() + ".faq.q" + itoa(i)
+		out = append(out, [2]string{q + ".question", q + ".answer"})
+	}
+	return out
+}
+
 // IconName is the badge glyph to draw, defaulting to the badge's own name.
 func (s AboutSection) IconName() string {
 	if s.Icon != "" {

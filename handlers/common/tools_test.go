@@ -77,14 +77,19 @@ func TestEveryToolDeclaresItsBody(t *testing.T) {
 }
 
 // TestEveryToolHasItsCopyInEveryLocale covers the tool's own labels — the
-// footer link, the tools grid, the meta description. The page body's keys are
-// checked against the rendered markup in services/template, which is exact
-// rather than a guess at what the template asks for.
+// footer link, the tools grid, the meta description — and its FAQ pairs,
+// which FaqSchema silently drops when a translation is missing. The page
+// body's keys are checked against the rendered markup in services/template,
+// which is exact rather than a guess at what the template asks for.
 func TestEveryToolHasItsCopyInEveryLocale(t *testing.T) {
 	locs := locales(t)
 	for _, tool := range Tools {
+		keys := []string{tool.Title, tool.Benefit, tool.Description}
+		for _, p := range tool.FaqPairs() {
+			keys = append(keys, p[0], p[1])
+		}
 		for lang, d := range locs {
-			for _, k := range []string{tool.Title, tool.Benefit, tool.Description} {
+			for _, k := range keys {
 				if strings.TrimSpace(d[k]) == "" {
 					t.Errorf("/%s: %s missing in locales/%s.json", tool.Url, k, lang)
 				}

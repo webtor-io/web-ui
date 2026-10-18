@@ -61,6 +61,7 @@ As of September 2026, the site shows no third-party ads.
 - [Cloud torrent client](https://webtor.io/cloud-torrent-client): torrents downloaded on Webtor's servers; the user's device never joins the swarm.
 - [Stremio online](https://webtor.io/stremio-addons-online): a web player for the user's Stremio addon catalogues, for devices where the Stremio app cannot play torrents.
 - [Webtor Stremio addon](https://webtor.io/webtor-stremio-addon): the user's own torrents and magnet links in Stremio on a TV, phone or tablet (paid plans).
+- [Debrid alternative for Stremio](https://webtor.io/debrid-alternative): the Webtor Stremio addon in place of or alongside a debrid service; with the user's own Real-Debrid or TorBox connected, the files it has cached play through it at no charge from Webtor, and Webtor's servers play the rest (paid plans).
 - [Torrent RSS alternative](https://webtor.io/torrent-rss-alternative): email alerts for new releases found on the user's own indexers and Stremio addons.
 
 ## Developers
