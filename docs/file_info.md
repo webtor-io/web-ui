@@ -19,7 +19,9 @@ Free for everyone; anonymous starts pass Turnstile like every job start
 
 - Button: `partials/file.html`, video and audio only, built by
   `handlers/resource` `MakeFileInfo` (`partials/button.html`, action
-  `file-info`). An icon on a phone beside Watch and Download. The deep link
+  `file-info`). Outlined and neutral (the row's secondary action); on a
+  phone a full-width line of its own under Watch and Download (as a third
+  icon in the row it squashed their icons to 0 px at 360 px). The deep link
   `#action=file-info` and the Umami click event `file-info` come from the
   form's class and `data-umami-event` with no code of their own.
 - `POST /file-info` → `h.post(c, "file-info")`: CSRF, Turnstile for
@@ -32,7 +34,10 @@ Free for everyone; anonymous starts pass Turnstile like every job start
   refused here, `error.forbidden`; rest-api's 404 is no error and no link →
   `error.not_found`; a format other than video/audio → `error.probe_failed`)
   → `job.probingMedia` → `GetMediaProbe(<download URL>~cp)` with a 60 s
-  deadline → `action/file_info` rendered into `#log-<ItemID>`.
+  deadline → `action/file_info` rendered into `#log-<ItemID>-info`, in the
+  card's `<dialog id="info-modal-<ItemID>">` (`partials/file.html`), opened on
+  submit like Download's: a press while watching leaves the player playing.
+  The no-peers "Try again" lands there too (`logTargetID`).
 - **No warm-up.** The probe runs as `services/thumbnail` runs its own: a
   probe content-prober already holds (7 days, shared with Watch and the
   thumbnail, key infohash+path) costs nothing, and a cold torrent pays only
@@ -40,9 +45,6 @@ Free for everyone; anonymous starts pass Turnstile like every job start
   probe the caller abandoned"): before it, a probe this job gave up on was
   cached as the file's failure for an hour and broke the next Watch of a
   transcoded file. Deploy content-prober first.
-- The card replaces whatever is in the file's log, a playing player included,
-  and Watch replaces the card (MVP; a `<dialog>` of its own is the next step,
-  as Download has).
 
 ## What the card says (`buildFileInfo`, a pure function)
 
@@ -56,12 +58,20 @@ Free for everyone; anonymous starts pass Turnstile like every job start
   is not shown by default).
 - **Forced**: `disposition.forced`, or "forced" as a word in the title (the
   player's `forcedTitleRe`). **SDH**: `disposition.hearing_impaired`, or
-  "SDH"/"CC" as a word in the title.
+  "SDH"/"CC" as a word in the title (not a `.cc` domain). A denied word —
+  "Non-SDH", "No SDH", "not forced" — is no badge: that is the track a viewer
+  has to rule out.
+- **Closed captions** (CEA-608/708) ride in the video stream, not in a
+  subtitle track: `closed_captions=1` on a video stream gives a row of its
+  own under Subtitles, so the card does not say "no subtitles" of a file VLC
+  shows captions for.
 - **Picture-based** subtitles (PGS, VobSub, DVB, XSUB) are listed and marked
   "external player only".
 - **Language**: the tag canonicalised (`eng` → `en`) and named in the page's
   language (`langDisplayIn`); an untagged or `und` track reads "Language not
-  specified" — never guessed.
+  specified" — never guessed by us. (Matroska's spec defaults an absent
+  Language element to `eng`; whether ffprobe then reports `eng` is not
+  checked.)
 - **Video**: cover art (`attached_pic`) skipped; HDR10 for `smpte2084`, HLG for
   `arib-std-b67` (Dolby Vision needs `side_data_list`, not read yet); bitrate
   from the stream (or mkvmerge's BPS tags), in the status's megabit.
@@ -84,7 +94,10 @@ content-prober's gRPC proto and lacks them, so it is not used as a fallback.
 
 How often the deadline hits: Loki,
 `{app="web-ui"} |= "no peers / warmup deadline" |= "action=file-info"`; other
-failures are `webui_jobs_total{job="file-info",outcome="error"}`. If timeouts
+failures are `webui_jobs_total{job="file-info",outcome="error"}`. The
+upstream cases are told apart by `{app="web-ui"} |= "file info: media prober
+unavailable"`, whose `cause` field carries the status, body or transport error
+(capped at 200 characters) — the "user error shown" line has only the key. If timeouts
 pass ~5% of starts in a week, add the stream's quick warm-up back before the
 probe.
 
@@ -93,12 +106,18 @@ probe.
 - The job log replaying the card is public (`Access-Control-Allow-Origin: *`):
   the card holds no URL. Track titles are escaped (`html/template`).
 - Nothing is stored or aggregated: no table, no index, no Discover filter
-  (the no-content-indexing policy). A repeat press in the same session within
-  the job key's 10-minute bucket replays the finished job.
+  (the no-content-indexing policy). Like every action's, the rendered card
+  lives in the job's Redis storage until the job's 30-minute deadline and its
+  body reaches Loki with the job log; the Loki line carries the job's id, not
+  the infohash.
+- A repeat press within the job key's 10-minute bucket replays the finished
+  job — for the same account, or for anonymous viewers for anyone with the
+  same role and language. Harmless: the card holds nothing personal.
 
 ## Later
 
-`<dialog>` instead of the shared log; a warm-up fallback if timeouts are
-common; Dolby Vision; file-info wording for the no-peers card; the player's
-forced/SDH detection moved to `disposition` (`handlers/action/helper.go`,
-`picker.go` still guess from the title).
+A warm-up fallback if timeouts are common; Dolby Vision; file-info wording
+for the no-peers card (it speaks of a warm-up this job does not have); the
+player's forced/SDH detection moved to `disposition` (`handlers/action/helper.go`,
+`picker.go` still guess from the title, and its `forcedTitleRe` still reads
+"Non-Forced" as forced).

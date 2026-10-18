@@ -13,8 +13,8 @@ import (
 const (
 	siteKeyFlag   = "turnstile-site-key"
 	secretKeyFlag = "turnstile-secret-key"
-	// The action pair backs an *invisible* widget that gates the five job
-	// starts (download/stream/preview) for anonymous visitors; the pair
+	// The action pair backs an *invisible* widget that gates the six job
+	// starts (download/stream/preview/file info) for anonymous visitors; the pair
 	// above backs the managed widget on the support form. Separate widgets
 	// because the modes differ, and so that one can be turned off alone.
 	actionSiteKeyFlag   = "turnstile-action-site-key"

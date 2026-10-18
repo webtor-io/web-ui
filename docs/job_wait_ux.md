@@ -118,8 +118,11 @@ the fold on 768-844 px tall screens. Nothing moved the page toward it.
   Download share the width (`max-sm:flex-1` on their forms), the watched toggle is a
   44 px icon at the end of the row (label `max-sm:sr-only`, `aria-pressed`, neutral
   instead of pink), a file with only a download has it full width, and the size moves
-  from the Download label to a line under the file name. 40 px tall, as before. From
-  `sm` up the row is what it was.
+  from the Download label to a line under the file name. 40 px tall, as before. File
+  info (docs/file_info.md) is a full-width, outlined line of its own under the row
+  (`max-sm:basis-full max-sm:order-last`): a third icon in the row squashed the two
+  labels' icons to 0 px at 360 px (2026-10-18). From `sm` up the row is what it was,
+  File info last and outlined.
 
 ## The log in words — `lib/progressLog.js` with a `.job-stage`
 

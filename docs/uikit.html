@@ -2747,7 +2747,8 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
       What a file holds, before a download (<code>templates/views/action/file_info.html</code>,
       <code>jobs/scripts/file_info.go</code>, docs/file_info.md): the third action of the file card
       (<code>partials/button.html</code> with action <code>file-info</code>, an info-circle icon from
-      <code>partials/icons.html</code>), rendered by the job into the card's log, where the player goes. Read-only facts:
+      <code>partials/icons.html</code>), rendered by the job into a <code>&lt;dialog&gt;</code> of the file card, as
+      Download's, so a playing player keeps playing. Read-only facts:
       Discover's static labels (<code>bg-w-cyan/10 text-w-cyan text-[10px]</code>, the yellow outline for a caveat), not
       the player's clickable track chips. Language names in the page's language (<code>langDisplayIn</code>), no flags.
     </p>
@@ -2771,21 +2772,23 @@ web.RedirectWithSuccessAndMessage(c, "Settings saved")</code></pre>
         </ul>
         <h4 class="mt-4 text-xs font-semibold uppercase tracking-wide text-w-muted">Subtitles</h4>
         <ul class="mt-1.5 space-y-1.5">
+          <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">Closed captions (CC) in the video stream</span></li>
           <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">SDH</span><span class="text-w-sub">SRT</span><span class="text-w-muted truncate max-w-[14rem] sm:max-w-[22rem]">English SDH</span></li>
           <li class="flex flex-wrap items-center gap-x-2 gap-y-1"><span class="font-medium">English</span><span class="bg-w-cyan/10 text-w-cyan text-[10px] px-1.5 py-0.5 rounded font-medium">signs only</span><span class="text-w-sub">PGS</span><span class="border border-yellow-500/30 text-yellow-400/80 text-[10px] px-1.5 py-0.5 rounded font-medium">picture-based · external player only</span></li>
         </ul>
         <p class="mt-4 text-xs text-w-muted leading-relaxed">“Default” is the track a player starts with when no preferred language is set in it; a player set to a language may pick another one.</p>
       </div>
     </div>
-    <div class="uikit-label">[data-file-info] &gt; h3 + h4 + ul &gt; li[data-file-info-audio|data-file-info-subtitle] &gt; label badges; the button: form.file-info.shrink-0 &gt; button.btn.btn-soft.max-sm:w-11 &gt; svg + span.max-sm:sr-only</div>
+    <div class="uikit-label">[data-file-info] &gt; h3 + h4 + ul &gt; li[data-file-info-cc|data-file-info-audio|data-file-info-subtitle] &gt; label badges; the button: form.file-info.max-sm:basis-full.max-sm:order-last &gt; button.btn.btn-ghost.border.border-w-line.max-sm:w-full &gt; svg + label; the card goes to dialog#info-modal-&lt;item&gt; &gt; #log-&lt;item&gt;-info</div>
     <div class="uikit-rule">
       <strong>Rules:</strong> no URL anywhere in the card (the job log is public with <code>Access-Control-Allow-Origin: *</code>);
       track titles are the file's free text, escaped and truncated, never <code>|safe</code>. A section with nothing in it
       says so (<code>action.fileInfo.noAudio</code>, <code>action.fileInfo.noSubtitles</code>) &mdash; for a viewer who needs
       subtitles, &ldquo;none inside&rdquo; is the answer. A track whose language the file does not name reads
-      <code>action.fileInfo.langUnknown</code>, never a guess. On a phone the button is a 44&nbsp;px icon beside Watch and
-      Download, like the watched toggle (three labels do not fit 360&nbsp;px); its name stays for screen readers and as
-      the tooltip. Keys: <code>resource.fileInfo</code>, <code>action.fileInfo.*</code>, reused
+      <code>action.fileInfo.langUnknown</code>, never a guess. Captions carried in the video stream get their own row
+      (<code>action.fileInfo.cc</code>), so a file with them never reads &ldquo;no subtitles&rdquo;. The button is the row's
+      secondary action, outlined and neutral; on a phone a full-width line under Watch and Download (as a third icon in
+      the row it squashed their icons to 0&nbsp;px at 360&nbsp;px). Keys: <code>resource.fileInfo</code>, <code>action.fileInfo.*</code>, reused
       <code>action.stream.audio</code>, <code>action.stream.subtitles</code>, <code>action.stream.badge.forced</code>,
       <code>resource.status.mbps</code>. Event: the button's <code>data-umami-event="file-info"</code>, nothing else.
     </div>
