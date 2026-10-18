@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/stremio"
@@ -151,5 +152,30 @@ func TestFileInfoProbeError(t *testing.T) {
 	// ErrorWrapperScript's own test for the no-peers card.
 	if !errors.Is(errors.Cause(err), context.DeadlineExceeded) {
 		t.Errorf("deadline lost: %v", err)
+	}
+}
+
+// The prober's cause reaches the log without the credentials of the URL an
+// unparsable body quotes (format.filename is the ~cp source URL).
+func TestFileInfoProbeErrorLogsNoCredentials(t *testing.T) {
+	hook := logtest.NewGlobal()
+	defer hook.Reset()
+	_ = probeError(errors.New(`failed to unmarshal data={"format":{"filename":"https://x.example/abc/f.mkv~cp?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl&api-key=secret1"}}`))
+	var cause string
+	for _, e := range hook.AllEntries() {
+		if e.Message == "file info: media prober unavailable" {
+			cause, _ = e.Data["cause"].(string)
+		}
+	}
+	if cause == "" {
+		t.Fatal("no cause logged")
+	}
+	for _, leak := range []string{"eyJhbGciOiJIUzI1NiJ9", "secret1"} {
+		if strings.Contains(cause, leak) {
+			t.Errorf("cause leaks %q: %s", leak, cause)
+		}
+	}
+	if len(cause) > probeErrorLogMax {
+		t.Errorf("cause not capped: %d", len(cause))
 	}
 }

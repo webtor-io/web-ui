@@ -14,6 +14,7 @@ import (
 	ra "github.com/webtor-io/rest-api/services"
 	"golang.org/x/text/language"
 
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
 	"github.com/webtor-io/web-ui/services/statusview"
@@ -78,9 +79,10 @@ func probeError(err error) error {
 	}
 	// UserError's Error() is its key, so the top-level "user error shown"
 	// line would carry only error.upstream_unavailable: the status, body or
-	// transport error that tells these cases apart is logged here. Capped:
-	// an unparsable 200 quotes the probe body, whose format.filename is the
-	// source URL, after the streams.
+	// transport error that tells these cases apart is logged here, its
+	// credentials redacted (an unparsable 200 quotes the probe body, whose
+	// format.filename is the source URL) and then capped.
+	msg = helpers.RedactURL(msg)
 	if len(msg) > probeErrorLogMax {
 		msg = msg[:probeErrorLogMax]
 	}
