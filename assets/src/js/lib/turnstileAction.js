@@ -1,6 +1,6 @@
-// Turnstile on job starts. The five action forms (download-file,
-// download-dir, preview-image, stream-audio, stream-video) carry a token
-// from a Turnstile widget; handlers/action refuses an anonymous start
+// Turnstile on job starts. The six action forms (download-file,
+// download-dir, preview-image, stream-audio, stream-video, file-info) carry
+// a token from a Turnstile widget; handlers/action refuses an anonymous start
 // without one. The widget is a *managed* one rendered with appearance
 // "interaction-only": nothing is shown while Cloudflare can vouch for the
 // visitor silently, and when it wants a click the checkbox appears in the
@@ -33,7 +33,10 @@
 import { isBusy, markBusy } from './actionBusy';
 import { reveal } from './stickyStatus';
 
-const ACTIONS = /\/(download-file|download-dir|preview-image|stream-audio|stream-video)$/;
+// The same routes as actionBusy.js's ACTION_RE and as handlers/action's
+// TestJobStartRoutesRequireTurnstile: a route missing here is refused to
+// every anonymous visitor (fail closed).
+const ACTIONS = /\/(download-file|download-dir|preview-image|stream-audio|stream-video|file-info)$/;
 const SILENT_TIMEOUT_MS = 15000;
 const INTERACTIVE_TIMEOUT_MS = 120000;
 const SCRIPT_WAIT_MS = 15000;

@@ -59,6 +59,24 @@ test('a form outside its log gets the check written into the log, then goes out'
     assert.deepEqual(seen, [{ ready: true, connected: true }]);
 });
 
+test('File info is a job start: its form gets the check and a token too', async () => {
+    // Without /file-info in the list the form went out without a token and
+    // the server refused every anonymous press (fail closed).
+    document.getElementById('log-1').innerHTML = '';
+    const form = document.createElement('form');
+    form.className = 'file-info';
+    form.setAttribute('action', '/ru/file-info');
+    form.setAttribute('method', 'post');
+    form.setAttribute('data-async-target', '#log-1');
+    document.body.appendChild(form);
+    const seen = watchSecondPass(form);
+    form.requestSubmit();
+    assert.ok(document.querySelector('#log-1 [data-turnstile-step]'), 'the step is in the log');
+    await settle();
+    assert.deepEqual(seen, [{ ready: true, connected: true }]);
+    form.remove();
+});
+
 test('a retry form inside its own log stays connected and goes out (anonymous "Try again")', async () => {
     // The no-peers and slow cards render their resubmit forms into the very
     // log they target (#log-<item>). Writing the step block there replaced

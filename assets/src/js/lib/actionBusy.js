@@ -30,10 +30,10 @@ import { notePress } from './stickyStatus';
 // this is a backstop against a lost SSE, not a deadline.
 export const BUSY_MAX_MS = 15 * 60 * 1000;
 
-// Which forms this is for: the five action endpoints that start a job. Other
+// Which forms this is for: the six action endpoints that start a job. Other
 // async forms (the watched toggle, profile settings) answer instantly and
 // would only flash.
-const ACTION_RE = /\/(download-file|download-dir|preview-image|stream-audio|stream-video)$/;
+const ACTION_RE = /\/(download-file|download-dir|preview-image|stream-audio|stream-video|file-info)$/;
 
 function actionPath(form) {
     try {

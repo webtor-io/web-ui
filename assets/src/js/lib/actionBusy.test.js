@@ -28,10 +28,13 @@ function card({ action = '/ru/stream-video', label = 'Смотреть' } = {}) 
     };
 }
 
-test('only the five job-start endpoints are treated as action forms', () => {
+test('only the six job-start endpoints are treated as action forms', () => {
     const p = card();
     assert.equal(isActionForm(p.stream), true);
     assert.equal(isActionForm(p.download), true);
+    // File info is a job start too: export, then the probe.
+    card({ action: '/ru/file-info' });
+    assert.equal(isActionForm(document.querySelector('form.stream')), true);
     // The watched toggle and friends answer instantly: a busy state would
     // only flash.
     card({ action: '/ru/user-video-status/mark' });
