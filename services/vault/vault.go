@@ -552,11 +552,20 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 	return resource, nil
 }
 
+// ErrResourceNotFound is rest-api's 404 for the resource: a hash it does not
+// know. GetResourceCached reports that as a nil response with no error, so
+// both readers below check for it rather than dereference nil. That nil is
+// cached for a minute, so a hash stored moments ago can still read as unknown.
+var ErrResourceNotFound = errors.New("resource not found")
+
 // getTorrentName extracts torrent name from API response
 func (s *Vault) getTorrentName(ctx context.Context, claims *api.Claims, resourceID string) (string, error) {
 	r, err := s.api.GetResourceCached(ctx, claims, resourceID)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get resource")
+	}
+	if r == nil {
+		return "", ErrResourceNotFound
 	}
 
 	return r.Name, nil
@@ -570,6 +579,9 @@ func (s *Vault) GetRequiredVP(ctx context.Context, claims *api.Claims, resourceI
 	r, err := s.api.GetResourceCached(ctx, claims, resourceID)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get resource")
+	}
+	if r == nil {
+		return 0, ErrResourceNotFound
 	}
 
 	// Convert bytes to VP (1 VP = 1 GB)

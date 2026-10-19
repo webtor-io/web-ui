@@ -1048,6 +1048,12 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "No such resource",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "409": {
                         "description": "A pledge for this resource already exists",
                         "schema": {

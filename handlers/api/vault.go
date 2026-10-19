@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -61,6 +62,7 @@ func (s *Handler) getVault(c *gin.Context) {
 //	@Failure		401		{object}	libapi.ErrorResponse
 //	@Failure		402		{object}	libapi.ErrorResponse
 //	@Failure		403		{object}	libapi.ErrorResponse	"Not enough Vault Points"
+//	@Failure		404		{object}	libapi.ErrorResponse	"No such resource"
 //	@Failure		409		{object}	libapi.ErrorResponse	"A pledge for this resource already exists"
 //	@Failure		503		{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
 //	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
@@ -206,6 +208,9 @@ func (s *Handler) createPledge(ctx context.Context, resourceID string, u *auth.U
 		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to get claims", nil)
 	}
 	res, err := s.vault.GetOrCreateResource(ctx, cl, resourceID)
+	if errors.Is(err, vault.ErrResourceNotFound) {
+		return nil, notFound("no such resource")
+	}
 	if err != nil {
 		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to resolve the resource", err)
 	}
