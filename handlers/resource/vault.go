@@ -39,27 +39,17 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 		return nil, errors.Wrap(err, "failed to get user vault stats")
 	}
 
-	// Get required VP using vault service
+	// Get required VP using vault service (1 VP = 1 GB of the torrent's size)
 	requiredVP, err := s.vault.GetRequiredVP(ctx, args.Claims, args.ID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get required VP")
 	}
 
-	// Read the torrent size straight from the resource response instead of
-	// paginating the whole /list just for the total (heavy on huge torrents).
-	res, err := s.api.GetResourceCached(ctx, args.Claims, args.ID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get resource for size calculation")
-	}
-
-	// Convert bytes to GB
-	torrentSizeGB := float64(res.Size) / (1024 * 1024 * 1024)
-
 	vaultForm := &VaultPledgeAddForm{
 		Available:     stats.Available,
 		Total:         stats.Total,
 		Required:      requiredVP,
-		TorrentSizeGB: torrentSizeGB,
+		TorrentSizeGB: requiredVP,
 		Funded:        false,
 		Vaulted:       false,
 		ResourceID:    args.ID,

@@ -187,8 +187,9 @@ func (s *Handler) listResource(c *gin.Context) {
 	// an error: the client turns upstream's 404 into a zero value. Answering
 	// 200 with an empty `items` for a typo'd infohash would be
 	// indistinguishable from an empty directory, so confirm the resource is
-	// real before saying so. The check runs only on the empty path and hits a
-	// cache, so the common case pays nothing.
+	// real before saying so. The check runs only on the empty path, so the
+	// common case pays nothing; an unknown hash costs one more GET (a miss is
+	// not cached).
 	if res.Count == 0 && len(res.Items) == 0 {
 		r, rerr := s.api.GetResourceCached(c.Request.Context(), claims, id)
 		if rerr != nil {
