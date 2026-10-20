@@ -190,7 +190,10 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 			}
 		}
 		d.Item, err = s.getBestItem(ctx, list, args)
-		if len(list.Items) == 1 && d.Item == nil {
+		// A directory holding one entry collapses into it -- except under
+		// ?file=: those links reload only #list (partials/list.html), and
+		// without a listing that block renders empty.
+		if len(list.Items) == 1 && (d.Item == nil || args.File != "") {
 			d.List = list
 		}
 		if err != nil {
