@@ -14,10 +14,13 @@ import (
 // the configured keys (aiProvider), never a fixed one: production runs on
 // OpenAI with an empty Anthropic key, and both pages named Anthropic.
 
-func renderPrivacy(t *testing.T, provider string) string {
+func renderPrivacy(t *testing.T, provider string, enabled bool) string {
 	t.Helper()
 	tpl, err := template.New("privacy.html").
-		Funcs(template.FuncMap{"aiProvider": func() string { return provider }}).
+		Funcs(template.FuncMap{
+			"aiProvider": func() string { return provider },
+			"aiEnabled":  func() bool { return enabled && provider != "" },
+		}).
 		ParseFiles("../../templates/views/legal/privacy.html")
 	if err != nil {
 		t.Fatal(err)
@@ -31,27 +34,32 @@ func renderPrivacy(t *testing.T, provider string) string {
 
 func TestPrivacyNamesTheConfiguredAIProvider(t *testing.T) {
 	for _, tc := range []struct {
+		name     string
 		provider string
+		enabled  bool
 		want     []string
 		absent   []string
 	}{
-		{"openai", []string{
+		{"openai", "openai", true, []string{
 			`href="https://openai.com"`,
 			"OpenAI Ireland Limited",
 			"Standard Contractual Clauses",
 			"first request to OpenAI",
-			"OpenAI retains API inputs and outputs in abuse-monitoring logs for up to 30&nbsp;days",
+			"OpenAI retains API inputs and outputs in abuse-monitoring logs for up to 30&nbsp;days, then deletes them unless longer retention is required by law or reasonably necessary",
 		}, []string{"Anthropic"}},
-		{"anthropic", []string{
+		{"anthropic", "anthropic", true, []string{
 			"Anthropic, PBC",
 			"Standard Contractual Clauses",
 			"first request to Anthropic",
-			"Anthropic retains API inputs and outputs for up to 30 days",
+			"Anthropic retains API inputs and outputs for up to 30&nbsp;days",
 		}, []string{"OpenAI"}},
-		{"", []string{"your watch history and queries are not sent to any AI provider"}, []string{"Anthropic", "OpenAI", "first request to"}},
+		{"no_key", "", true, []string{"your watch history and queries are not sent to any AI provider"}, []string{"Anthropic", "OpenAI", "first request to"}},
+		// A key with the flag off (enrichment only): Discover does not run,
+		// so nothing of the user's goes to the provider.
+		{"openai_flag_off", "openai", false, []string{"your watch history and queries are not sent to any AI provider"}, []string{"Anthropic", "OpenAI", "first request to"}},
 	} {
-		t.Run("provider="+tc.provider, func(t *testing.T) {
-			out := renderPrivacy(t, tc.provider)
+		t.Run(tc.name, func(t *testing.T) {
+			out := renderPrivacy(t, tc.provider, tc.enabled)
 			for _, w := range tc.want {
 				if !strings.Contains(out, w) {
 					t.Errorf("missing %q", w)

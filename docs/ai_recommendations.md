@@ -736,7 +736,8 @@ The section uses the cyan theme (secondary actions):
 ## Privacy
 
 The configured AI provider receives title, year, and rating signal for the user's most
-recent watched/rated movies (default 40 entries). **No email, user id,
+recent watched/rated movies (default 40 entries), watchlist titles, the
+response locale and the client's day / time-of-day bucket / local hour. **No email, user id,
 watch position, or other PII is sent.** The user id is used only as a
 Redis key for quota / chip cache; it never leaves our infrastructure.
 
@@ -749,8 +750,9 @@ calling `RecommendStream`.
 
 The privacy policy (§3, §4) and the FAQ answer `about.faq.aiModel.*` name
 the provider `aiProvider` reports (`recommendations.Helper`, the same
-`ai_client.SelectProvider` result): OpenAI, Anthropic, or — with no key —
-a line saying watch history and queries go to no AI provider. Neither
+`ai_client.SelectProvider` result) while `aiEnabled` holds: OpenAI or
+Anthropic. With AI Discover off (no key, or the flag off with a key kept for
+enrichment) the policy says watch history and queries go to no AI provider. Neither
 company is on the EU–US Data Privacy Framework list (checked 2026-10-20);
 both DPAs rely on Standard Contractual Clauses, which is what the policy
 states.
