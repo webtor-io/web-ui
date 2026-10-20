@@ -441,7 +441,7 @@
             <div class="collapse collapse-plus collapse-webtor border border-w-line rounded-2xl">
                 <input type="checkbox">
                 <div class="collapse-title text-base font-semibold">{{ t $.Lang "about.faq.aiModel.q" }}</div>
-                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ t $.Lang "about.faq.aiModel.a" }}</p></div>
+                <div class="collapse-content"><p class="text-[0.92rem] text-w-sub leading-relaxed">{{ if eq aiProvider "openai" }}{{ t $.Lang "about.faq.aiModel.openai" }}{{ else }}{{ t $.Lang "about.faq.aiModel.anthropic" }}{{ end }}</p></div>
             </div>
             {{ end }}
 

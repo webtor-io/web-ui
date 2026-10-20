@@ -36,16 +36,17 @@ func aiTestCLI(t *testing.T, args ...string) *cli.Context {
 
 func TestAIConfigDefaultsAndVisibility(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		args    []string
-		model   string
-		visible bool
+		name     string
+		args     []string
+		model    string
+		visible  bool
+		provider string
 	}{
-		{"no_key", []string{"--ai-recommendations-enabled"}, ac.DefaultAnthropicModel, false},
-		{"openai_disabled", []string{"--openai-api-key", "o"}, ac.DefaultOpenAIModel, false},
-		{"openai", []string{"--ai-recommendations-enabled", "--openai-api-key", "o"}, ac.DefaultOpenAIModel, true},
-		{"anthropic", []string{"--ai-recommendations-enabled", "--anthropic-api-key", "a"}, ac.DefaultAnthropicModel, true},
-		{"both", []string{"--ai-recommendations-enabled", "--anthropic-api-key", "a", "--openai-api-key", "o"}, ac.DefaultAnthropicModel, true},
+		{"no_key", []string{"--ai-recommendations-enabled"}, ac.DefaultAnthropicModel, false, ""},
+		{"openai_disabled", []string{"--openai-api-key", "o"}, ac.DefaultOpenAIModel, false, "openai"},
+		{"openai", []string{"--ai-recommendations-enabled", "--openai-api-key", "o"}, ac.DefaultOpenAIModel, true, "openai"},
+		{"anthropic", []string{"--ai-recommendations-enabled", "--anthropic-api-key", "a"}, ac.DefaultAnthropicModel, true, "anthropic"},
+		{"both", []string{"--ai-recommendations-enabled", "--anthropic-api-key", "a", "--openai-api-key", "o"}, ac.DefaultAnthropicModel, true, "anthropic"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := aiTestCLI(t, tc.args...)
@@ -60,6 +61,10 @@ func TestAIConfigDefaultsAndVisibility(t *testing.T) {
 			}
 			if got := NewHelper(ctx).AiEnabled(); got != tc.visible {
 				t.Fatalf("visible = %t, want %t", got, tc.visible)
+			}
+			// The privacy policy and the FAQ name this provider (aiProvider).
+			if got := NewHelper(ctx).AiProvider(); got != tc.provider {
+				t.Fatalf("provider = %q, want %q", got, tc.provider)
 			}
 		})
 	}

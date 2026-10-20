@@ -124,6 +124,8 @@ func aboutPageFuncs() template.FuncMap {
 	funcs["aiEnabled"] = func() bool { return true }
 	funcs["aiFreeQuota"] = func() int { return 0 }
 	funcs["aiPaidQuota"] = func() int { return 0 }
+	// recommendations.Helper.AiProvider: production's provider.
+	funcs["aiProvider"] = func() string { return "openai" }
 	funcs["blogLang"] = func(lang string) string { return lang }
 	funcs["tools"] = func() []hc.Tool { return hc.Tools }
 	funcs["apiDocsURL"] = func() string { return "" }

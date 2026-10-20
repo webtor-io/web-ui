@@ -740,12 +740,20 @@ recent watched/rated movies (default 40 entries). **No email, user id,
 watch position, or other PII is sent.** The user id is used only as a
 Redis key for quota / chip cache; it never leaves our infrastructure.
 
-Users can effectively opt out today by never triggering the AI section
-— chips load on visit but no Claude call happens until they tap a chip
-or submit text. Cold-start users (zero history) get static chips, no
-Claude call at all. If a future requirement is a hard opt-out toggle,
+Users can effectively opt out today by not opening Discover — the chip
+load on visit is already a provider call (cached per user for the chips
+TTL). Cold-start users (zero history and watchlist) get static chips, no
+provider call at all. If a future requirement is a hard opt-out toggle,
 add it as a column on `users` and check it in the handler before
 calling `RecommendStream`.
+
+The privacy policy (§3, §4) and the FAQ answer `about.faq.aiModel.*` name
+the provider `aiProvider` reports (`recommendations.Helper`, the same
+`ai_client.SelectProvider` result): OpenAI, Anthropic, or — with no key —
+a line saying watch history and queries go to no AI provider. Neither
+company is on the EU–US Data Privacy Framework list (checked 2026-10-20);
+both DPAs rely on Standard Contractual Clauses, which is what the policy
+states.
 
 ## Rollout plan
 

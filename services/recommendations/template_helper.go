@@ -30,6 +30,13 @@ func (h *Helper) AiEnabled() bool {
 	return h.cfg.Enabled && h.cfg.Provider != ""
 }
 
+// AiProvider names the provider ai_client selects from the configured keys:
+// "anthropic", "openai", or "" when neither key is set. The privacy policy
+// and the FAQ name the company that actually receives AI requests from it.
+func (h *Helper) AiProvider() string {
+	return string(h.cfg.Provider)
+}
+
 // AiFreeQuota returns the per-day request budget for free-tier users.
 // Used in the about-page FAQ to keep the displayed limit honest when
 // AI_RECOMMENDATIONS_FREE_DAILY_QUOTA changes via env.
