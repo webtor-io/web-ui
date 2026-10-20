@@ -554,8 +554,7 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 
 // ErrResourceNotFound is rest-api's 404 for the resource: a hash it does not
 // know. GetResourceCached reports that as a nil response with no error, so
-// both readers below check for it rather than dereference nil. That nil is
-// cached for a minute, so a hash stored moments ago can still read as unknown.
+// both readers below check for it rather than dereference nil.
 var ErrResourceNotFound = errors.New("resource not found")
 
 // getTorrentName extracts torrent name from API response

@@ -415,10 +415,23 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *r
 	return
 }
 
+// errResourceNotFound carries rest-api's 404 out of resourcesCache, which
+// keeps only successes: a cached miss would keep a hash stored a moment later
+// unknown for the whole minute (an API client stores, then pledges).
+var errResourceNotFound = errors.New("resource not found")
+
 func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
-	return s.resourcesCache.Get(infohash, func() (*ra.ResourceResponse, error) {
-		return s.GetResource(ctx, c, infohash)
+	e, err = s.resourcesCache.Get(infohash, func() (*ra.ResourceResponse, error) {
+		r, err := s.GetResource(ctx, c, infohash)
+		if err == nil && r == nil {
+			return nil, errResourceNotFound
+		}
+		return r, err
 	})
+	if errors.Is(err, errResourceNotFound) {
+		return nil, nil
+	}
+	return
 }
 
 func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (closer io.ReadCloser, err error) {
