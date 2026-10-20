@@ -344,6 +344,23 @@ test('dispose lets go of the element and of hls.js', () => {
     assert.equal(s.events.length, 0);
 });
 
+// hls-manager.js createHls hands the instance over before its loadSource,
+// which asks for the manifest at once (Player.wiring.test.js has the player).
+test('bound before loadSource: the manifest it asks for is waiting; after dispose nothing is bound', () => {
+    const video = fakeVideo();
+    const hls = fakeHls(video);
+    const s = setup({ video, hls });
+    s.watch.bindHls(hls);
+    hls.trigger(Hls.Events.MANIFEST_LOADING);
+    s.video.play();
+    s.advance(3 * 60000);
+    assert.equal(dead(s.events).length, 0);
+    s.watch.dispose();
+    const next = fakeHls(video);
+    s.watch.bindHls(next);
+    assert.equal(next.listeners(), 0);
+});
+
 test('sourceKind names the source without its URL', () => {
     const v = fakeVideo();
     assert.equal(sourceKind(v, true), 'hlsjs');

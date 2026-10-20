@@ -6550,6 +6550,191 @@ test('player-dead, then it played after all: a later dead session restarts', asy
     assert.equal(rec.got.length, 1);
 });
 
+// ---- a manifest the server holds, heard from its request -------------------
+//
+// hls.js's loadSource asks for the manifest at once (MANIFEST_LOADING is its
+// last line, hls.ts), and the HLS effect calls it at mount. The watch was
+// made in a later effect and took the instance at its first check, 2 s on,
+// never having heard that request: a manifest held for 60 s, and for 165 s
+// (2026-10-19, both played once it came), was player-dead at 32 s -- and the
+// verdict holds back the stream restart and the card. hls.js is real here
+// down to its playlist loader: its own loadSource, and a loader that holds
+// every request until the test answers it. jsdom has no MediaSource:
+// attachMedia only says where it attached, which is all the watch reads.
+const { LoadStats } = await import('hls.js');
+function withHeldRequests(t) {
+    const held = [];
+    class HeldLoader {
+        constructor() { this.context = null; this.stats = new LoadStats(); }
+        load(context, config, callbacks) {
+            this.context = context;
+            held.push({ context, stats: this.stats, callbacks });
+        }
+        abort() { this.stats.aborted = true; }
+        destroy() {}
+    }
+    const saved = { isSupported: Hls.isSupported, attachMedia: Hls.prototype.attachMedia, config: Hls.DefaultConfig, self: globalThis.self };
+    Hls.isSupported = () => true;
+    Hls.prototype.attachMedia = function attachMedia(media) { Object.defineProperty(this, 'media', { value: media, configurable: true }); };
+    Hls.DefaultConfig = { ...saved.config, loader: HeldLoader };
+    // loadSource resolves the URL against `self`, and hls.js's timers are
+    // self's: gone only after the player is.
+    globalThis.self = window;
+    t.after(() => {
+        destroyPlayer();
+        Hls.isSupported = saved.isSupported;
+        Hls.prototype.attachMedia = saved.attachMedia;
+        Hls.DefaultConfig = saved.config;
+        if (saved.self === undefined) delete globalThis.self;
+        else globalThis.self = saved.self;
+    });
+    return held;
+}
+const MASTER = '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=1280x720\nv0-720.m3u8\n';
+const answer = (req, data) => req.callbacks.onSuccess({ url: req.context.url, data }, req.stats, req.context, null);
+const refuse = (req, code) => req.callbacks.onError({ code, text: '' }, req.context,
+    { status: code, responseType: 'text', responseText: '', getAllResponseHeaders: () => '' }, req.stats);
+const playAsked = (p) => {
+    p.video.paused = false;
+    p.video.dispatchEvent(new dom.window.Event('play'));
+};
+const verdicts = (p) => p.events.filter((e) => e.name === 'player-dead' || e.name === 'player-revived');
+
+test('a manifest the server holds for a minute, or for 165 s: no player-dead while it is out; it answers, the film plays, nothing to revive', async (t) => {
+    const held = withHeldRequests(t);
+    for (const heldS of [60, 165]) {
+        held.length = 0;
+        const p = await mountPlayer(sessionPlayer);
+        assert.deepEqual(held.map((r) => r.context.type), ['manifest'], 'loadSource asked for it at mount');
+        mockClock(t, () => {
+            playAsked(p);
+            tickBy(t, heldS * 1000);
+            assert.deepEqual(verdicts(p), [], `${heldS} s held: waiting, not dead`);
+            answer(held[0], MASTER);
+            assert.deepEqual(held.map((r) => r.context.type), ['manifest', 'level'], 'parsed, and the level asked for');
+            tickBy(t, 2000);
+            p.video.dispatchEvent(new dom.window.Event('playing'));
+        });
+        assert.deepEqual(verdicts(p), [], `${heldS} s held`);
+        destroyPlayer();
+    }
+});
+
+// The other side: a watch bound before loadSource hears what is asked, it
+// does not take it for granted. An instance that asks for nothing is dead at
+// DEAD_AFTER_MS -- from the play request now, no longer from a first check
+// 2 s after it.
+test('hls.js that never asks for its manifest is still player-dead', async (t) => {
+    withHlsJs(t);
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer(sessionPlayer);
+    mockClock(t, () => {
+        playAsked(p);
+        tickBy(t, 28000);
+        assert.deepEqual(verdicts(p), [], 'not before the quiet');
+        tickBy(t, 4000);
+    });
+    const ev = verdicts(p);
+    assert.equal(ev.length, 1);
+    assert.equal(ev[0].name, 'player-dead');
+    assert.equal(ev[0].data.why, 'quiet');
+    assert.equal(ev[0].data.waited_s, 30);
+});
+
+test('a held manifest does not hide a real error: MediaError 4 that holds for the quiet is player-dead', async (t) => {
+    withHeldRequests(t);
+    const p = await mountPlayer(sessionPlayer);
+    mockClock(t, () => {
+        playAsked(p);
+        tickBy(t, 10000);
+        Object.defineProperty(p.video, 'error', { value: { code: 4 }, configurable: true });
+        p.video.dispatchEvent(new dom.window.Event('error'));
+        tickBy(t, 32000);
+    });
+    const ev = verdicts(p);
+    assert.equal(ev.length, 1);
+    assert.deepEqual([ev[0].data.why, ev[0].data.err, ev[0].data.path], ['error', 4, 'hlsjs']);
+});
+
+// The give-up after a held manifest is the card's: no verdict stands in front
+// of it (stream-restart.js blocked). A 4xx gives up at once
+// (network-recovery.js); every give-up goes through the same policy.
+test('a held manifest that ends in a give-up: the card, not held back by a verdict', async (t) => {
+    const held = withHeldRequests(t);
+    cleanRestart();
+    t.after(() => cleanRestart());
+    const p = await mountPlayer(sessionPlayer);
+    mockClock(t, () => {
+        playAsked(p);
+        tickBy(t, 120000);
+        refuse(held[0], 410);
+    });
+    await settle();
+    assert.deepEqual(verdicts(p), []);
+    assert.ok(p.container.querySelector('.wt-recover'), 'the card');
+    assert.deepEqual(p.events.find((e) => e.name === 'player-recover-card-shown').data, { reason: 'network', status: 410 });
+});
+
+// useHls makes a new instance for a new source; it is bound before its
+// loadSource too.
+test('a new source before the start: the new instance is heard from its own manifest request', async (t) => {
+    const held = withHeldRequests(t);
+    const p = await mountPlayer(sessionPlayer);
+    const first = window.hlsPlayer;
+    p.video.querySelector('source').setAttribute('src', 'https://api.test/x/next.mkv~hls/session/0b5e11aa/index.m3u8');
+    // A state change re-renders the player, which reads the new URL.
+    p.video.playbackRate = 1.1;
+    p.video.dispatchEvent(new dom.window.Event('ratechange'));
+    await settle();
+    assert.notEqual(window.hlsPlayer, first, 'a new instance');
+    assert.equal(held.length, 2);
+    assert.equal(held[1].context.url, 'https://api.test/x/next.mkv~hls/session/0b5e11aa/index.m3u8');
+    mockClock(t, () => {
+        playAsked(p);
+        tickBy(t, 90000);
+    });
+    assert.deepEqual(verdicts(p), []);
+});
+
+// Native HLS has no instance to bind: the element is what is watched, as
+// before -- loading is waiting, a pause or a hidden tab is not watched.
+test('native HLS, a pause, a hidden tab: watched as before', async (t) => {
+    t.after(() => { delete document.hidden; destroyPlayer(); });
+    const p = await mountPlayer((page) => {
+        sessionPlayer(page);
+        page.video.canPlayType = () => 'maybe';
+        page.video.load = () => {};
+    });
+    assert.equal(window.hlsPlayer, null, 'the browser plays the m3u8 itself');
+    let ns = 2;
+    Object.defineProperty(p.video, 'networkState', { get: () => ns, configurable: true });
+    const setHidden = (h) => {
+        Object.defineProperty(document, 'hidden', { value: h, configurable: true });
+        document.dispatchEvent(new dom.window.Event('visibilitychange'));
+    };
+    mockClock(t, () => {
+        playAsked(p);
+        tickBy(t, 90000);
+        assert.deepEqual(verdicts(p), [], 'the element loading');
+        ns = 1;
+        p.video.paused = true;
+        p.video.dispatchEvent(new dom.window.Event('pause'));
+        tickBy(t, 120000);
+        assert.deepEqual(verdicts(p), [], 'paused');
+        playAsked(p);
+        setHidden(true);
+        tickBy(t, 120000);
+        assert.deepEqual(verdicts(p), [], 'hidden');
+        setHidden(false);
+        tickBy(t, 28000);
+        assert.deepEqual(verdicts(p), [], 'not before the quiet');
+        tickBy(t, 4000);
+    });
+    const ev = verdicts(p);
+    assert.equal(ev.length, 1);
+    assert.equal(ev[0].data.path, 'native');
+});
+
 test('a restart of ours gone out: the old player is not reported dead while the page restarts', async (t) => {
     withHlsJs(t);
     cleanRestart();

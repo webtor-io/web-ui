@@ -97,7 +97,7 @@ export function sourceKind(video, hlsOn) {
 // createDeadPlayerWatch watches one player element until its first start.
 // getHls returns the hls.js instance the player holds (or null); Hls is the
 // hls.js class, for its event names; handled() is true once a guard has
-// begun a restart. Returns { dispose }.
+// begun a restart. Returns { dispose, bindHls, reported, dead }.
 export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, handled = () => false,
     track, doc = document, now = () => Date.now(),
     setInterval: startTimer = (fn, ms) => setInterval(fn, ms),
@@ -342,8 +342,13 @@ export function createDeadPlayerWatch({ video, getHls = () => null, Hls = null, 
 
     // dead: reported and not revived -- the player is this watch's verdict
     // (the stream restart, stream-restart.js, stands back while it is).
+    // bindHls: an instance before its loadSource (hls-manager.js createHls).
+    // loadSource asks for the manifest at once, and a bind at the next check
+    // would not know that request is out: a manifest the server held for a
+    // minute was player-dead at 32 s (2026-10-19, it played after all).
     return {
         dispose,
+        bindHls(hls) { if (!stopped) bind(hls); },
         get reported() { return reportedAt !== null; },
         get dead() { return reportedAt !== null && !revived; },
     };

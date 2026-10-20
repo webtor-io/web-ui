@@ -13,9 +13,10 @@ import { createHls, initDefaultTracks, Hls } from '../hls-manager';
  * recovery: { onSessionGone, onGiveUp, onFilmLoaded }, what the player
  * does after a fatal network error hls.js cannot recover from, and when a
  * fragment of the film arrives (network-recovery.js); read when the instance
- * is created, so the player hands a stable object.
+ * is created, so the player hands a stable object. beforeLoad(hls): every
+ * instance before its loadSource (hls-manager.js createHls).
  */
-export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audioGuard = null, recovery = null, loop = null } = {}) {
+export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audioGuard = null, recovery = null, loop = null, beforeLoad = null } = {}) {
     const hlsRef = useRef(null);
     const tracksInitialized = useRef(false);
 
@@ -32,6 +33,7 @@ export function useHls(videoRef, sourceUrl, { onReady, passthrough = null, audio
                 : audioGuard ? { guard: audioGuard } : {};
             if (recovery) opts.recovery = recovery;
             if (loop) opts.loop = loop;
+            if (beforeLoad) opts.beforeLoad = beforeLoad;
             const hls = createHls(video, sourceUrl, () => {
                 if (onReady) onReady(hls);
             }, opts);

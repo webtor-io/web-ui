@@ -516,8 +516,32 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         };
     }
 
+    // A player that never starts says so (dead-player.js): an Umami event,
+    // nothing the viewer sees. A restart a guard has begun is the guard's.
+    // Nor one the stream restart has taken over (stream-restart.js engaged:
+    // a restart gone out, its card up or waiting, a restart waiting for the
+    // grace popup): that player is not dead, it is being replaced or has
+    // said so itself -- one message, not two.
+    // Declared above the HLS hook: its effect runs first, and every hls.js
+    // instance is bound to it before its loadSource (beforeLoad below).
+    useEffect(() => {
+        const w = createDeadPlayerWatch({
+            video: videoEl,
+            getHls: () => hlsRef.current,
+            Hls,
+            handled: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
+                || (audioGuardRef.current && audioGuardRef.current.done)
+                || (vodGuardRef.current && vodGuardRef.current.done)
+                || (recoverPolicyRef.current && recoverPolicyRef.current.engaged)),
+            track,
+        });
+        deadWatchRef.current = w;
+        return w.dispose;
+    }, []);
+
     // HLS hook
     const hlsRef = useHls(videoRef, sourceUrl, {
+        beforeLoad: (hls) => deadWatchRef.current?.bindHls(hls),
         passthrough: passthroughRoute
             ? { fragLoadMs: parseInt(videoEl.dataset.fragLoadMs || '0', 10) || 0, guard: passthroughGuardRef.current }
             : null,
@@ -571,27 +595,6 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // effect is declared above this one, so the new instance is already
         // in the ref by the time this re-runs.
     }, [trackContainer, sourceUrl]);
-
-    // A player that never starts says so (dead-player.js): an Umami event,
-    // nothing the viewer sees. A restart a guard has begun is the guard's.
-    // Nor one the stream restart has taken over (stream-restart.js engaged:
-    // a restart gone out, its card up or waiting, a restart waiting for the
-    // grace popup): that player is not dead, it is being replaced or has
-    // said so itself -- one message, not two.
-    useEffect(() => {
-        const w = createDeadPlayerWatch({
-            video: videoEl,
-            getHls: () => hlsRef.current,
-            Hls,
-            handled: () => !!((passthroughGuardRef.current && passthroughGuardRef.current.done)
-                || (audioGuardRef.current && audioGuardRef.current.done)
-                || (vodGuardRef.current && vodGuardRef.current.done)
-                || (recoverPolicyRef.current && recoverPolicyRef.current.engaged)),
-            track,
-        });
-        deadWatchRef.current = w;
-        return w.dispose;
-    }, []);
 
     // Resume prompt state — must be declared before useWatchHistory which reads it.
     const [showResumePrompt, setShowResumePrompt] = useState(false);

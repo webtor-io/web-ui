@@ -51,7 +51,9 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 // cannot recover from -- a dead session's, fatal or not, and a failure that
 // outlasted the retries (network-recovery.js: onSessionGone, onGiveUp) --
 // the stream restart and the card (Player.jsx) -- and onFilmLoaded, a
-// fragment of the film arriving (the card comes down).
+// fragment of the film arriving (the card comes down). opts.beforeLoad(hls):
+// the instance before it asks for anything (the player-dead watch,
+// dead-player.js bindHls).
 export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     if (!Hls || !Hls.isSupported() || (isIOS && !iosPlaysHlsJs(window))) {
         // Native HLS (Safari/iOS) — browser handles m3u8 natively
@@ -76,6 +78,8 @@ export function createHls(videoEl, sourceUrl, onReady, opts = {}) {
     // events then refetches the one that is actually showing
     // (applySubtitleSelection → refreshStaleTrack).
     markUnsnapshottedTracksStale(Array.from(videoEl.querySelectorAll('track')), []);
+    // Before loadSource: its manifest request is the first thing to watch.
+    if (opts.beforeLoad) opts.beforeLoad(hls);
     hls.loadSource(sourceUrl);
     hls.attachMedia(videoEl);
 
