@@ -607,8 +607,8 @@ github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805 h1:OrhGq
 github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805/go.mod h1:r6jdz43RU9T68jBhxLMIAlkEXGMw5BWTkTiWa0PtaZc=
 github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158 h1:lf2kNtRMP+iqfBUoRrP6ZJGBOno75G/+7xjxAYMexq8=
 github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158/go.mod h1:fzmO7jNO+4ZVk12WHBuqCow2M8iJQFgJ8WWeGS6Rr6U=
-github.com/webtor-io/lazymap v0.0.0-20260807153732-a258d93d42f4 h1:IzqyT2MZFfDc4Dat89c3BV8vmIbiMl5sDg84uSIyQGA=
-github.com/webtor-io/lazymap v0.0.0-20260807153732-a258d93d42f4/go.mod h1:noIeMCqd9BmJsPsyDt/fYcyvFpdQ+7LnvQKtISl7kMk=
+github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a h1:LmYfSO3oVs630vYUK3TurHR/an1VjPXGPuc3LJG6VoI=
+github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a/go.mod h1:noIeMCqd9BmJsPsyDt/fYcyvFpdQ+7LnvQKtISl7kMk=
 github.com/webtor-io/magnet2torrent v0.0.0-20220312143110-bc1a7e4bcbba h1:OyPsU+YnNo0h22PfqfQHtkBTO9vKllKgy94RzF/Ga3c=
 github.com/webtor-io/magnet2torrent v0.0.0-20220312143110-bc1a7e4bcbba/go.mod h1:2cBSuVh1bLCrVUUy5TxEZj+Msuzz127kEt5XfeX/F3s=
 github.com/webtor-io/rest-api v1.0.1-0.20260926072012-e91a19d58e76 h1:bVWeqxBERTcFan9uqBUHGSnFnw04+fc9aIlc3L2HUp8=

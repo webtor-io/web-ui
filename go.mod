@@ -27,7 +27,7 @@ require (
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
 	github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
-	github.com/webtor-io/lazymap v0.0.0-20260807153732-a258d93d42f4
+	github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a
 	github.com/webtor-io/rest-api v1.0.1-0.20260926072012-e91a19d58e76
 	github.com/yargevad/filepathx v1.0.0
 	golang.org/x/image v0.45.0
