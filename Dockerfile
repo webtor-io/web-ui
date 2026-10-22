@@ -1,4 +1,4 @@
-FROM alpine:3.21 AS certs
+FROM alpine:3.24 AS certs
 
 # getting certs
 RUN apk update && apk upgrade && apk add --no-cache ca-certificates
@@ -13,7 +13,7 @@ RUN npm install
 
 RUN npm run build
 
-FROM golang:1.26-alpine AS build
+FROM golang:latest AS build
 
 # set work dir
 WORKDIR /app
@@ -30,12 +30,14 @@ ENV GOOS=linux
 # build the binary with debug information removed
 RUN go build -ldflags '-w -s -X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore' -a -installsuffix cgo -o server
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 # ffmpeg powers the thumbnail-generation fallback (services/thumbnail).
 # Alpine's ffmpeg package brings in libavformat + libavcodec + libswscale
 # — adds ~80 MB to the image. Only the decode/encode-still-frame path is
 # used; we never transcode video here.
+# The alpine tag is pinned, not latest: it picks ffmpeg's major (3.21: 6.1,
+# 3.24: 8.1), and services/thumbnail's memory guard is measured against it.
 RUN apk add --no-cache ffmpeg
 
 # set work dir
