@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+	"github.com/webtor-io/web-ui/helpers"
 )
 
 const (
@@ -425,7 +426,7 @@ func (api *Api) doRequest(ctx context.Context, rawURL string) (map[string]any, e
 		return nil, errors.Wrap(err, "prepare request")
 	}
 
-	resp, err := api.cl.Do(req)
+	resp, err := api.do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "request failed")
 	}
@@ -448,4 +449,14 @@ func (api *Api) doRequest(ctx context.Context, rawURL string) (map[string]any, e
 	}
 
 	return raw, nil
+}
+
+// do is cl.Do with the URL in a transport error redacted: the error quotes
+// the URL whole, api key included, and the callers log it.
+func (api *Api) do(req *http.Request) (*http.Response, error) {
+	resp, err := api.cl.Do(req)
+	if ue, ok := err.(*url.Error); ok {
+		ue.URL = helpers.RedactURL(ue.URL)
+	}
+	return resp, err
 }
