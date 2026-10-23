@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -611,6 +612,148 @@ func truncateRunes(s string, n int) string {
 	return string(runes[:n]) + "…"
 }
 
+// Enough names to recognise a title, few enough for a line or two under
+// the plot on a phone.
+const (
+	maxCreditDirectors = 2
+	maxCreditCast      = 4
+)
+
+// Credits implements CreditsProvider off the cached tmdb.info row only, like
+// IsAiring: no upstream call. Rows last written before GetDetails asked
+// for credits (c3ef013e, in prod by ~2026-04-15) have none and answer empty.
+func (s *TMDB) Credits(ctx context.Context, videoID string, ct models.ContentType) (*Credits, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return nil, errors.New("db is nil")
+	}
+	var info *tm.Info
+	var err error
+	switch {
+	case strings.HasPrefix(videoID, "tt"):
+		info, err = tm.GetInfoByIMDBID(ctx, db, videoID)
+	case strings.HasPrefix(videoID, "tmdb"):
+		id, aerr := strconv.Atoi(strings.TrimPrefix(videoID, "tmdb"))
+		if aerr != nil {
+			return nil, nil
+		}
+		info, err = tm.GetInfoByID(ctx, db, id)
+	default:
+		return nil, nil
+	}
+	if err != nil || info == nil {
+		return nil, err
+	}
+	return creditsFor(info, videoID, ct), nil
+}
+
+// backfillMaxFailuresInARow ends a backfill run early: that many failed
+// calls in a row means TMDB is down or rate-limiting, and the rest of the
+// batch would only fail the same way.
+const backfillMaxFailuresInARow = 10
+
+// creditsInProdSince bounds the backfill: GetDetails asked for credits from
+// c3ef013e, live in prod by 2026-04-15, so only rows last written before
+// this can lack them for that reason.
+var creditsInProdSince = time.Date(2026, 4, 16, 0, 0, 0, 0, time.UTC)
+
+// backfillCallTimeout bounds one re-fetch: the cron's client has no timeout
+// of its own, and one stalled response must not hold the run forever.
+const backfillCallTimeout = 30 * time.Second
+
+// BackfillCredits implements CreditsBackfiller: re-fetches up to limit
+// cached rows written before GetDetails asked for credits. A row TMDB no
+// longer has details for is marked so it is not asked again; a failed
+// call leaves the row for the next run.
+func (s *TMDB) BackfillCredits(ctx context.Context, limit int) (int, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return 0, errors.New("db is nil")
+	}
+	rows, err := tm.ListWithoutCredits(ctx, db, creditsInProdSince, limit)
+	if err != nil {
+		return 0, err
+	}
+	done, failed := 0, 0
+	for _, r := range rows {
+		searchType := tmdb.TmdbTypeMovie
+		if r.Type == tm.TmdbTypeSeries {
+			searchType = tmdb.TmdbTypeTV
+		}
+		cctx, cancel := context.WithTimeout(ctx, backfillCallTimeout)
+		info, err := s.ensureByTmdbID(cctx, db, r.TmdbID, r.Type, searchType)
+		cancel()
+		if err != nil {
+			log.WithError(err).WithField("tmdb_id", r.TmdbID).Warn("credits backfill: refetch failed")
+			if failed++; failed == backfillMaxFailuresInARow {
+				return done, errors.Errorf("%d failures in a row, stopping", failed)
+			}
+			continue
+		}
+		failed = 0
+		if info == nil {
+			if err := tm.MarkNoCredits(ctx, db, r.TmdbID); err != nil {
+				return done, err
+			}
+		}
+		done++
+	}
+	return done, nil
+}
+
+// creditsFor answers for the row a video id resolved to. TMDB numbers films
+// and series independently and tmdb.info keys on the number alone, so for a
+// tmdbN id a row of the other type is another title: checked, nothing shown.
+func creditsFor(info *tm.Info, videoID string, ct models.ContentType) *Credits {
+	want := tm.TmdbTypeMovie
+	if ct == models.ContentTypeSeries {
+		want = tm.TmdbTypeSeries
+	}
+	if strings.HasPrefix(videoID, "tmdb") && info.Type != want {
+		return &Credits{}
+	}
+	return creditsFromMetadata(info.Metadata)
+}
+
+// creditsFromMetadata reads the people line off a TMDB details response:
+// crew with job "Director" (films, and about a quarter of series),
+// created_by (series only) and the first cast entries in billing order. An adult title answers empty.
+func creditsFromMetadata(md map[string]any) *Credits {
+	c := &Credits{}
+	if adult, _ := md["adult"].(bool); adult {
+		return c
+	}
+	credits, _ := md["credits"].(map[string]any)
+	c.Directors = creditNames(credits["crew"], maxCreditDirectors, func(p map[string]any) bool {
+		job, _ := p["job"].(string)
+		return job == "Director"
+	})
+	c.Creators = creditNames(md["created_by"], maxCreditDirectors, nil)
+	c.Cast = creditNames(credits["cast"], maxCreditCast, nil)
+	return c
+}
+
+// creditNames collects up to max distinct names from a TMDB person array,
+// optionally only the entries keep accepts.
+func creditNames(v any, max int, keep func(map[string]any) bool) []string {
+	list, _ := v.([]any)
+	var out []string
+	for _, e := range list {
+		if len(out) == max {
+			break
+		}
+		p, _ := e.(map[string]any)
+		if keep != nil && !keep(p) {
+			continue
+		}
+		name, _ := p["name"].(string)
+		if name = strings.TrimSpace(name); name != "" && !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // IsAiring reads `status` / `in_production` off the locally cached TMDB
 // metadata. No external API call — if the row isn't cached yet, we return
 // false and the release-subscribe banner just doesn't render (safe
@@ -713,3 +856,5 @@ var _ LocalizableMapper = (*TMDB)(nil)
 var _ AiringChecker = (*TMDB)(nil)
 var _ SeasonAiringChecker = (*TMDB)(nil)
 var _ ReviewsProvider = (*TMDB)(nil)
+var _ CreditsProvider = (*TMDB)(nil)
+var _ CreditsBackfiller = (*TMDB)(nil)

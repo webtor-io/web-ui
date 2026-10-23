@@ -1,0 +1,74 @@
+package resource
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/enrich"
+)
+
+func creditsMovie(videoID string) *models.Movie {
+	return &models.Movie{MovieMetadata: &models.MovieMetadata{VideoMetadata: &models.VideoMetadata{VideoID: videoID, Title: "Movie A"}}}
+}
+
+func TestCreditsTarget(t *testing.T) {
+	series := &models.Series{SeriesMetadata: &models.SeriesMetadata{VideoMetadata: &models.VideoMetadata{VideoID: "tt2"}}}
+	cases := []struct {
+		name   string
+		d      *GetData
+		u      *auth.User
+		wantID string
+		wantCT models.ContentType
+		wantOK bool
+	}{
+		{"signed-in movie", &GetData{Movie: creditsMovie("tt1")}, signedIn, "tt1", models.ContentTypeMovie, true},
+		{"signed-in series", &GetData{Series: series}, signedIn, "tt2", models.ContentTypeSeries, true},
+		{"anonymous", &GetData{Movie: creditsMovie("tt1")}, &auth.User{}, "", models.ContentTypeMovie, false},
+		{"adult torrent", &GetData{Movie: creditsMovie("tt1"), ResourceMetadata: &models.ResourceMetadata{IsAdult: true}}, signedIn, "", models.ContentTypeMovie, false},
+		{"unclassified torrent", &GetData{Movie: creditsMovie("tt1"), ResourceMetadata: nil}, signedIn, "tt1", models.ContentTypeMovie, true},
+		{"classification read failed", &GetData{Movie: creditsMovie("tt1"), adultUnknown: true}, signedIn, "", models.ContentTypeMovie, false},
+		{"not enriched", &GetData{Movie: &models.Movie{}}, signedIn, "", models.ContentTypeMovie, false},
+		{"no title", &GetData{}, signedIn, "", models.ContentTypeMovie, false},
+	}
+	for _, c := range cases {
+		id, ct, ok := creditsTarget(c.d, c.u)
+		if id != c.wantID || ct != c.wantCT || ok != c.wantOK {
+			t.Errorf("%s: got (%q, %v, %v), want (%q, %v, %v)", c.name, id, ct, ok, c.wantID, c.wantCT, c.wantOK)
+		}
+	}
+}
+
+func TestCreditsBlock(t *testing.T) {
+	tpl := resourceTemplates(t)
+	render := func(lang string, cr *enrich.Credits) string {
+		gd := intentPage("", false)
+		gd.Movie = creditsMovie("tt1")
+		gd.Credits = cr
+		return execute(t, tpl, "main", pageContext(lang, gd))
+	}
+
+	got := render("en", &enrich.Credits{Directors: []string{"Director A", "Director B"}, Cast: []string{"Actor A", "Actor B"}})
+	for _, want := range []string{
+		`<span class="text-w-muted">Director:</span> Director A, Director B</p>`,
+		`<span class="text-w-muted">Cast:</span> Actor A, Actor B</p>`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Contains(got, "Creator:") {
+		t.Error("an empty creators list rendered a line")
+	}
+
+	if got := render("ru", &enrich.Credits{Creators: []string{"Creator A"}}); !strings.Contains(got, `Создатель:</span> Creator A`) {
+		t.Error("ru creators line missing")
+	}
+
+	for name, cr := range map[string]*enrich.Credits{"nil": nil, "empty": {}} {
+		if got := render("en", cr); strings.Contains(got, "space-y-0.5") {
+			t.Errorf("%s credits rendered the block", name)
+		}
+	}
+}

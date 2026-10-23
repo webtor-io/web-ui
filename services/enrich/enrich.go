@@ -50,6 +50,12 @@ type PopularProvider interface {
 	RefreshPopular(ctx context.Context, releaseDateGte string, limit int, force bool) (int, error)
 }
 
+// CreditsBackfiller is an optional capability of a MetadataMapper: re-fetch
+// cached rows written before the mapper stored credits. Today only TMDB.
+type CreditsBackfiller interface {
+	BackfillCredits(ctx context.Context, limit int) (int, error)
+}
+
 // LocalizableMapper is an optional capability of a MetadataMapper. Mappers
 // that can return localized title/plot for a given language implement this
 // interface. Today only TMDB supports it; OMDB is English-only, Kinopoisk
@@ -79,6 +85,24 @@ type Review struct {
 // itself failed and the caller must not cache the miss.
 type ReviewsProvider interface {
 	Reviews(ctx context.Context, videoID string) ([]Review, error)
+}
+
+// Credits is the people line under a title: directors, creators (series)
+// and the top-billed cast. Names are the upstream API's as they are;
+// person names are not localized.
+type Credits struct {
+	Directors []string `json:"directors,omitempty"`
+	Creators  []string `json:"creators,omitempty"`
+	Cast      []string `json:"cast,omitempty"`
+}
+
+// CreditsProvider is an optional capability of a MetadataMapper. Today
+// only TMDB implements it, off its local cache. Same three-valued contract
+// as ReviewsProvider: a non-nil (possibly empty) Credits means "checked";
+// nil with nil error means the id isn't known locally; an error means the
+// check failed.
+type CreditsProvider interface {
+	Credits(ctx context.Context, videoID string, ct models.ContentType) (*Credits, error)
 }
 
 // AiringChecker is an optional capability of a MetadataMapper. Mappers that
@@ -125,6 +149,24 @@ func (s *Enricher) RefreshPopular(ctx context.Context, releaseDateGte string, li
 		}).Info("refreshed popular films")
 	}
 	return nil
+}
+
+// BackfillCredits runs CreditsBackfiller on every mapper that has it, up to
+// limit rows each. Errors are logged, not returned, like RefreshPopular.
+func (s *Enricher) BackfillCredits(ctx context.Context, limit int) {
+	for _, m := range s.mappers {
+		cb, ok := m.(CreditsBackfiller)
+		if !ok {
+			continue
+		}
+		count, err := cb.BackfillCredits(ctx, limit)
+		l := log.WithFields(log.Fields{"mapper": m.GetName(), "count": count})
+		if err != nil {
+			l.WithError(err).Error("credits backfill failed")
+			continue
+		}
+		l.Info("credits backfilled")
+	}
 }
 
 // Localize overlays localized title and plot onto md in-place.
@@ -290,6 +332,51 @@ func (s *Enricher) ReviewsByID(ctx context.Context, videoID string, ct models.Co
 		return out, nil
 	}
 	return nil, err
+}
+
+// CreditsByID returns directors / creators / cast for a bare video ID
+// (IMDB tt* / tmdb*), with the same walkByID semantics and error contract
+// as ReviewsByID.
+func (s *Enricher) CreditsByID(ctx context.Context, videoID string, ct models.ContentType) (*Credits, error) {
+	if videoID == "" {
+		return nil, nil
+	}
+	var out *Credits
+	err := s.walkByID(ctx, videoID, ct, "credits by id", func(m MetadataMapper) (bool, bool, error) {
+		cp, ok := m.(CreditsProvider)
+		if !ok {
+			return false, false, nil
+		}
+		c, err := cp.Credits(ctx, videoID, ct)
+		if err != nil {
+			return true, false, err
+		}
+		if c != nil {
+			out = c
+			return true, true, nil
+		}
+		return true, false, nil
+	})
+	if out != nil {
+		return out, nil
+	}
+	return nil, err
+}
+
+// CachedCredits is CreditsByID without the MapByID fallback: locally cached
+// rows only, never an upstream call -- for the torrent page, whose render
+// must not wait on TMDB. Unknown ids and errors read as no credits.
+func (s *Enricher) CachedCredits(ctx context.Context, videoID string, ct models.ContentType) *Credits {
+	for _, m := range s.mappers {
+		cp, ok := m.(CreditsProvider)
+		if !ok {
+			continue
+		}
+		if c, err := cp.Credits(ctx, videoID, ct); err == nil && c != nil {
+			return c
+		}
+	}
+	return nil
 }
 
 // IsAiringSeries asks any mapper that supports AiringChecker whether the

@@ -90,6 +90,12 @@ func configureEnrich(c *cli.Command) {
 			Name:  "force",
 			Usage: "re-fetch and update all films even if already cached (useful after adding new metadata fields like credits)",
 		},
+		cli.IntFlag{
+			Name:   "credits-backfill-limit",
+			Usage:  "max cached rows without credits to re-fetch per run (0 disables)",
+			Value:  2000,
+			EnvVar: "ENRICH_CREDITS_BACKFILL_LIMIT",
+		},
 	)
 
 	cleanupCmd := cli.Command{
@@ -246,6 +252,9 @@ func enrichPopular(c *cli.Context) error {
 	ctx := context.Background()
 	if err := en.RefreshPopular(ctx, releaseDateGte, limit, force); err != nil {
 		return errors.Wrap(err, "enrich popular failed")
+	}
+	if n := c.Int("credits-backfill-limit"); n > 0 {
+		en.BackfillCredits(ctx, n)
 	}
 
 	log.Info("enrich popular completed")

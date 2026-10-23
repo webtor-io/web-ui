@@ -84,13 +84,45 @@ func UpsertInfo(ctx context.Context, db *pg.DB, tmdbID int, tmdbType TmdbType, m
 		Metadata: metadata,
 	}
 
+	// imdb_id keeps the stored value when a re-fetch of the same title
+	// carries none: TV details never do, and ensureByTmdbID adds it only when
+	// the follow-up external_ids call succeeds, so a failed external_ids must
+	// not erase a known id. Only for the same type: tmdb_id numbers films and
+	// series independently, and a row taken over by the other type is another
+	// title, whose IMDB id the old one is not.
 	_, err := db.Model(m).
 		Context(ctx).
 		OnConflict("(tmdb_id) DO UPDATE").
-		Set("type = EXCLUDED.type, metadata = EXCLUDED.metadata, title = EXCLUDED.title, year = EXCLUDED.year, imdb_id = EXCLUDED.imdb_id").
+		Set("type = EXCLUDED.type, metadata = EXCLUDED.metadata, title = EXCLUDED.title, year = EXCLUDED.year, imdb_id = CASE WHEN info.type = EXCLUDED.type THEN COALESCE(EXCLUDED.imdb_id, info.imdb_id) ELSE EXCLUDED.imdb_id END").
 		Insert()
 
 	return m, err
+}
+
+// ListWithoutCredits returns up to limit rows (tmdb_id and type only) last
+// written before the given time whose metadata has no credits. Lowest ids
+// first. The time bound goes first: the credits test detoasts the whole
+// metadata of every row it reads (865 MB on prod), the updated_at one does
+// not, and it leaves only the old rows to test.
+func ListWithoutCredits(ctx context.Context, db *pg.DB, before time.Time, limit int) ([]Info, error) {
+	var infos []Info
+	err := db.ModelContext(ctx, &infos).
+		Column("tmdb_id", "type").
+		Where("updated_at < ?", before).
+		Where("metadata->'credits' IS NULL").
+		Order("tmdb_id").
+		Limit(limit).
+		Select()
+	return infos, err
+}
+
+// MarkNoCredits records an empty credits block on a row TMDB no longer
+// has details for (a deleted entry answers 404); the write also moves its
+// updated_at past any cutoff, so ListWithoutCredits stops returning it.
+func MarkNoCredits(ctx context.Context, db *pg.DB, tmdbID int) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE tmdb.info SET metadata = metadata || '{"credits": {}}'::jsonb WHERE tmdb_id = ?`, tmdbID)
+	return err
 }
 
 // GetInfoByIMDBID looks up a cached TMDB record by its IMDB id. Used by the

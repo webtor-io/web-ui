@@ -62,6 +62,7 @@ The UI is built with **Preact** (lightweight React alternative) using hooks (`us
 - `assets/src/js/lib/discover/components/StarIcon.jsx` — shared filled rating star (grid cards, modal header, rate buttons, AI badges, review ratings)
 - `assets/src/js/lib/discover/ids.js` — `bareImdbTitleID` guard shared by localizeClient and reviewsClient (client mirror of the server-side id checks)
 - `handlers/discover/reviews.go` — Go handler bridging the modal's title id to the `ReviewsProvider` enrichment capability
+- `assets/src/js/lib/discover/creditsClient.js`, `handlers/discover/credits.go` — `POST /discover/credits` and its client (same shape and cache rules as reviews); see «Credits (TMDB)»
 - `migrations/59_tmdb_info_imdb_id_index.up.sql` — partial index on `tmdb.info(imdb_id)` for batch imdb→tmdb lookups
 
 ### Key Components
@@ -143,6 +144,16 @@ The stream modal shows TMDB community reviews for the open title, when they exis
 - **Value is still a hypothesis** — `discover-reviews-expand` exists to answer "does anyone read these" before investing in translation or additional sources (RT/Metacritic via OMDB would be a separate `RatingsProvider`-style capability)
 - **TMDB attribution** — the section header carries a TMDB badge; reviews are community content from TMDB and the badge is part of their attribution terms
 - **No new pipeline logic** — adding reviews from another source means implementing `ReviewsProvider` on that mapper, zero changes in the endpoint
+
+## Credits (TMDB)
+
+Directors, creators (series) and the top-billed cast under the description — in the stream modal and in the resource-page header (owner, 2026-10-23). Names are TMDB's primary names as they are, the same on every locale (usually Latin script, not always); the footer's TMDB line covers the source.
+
+1. TMDB `GetDetails` has carried `append_to_response=credits` since c3ef013e (2026-04-12, in prod by ~2026-04-15), and the whole response sits in `tmdb.info.metadata`, so showing credits costs no extra TMDB call. `creditsFromMetadata` (`services/enrich/tmdb.go`) takes crew with job `Director` (≤2), `created_by` (≤2) and the first 4 cast entries in billing order, deduped; a title with TMDB `adult: true` answers empty. Series rows have `Director` crew too (≈25%), so a series can show both lines
+2. `CreditsProvider` (TMDB only) reads the cached row and never calls TMDB. A `tmdbN` id whose row is of the other type answers empty: TMDB numbers films and series independently and `tmdb.info` keys on the number alone, so that row is another title
+3. Discover: `Enricher.CreditsByID` — `walkByID`, like reviews, so an unseen `tt*` id is pulled in by one `MapByID`. Endpoint, client and caching mirror reviews (200 with a possibly empty object is cacheable for the page lifetime, 502 is not). `Credits` in `StreamModal.jsx` rides `headerMeta.afterDescription`, so every header view that shows the description carries it (loading, fetching, episodes, streams; not progress, whose `ProgressView` builds its own header), for bare IMDB `tt*` ids with a known type only; it reads the client cache synchronously (`peekCredits`) because the header remounts on each view switch
+4. Resource page: `Enricher.CachedCredits` — the local cache only, no `MapByID`, so the render never waits on TMDB. Signed-in visitors only, and never on an adult torrent or one whose `resource_metadata` read failed (`creditsTarget` in `handlers/resource/get.go`). No JSON-LD, no links: the names are text
+5. Rows last written 2026-03-23 … 2026-04-15, before that change reached prod (5,730 of 145k on 2026-10-23), have no credits. The `enrich popular` cron (every 6 h) re-fetches up to `--credits-backfill-limit` of them per run (default 2000, `ENRICH_CREDITS_BACKFILL_LIMIT`, 0 disables; `TMDB.BackfillCredits`), lowest `tmdb_id` first, 30 s per call, and stops a run after 10 failures in a row. The selection is bounded by `updated_at < 2026-04-16` before the credits test: that test detoasts every row's metadata (865 MB), the bound leaves only old rows to test (273 ms on prod), and a re-fetched row's write moves it past the bound. A row TMDB no longer has (404) gets an empty `credits` object. `UpsertInfo` keeps a stored `imdb_id` when a same-type re-fetch carries none, so a TV re-fetch whose `external_ids` call failed does not erase it; a row taken over by the other type takes the new value, since it is another title
 
 ## Search
 
