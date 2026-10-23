@@ -629,6 +629,25 @@ func (s *Helper) PosterURL(resourceID string, width int, isAdult bool, ctx *Cont
 	return PosterURL(resourceID, width, isAdult, ctx)
 }
 
+// PersonPhotoWidth is the cast photo the strip draws: a 48px circle at 2x.
+const PersonPhotoWidth = 96
+
+// PersonPhotoURL is the proxied cast photo for a TMDB profile image file
+// name (enrich.CastMember.Profile), "" when there is none. Proxied like
+// posters and episode stills, never hotlinked (handlers/library/person_photo.go).
+//
+// Template usage: {{ personPhotoURL .Profile }}
+func PersonPhotoURL(profile string) string {
+	if profile == "" {
+		return ""
+	}
+	return fmt.Sprintf("/lib/person/photo/%s/%d.jpg", profile, PersonPhotoWidth)
+}
+
+func (s *Helper) PersonPhotoURL(profile string) string {
+	return PersonPhotoURL(profile)
+}
+
 // ShowAdultBadge tells templates whether to render the 18+ overlay on
 // an adult card. False for users who've opted in to see adult content
 // unblurred — the badge would just clutter every card once the blur

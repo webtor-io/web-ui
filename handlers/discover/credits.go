@@ -7,7 +7,31 @@ import (
 
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/web"
 )
+
+// creditsView is enrich.Credits as the modal draws it: each cast photo as
+// the proxied URL (web.PersonPhotoURL), not the TMDB file name. The cast is
+// "people", not "cast": that key carried bare names before, and a bundle and
+// a pod from either side of a rollout must not misread each other.
+type creditsView struct {
+	Directors []string   `json:"directors,omitempty"`
+	Creators  []string   `json:"creators,omitempty"`
+	People    []castView `json:"people,omitempty"`
+}
+
+type castView struct {
+	Name  string `json:"name"`
+	Photo string `json:"photo,omitempty"`
+}
+
+func newCreditsView(cr *enrich.Credits) creditsView {
+	v := creditsView{Directors: cr.Directors, Creators: cr.Creators}
+	for _, m := range cr.Cast {
+		v.People = append(v.People, castView{Name: m.Name, Photo: web.PersonPhotoURL(m.Profile)})
+	}
+	return v
+}
 
 // credits is the handler for POST /discover/credits: directors / creators /
 // cast from TMDB for the title open in the stream modal. Same request shape
@@ -15,7 +39,7 @@ import (
 // verdict the client may cache, 502 means the pipeline couldn't check.
 func (h *Handler) credits(c *gin.Context) {
 	if h.en == nil || !h.en.HasMappers() {
-		c.JSON(http.StatusOK, enrich.Credits{})
+		c.JSON(http.StatusOK, creditsView{})
 		return
 	}
 	var req reviewsRequest
@@ -35,5 +59,5 @@ func (h *Handler) credits(c *gin.Context) {
 	if cr == nil {
 		cr = &enrich.Credits{}
 	}
-	c.JSON(http.StatusOK, cr)
+	c.JSON(http.StatusOK, newCreditsView(cr))
 }

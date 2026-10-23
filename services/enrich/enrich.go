@@ -91,9 +91,17 @@ type ReviewsProvider interface {
 // and the top-billed cast. Names are the upstream API's as they are;
 // person names are not localized.
 type Credits struct {
-	Directors []string `json:"directors,omitempty"`
-	Creators  []string `json:"creators,omitempty"`
-	Cast      []string `json:"cast,omitempty"`
+	Directors []string     `json:"directors,omitempty"`
+	Creators  []string     `json:"creators,omitempty"`
+	Cast      []CastMember `json:"cast,omitempty"`
+}
+
+// CastMember is one billed actor. Profile is the TMDB image file name of
+// their photo ("abc.jpg"), empty when TMDB has none; it is served through
+// /lib/person/photo (handlers/library/person_photo.go), never hotlinked.
+type CastMember struct {
+	Name    string `json:"name"`
+	Profile string `json:"profile,omitempty"`
 }
 
 // CreditsProvider is an optional capability of a MetadataMapper. Today

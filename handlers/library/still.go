@@ -166,7 +166,11 @@ func (s *Handler) getResizedJPEGStill(ctx context.Context, db *pg.DB, args *Stil
 	return &buf, nil
 }
 
-func (s *Handler) getStillFromCache(ctx context.Context, s3Cl *s3.S3, sa *StillArgs) (*bytes.Buffer, error) {
+// cacheKeyed is what the S3 cache helpers below need of a request: its
+// object key. StillArgs and PersonPhotoArgs share them.
+type cacheKeyed interface{ Key() string }
+
+func (s *Handler) getStillFromCache(ctx context.Context, s3Cl *s3.S3, sa cacheKeyed) (*bytes.Buffer, error) {
 	r, err := s3Cl.GetObjectWithContext(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.posterCacheS3Bucket),
 		Key:    aws.String(sa.Key()),
@@ -189,7 +193,7 @@ func (s *Handler) getStillFromCache(ctx context.Context, s3Cl *s3.S3, sa *StillA
 	return &buf, nil
 }
 
-func (s *Handler) putStillToCache(ctx context.Context, s3Cl *s3.S3, sa *StillArgs, b *bytes.Buffer) (err error) {
+func (s *Handler) putStillToCache(ctx context.Context, s3Cl *s3.S3, sa cacheKeyed, b *bytes.Buffer) (err error) {
 	data := b.Bytes()
 	_, err = s3Cl.PutObjectWithContext(ctx,
 		&s3.PutObjectInput{

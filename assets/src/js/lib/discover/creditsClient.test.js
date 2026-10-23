@@ -14,10 +14,10 @@ function respond(status, body) {
 
 test('an answer is cached and readable synchronously', async () => {
     calls = 0;
-    respond(200, { cast: ['Actor A'] });
+    respond(200, { people: [{ name: 'Actor A' }] });
     assert.equal(peekCredits('tt1'), null);
-    assert.deepEqual(await fetchCredits('tt1', 'movie'), { cast: ['Actor A'] });
-    assert.deepEqual(peekCredits('tt1'), { cast: ['Actor A'] });
+    assert.deepEqual(await fetchCredits('tt1', 'movie'), { people: [{ name: 'Actor A' }] });
+    assert.deepEqual(peekCredits('tt1'), { people: [{ name: 'Actor A' }] });
     await fetchCredits('tt1', 'movie');
     assert.equal(calls, 1);
 });

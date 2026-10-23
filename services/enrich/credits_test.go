@@ -27,8 +27,9 @@ func TestCreditsFromMetadata(t *testing.T) {
 				person("Director C", "job", "Director"),
 			},
 			"cast": []any{
-				person("Actor A"), person(" "), person("Actor B"), "junk",
-				person("Actor C"), person("Actor D"), person("Actor E"),
+				person("Actor A", "profile_path", "/aaaaaaaa.jpg"), person(" "), person("Actor B"), "junk",
+				person("Actor C"), person("Actor D"), person("Actor E"), person("Actor F"),
+				person("Actor G"), person("Actor H"), person("Actor I"),
 			},
 		},
 	}
@@ -43,13 +44,14 @@ func TestCreditsFromMetadata(t *testing.T) {
 		md   map[string]any
 		want *Credits
 	}{
-		{"movie: directors deduped and capped, cast capped in billing order", movie, &Credits{
+		{"movie: directors deduped and capped, cast capped in billing order, photo file name without the slash", movie, &Credits{
 			Directors: []string{"Director A", "Director B"},
-			Cast:      []string{"Actor A", "Actor B", "Actor C", "Actor D"},
+			Cast: []CastMember{{Name: "Actor A", Profile: "aaaaaaaa.jpg"}, {Name: "Actor B"}, {Name: "Actor C"}, {Name: "Actor D"},
+				{Name: "Actor E"}, {Name: "Actor F"}, {Name: "Actor G"}, {Name: "Actor H"}},
 		}},
 		{"series without crew: creators only", series, &Credits{
 			Creators: []string{"Creator A"},
-			Cast:     []string{"Actor A"},
+			Cast:     []CastMember{{Name: "Actor A"}},
 		}},
 		{"adult title answers empty", adult, &Credits{}},
 		{"row without credits answers empty", map[string]any{"title": "x"}, &Credits{}},
@@ -71,9 +73,9 @@ func TestCreditsForTypeMismatch(t *testing.T) {
 		ct      models.ContentType
 		want    *Credits
 	}{
-		{"tmdbN film row for a film", "tmdb7", models.ContentTypeMovie, &Credits{Cast: []string{"Actor A"}}},
+		{"tmdbN film row for a film", "tmdb7", models.ContentTypeMovie, &Credits{Cast: []CastMember{{Name: "Actor A"}}}},
 		{"tmdbN film row for a series is another title", "tmdb7", models.ContentTypeSeries, &Credits{}},
-		{"an IMDB id names one title, type hint ignored", "tt7", models.ContentTypeSeries, &Credits{Cast: []string{"Actor A"}}},
+		{"an IMDB id names one title, type hint ignored", "tt7", models.ContentTypeSeries, &Credits{Cast: []CastMember{{Name: "Actor A"}}}},
 	}
 	for _, c := range cases {
 		if got := creditsFor(film, c.videoID, c.ct); !reflect.DeepEqual(got, c.want) {

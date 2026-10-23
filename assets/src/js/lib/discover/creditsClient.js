@@ -16,8 +16,8 @@ export function peekCredits(id) {
     return cache.get(id) || null;
 }
 
-// fetchCredits resolves to {directors?, creators?, cast?} (arrays of names),
-// or null for non-resolvable ids and on failure.
+// fetchCredits resolves to {directors?, creators?: string[], people?:
+// {name, photo?}[]}, or null for non-resolvable ids and on failure.
 export async function fetchCredits(id, type) {
     if (!bareImdbTitleID(id)) return null;
     if (cache.has(id)) return cache.get(id);

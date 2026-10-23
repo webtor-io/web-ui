@@ -220,16 +220,15 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, inWatchlist, 
     );
 }
 
-const CREDIT_ROWS = [
+const CREDIT_LINES = [
     ['directors', 'discover.credits.director'],
     ['creators', 'discover.credits.creator'],
-    ['cast', 'discover.credits.cast'],
 ];
 
-// Directors / creators / cast from TMDB under the description. Draws
-// nothing until the answer arrives, and nothing for an empty one. The
-// answer is kept with its id, so a switch of title never shows the
-// previous title's names.
+// Directors / creators as lines, the cast as a line that opens a photo strip,
+// all from TMDB under the description. Draws nothing until the answer
+// arrives, and nothing for an empty one. The answer is kept with its id, so
+// a switch of title never shows the previous title's names.
 function Credits({ id, type }) {
     const [loaded, setLoaded] = useState(null);
     useEffect(() => {
@@ -238,13 +237,63 @@ function Credits({ id, type }) {
         return () => { live = false; };
     }, [id, type]);
     const credits = loaded?.id === id ? loaded.c : peekCredits(id);
-    const rows = CREDIT_ROWS.filter(([field]) => credits?.[field]?.length);
-    if (!rows.length) return null;
+    const lines = CREDIT_LINES.filter(([field]) => credits?.[field]?.length);
+    const cast = credits?.people || [];
+    if (!lines.length && !cast.length) return null;
     return (
-        <div class="text-sm text-w-sub leading-relaxed mt-1 space-y-0.5">
-            {rows.map(([field, key]) => (
+        <div class="text-sm text-w-sub leading-relaxed mt-1 space-y-1">
+            {lines.map(([field, key]) => (
                 <p key={field} class="line-clamp-2"><span class="text-w-muted">{t(key)}:</span> {credits[field].join(', ')}</p>
             ))}
+            {cast.length > 0 && <CastStrip id={id} cast={cast} />}
+        </div>
+    );
+}
+
+// Titles whose strip the viewer opened. The header remounts on every view
+// switch (fetching → streams), and the strip must not fold up under them.
+const openCast = new Set();
+
+// The first four names, two lines at most; the strip of photos opens in
+// place (owner, 2026-10-23). Not rendered while closed, so no photo is fetched before.
+function CastStrip({ id, cast }) {
+    const [open, setOpen] = useState(() => openCast.has(id));
+    const onToggle = e => {
+        const now = e.currentTarget.open;
+        if (now) openCast.add(id); else openCast.delete(id);
+        setOpen(now);
+    };
+    return (
+        <details class="group" open={open} onToggle={onToggle}>
+            <summary class="flex items-end gap-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <span class="min-w-0 line-clamp-2">
+                    <span class="text-w-muted">{t('discover.credits.cast')}:</span>{' '}
+                    <span class="group-open:hidden">{cast.slice(0, 4).map(m => m.name).join(', ')}</span>
+                </span>
+                <span class="shrink-0 text-w-cyan transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
+            </summary>
+            {open && (
+                <div class="flex gap-3 overflow-x-auto pt-2 pb-1">
+                    {cast.map(m => <CastPhoto key={m.name} member={m} />)}
+                </div>
+            )}
+        </details>
+    );
+}
+
+// A proxied photo (/lib/person/photo) over a placeholder that shows when
+// there is none or it fails to load.
+function CastPhoto({ member }) {
+    const [failed, setFailed] = useState(false);
+    return (
+        <div class="w-14 shrink-0 text-center">
+            <div class="relative w-12 h-12 mx-auto rounded-full overflow-hidden bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 grid place-items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6" aria-hidden="true"><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" /></svg>
+                {member.photo && !failed && (
+                    <img src={member.photo} alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover" onError={() => setFailed(true)} />
+                )}
+            </div>
+            <div class="mt-1 text-xs leading-tight line-clamp-2">{member.name}</div>
         </div>
     );
 }
