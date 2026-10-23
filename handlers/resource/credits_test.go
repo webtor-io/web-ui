@@ -49,10 +49,15 @@ func TestCreditsBlock(t *testing.T) {
 		return execute(t, tpl, "main", pageContext(lang, gd))
 	}
 
-	got := render("en", &enrich.Credits{Directors: []string{"Director A", "Director B"}, Cast: []string{"Actor A", "Actor B"}})
+	got := render("en", &enrich.Credits{Directors: []string{"Director A", "Director B"}, Cast: []enrich.CastMember{
+		{Name: "Actor A", Profile: "aaaaaaaa.jpg"}, {Name: "Actor B"}, {Name: "Actor C"}, {Name: "Actor D"}, {Name: "Actor E"},
+	}})
 	for _, want := range []string{
 		`<span class="text-w-muted">Director:</span> Director A, Director B</p>`,
-		`<span class="text-w-muted">Cast:</span> Actor A, Actor B</p>`,
+		// The collapsed line names the first four; the fifth is in the strip only.
+		`<span class="text-w-muted">Cast:</span> <span class="group-open:hidden">Actor A, Actor B, Actor C, Actor D</span>`,
+		`<img src="/lib/person/photo/aaaaaaaa.jpg/96.jpg"`,
+		`line-clamp-2">Actor E</div>`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q", want)
@@ -61,13 +66,16 @@ func TestCreditsBlock(t *testing.T) {
 	if strings.Contains(got, "Creator:") {
 		t.Error("an empty creators list rendered a line")
 	}
+	if n := strings.Count(got, "<img src=\"/lib/person/photo/"); n != 1 {
+		t.Errorf("%d photos, want 1: the others have no profile and show the placeholder", n)
+	}
 
 	if got := render("ru", &enrich.Credits{Creators: []string{"Creator A"}}); !strings.Contains(got, `Создатель:</span> Creator A`) {
 		t.Error("ru creators line missing")
 	}
 
 	for name, cr := range map[string]*enrich.Credits{"nil": nil, "empty": {}} {
-		if got := render("en", cr); strings.Contains(got, "space-y-0.5") {
+		if got := render("en", cr); strings.Contains(got, "credits.") || strings.Contains(got, "<details") || strings.Contains(got, "space-y-1") {
 			t.Errorf("%s credits rendered the block", name)
 		}
 	}

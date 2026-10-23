@@ -123,6 +123,12 @@ type Api struct {
 	imageBaseURL   string
 }
 
+// ImageBaseURL is the TMDB image CDN base ("https://image.tmdb.org/t/p"),
+// for callers that proxy TMDB images without an Api (handlers/library).
+func ImageBaseURL(c *cli.Context) string {
+	return c.String(tmdbImageBaseURLFlag)
+}
+
 func New(c *cli.Context, cl *http.Client) *Api {
 	host := c.String(tmdbApiHostFlag)
 	port := c.Int(tmdbApiPortFlag)

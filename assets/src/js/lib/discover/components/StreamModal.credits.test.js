@@ -31,7 +31,10 @@ const { init } = await import('../i18n.js');
 const { StreamModal } = await import('./StreamModal.jsx');
 await init();
 
-const answers = { tt1: { directors: ['Director A'], cast: ['Actor A'] }, tt2: { cast: ['Actor B'] } };
+const answers = {
+    tt1: { directors: ['Director A'], people: [{ name: 'Actor A', photo: '/lib/person/photo/aaaaaaaa.jpg/96.jpg' }, { name: 'Actor C' }] },
+    tt2: { people: [{ name: 'Actor B' }] },
+};
 const calls = [];
 globalThis.fetch = window.fetch = async (url, opts) => {
     if (String(url).includes('/discover/credits')) {
@@ -81,5 +84,24 @@ test('a failure draws nothing and the next open asks again; episode ids ask noth
     show({ view: 'streams', metaId: 'tt1:1:2', itemType: 'series', title: 'Episode', streams: [] });
     await settle();
     assert.equal(calls.length, n);
+    render(null, root);
+});
+
+test('the cast strip draws no photo until it is opened, and stays open across views', async () => {
+    show({ view: 'fetching', metaId: 'tt1', itemType: 'movie', title: 'One', addons: [] });
+    await settle();
+    const details = () => root.querySelector('details');
+    assert.ok(details(), 'the cast line is there');
+    assert.match(details().querySelector('summary').textContent, /Actor A, Actor C/);
+    assert.equal(root.querySelectorAll('img[src^="/lib/person/photo/"]').length, 0, 'closed: no photo requested');
+
+    details().open = true;
+    await settle();
+    const photos = [...root.querySelectorAll('img[src^="/lib/person/photo/"]')].map(i => i.getAttribute('src'));
+    assert.deepEqual(photos, ['/lib/person/photo/aaaaaaaa.jpg/96.jpg'], 'one photo; the other actor has none');
+
+    show({ view: 'streams', metaId: 'tt1', itemType: 'movie', title: 'One', streams: [] });
+    assert.ok(details().open, 'the view switch did not fold it');
+    assert.equal(root.querySelectorAll('img[src^="/lib/person/photo/"]').length, 1);
     render(null, root);
 });

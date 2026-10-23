@@ -612,11 +612,12 @@ func truncateRunes(s string, n int) string {
 	return string(runes[:n]) + "…"
 }
 
-// Enough names to recognise a title, few enough for a line or two under
-// the plot on a phone.
+// Directors: enough to recognise a title, few enough for one line under
+// the plot on a phone. Cast: what the photo strip holds; the collapsed line
+// names the first four.
 const (
 	maxCreditDirectors = 2
-	maxCreditCast      = 4
+	maxCreditCast      = 8
 )
 
 // Credits implements CreditsProvider off the cached tmdb.info row only, like
@@ -724,20 +725,21 @@ func creditsFromMetadata(md map[string]any) *Credits {
 		return c
 	}
 	credits, _ := md["credits"].(map[string]any)
-	c.Directors = creditNames(credits["crew"], maxCreditDirectors, func(p map[string]any) bool {
+	c.Directors = names(creditPeople(credits["crew"], maxCreditDirectors, func(p map[string]any) bool {
 		job, _ := p["job"].(string)
 		return job == "Director"
-	})
-	c.Creators = creditNames(md["created_by"], maxCreditDirectors, nil)
-	c.Cast = creditNames(credits["cast"], maxCreditCast, nil)
+	}))
+	c.Creators = names(creditPeople(md["created_by"], maxCreditDirectors, nil))
+	c.Cast = creditPeople(credits["cast"], maxCreditCast, nil)
 	return c
 }
 
-// creditNames collects up to max distinct names from a TMDB person array,
-// optionally only the entries keep accepts.
-func creditNames(v any, max int, keep func(map[string]any) bool) []string {
+// creditPeople collects up to max people with distinct names from a TMDB
+// person array, optionally only the entries keep accepts. profile_path
+// comes as "/abc.jpg"; the leading slash is dropped.
+func creditPeople(v any, max int, keep func(map[string]any) bool) []CastMember {
 	list, _ := v.([]any)
-	var out []string
+	var out []CastMember
 	for _, e := range list {
 		if len(out) == max {
 			break
@@ -747,9 +749,19 @@ func creditNames(v any, max int, keep func(map[string]any) bool) []string {
 			continue
 		}
 		name, _ := p["name"].(string)
-		if name = strings.TrimSpace(name); name != "" && !slices.Contains(out, name) {
-			out = append(out, name)
+		if name = strings.TrimSpace(name); name == "" || slices.ContainsFunc(out, func(m CastMember) bool { return m.Name == name }) {
+			continue
 		}
+		profile, _ := p["profile_path"].(string)
+		out = append(out, CastMember{Name: name, Profile: strings.TrimPrefix(profile, "/")})
+	}
+	return out
+}
+
+func names(people []CastMember) []string {
+	var out []string
+	for _, p := range people {
+		out = append(out, p.Name)
 	}
 	return out
 }
