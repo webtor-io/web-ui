@@ -39,7 +39,7 @@ func ServeError(w http.ResponseWriter, err error) {
 // of golang.org/x/net/webdav.
 func DecodeXMLRequest(r *http.Request, v interface{}) error {
 	if err := xml.NewDecoder(r.Body).Decode(v); err != nil {
-		return &HTTPError{http.StatusBadRequest, err}
+		return &HTTPError{Code: http.StatusBadRequest, Err: err}
 	}
 	return nil
 }
@@ -134,7 +134,7 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) error {
 	if _, err := body.Peek(1); err == io.EOF {
 		propfind.AllProp = &struct{}{}
 	} else if err := xml.NewDecoder(body).Decode(&propfind); err != nil {
-		return &HTTPError{http.StatusBadRequest, err}
+		return &HTTPError{Code: http.StatusBadRequest, Err: err}
 	}
 
 	depth := DepthInfinity
@@ -142,7 +142,7 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) error {
 		var err error
 		depth, err = ParseDepth(s)
 		if err != nil {
-			return &HTTPError{http.StatusBadRequest, err}
+			return &HTTPError{Code: http.StatusBadRequest, Err: err}
 		}
 	}
 

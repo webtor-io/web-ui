@@ -307,7 +307,7 @@ func (b *backend) Copy(r *http.Request, dest *internal.Href, recursive, overwrit
 	}
 	created, err = b.FileSystem.Copy(r.Context(), r.URL.Path, dest.Path, &options)
 	if os.IsExist(err) {
-		return false, &internal.HTTPError{http.StatusPreconditionFailed, err}
+		return false, &internal.HTTPError{Code: http.StatusPreconditionFailed, Err: err}
 	}
 	return created, err
 }
@@ -318,7 +318,7 @@ func (b *backend) Move(r *http.Request, dest *internal.Href, overwrite bool) (cr
 	}
 	created, err = b.FileSystem.Move(r.Context(), r.URL.Path, dest.Path, &options)
 	if os.IsExist(err) {
-		return false, &internal.HTTPError{http.StatusPreconditionFailed, err}
+		return false, &internal.HTTPError{Code: http.StatusPreconditionFailed, Err: err}
 	}
 	return created, err
 }

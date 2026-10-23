@@ -13,12 +13,12 @@ import (
 const Namespace = "DAV:"
 
 var (
-	ResourceTypeName     = xml.Name{Namespace, "resourcetype"}
-	GetContentLengthName = xml.Name{Namespace, "getcontentlength"}
-	GetContentTypeName   = xml.Name{Namespace, "getcontenttype"}
-	GetLastModifiedName  = xml.Name{Namespace, "getlastmodified"}
-	GetETagName          = xml.Name{Namespace, "getetag"}
-	DisplayNameName      = xml.Name{Namespace, "displayname"}
+	ResourceTypeName     = xml.Name{Space: Namespace, Local: "resourcetype"}
+	GetContentLengthName = xml.Name{Space: Namespace, Local: "getcontentlength"}
+	GetContentTypeName   = xml.Name{Space: Namespace, Local: "getcontenttype"}
+	GetLastModifiedName  = xml.Name{Space: Namespace, Local: "getlastmodified"}
+	GetETagName          = xml.Name{Space: Namespace, Local: "getetag"}
+	DisplayNameName      = xml.Name{Space: Namespace, Local: "displayname"}
 )
 
 type Status struct {
@@ -290,7 +290,7 @@ func (t *ResourceType) Is(name xml.Name) bool {
 	return false
 }
 
-var CollectionName = xml.Name{Namespace, "collection"}
+var CollectionName = xml.Name{Space: Namespace, Local: "collection"}
 
 // https://tools.ietf.org/html/rfc4918#section-15.4
 type GetContentLength struct {
