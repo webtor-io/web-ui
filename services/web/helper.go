@@ -629,8 +629,8 @@ func (s *Helper) PosterURL(resourceID string, width int, isAdult bool, ctx *Cont
 	return PosterURL(resourceID, width, isAdult, ctx)
 }
 
-// PersonPhotoWidth is the cast photo the strip draws: a 48px circle at 2x.
-const PersonPhotoWidth = 96
+// PersonPhotoWidth is the cast photo the strip draws: a 72×108 portrait at 2x.
+const PersonPhotoWidth = 144
 
 // PersonPhotoURL is the proxied cast photo for a TMDB profile image file
 // name (enrich.CastMember.Profile), "" when there is none. Proxied like

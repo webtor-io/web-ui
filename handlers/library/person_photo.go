@@ -24,16 +24,17 @@ import (
 //
 //	GET /lib/person/photo/<tmdb image file name>/<width>.jpg
 //
-// The answer is a width×width square cut from the top of the portrait, where
-// the face is, for the circles in the cast strip. Cached in the poster bucket.
+// The answer is the portrait at width × 1.5·width: TMDB's own 2:3 profile
+// shape, so nothing TMDB shows is cut (a circle or a square cut the head on
+// its tightly framed headshots). Cached in the poster bucket.
 
 // personPhotoName is a TMDB image file name as profile_path carries it, minus
 // the slash. Nothing else is fetched: the route can only reach TMDB images.
 // Profiles are always .jpg; .png would let in logos, which come in any shape.
 var personPhotoName = regexp.MustCompile(`^[A-Za-z0-9]{8,64}\.jpg$`)
 
-// personPhotoSource is the TMDB size the square is cut from; 185px wide
-// covers the 96px the strip asks for with room to spare.
+// personPhotoSource is the TMDB size the portrait is scaled from; 185px
+// wide covers the 144px the strip asks for.
 const personPhotoSource = "w185"
 
 var errPersonPhotoNotFound = errors.New("no such photo")
@@ -62,8 +63,8 @@ func bindPersonPhotoArgs(c *gin.Context) (*PersonPhotoArgs, error) {
 	}
 	// Only the width the strip asks for. poster_resolver's 32..1600 is not a
 	// bound here: Fill scales a source thinner than 100px to cover the whole
-	// square before cropping, so a caller-chosen image at 1600 costs hundreds
-	// of MB on this unauthenticated route; at 96 it is about 1 MB.
+	// frame before cropping, so a caller-chosen image at 1600 costs hundreds
+	// of MB on this unauthenticated route; at 144 it is a few MB at worst.
 	if width != web.PersonPhotoWidth {
 		return nil, errors.Errorf("wrong width %v", width)
 	}
@@ -148,9 +149,9 @@ func (s *Handler) getPersonPhoto(ctx context.Context, args *PersonPhotoArgs) (*b
 	if err != nil {
 		return nil, err
 	}
-	square := imaging.Fill(src, args.width, args.width, imaging.Top, imaging.Lanczos)
+	portrait := imaging.Fill(src, args.width, args.width*3/2, imaging.Top, imaging.Lanczos)
 	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, square, &jpeg.Options{Quality: PosterJPEGQuality}); err != nil {
+	if err := jpeg.Encode(&buf, portrait, &jpeg.Options{Quality: PosterJPEGQuality}); err != nil {
 		return nil, err
 	}
 	return &buf, nil

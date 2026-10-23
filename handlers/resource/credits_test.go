@@ -56,7 +56,7 @@ func TestCreditsBlock(t *testing.T) {
 		`<span class="text-w-muted">Director:</span> Director A, Director B</p>`,
 		// The collapsed line names the first four; the fifth is in the strip only.
 		`<span class="text-w-muted">Cast:</span> <span class="group-open:hidden">Actor A, Actor B, Actor C, Actor D</span>`,
-		`<img src="/lib/person/photo/aaaaaaaa.jpg/96.jpg"`,
+		`<img src="/lib/person/photo/aaaaaaaa.jpg/144.jpg"`,
 		`line-clamp-2">Actor E</div>`,
 	} {
 		if !strings.Contains(got, want) {

@@ -273,7 +273,7 @@ function CastStrip({ id, cast }) {
                 <span class="shrink-0 text-w-cyan transition-transform group-open:rotate-90" aria-hidden="true">▸</span>
             </summary>
             {open && (
-                <div class="flex gap-3 overflow-x-auto pt-2 pb-1">
+                <div class="flex gap-3 overflow-x-auto pt-4 pb-1 px-2 -mx-2">
                     {cast.map(m => <CastPhoto key={m.name} member={m} />)}
                 </div>
             )}
@@ -286,9 +286,9 @@ function CastStrip({ id, cast }) {
 function CastPhoto({ member }) {
     const [failed, setFailed] = useState(false);
     return (
-        <div class="w-14 shrink-0 text-center">
-            <div class="relative w-12 h-12 mx-auto rounded-full overflow-hidden bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 grid place-items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6" aria-hidden="true"><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" /></svg>
+        <div class="w-20 shrink-0 text-center">
+            <div class="relative w-18 h-27 mx-auto rounded-lg overflow-hidden transition-transform duration-200 origin-bottom hover:scale-115 bg-gradient-to-br from-w-purple/20 via-w-pink/10 to-w-cyan/15 text-w-purpleL/60 grid place-items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-9 h-9" aria-hidden="true"><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" /></svg>
                 {member.photo && !failed && (
                     <img src={member.photo} alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover" onError={() => setFailed(true)} />
                 )}
