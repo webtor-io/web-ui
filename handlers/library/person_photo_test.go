@@ -46,7 +46,7 @@ func TestPersonPhoto(t *testing.T) {
 		return w
 	}
 
-	w := get("/lib/person/photo/abcdefgh123.jpg/96.jpg")
+	w := get("/lib/person/photo/abcdefgh123.jpg/144.jpg")
 	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/jpeg" {
 		t.Fatalf("photo: %d %q", w.Code, w.Header().Get("Content-Type"))
 	}
@@ -54,24 +54,25 @@ func TestPersonPhoto(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b := got.Bounds(); b.Dx() != 96 || b.Dy() != 96 {
-		t.Errorf("photo is %v, want a 96×96 square", b.Size())
+	if b := got.Bounds(); b.Dx() != 144 || b.Dy() != 216 {
+		t.Errorf("photo is %v, want the 144×216 portrait", b.Size())
 	}
 
-	if w := get("/lib/person/photo/missing12345.jpg/96.jpg"); w.Code != http.StatusNotFound {
+	if w := get("/lib/person/photo/missing12345.jpg/144.jpg"); w.Code != http.StatusNotFound {
 		t.Errorf("a photo TMDB does not have: %d, want 404", w.Code)
 	}
 
 	asked = nil
 	for _, path := range []string{
-		"/lib/person/photo/abcdefgh123.gif/96.jpg",
-		"/lib/person/photo/short.jpg/96.jpg",
-		"/lib/person/photo/..%2Fsecret1234.jpg/96.jpg",
+		"/lib/person/photo/abcdefgh123.gif/144.jpg",
+		"/lib/person/photo/short.jpg/144.jpg",
+		"/lib/person/photo/..%2Fsecret1234.jpg/144.jpg",
 		"/lib/person/photo/abcdefgh123.jpg/9000.jpg",
 		"/lib/person/photo/abcdefgh123.jpg/1600.jpg",
 		"/lib/person/photo/abcdefgh123.jpg/32.jpg",
-		"/lib/person/photo/abcdefgh123.png/96.jpg",
-		"/lib/person/photo/abcdefgh123.jpg/96.png",
+		"/lib/person/photo/abcdefgh123.jpg/96.jpg",
+		"/lib/person/photo/abcdefgh123.png/144.jpg",
+		"/lib/person/photo/abcdefgh123.jpg/144.png",
 	} {
 		// 400 from the handler, or 404 from the router for a path that
 		// does not even match the route: either way nothing is served.
