@@ -7,6 +7,7 @@ import { loadPrefs, savePrefs } from '../prefs';
 import { chipClass } from './discoverUtils';
 import { ExpandableText } from './ExpandableText';
 import { ReviewsList, useReviews } from './Reviews';
+import { fetchCredits, peekCredits } from '../creditsClient';
 import { SubscribeButton, OnAirDot } from './SubscribeButton';
 import { isSeasonUnfinished } from '../seasonStatus';
 import { getStreamPrefs, noneMatchPrefs } from '../streamPrefs';
@@ -92,7 +93,12 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
             onToggleWatchlist={onToggleWatchlist}
         />
     ) : null;
-    const headerMeta = { year: modal.year || modal.releaseInfo, imdbRating: modal.imdbRating, description: modal.description };
+    const headerMeta = {
+        year: modal.year || modal.releaseInfo,
+        imdbRating: modal.imdbRating,
+        description: modal.description,
+        afterDescription: isImdb && videoType ? <Credits id={videoId} type={videoType} /> : null,
+    };
 
     if (modal.view === 'loading') {
         return (
@@ -210,6 +216,35 @@ function WatchedRateButtons({ videoId, videoType, watched, rating, inWatchlist, 
                     </button>
                 )
             )}
+        </div>
+    );
+}
+
+const CREDIT_ROWS = [
+    ['directors', 'discover.credits.director'],
+    ['creators', 'discover.credits.creator'],
+    ['cast', 'discover.credits.cast'],
+];
+
+// Directors / creators / cast from TMDB under the description. Draws
+// nothing until the answer arrives, and nothing for an empty one. The
+// answer is kept with its id, so a switch of title never shows the
+// previous title's names.
+function Credits({ id, type }) {
+    const [loaded, setLoaded] = useState(null);
+    useEffect(() => {
+        let live = true;
+        fetchCredits(id, type).then(c => { if (live) setLoaded({ id, c }); });
+        return () => { live = false; };
+    }, [id, type]);
+    const credits = loaded?.id === id ? loaded.c : peekCredits(id);
+    const rows = CREDIT_ROWS.filter(([field]) => credits?.[field]?.length);
+    if (!rows.length) return null;
+    return (
+        <div class="text-sm text-w-sub leading-relaxed mt-1 space-y-0.5">
+            {rows.map(([field, key]) => (
+                <p key={field} class="line-clamp-2"><span class="text-w-muted">{t(key)}:</span> {credits[field].join(', ')}</p>
+            ))}
         </div>
     );
 }

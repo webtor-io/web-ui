@@ -14,6 +14,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/web"
@@ -127,6 +128,12 @@ type GetData struct {
 	// hasn't run for this resource yet — templates treat nil as "no
 	// flags raised, behave normally".
 	ResourceMetadata *models.ResourceMetadata
+	// Credits are the title's directors / creators / cast; nil for anonymous
+	// visitors and adult torrents (see get).
+	Credits *enrich.Credits
+	// adultUnknown is set when the resource_metadata read failed. Unlike a
+	// resource that was never classified, its adult flag is then unknown.
+	adultUnknown bool
 }
 
 type RateForm struct {
@@ -222,7 +229,9 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		// the resource hasn't been classified yet — template helpers
 		// treat that as "no flags" so old resources render normally
 		// until the metadata-only backfill catches up.
-		d.ResourceMetadata, _ = models.GetResourceMetadataByResourceID(ctx, db, args.ID)
+		var rmErr error
+		d.ResourceMetadata, rmErr = models.GetResourceMetadataByResourceID(ctx, db, args.ID)
+		d.adultUnknown = rmErr != nil
 		d.ReleaseSubBanner = prepareReleaseSubscribeBanner(ctx, s.enricher, pgBannerSubs{db: db}, args.User, d.Series)
 		// Load watch history for file list
 		if args.User.HasAuth() {
@@ -289,6 +298,27 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 	return d, nil
 }
 
+// creditsTarget names the title whose directors and cast the page shows:
+// none for anonymous visitors (owner, 2026-10-23), and none on an adult
+// torrent, or one whose classification could not be read, where a wrong
+// match would put real people's names on it.
+func creditsTarget(d *GetData, u *auth.User) (string, models.ContentType, bool) {
+	ct := models.ContentTypeMovie
+	if !u.HasAuth() || d.adultUnknown || (d.ResourceMetadata != nil && d.ResourceMetadata.IsAdult) {
+		return "", ct, false
+	}
+	var md *models.VideoMetadata
+	if d.Movie != nil {
+		md = d.Movie.GetMetadata()
+	} else if d.Series != nil {
+		md, ct = d.Series.GetMetadata(), models.ContentTypeSeries
+	}
+	if md == nil || md.VideoID == "" {
+		return "", ct, false
+	}
+	return md.VideoID, ct, true
+}
+
 func (s *Handler) get(c *gin.Context) {
 	getTpl := s.tb.Build("resource/get")
 	args, err := s.bindGetArgs(c)
@@ -324,6 +354,10 @@ func (s *Handler) get(c *gin.Context) {
 		if d.Series != nil {
 			s.enricher.Localize(ctx, d.Series.GetMetadata(), lang)
 		}
+	}
+
+	if id, ct, ok := creditsTarget(d, args.User); ok && s.enricher != nil {
+		d.Credits = s.enricher.CachedCredits(ctx, id, ct)
 	}
 
 	// Set vault availability
