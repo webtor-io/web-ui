@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/helpers"
 )
 
 // Client is a TorBox API client
@@ -304,6 +305,11 @@ func (s *Client) doRequest(req *http.Request) ([]byte, error) {
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
+		// RequestDownloadLink sends the user's token in the query, and a
+		// transport error quotes the URL whole; callers log it.
+		if ue, ok := err.(*url.Error); ok {
+			ue.URL = helpers.RedactURL(ue.URL)
+		}
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer func(Body io.ReadCloser) {
