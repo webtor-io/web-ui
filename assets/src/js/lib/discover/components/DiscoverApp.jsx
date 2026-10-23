@@ -191,7 +191,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 // Catalog: URL > localStorage > default
                 if (urlCatalogBase && urlCatalogId) {
                     const match = getCatalogsForType(catalogs, selectedType)
-                        .find(c => c.baseUrl === urlCatalogBase && c.id === urlCatalogId);
+                        .find(c => client.namesAddon(urlCatalogBase, c.baseUrl) && c.id === urlCatalogId);
                     if (match) selectedCatalog = match;
                 } else if (prefs.catalogBase && prefs.catalogId) {
                     const match = getCatalogsForType(catalogs, selectedType)
@@ -271,7 +271,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const catalogs = getCatalogsForType(state.catalogs, type);
         const catalog = catalogs[0] || null;
         url.push({
-            type, 'catalog-base': catalog?.baseUrl, 'catalog-id': catalog?.id,
+            type, 'catalog-base': client.addonKey(catalog?.baseUrl), 'catalog-id': catalog?.id,
             id: null, season: null, episode: null, search: null, 'search-type': null,
         });
         dispatch({ type: 'SELECT_TYPE', selectedType: type });
@@ -281,7 +281,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         abortCatalog();
         savePrefs({ catalogBase: catalog.baseUrl, catalogId: catalog.id });
         url.push({
-            'catalog-base': catalog.baseUrl, 'catalog-id': catalog.id,
+            'catalog-base': client.addonKey(catalog.baseUrl), 'catalog-id': catalog.id,
             id: null, season: null, episode: null,
         });
         dispatch({ type: 'SELECT_CATALOG', catalog });
@@ -300,7 +300,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             const type = types[0] || null;
             const catalog = type ? getCatalogsForType(state.catalogs, type)[0] : null;
             url.push({
-                type, 'catalog-base': catalog?.baseUrl, 'catalog-id': catalog?.id,
+                type, 'catalog-base': client.addonKey(catalog?.baseUrl), 'catalog-id': catalog?.id,
                 search: null, 'search-type': null, id: null, season: null, episode: null,
             });
         }
@@ -863,9 +863,9 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         // Handle catalog change
         if (catalogBase && catalogId && cur) {
             const curCat = cur.selectedCatalog;
-            if (!curCat || curCat.baseUrl !== catalogBase || curCat.id !== catalogId) {
+            if (!curCat || !client.namesAddon(catalogBase, curCat.baseUrl) || curCat.id !== catalogId) {
                 const match = getCatalogsForType(cur.catalogs, type || cur.selectedType)
-                    .find(c => c.baseUrl === catalogBase && c.id === catalogId);
+                    .find(c => client.namesAddon(catalogBase, c.baseUrl) && c.id === catalogId);
                 if (match) {
                     savePrefs({ catalogBase: match.baseUrl, catalogId: match.id });
                     dispatch({ type: 'SELECT_CATALOG', catalog: match });
@@ -964,7 +964,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         } else {
             if (state.selectedType) params.type = state.selectedType;
             if (state.selectedCatalog) {
-                params['catalog-base'] = state.selectedCatalog.baseUrl;
+                params['catalog-base'] = client.addonKey(state.selectedCatalog.baseUrl);
                 params['catalog-id'] = state.selectedCatalog.id;
             }
             if (state.page > 0) params.page = state.page;

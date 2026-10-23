@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -280,5 +281,44 @@ func TestStreamService_CacheExpiration(t *testing.T) {
 	// Should have made two HTTP requests due to cache expiration
 	if requestCount != 2 {
 		t.Errorf("Expected 2 HTTP requests due to cache expiration, got %d", requestCount)
+	}
+}
+
+// A third-party addon keeps its configuration, debrid keys included, in its
+// URL's path, and both the service's name and its errors are logged at Warn
+// (CompositeStream): neither may carry more of the URL than scheme and host,
+// whether the request fails in transport or the URL does not parse.
+func TestAddonStream_LogsHostOnly(t *testing.T) {
+	const secret = "debrid-key"
+	server := httptest.NewServer(http.NotFoundHandler())
+	server.Close()
+	cache := lazymap.New[*StreamsResponse](&lazymap.Config{Expire: time.Minute, ErrorExpire: time.Minute})
+
+	dead := NewAddonStream(&http.Client{}, server.URL+"/"+secret, cache, "", nil)
+	if got, want := dead.GetName(), "AddonStream ("+server.URL+")"; got != want {
+		t.Errorf("GetName() = %q, want %q", got, want)
+	}
+	for _, base := range []string{server.URL + "/" + secret, "http://[bad/" + secret} {
+		_, err := NewAddonStream(&http.Client{}, base, cache, "", nil).GetStreams(context.Background(), "movie", "tt1")
+		if err == nil || strings.Contains(err.Error(), secret) {
+			t.Errorf("GetStreams(%q) error = %v, want one without the path", base, err)
+		}
+	}
+}
+
+// A redirect to a Location that does not parse: net/http quotes that
+// Location in its error, and here it carries the addon's configuration. The
+// client refuses redirects as NewClient's does; the parse comes first anyway.
+func TestAddonStream_BadRedirectHostOnly(t *testing.T) {
+	const secret = "debrid-key"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "https://addon.example/"+secret+"/%zz/manifest.json")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer server.Close()
+	cache := lazymap.New[*StreamsResponse](&lazymap.Config{Expire: time.Minute, ErrorExpire: time.Minute})
+	_, err := NewAddonStream(&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, server.URL+"/"+secret, cache, "", nil).GetStreams(context.Background(), "movie", "tt1")
+	if err == nil || strings.Contains(err.Error(), secret) || !strings.Contains(err.Error(), "Location header") {
+		t.Errorf("error = %v, want the cause without the Location", err)
 	}
 }

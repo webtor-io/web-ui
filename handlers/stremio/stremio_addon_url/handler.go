@@ -162,7 +162,7 @@ func (s *Handler) batchAddAddonUrls(ctx context.Context, urls []string, user *au
 		// pick the snapshot up once the addon recovers.
 		snapshot, snapErr := s.validator.ValidateAndFetch(addonUrl)
 		if snapErr != nil {
-			log.WithError(snapErr).WithField("url", addonUrl).Warn("batch-add: addon manifest unreachable, saving URL without snapshot")
+			log.WithError(snapErr).WithField("host", parsedUrl.Host).Warn("batch-add: addon manifest unreachable, saving URL without snapshot")
 			snapshot = nil
 		}
 

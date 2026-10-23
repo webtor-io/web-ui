@@ -394,6 +394,7 @@ The active mode is reflected in the URL so back/forward navigation works:
 - `?watchlist=1&watchlist-type=movie` — Watchlist view filtered to movies/series
 - No `watchlist` param — Catalog view (default)
 - `?tab=reviews` — reviews tab active inside an open stream modal (absent = streams tab); cleared on modal close
+- `?catalog-base=<addon key>&catalog-id=top` — the selected catalog. The addon is named by key, never by its URL: a configured addon keeps the user's credentials in its path (`https://host/<debrid config>/manifest.json`), and the page URL reaches Umami (url and referrer), the access log and the login `return-url`. The key is a short FNV-1a hash of the addon URL (`urlKey`), `cinemeta` for Cinemeta whether built in or the user's own row (`StremioClient.addonKey`, `CINEMETA_KEY` in `client.js`): it needs nothing but the URL, so it works for an addon the wizard installed minutes ago and in a link from another user with the same addon, and 32 bits reveal nothing of the credentials in the URL. A link from before the keys, with the addon's URL as `catalog-base`, still opens its catalog (`StremioClient.namesAddon`), and the URL sync then writes the key over it with `replaceState`
 
 The Preact app pushes a history entry on each switcher click and listens to `popstate` so the user can navigate between catalog → watchlist → modal → catalog with the browser controls. Direct links to `/discover?watchlist=1` open the Watchlist view immediately and lazy-load items on first paint.
 
@@ -572,7 +573,7 @@ Catalogs built by `buildCatalogs(addonStatuses)` carry `disabled: status !== 'ok
 
 ### Pre-selected disabled catalog
 
-When the URL points at a catalog whose addon is currently down (e.g. `?catalog-base=torrentio.strem.fun&catalog-id=top`), `loadCatalog` short-circuits on `catalog.disabled` and the grid renders `CatalogUnavailable` (`EmptyStates.jsx`) — explicit attribution to the addon, retry button, and a copy that nudges the user to pick another catalog. The chip is still visible and still works.
+When the URL points at a catalog whose addon is currently down (e.g. `?catalog-base=<addon key>&catalog-id=top`), `loadCatalog` short-circuits on `catalog.disabled` and the grid renders `CatalogUnavailable` (`EmptyStates.jsx`) — explicit attribution to the addon, retry button, and a copy that nudges the user to pick another catalog. The chip is still visible and still works.
 
 ### What's intentionally NOT done
 

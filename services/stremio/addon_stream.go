@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/lazymap"
@@ -34,9 +36,10 @@ func NewAddonStream(cl *http.Client, addonURL string, cache *lazymap.LazyMap[*St
 	}
 }
 
-// GetName returns the name of this stream service for logging purposes
+// GetName returns the name of this stream service for logging purposes:
+// the addon's host only, see addonHost.
 func (s *AddonStream) GetName() string {
-	return fmt.Sprintf("AddonStream (%v)", s.addonURL)
+	return fmt.Sprintf("AddonStream (%v)", addonHost(s.addonURL))
 }
 
 // GetStreams fetches streams from a Stremio addon endpoint with caching
@@ -63,7 +66,7 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 	// Create HTTP request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", streamURL, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
+		return nil, errors.Wrap(hostOnly(err), "failed to create request")
 	}
 
 	// Set appropriate headers
@@ -75,7 +78,7 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 	// Execute the request
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to execute request")
+		return nil, errors.Wrap(hostOnly(err), "failed to execute request")
 	}
 	defer resp.Body.Close()
 
@@ -91,4 +94,31 @@ func (s *AddonStream) fetchStreams(ctx context.Context, addonURL, contentType, c
 	}
 
 	return &streamsResp, nil
+}
+
+// addonHost is an addon URL as logs and errors may carry it: scheme and host.
+// A third-party addon keeps its configuration, debrid keys included, in the
+// path or query (https://host/<config>/manifest.json), which
+// helpers.RedactURL cannot tell from an ordinary path.
+func addonHost(s string) string {
+	u, err := url.Parse(s)
+	if err != nil || u.Host == "" {
+		return "<redacted>"
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+// hostOnly is err with the URL a *url.Error quotes (the whole of it, both
+// when the URL does not parse and when the request fails) cut to addonHost.
+// A redirect whose Location does not parse is quoted whole in the inner
+// error too: net/http parses Location before CheckRedirect can refuse the
+// redirect, and an addon may put its configuration in it.
+func hostOnly(err error) error {
+	if ue, ok := err.(*url.Error); ok {
+		ue.URL = addonHost(ue.URL)
+		if ue.Err != nil && strings.HasPrefix(ue.Err.Error(), "failed to parse Location header") {
+			ue.Err = errors.New("failed to parse Location header")
+		}
+	}
+	return err
 }

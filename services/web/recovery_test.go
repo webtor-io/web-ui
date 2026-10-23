@@ -13,17 +13,17 @@ import (
 )
 
 // A handler panic must come back as a 500 AND land in logrus with the
-// request that caused it.
+// request that caused it: the path redacted, of the query only the names.
 func TestRecoverToLog(t *testing.T) {
 	hook := test.NewGlobal()
 	defer hook.Reset()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(gin.CustomRecovery(RecoverToLog))
-	r.GET("/boom", func(c *gin.Context) { panic("kaboom") })
+	r.GET("/boom/*rest", func(c *gin.Context) { panic("kaboom") })
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/boom?x=1", nil))
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/boom/token/secret-uuid?x=1&catalog-base=https%3A%2F%2Faddon.test%2Fsecret-config", nil))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
@@ -31,7 +31,7 @@ func TestRecoverToLog(t *testing.T) {
 	if e == nil || e.Level != log.ErrorLevel || e.Message != "panic recovered" {
 		t.Fatalf("expected logrus error 'panic recovered', got %+v", e)
 	}
-	if e.Data["panic"] != "kaboom" || e.Data["path"] != "/boom" || e.Data["query"] != "x=1" {
+	if e.Data["panic"] != "kaboom" || e.Data["path"] != "/boom/token/<redacted>" || e.Data["query"] != "catalog-base,x" {
 		t.Errorf("fields = %+v", e.Data)
 	}
 }

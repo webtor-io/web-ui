@@ -53,6 +53,21 @@ class LRUCache {
 }
 
 export const CINEMETA_BASE = 'https://v3-cinemeta.strem.io';
+// CINEMETA_KEY is Cinemeta's addon key (StremioClient.addonKey), the same
+// whether it is the built-in seed or the user's own row.
+export const CINEMETA_KEY = 'cinemeta';
+
+// urlKey is a short FNV-1a hash of an addon URL: stable across reloads,
+// sessions and users, needing nothing but the URL (an addon installed by the
+// wizard minutes ago has no seed yet), and revealing nothing of the
+// credentials in it — they are far too long to guess back from 32 bits.
+export function urlKey(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+    }
+    return h.toString(36);
+}
 
 // Map an HTTP status / fetch error into one of the two failure buckets we
 // surface to the user. 4xx (except 408/429) means the addon is responding
@@ -187,6 +202,23 @@ export class StremioClient {
         const results = await Promise.all(tasks);
         this.addonStatuses = results;
         return results;
+    }
+
+    // addonKey is how the page URL names an addon (?catalog-base=), never by
+    // its URL: a configured addon keeps the user's credentials in its path
+    // (https://host/<debrid config>/manifest.json), and the page URL reaches
+    // Umami, the access log and the login return-url. The key is urlKey of
+    // the URL, Cinemeta's is CINEMETA_KEY; null when there is no URL.
+    addonKey(baseUrl) {
+        if (!baseUrl) return null;
+        return baseUrl === CINEMETA_BASE ? CINEMETA_KEY : urlKey(baseUrl);
+    }
+
+    // namesAddon says whether a ?catalog-base= value names the addon at
+    // baseUrl: by its key, or by the URL itself in a link from before the
+    // keys (the page's URL sync then writes the key over it).
+    namesAddon(param, baseUrl) {
+        return !!param && (param === this.addonKey(baseUrl) || param === baseUrl);
     }
 
     async fetchCatalog(baseUrl, type, catalogId, skip = 0, { signal } = {}) {
