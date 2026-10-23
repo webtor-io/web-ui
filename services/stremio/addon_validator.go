@@ -44,7 +44,7 @@ func (av *AddonValidator) ValidateAndFetch(url string) (*models.ManifestSnapshot
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
+		return nil, errors.Wrap(hostOnly(err), "failed to create request")
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -54,7 +54,7 @@ func (av *AddonValidator) ValidateAndFetch(url string) (*models.ManifestSnapshot
 
 	resp, err := av.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "addon URL is not accessible")
+		return nil, errors.Wrap(hostOnly(err), "addon URL is not accessible")
 	}
 	defer resp.Body.Close()
 

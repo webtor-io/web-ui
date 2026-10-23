@@ -355,6 +355,26 @@ func TestAddonValidator_ValidateAddonURL_InvalidURL(t *testing.T) {
 	}
 }
 
+// The manifest fetch's error reaches the logs and the owner's 502 body
+// (stremio_addon_url): it keeps its prefix but quotes no more of the URL
+// than scheme and host, which is where an addon keeps its configuration.
+func TestAddonValidator_ErrorsQuoteHostOnly(t *testing.T) {
+	const secret = "debrid-key"
+	server := httptest.NewServer(http.NotFoundHandler())
+	server.Close()
+	validator := NewAddonValidator(createMockContext(), &http.Client{Timeout: 5 * time.Second})
+
+	for u, prefix := range map[string]string{
+		server.URL + "/" + secret + "/manifest.json?key=" + secret: "addon URL is not accessible",
+		"http://[bad/" + secret + "/manifest.json":                 "failed to create request",
+	} {
+		err := validator.ValidateURL(u)
+		if err == nil || !strings.HasPrefix(err.Error(), prefix) || strings.Contains(err.Error(), secret) {
+			t.Errorf("ValidateURL(%q) = %v, want %q without the path or query", u, err, prefix)
+		}
+	}
+}
+
 func TestAddonValidator_ValidateManifest_EdgeCases(t *testing.T) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	validator := NewAddonValidator(createMockContext(), client)

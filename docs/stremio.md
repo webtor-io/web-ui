@@ -117,6 +117,15 @@ Jackett query fans out to every configured tracker). `CompositeStream`
 reports the max of its children, so nesting one composite inside another
 does not clamp the inner budget back to the default.
 
+A failed source is logged at Warn with its `service_name`. An addon is named
+by scheme and host only (`AddonStream (https://host)`), and its errors quote
+no more of the URL: a third-party addon keeps its configuration, debrid keys
+included, in the path or query, which `helpers.RedactURL` cannot tell from an
+ordinary path. The manifest fetch (`AddonValidator`, behind add, batch-add and
+refresh-snapshot) cuts its errors the same way. So does a redirect whose
+`Location` does not parse: net/http quotes that Location in its error before
+`CheckRedirect` can refuse it, and the text is replaced (`hostOnly`).
+
 **Language detection falls back to the script.** `ExtractLanguages` matches
 explicit tags first (`rus`, `рус`, `ukr`, …); when a title carries none, a
 Cyrillic title counts as Russian, or Ukrainian if it has letters Russian does
