@@ -208,14 +208,13 @@ type MediaProbe struct {
 		BitRate    string `json:"bit_rate"`
 		Duration   string `json:"duration"`
 		Tags       struct {
-			CompatibleBrands string    `json:"compatible_brands"`
-			Copyright        string    `json:"copyright"`
-			CreationTime     time.Time `json:"creation_time"`
-			Description      string    `json:"description"`
-			Encoder          string    `json:"encoder"`
-			MajorBrand       string    `json:"major_brand"`
-			MinorVersion     string    `json:"minor_version"`
-			Title            string    `json:"title"`
+			CompatibleBrands string `json:"compatible_brands"`
+			Copyright        string `json:"copyright"`
+			Description      string `json:"description"`
+			Encoder          string `json:"encoder"`
+			MajorBrand       string `json:"major_brand"`
+			MinorVersion     string `json:"minor_version"`
+			Title            string `json:"title"`
 		} `json:"tags"`
 	} `json:"format"`
 	// Chapters is the container's chapter list (ffprobe -show_chapters), present
@@ -231,11 +230,10 @@ type MediaProbe struct {
 		BitRate   string `json:"bit_rate"`
 		Duration  string `json:"duration"`
 		Tags      struct {
-			CreationTime time.Time `json:"creation_time"`
-			HandlerName  string    `json:"handler_name"`
-			Language     string    `json:"language"`
-			VendorId     string    `json:"vendor_id"`
-			Title        string    `json:"title"`
+			HandlerName string `json:"handler_name"`
+			Language    string `json:"language"`
+			VendorId    string `json:"vendor_id"`
+			Title       string `json:"title"`
 			// The stream's average bitrate as mkvmerge's statistics tags
 			// record it: in a Matroska file ffprobe leaves a video
 			// stream's bit_rate empty, and these are all there is (BPS-eng
