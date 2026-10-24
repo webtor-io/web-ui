@@ -342,6 +342,7 @@ func (s *Handler) post(c *gin.Context, action string) {
 		)
 		return
 	}
+	logFallbackPass(c, action)
 	notePassthroughFallback(action, args.VideoStreamUserData)
 	actionJob, err = s.jobs.Action(
 		web.NewContext(c),
@@ -383,11 +384,6 @@ func (s *Handler) verifyAction(c *gin.Context) error {
 	return s.verifier.Validate(c.PostForm("cf-turnstile-response"), c.GetHeader("CF-Connecting-IP"))
 }
 
-// logRefusal leaves one warning per refused start with what is needed to
-// tell the cases apart: siteverify's codes (missing token = a client that
-// never ran the widget; timeout-or-duplicate = a token used twice or too
-// late), the country Cloudflare saw, the User-Agent and the referer. No
-// token contents.
 // notePassthroughFallback counts and logs a video start that restarts a
 // file whose HEVC passthrough failed in the browser (decode-fallback;
 // docs/player.md "Passthrough: errors and fallback"), so the alerts see
@@ -407,20 +403,22 @@ func notePassthroughFallback(action string, vsud *models.VideoStreamUserData) bo
 	return true
 }
 
+// logRefusal leaves one warning per refused start with what is needed to
+// tell the cases apart: siteverify's codes (missing token = a client that
+// never ran the widget; timeout-or-duplicate = a token used twice or too
+// late), the country Cloudflare saw, the User-Agent and the referer. No
+// token contents.
 func logRefusal(c *gin.Context, action string, err error) {
 	codes := "unknown"
 	var ve *turnstile.VerifyError
 	if errors.As(err, &ve) && len(ve.Codes) > 0 {
 		codes = strings.Join(ve.Codes, ",")
 	}
-	ua := c.Request.UserAgent()
-	if len(ua) > 120 {
-		ua = ua[:120]
-	}
 	// reason is what the client says happened when it sent no token
-	// (turnstileAction.js: no-script, silent-timeout, interactive-timeout,
-	// widget-error…, with the elapsed ms); "absent" means the request did
-	// not carry the field at all — no script ran the interception.
+	// (turnstileAction.js: no-script, fallback-timeout, interactive-timeout,
+	// widget-error…, with the elapsed ms; silent-fallback comes with a
+	// token); "absent" means the request did not carry the field at all —
+	// no script ran the interception.
 	reason := c.PostForm("cf-turnstile-reason")
 	if _, ok := c.GetPostForm("cf-turnstile-response"); !ok {
 		reason = "absent"
@@ -431,9 +429,35 @@ func logRefusal(c *gin.Context, action string, err error) {
 		"reason":    reason,
 		"token_len": len(c.PostForm("cf-turnstile-response")),
 		"country":   c.GetHeader("CF-IPCountry"),
-		"ua":        ua,
+		"ua":        shortUA(c),
 		"referer":   c.Request.Referer(),
 	}).Warn("turnstile refused job start")
+}
+
+// logFallbackPass leaves an info line for a start whose token the page got
+// only from the visible widget shown after the silent one ran out of time
+// (turnstileAction.js, reason silent-fallback:<ms>). Until 2026-10-24 those
+// were refused at 15 s; the count of these lines is the count of people that
+// turned away.
+func logFallbackPass(c *gin.Context, action string) {
+	reason := c.PostForm("cf-turnstile-reason")
+	if !strings.HasPrefix(reason, "silent-fallback:") {
+		return
+	}
+	log.WithFields(log.Fields{
+		"action":  action,
+		"reason":  reason,
+		"country": c.GetHeader("CF-IPCountry"),
+		"ua":      shortUA(c),
+	}).Info("turnstile passed after silent fallback")
+}
+
+func shortUA(c *gin.Context) string {
+	ua := c.Request.UserAgent()
+	if len(ua) > 120 {
+		ua = ua[:120]
+	}
+	return ua
 }
 
 // isNilVerifier catches a typed nil (*turnstile.Service)(nil) stored in the

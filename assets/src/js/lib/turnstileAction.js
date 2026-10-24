@@ -30,6 +30,13 @@
 // would make "don't load the script" the bypass. A loaded script that
 // stays silent gets SILENT_TIMEOUT_MS; a visible checkbox gets
 // INTERACTIVE_TIMEOUT_MS — a person needs time to click.
+//
+// Silent past SILENT_TIMEOUT_MS is not refused on the spot: a slow phone
+// looks the same as a bot there (2026-10-23, a person in India refused twice
+// who then passed the support form's visible widget). The warm widget is
+// dropped and a live one is shown in the step block (appearance "always"),
+// with INTERACTIVE_TIMEOUT_MS to finish. A bot that cannot pass a widget
+// is refused all the same, only later.
 import { isBusy, markBusy } from './actionBusy';
 import { reveal } from './stickyStatus';
 
@@ -127,7 +134,24 @@ function dropWarm() {
     }
 }
 
-function renderLive(slot) {
+// askForClick: the checkbox waits for a click for up to two minutes, so the
+// line says what to do -- the wait is the viewer's now, not ours (no
+// spinner, no bar).
+function askForClick(slot) {
+    const block = slot.closest('.progress-alert');
+    const stage = block && block.querySelector('.job-stage');
+    const ask = container() && container().dataset.labelInteractive;
+    if (stage && ask) {
+        stage.querySelector('.job-stage-title').textContent = ask;
+        stage.classList.add('job-stage-done');
+    }
+}
+
+// renderLive shows a widget in the step block. Without `always` it is there
+// because Cloudflare wants a click; with it, because the warm one stayed
+// silent: the widget shows its own "verifying" state, and the line asks for
+// a click only if Cloudflare does.
+function renderLive(slot, always) {
     if (!slot || !hasTurnstile()) { if (st.pending) st.pending.finish('', 'no-live-slot'); return; }
     // The normal widget is 300 px wide: on a phone narrower than about 350 px
     // it ran past the card and widened the page. Compact (150x140) there.
@@ -135,22 +159,14 @@ function renderLive(slot) {
     try {
         st.liveId = turnstile.render(slot, { ...widgetOptions(() => {
             if (st.pending) st.pending.interactive();
-        }), size: narrow ? 'compact' : 'normal' });
+            askForClick(slot);
+        }), size: narrow ? 'compact' : 'normal', ...(always ? { appearance: 'always' } : {}) });
         turnstile.execute(st.liveId);
-        // The checkbox waits for a click for up to two minutes: where the
-        // eye is, and the line says what to do -- the wait is the viewer's
-        // now, not ours (no spinner, no bar). The widget's iframe sizes
-        // itself later, so the slot holds its height (65 px, Turnstile's
-        // normal size) from now.
+        // The widget's iframe sizes itself later, so the slot holds its
+        // height (65 px, Turnstile's normal size) from now.
         slot.classList.remove('empty:hidden');
         slot.style.minHeight = narrow ? '140px' : '65px';
-        const block = slot.closest('.progress-alert');
-        const stage = block && block.querySelector('.job-stage');
-        const ask = container() && container().dataset.labelInteractive;
-        if (stage && ask) {
-            stage.querySelector('.job-stage-title').textContent = ask;
-            stage.classList.add('job-stage-done');
-        }
+        if (!always) askForClick(slot);
         // The slot itself, not the block: in a card's log (a retry form) the
         // block is the whole job log, taller than the screen, and pinning
         // its top pushed the checkbox out of view.
@@ -254,6 +270,7 @@ function getToken(form) {
         const step = stepBlock(form);
         let done = false;
         let timer = null;
+        let fellBack = false;
         const started = Date.now();
         const finish = (t, reason) => {
             if (done) return;
@@ -261,7 +278,12 @@ function getToken(form) {
             clearTimeout(timer);
             st.pending = null;
             dropLive();
-            form.dataset.turnstileReason = t ? '' : `${reason || 'unknown'}:${Date.now() - started}`;
+            // A token that came through the silent fallback is reported too:
+            // the server logs it, the only count of people the old 15-second
+            // refusal turned away.
+            const elapsed = Date.now() - started;
+            if (t) form.dataset.turnstileReason = fellBack ? `silent-fallback:${elapsed}` : '';
+            else form.dataset.turnstileReason = `${reason || 'unknown'}:${elapsed}`;
             if (step.line) step.line.classList.replace('inprogress', t ? 'done' : 'error');
             // Ticked: the line goes back to working until the job's log
             // replaces it -- it said "tick the box" over an empty slot for
@@ -284,8 +306,17 @@ function getToken(form) {
             clearTimeout(timer);
             timer = setTimeout(() => finish('', 'interactive-timeout'), INTERACTIVE_TIMEOUT_MS);
         };
+        const fallBack = () => {
+            // The step went with its log (another file, the page swapped):
+            // nobody is there to see a widget.
+            if (!step.slot.isConnected) { finish('', 'detached'); return; }
+            fellBack = true;
+            dropWarm();
+            timer = setTimeout(() => finish('', 'fallback-timeout'), INTERACTIVE_TIMEOUT_MS);
+            renderLive(step.slot, true);
+        };
         st.pending = { finish, interactive, slot: step.slot };
-        timer = setTimeout(() => finish('', 'silent-timeout'), SILENT_TIMEOUT_MS);
+        timer = setTimeout(fallBack, SILENT_TIMEOUT_MS);
         if (st.warmId === null) renderWarm();
         if (st.warmId === null) { finish('', 'no-widget'); return; }
         try {
@@ -344,11 +375,12 @@ function hidden(form, name, value) {
 
 // setToken writes the token and, when there is none, why — the server logs
 // the reason next to siteverify's code, so a refusal can be read as "the
-// script never ran", "the widget was silent for 15 s" or "the checkbox was
-// shown and nobody clicked it for two minutes".
+// script never ran", "the widget was silent and its visible fallback went
+// unanswered" or "the checkbox was shown and nobody clicked it for two
+// minutes". A token that needed the fallback carries a reason as well.
 function setToken(form, token) {
     hidden(form, 'cf-turnstile-response', token);
-    hidden(form, 'cf-turnstile-reason', token ? '' : (form.dataset.turnstileReason || 'unknown'));
+    hidden(form, 'cf-turnstile-reason', form.dataset.turnstileReason || (token ? '' : 'unknown'));
     delete form.dataset.turnstileReason;
 }
 

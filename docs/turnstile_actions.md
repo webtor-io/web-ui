@@ -57,7 +57,12 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
   stops or delays a submit.
 - Deadlines: the script missing → the form goes out at once without a token
   (fail closed: the server refuses, the card says to disable blockers or
-  sign in); script loaded but silent → 15 s; checkbox shown → 120 s.
+  sign in); script loaded but silent → after 15 s the hidden widget is
+  dropped and a visible one (`appearance: always`) is rendered in the step
+  block, with 120 s to finish (`fallback-timeout`); checkbox shown → 120 s.
+  The silent case used to be refused at 15 s, which turned away real people
+  on slow phones (2026-10-23: refused twice, then passed the support form's
+  visible widget).
 - The widget is a separate Turnstile widget in **managed** mode rendered with
   `appearance: interaction-only`. Invisible mode was tried first and rejected:
   it never shows the checkbox, so an unsure visitor just fails. The support
@@ -69,6 +74,10 @@ Cloudflare may ask a click from a suspicious environment (VPN, proxy).
   Read the codes before drawing conclusions from the 400 count on these
   endpoints: a client that never ran the widget and a person whose token was
   used twice both get a 400.
+- `handlers/action.logFallbackPass`: a start that passed with a token from the
+  visible fallback is an info line `turnstile passed after silent fallback`
+  (`reason=silent-fallback:<ms>`). These are the people the 15 s refusal used
+  to turn away; compare with `fallback-timeout` refusals.
 
 ## Testing the unhappy paths
 

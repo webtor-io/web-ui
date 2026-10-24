@@ -9,11 +9,13 @@ global.window = dom.window;
 global.document = dom.window.document;
 global.HTMLFormElement = dom.window.HTMLFormElement;
 
-// A widget that always vouches silently: execute() answers with a token.
+// A widget that always vouches silently: execute() answers with a token --
+// unless a test sets `silent`, and then no widget answers by itself.
 const widgets = [];
+let silent = false;
 global.turnstile = {
     render(el, opts) { widgets.push(opts); return widgets.length - 1; },
-    execute(id) { setTimeout(() => widgets[id].callback('tok'), 0); },
+    execute(id) { if (!silent) setTimeout(() => widgets[id].callback('tok'), 0); },
     reset() {},
     remove() {},
 };
@@ -31,7 +33,7 @@ init();
 // A press marks its form busy (lib/actionBusy.js) with a 15-minute backstop
 // timer; nothing here ends the job, so each test releases what it pressed --
 // a live timer kept this file's process up for the full 15 minutes.
-test.afterEach(() => { for (const f of document.querySelectorAll('form')) clearBusy(f); });
+test.afterEach(() => { for (const f of document.querySelectorAll('form')) clearBusy(f); silent = false; });
 
 // The second pass -- token attached -- is the one that reaches the form
 // (the first is stopped on document in the capture phase). Record whether the
@@ -137,4 +139,49 @@ test('on a narrow phone the live checkbox is the compact one', async () => {
     assert.equal(widgets.at(-1).size, 'compact');
     assert.equal(step.lastElementChild.style.minHeight, '140px');
     await settle();
+});
+
+// The answer resolves a promise and the re-submit is a timer of its own: let
+// the promise jobs run (setImmediate is not mocked), then fire the timer.
+const resubmit = async (t) => { await new Promise((r) => setImmediate(r)); t.mock.timers.tick(0); };
+
+test('silent past the deadline: a widget the person can see, not a refusal; its token says so', async (t) => {
+    // 2026-10-23: a person on a slow phone was refused twice at 15 s, then
+    // passed the support form's visible widget.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    silent = true;
+    document.getElementById('log-1').innerHTML = '';
+    const form = document.getElementById('watch');
+    const seen = watchSecondPass(form);
+    form.requestSubmit();
+    const step = document.querySelector('#log-1 [data-turnstile-step]');
+    const before = widgets.length;
+    t.mock.timers.tick(15000);
+    assert.deepEqual(seen, [], 'not sent at 15 s');
+    assert.equal(widgets.length, before + 1, 'a live widget');
+    const live = widgets.at(-1);
+    assert.equal(live.appearance, 'always');
+    assert.equal(step.querySelector('.job-stage-title').textContent, 'Checking that you are not a robot', 'no click asked for yet');
+    live.callback('tok-late');
+    await resubmit(t);
+    assert.deepEqual(seen, [{ ready: true, connected: true }]);
+    assert.equal(form.querySelector('[name="cf-turnstile-response"]').value, 'tok-late');
+    assert.match(form.querySelector('[name="cf-turnstile-reason"]').value, /^silent-fallback:\d+$/);
+});
+
+test('a fallback nobody answers is refused after two minutes, and says which wait ran out', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    silent = true;
+    document.getElementById('log-1').innerHTML = '';
+    const form = document.getElementById('watch');
+    const seen = watchSecondPass(form);
+    form.requestSubmit();
+    t.mock.timers.tick(15000);
+    t.mock.timers.tick(119000);
+    assert.deepEqual(seen, [], 'still waiting at 2:14');
+    t.mock.timers.tick(1000);
+    await resubmit(t);
+    assert.deepEqual(seen, [{ ready: true, connected: true }]);
+    assert.equal(form.querySelector('[name="cf-turnstile-response"]').value, '');
+    assert.match(form.querySelector('[name="cf-turnstile-reason"]').value, /^fallback-timeout:\d+$/);
 });
