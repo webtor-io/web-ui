@@ -727,10 +727,17 @@ func serve(c *cli.Context) error {
 //     for exactly the visitors most likely to want it. It exposes no user
 //     data: the handler renders payment options and takes a checkout.
 //
+//   - /user-subtitle/file is addressed by the SHA-256 of the blob, which is
+//     the capability: guessing a URL takes the file itself. The player never
+//     asks for it; external-proxy does, behind torrent-http-proxy's /ext/,
+//     with no session and no Accept: text/html, so the gate answered it a
+//     bare 401 and uploaded subtitles never loaded on an instance with a
+//     password. Only the file route: upload and delete stay gated.
+//
 // Kept as a named function rather than inline so the policy is greppable and
 // can be asserted in a test.
 func onlyAuthorizedExempt() []string {
-	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate", "/profile/email/verify"}
+	return []string{libapi.MountPath, "/stremio", s3svc.MountPath, "/embed", "/donate", "/profile/email/verify", "/user-subtitle/file"}
 }
 
 // requireSessionSecret refuses to start without SESSION_SECRET.

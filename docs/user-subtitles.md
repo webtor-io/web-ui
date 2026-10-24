@@ -117,7 +117,8 @@ Migration: `48_create_user_subtitle.up.sql`.
 The file endpoint must be public because `torrent-http-proxy` (and the
 external-proxy service) fetch it anonymously from outside the user's
 browser session; the hash makes the URL unguessable — same trust model as
-OpenSubtitles URLs.
+OpenSubtitles URLs. For the same reason it is on the `ONLY_AUTHORIZED`
+exempt list (`onlyAuthorizedExempt` in `serve.go`).
 
 ## Concurrency
 
