@@ -139,8 +139,8 @@ anacrolix has already verified. Stream close = warmup complete. The bytes
 themselves are never transferred. `web-ui`:
 
 - Derives the warmup URL by swapping `stats=true` → `warmup=true` on the
-  rest-api-signed stats URL (same path, same auth tokens, same pinned
-  non-premium domain — see `api.Warmup` in `services/api/api.go`).
+  rest-api-signed stats URL (same path, same auth tokens, same domain —
+  see `api.Warmup` in `services/api/api.go`).
 - Opens head and tail SSE streams in parallel so both priority bumps land
   up front and anacrolix can dispatch peer requests for both ranges
   concurrently. The tail stream is best-effort; a failure there just logs

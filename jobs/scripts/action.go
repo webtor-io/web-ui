@@ -1472,7 +1472,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	// deadline. Two thresholds (both configurable via env):
 	//   - WARMUP_NO_PEERS_TIMEOUT_SEC + zero bytes + zero peers — torrent has
 	//     no peers at all. Gated on statsEverSeen so we don't conflate a slow
-	//     SSE stream (cold-start seeder, premium-edge buffering) with absence
+	//     SSE stream (cold-start seeder) with absence
 	//     of peers; if no statupdate has arrived we fall through to the slow
 	//     peers branch which measures throughput directly.
 	//   - WARMUP_SLOW_PEERS_TIMEOUT_SEC + bytes < earlyMinBytes — peers serve,

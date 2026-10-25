@@ -399,8 +399,7 @@ under the piece bar.
   window the limiter held the session's traffic for this torrent, absent when
   no limiter applied). The node that serves the viewer holds the counters, so the
   host is taken from an export URL rest-api returned for the torrent — the
-  same export `tryConnectStats` already fetches, now asked with
-  `use-premium-domain=false` (the premium edge buffers an event stream): the
+  same export `tryConnectStats` already fetches: the
   `torrent_client_stat` URL, or for cached content the `download`, then the
   `stream` one (`sessionStatsTarget`, path prefix and api-key kept, the
   export's own token dropped). web-ui calls it server-side (`api.SessionStats`)
@@ -422,8 +421,7 @@ under the piece bar.
   lines. thp takes a stream token only when it is bound to that torrent.
 - **What is measured, and what is not.** thp counts what it wrote
   downstream, and downstream is ingress-nginx with proxy buffering (about
-  260 MB per response; a paid viewer on the premium domain has the edge's
-  larger buffer in front of that), not the viewer. A viewer on a link slower
+  260 MB per response), not the viewer. A viewer on a link slower
   than their plan still has the limiter pacing thp until that buffer fills.
   So the chain says what the node sends, and the plan box states the cap as a
   fact ("without a subscription — up to 5 Mbps"), never "your plan limits
@@ -795,8 +793,6 @@ under the piece bar.
   the same hash; the cookie store (no id) keeps hashing the cookie. The
   switch changed every anonymous viewer's id once (render caches keyed by
   it, thp's limiter buckets and session counters started over).
-- **Known gaps.** Whether a paying viewer's traffic through the premium edge
-  is counted on the standard-domain node the stream reads is not verified.
 - **Rollout order.** thp with `/session-stats` first. A deployed thp without
   the route answers 4xx, which web-ui treats as final: the viewer's link is
   not drawn, the rest of the chain works. Grace tokens with the session

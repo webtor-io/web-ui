@@ -23,62 +23,27 @@ async function runTest(root) {
     const speedEl = root.querySelector('#speedtest-speed');
     const bar = root.querySelector('#speedtest-bar');
     const statusEl = root.querySelector('#speedtest-status');
-    const phaseEl = root.querySelector('#speedtest-phase');
     const form = root.querySelector('#speedtest-form');
     const speedInput = root.querySelector('#speedtest-speed-input');
-    const premiumSpeedInput = root.querySelector('#speedtest-premium-speed-input');
 
     const i18n = window._speedtestI18n || {};
     i18n.gettingServer = i18n.gettingServer || 'Getting test server...';
     i18n.measuring = i18n.measuring || 'Measuring speed...';
-    i18n.testingPremium = i18n.testingPremium || 'Testing premium server...';
-    i18n.premiumServer = i18n.premiumServer || 'Premium Server';
-    i18n.standardServer = i18n.standardServer || 'Standard Server';
 
     controls.classList.add('hidden');
     progress.classList.remove('hidden');
     speedEl.textContent = '0.0';
     bar.value = 0;
     statusEl.textContent = i18n.gettingServer;
-    if (phaseEl) phaseEl.textContent = '';
 
     try {
-        const urlInputs = root.querySelectorAll('.speedtest-url');
-        const urls = Array.from(urlInputs).map(el => ({
-            url: el.value,
-            type: el.dataset.type,
-        }));
-        if (urls.length === 0) throw new Error('No speedtest URLs available');
+        const urlInput = root.querySelector('.speedtest-url[data-type="standard"]');
+        if (!urlInput) throw new Error('No speedtest URLs available');
 
-        let standardSpeed = 0;
-        let premiumSpeed = 0;
+        statusEl.textContent = i18n.measuring;
+        const speed = await measure(urlInput.value, speedEl, bar);
 
-        for (const entry of urls) {
-            const isPremium = entry.type === 'premium';
-
-            if (phaseEl) {
-                phaseEl.textContent = isPremium ? i18n.premiumServer : i18n.standardServer;
-                phaseEl.className = isPremium
-                    ? 'text-sm font-semibold text-w-purpleL mb-1'
-                    : 'text-sm font-semibold text-w-cyan mb-1';
-            }
-            statusEl.textContent = isPremium ? i18n.testingPremium : i18n.measuring;
-            speedEl.textContent = '0.0';
-            bar.value = 0;
-
-            const speed = await measure(entry.url, speedEl, bar);
-
-            if (isPremium) {
-                premiumSpeed = speed;
-            } else {
-                standardSpeed = speed;
-            }
-        }
-
-        speedInput.value = standardSpeed.toFixed(1);
-        if (premiumSpeedInput) {
-            premiumSpeedInput.value = premiumSpeed.toFixed(1);
-        }
+        speedInput.value = speed.toFixed(1);
         form.requestSubmit();
     } catch (err) {
         statusEl.textContent = 'Error: ' + err.message;

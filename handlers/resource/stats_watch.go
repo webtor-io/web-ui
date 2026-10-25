@@ -344,8 +344,7 @@ type statsConn struct {
 // for real-time torrent-level stats. Gets the root content ID from the list response,
 // then uses ExportResourceContent to get the stat URL for the whole torrent. The
 // same export response yields the viewer's /session-stats location — no extra
-// call; it is asked for standard-domain URLs, since the premium edge buffers
-// an event stream. file is the page's path, whose size prices the ETA.
+// call. file is the page's path, whose size prices the ETA.
 func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resourceID string, file string) statsConn {
 	connCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -369,7 +368,7 @@ func (s *Handler) tryConnectStats(ctx context.Context, claims *api.Claims, resou
 	size := s.priceSize(connCtx, claims, resourceID, file, list.Size)
 
 	// Get torrent-level export using root content ID
-	exportResp, err := s.api.ExportResourceContentStandardDomain(connCtx, claims, resourceID, rootID)
+	exportResp, err := s.api.ExportResourceContent(connCtx, claims, resourceID, rootID, "")
 	if err != nil {
 		msg := fmt.Sprintf("export failed: %v", err)
 		log.WithError(err).WithField("resourceID", resourceID).Warn("status: " + msg)

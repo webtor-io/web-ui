@@ -7,9 +7,6 @@
 window._speedtestI18n = {
   gettingServer: {{ t $.Lang "speedtest.gettingServer" | json }},
   measuring: {{ t $.Lang "speedtest.measuring" | json }},
-  testingPremium: {{ t $.Lang "speedtest.testingPremium" | json }},
-  premiumServer: {{ t $.Lang "speedtest.premiumServer" | json }},
-  standardServer: {{ t $.Lang "speedtest.standardServer" | json }},
 };
 </script>
 {{ "speedtest.js" | asset }}
@@ -31,7 +28,6 @@ window._speedtestI18n = {
     <!-- Hidden form for posting results -->
     <form id="speedtest-form" action="{{ langPath $.Lang "/speedtest" }}" method="post" data-async-target="main" data-async-push-state="false" class="hidden">
       <input type="hidden" name="speed" id="speedtest-speed-input" value="0" />
-      <input type="hidden" name="premium-speed" id="speedtest-premium-speed-input" value="0" />
       {{ range .Data.URLs }}
       <input type="hidden" name="{{ .Type }}-url" value="{{ .URL }}" class="speedtest-url" data-type="{{ .Type }}" />
       {{ end }}
@@ -50,7 +46,6 @@ window._speedtestI18n = {
     <!-- Progress -->
     <div id="speedtest-progress" class="hidden mt-8">
       <div class="text-center">
-        <div id="speedtest-phase" class="text-sm font-semibold text-w-cyan mb-1"></div>
         <div id="speedtest-speed" class="text-5xl font-extrabold text-w-cyan tabular-nums">0.0</div>
         <div class="text-w-sub text-sm mt-1">Mbps</div>
       </div>

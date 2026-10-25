@@ -571,17 +571,6 @@ func (s *Api) ExportResourceContent(ctx context.Context, c *Claims, infohash str
 	return s.ExportResourceContentWithArchiveFormat(ctx, c, infohash, itemID, imdbID, "", nil)
 }
 
-// ExportResourceContentStandardDomain is ExportResourceContent with every URL
-// on the standard domain (use-premium-domain=false), whatever the viewer's
-// role: for URLs web-ui reads event streams from on its own side — the
-// premium edge buffers them. rest-api already pins the stat URL there; this
-// pins the rest, from which the status derives the viewer's session stream.
-func (s *Api) ExportResourceContentStandardDomain(ctx context.Context, c *Claims, infohash string, itemID string) (*ra.ExportResponse, error) {
-	q := url.Values{}
-	q.Set("use-premium-domain", "false")
-	return s.exportResourceContent(ctx, c, infohash, itemID, q)
-}
-
 // ExportResourceContentWithArchiveFormat additionally forwards the archive
 // format ("tar" or "zip") that rest-api uses to name directory downloads
 // (empty keeps the rest-api default, zip) and the optional selection of
@@ -1126,8 +1115,8 @@ type WarmupEvent struct {
 //
 // The URL is derived from statsURL — the seeder routes ?stats and
 // ?warmup off the same path, so we reuse the rest-api-signed stats URL
-// (which already pins to the direct, non-premium domain to keep SSE
-// chunks unbuffered through nginx). statsURL must be non-empty; the
+// (on the direct domain, where SSE chunks pass nginx unbuffered).
+// statsURL must be non-empty; the
 // caller is expected to have short-circuited the Cache=true branch
 // upstream (rest-api emits an empty stats URL in that case).
 func (s *Api) Warmup(ctx context.Context, statsURL string, rangeStart int64, rangeEnd int64) (chan WarmupEvent, error) {

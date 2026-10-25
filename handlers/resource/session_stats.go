@@ -32,12 +32,9 @@ import (
 // by — only that the node is sending at the plan's cap.
 
 // sessionStatsSources are the export items whose URL points at thp on the
-// torrent's node, in order of preference: the stat URL (always the standard
-// domain), then what a cached torrent still has — rest-api omits the stat
+// torrent's node, in order of preference: the stat URL, then what a cached torrent still has — rest-api omits the stat
 // item exactly when the content is cached, which is where the plan is most
-// often the only limit. The export is asked with use-premium-domain=false
-// (tryConnectStats), so these are standard-domain URLs too: the premium edge
-// buffers an event stream.
+// often the only limit.
 var sessionStatsSources = []string{
 	string(ra.ExportTypeTorrentStat),
 	string(ra.ExportTypeDownload),

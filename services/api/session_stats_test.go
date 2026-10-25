@@ -311,29 +311,3 @@ func TestStats_ErrorsDoNotQuoteCredentials(t *testing.T) {
 		t.Errorf("error lost the rest of the URL: %v", err)
 	}
 }
-
-// The status derives the viewer's session stream from this export, so every
-// URL in it must be on the standard domain: rest-api moves them there with
-// use-premium-domain=false.
-func TestExportResourceContentStandardDomain(t *testing.T) {
-	var path, query string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path, query = r.URL.Path, r.URL.RawQuery
-		_, _ = fmt.Fprint(w, `{"export_items":{}}`)
-	}))
-	defer srv.Close()
-	a := &Api{cl: srv.Client(), url: srv.URL, prepareRequest: func(r *http.Request, _ *Claims) (*http.Request, error) { return r, nil }}
-	if _, err := a.ExportResourceContentStandardDomain(context.Background(), &Claims{}, "abc", "root"); err != nil {
-		t.Fatal(err)
-	}
-	if path != "/resource/abc/export/root" || query != "use-premium-domain=false" {
-		t.Errorf("export asked as %q ? %q", path, query)
-	}
-	// The ordinary export keeps rest-api's default.
-	if _, err := a.ExportResourceContent(context.Background(), &Claims{}, "abc", "root", ""); err != nil {
-		t.Fatal(err)
-	}
-	if query != "" {
-		t.Errorf("the ordinary export changed: %q", query)
-	}
-}

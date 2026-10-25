@@ -54,18 +54,14 @@ type Plan struct {
 }
 
 type ResultData struct {
-	SpeedMbps           float64
-	SpeedDisplay        string
-	PremiumSpeedMbps    float64
-	PremiumSpeedDisplay string
-	HasPremium          bool
-	SpeedBoost          string
-	TierName            string
-	RateLimit           uint64
-	Quality             []QualityTier
-	Plans               []Plan
-	RateLimited         bool
-	ShareURL            string
+	SpeedMbps    float64
+	SpeedDisplay string
+	TierName     string
+	RateLimit    uint64
+	Quality      []QualityTier
+	Plans        []Plan
+	RateLimited  bool
+	ShareURL     string
 }
 
 var qualityTiers = []struct {
@@ -161,19 +157,15 @@ func (s *Handler) postResult(c *gin.Context) {
 	speedMbps, _ := strconv.ParseFloat(speedStr, 64)
 	speedMbps = math.Round(speedMbps*10) / 10
 
-	premiumStr := c.PostForm("premium-speed")
-	premiumMbps, _ := strconv.ParseFloat(premiumStr, 64)
-	premiumMbps = math.Round(premiumMbps*10) / 10
-
 	// Save results to DB
-	sessionID := s.saveResults(c, speedMbps, premiumMbps)
+	sessionID := s.saveResults(c, speedMbps)
 
 	var shareURL string
 	if sessionID != "" {
 		shareURL = "/speedtest/" + sessionID
 	}
 
-	data := s.buildResultData(speedMbps, premiumMbps, tierName, rateLimit, shareURL)
+	data := s.buildResultData(speedMbps, tierName, rateLimit, shareURL)
 
 	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(data))
 }
@@ -208,7 +200,7 @@ type measurement struct {
 	destIP     string
 }
 
-func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps float64) string {
+func (s *Handler) saveResults(c *gin.Context, speedMbps float64) string {
 	db := s.pg.Get()
 	if db == nil {
 		return ""
@@ -222,17 +214,6 @@ func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps flo
 				speedMbps:  float32(speedMbps),
 				requestURL: stripQueryParams(standardURL),
 				destType:   "standard",
-				destIP:     destIP,
-			})
-		}
-	}
-
-	if premiumURL := c.PostForm("premium-url"); premiumURL != "" && premiumMbps > 0 {
-		if destIP := resolveDestIP(premiumURL); destIP != "" {
-			measurements = append(measurements, measurement{
-				speedMbps:  float32(premiumMbps),
-				requestURL: stripQueryParams(premiumURL),
-				destType:   "premium",
 				destIP:     destIP,
 			})
 		}
@@ -263,52 +244,33 @@ func (s *Handler) saveResults(c *gin.Context, speedMbps float64, premiumMbps flo
 	return sessionID.String()
 }
 
-func (s *Handler) buildResultData(speedMbps, premiumMbps float64, tierName string, rateLimit uint64, shareURL string) *ResultData {
-	hasPremium := premiumMbps > 0
-
-	bestSpeed := speedMbps
-	if hasPremium && premiumMbps > bestSpeed {
-		bestSpeed = premiumMbps
-	}
-
+func (s *Handler) buildResultData(speedMbps float64, tierName string, rateLimit uint64, shareURL string) *ResultData {
 	var quality []QualityTier
 	for _, t := range qualityTiers {
 		quality = append(quality, QualityTier{
 			Name:     t.Name,
 			MinSpeed: t.MinSpeed,
-			Ok:       bestSpeed >= t.MinSpeed,
+			Ok:       speedMbps >= t.MinSpeed,
 		})
 	}
 
 	planList := catalogPlans(s.offers.Catalog())
 	for i := range planList {
 		planList[i].IsCurrent = strings.EqualFold(planList[i].Name, tierName)
-		planList[i].Supported = bestSpeed >= float64(planList[i].Speed)
+		planList[i].Supported = speedMbps >= float64(planList[i].Speed)
 	}
 
 	rateLimited := rateLimit > 0 && speedMbps >= float64(rateLimit)*0.9
 
-	var speedBoost string
-	if hasPremium && speedMbps > 0 {
-		boost := premiumMbps / speedMbps
-		if boost >= 1.1 {
-			speedBoost = fmt.Sprintf("%.1fx", boost)
-		}
-	}
-
 	return &ResultData{
-		SpeedMbps:           speedMbps,
-		SpeedDisplay:        strconv.FormatFloat(speedMbps, 'f', 1, 64),
-		PremiumSpeedMbps:    premiumMbps,
-		PremiumSpeedDisplay: strconv.FormatFloat(premiumMbps, 'f', 1, 64),
-		HasPremium:          hasPremium,
-		SpeedBoost:          speedBoost,
-		TierName:            tierName,
-		RateLimit:           rateLimit,
-		Quality:             quality,
-		Plans:               planList,
-		RateLimited:         rateLimited,
-		ShareURL:            shareURL,
+		SpeedMbps:    speedMbps,
+		SpeedDisplay: strconv.FormatFloat(speedMbps, 'f', 1, 64),
+		TierName:     tierName,
+		RateLimit:    rateLimit,
+		Quality:      quality,
+		Plans:        planList,
+		RateLimited:  rateLimited,
+		ShareURL:     shareURL,
 	}
 }
 
@@ -333,17 +295,15 @@ func (s *Handler) getShared(c *gin.Context) {
 		return
 	}
 
-	var speedMbps, premiumMbps float64
+	// Sessions from before 2026-10-25 may also hold a "premium" row.
+	var speedMbps float64
 	for _, r := range results {
-		switch r.DestType {
-		case "premium":
-			premiumMbps = float64(r.SpeedMbps)
-		default:
+		if r.DestType == "standard" {
 			speedMbps = float64(r.SpeedMbps)
 		}
 	}
 
-	data := s.buildResultData(speedMbps, premiumMbps, "", 0, "/speedtest/"+sessionID.String())
+	data := s.buildResultData(speedMbps, "", 0, "/speedtest/"+sessionID.String())
 
 	s.tb.Build("speedtest/result").HTML(http.StatusOK, ctx.WithData(data))
 }

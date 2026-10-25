@@ -57,7 +57,6 @@ type fakeNode struct {
 	sessions atomic.Int32
 	mu       sync.Mutex
 	sessURL  string
-	export   string
 	// sessStatus answers /session-stats with this status and no stream.
 	sessStatus int
 	// pace: after events, one more at-cap event every pace until the
@@ -104,9 +103,6 @@ func newFakeNode(t *testing.T, events []string, opts ...func(*fakeNode)) *fakeNo
 		case r.URL.Path == "/resource/"+ssHash+"/list":
 			_ = json.NewEncoder(w).Encode(ra.ListResponse{ListItem: ra.ListItem{ID: "root", Size: 1 << 30}})
 		case r.URL.Path == "/resource/"+ssHash+"/export/root":
-			n.mu.Lock()
-			n.export = r.URL.RawQuery
-			n.mu.Unlock()
 			// Cached content: no torrent_client_stat, the download item
 			// stands in for the node's host.
 			items := map[string]ra.ExportItem{
@@ -227,12 +223,6 @@ func (n *fakeNode) statsEnded() time.Time {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.statsEndedAt
-}
-
-func (n *fakeNode) exportQuery() string {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	return n.export
 }
 
 // testAPI points an api.Api at the fake with every flag explicit: the flags
@@ -445,11 +435,6 @@ func TestStatusStream_ViewEndToEnd(t *testing.T) {
 	}
 	if sub, _ := get(m, "view", "plan", "download", "box", "sub").(string); !strings.HasPrefix(sub, "The whole file is already with us. 1.0 GB") {
 		t.Errorf("the ETA prices the torrent's size: %q", sub)
-	}
-	// The export was asked for standard-domain URLs: the premium edge
-	// buffers an event stream.
-	if q, _ := url.ParseQuery(node.exportQuery()); q.Get("use-premium-domain") != "false" {
-		t.Errorf("export query %q", node.exportQuery())
 	}
 	// The stream went to the host of the export's download URL, with the
 	// export's api-key and a token minted here — not the export's own.
