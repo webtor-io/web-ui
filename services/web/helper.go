@@ -24,7 +24,6 @@ import (
 	"github.com/webtor-io/web-ui/services/libapi"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hako/durafmt"
 	"github.com/urfave/cli"
 
 	log "github.com/sirupsen/logrus"
@@ -398,9 +397,41 @@ func (s *Helper) ToolFaq(t *hc.Tool) [][2]string {
 	return t.FaqPairs()
 }
 
-// Duration formats a time.Duration into a human-readable string
-func (s *Helper) Duration(d time.Duration) string {
-	return durafmt.Parse(d).LimitFirstN(2).String()
+// Duration is d in the viewer's language, in its two largest units: "45 min",
+// "13 h 20 min", "24 h", "6 d 23 h". The units are the download ETA's
+// (offer.eta.*): abbreviated, so no plural forms, short enough for the Vault
+// table's narrow column on a phone, a no-break space before each. Rounded up
+// to the minute (the hour from 48 h): what it counts is a wait -- a freeze,
+// an expiry -- and "13 h" said of 13 h 20 min sends the user back into a
+// refusal. Days only from 48 h, so the 24 h freeze reads "24 h", not "1 d".
+// Template usage: {{ duration $.Lang .Data.FreezePeriod }}
+func (s *Helper) Duration(lang string, d time.Duration) string {
+	key, data := durationParts(d)
+	return i18n.TranslateWithLocalizerData(i18n.GlobalService().Localizer(lang), key, data)
+}
+
+// durationParts rounds before it splits, so 59 min 30 s is "1 h", never
+// "60 min", and 6 d 23 h 30 min is "7 d", never "6 d 24 h". Under a minute
+// is "1 min": never "0 min", and no seconds.
+func durationParts(d time.Duration) (string, map[string]any) {
+	mins := int((d + time.Minute - 1) / time.Minute)
+	if mins < 1 {
+		mins = 1
+	}
+	if mins < 60 {
+		return "offer.eta.min", map[string]any{"M": mins}
+	}
+	if mins < 48*60 {
+		if mins%60 == 0 {
+			return "offer.eta.h", map[string]any{"H": mins / 60}
+		}
+		return "offer.eta.hMin", map[string]any{"H": mins / 60, "M": mins % 60}
+	}
+	hours := (mins + 59) / 60
+	if hours%24 == 0 {
+		return "offer.eta.d", map[string]any{"D": hours / 24}
+	}
+	return "offer.eta.dH", map[string]any{"D": hours / 24, "H": hours % 24}
 }
 
 // TimeAgo formats a time.Time into a relative string like "3 hours ago"

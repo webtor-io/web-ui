@@ -26,6 +26,7 @@ type PledgeDisplay struct {
 	Resource     *vaultModels.Resource
 	Amount       float64
 	IsFrozen     bool
+	FrozenFor    time.Duration // what is left of the freeze, said under the amount
 	Funded       bool
 	CreatedAt    string
 	ExpiresIn    time.Duration // time until resource is removed (for unfunded pledges)

@@ -298,11 +298,11 @@ func fixturePledges() *PledgeListData {
 	expiring := &vaultModels.Resource{ResourceID: expiringHash, Name: "expiring"}
 	second := &vaultModels.Resource{ResourceID: secondHash, Name: "second", Funded: true}
 	return &PledgeListData{Pledges: []PledgeDisplay{
-		{ResourceID: loadingHash, Resource: loading, Amount: 3.5, Funded: true, ShowProgress: true, IsFrozen: true},
+		{ResourceID: loadingHash, Resource: loading, Amount: 3.5, Funded: true, ShowProgress: true, IsFrozen: true, FrozenFor: 13*time.Hour + 20*time.Minute},
 		{ResourceID: vaultedHash, Resource: vaulted, Amount: 6.5, Funded: true},
 		{ResourceID: expiringHash, Resource: expiring, Amount: 2, ExpiresIn: 5 * time.Hour},
 		{ResourceID: secondHash, Resource: second, Amount: 1, Funded: true, ShowProgress: true},
-	}}
+	}, FreezePeriod: 24 * time.Hour}
 }
 
 const (
@@ -402,5 +402,72 @@ func TestVaultBulkRemove(t *testing.T) {
 	out = render(d)
 	if strings.Contains(out, `id="bulk-remove"`) || strings.Contains(out, "bulk_select.js") {
 		t.Error("all pledges frozen, but the select mode is offered")
+	}
+}
+
+// rowCells are each pledge row's four cells, keyed by the row's resource name.
+func rowCells(out string) map[string][]string {
+	rows := map[string][]string{}
+	for _, tr := range regexp.MustCompile(`(?s)<tr [^>]*>.*?</tr>`).FindAllString(out, -1) {
+		cells := regexp.MustCompile(`(?s)<td[^>]*>.*?</td>`).FindAllString(tr, -1)
+		if len(cells) != 4 {
+			continue
+		}
+		rows[strings.TrimSpace(regexp.MustCompile(`(?s)<a [^>]*>(.*?)</a>`).FindStringSubmatch(cells[1])[1])] = cells
+	}
+	return rows
+}
+
+// A frozen pledge says, as text under its amount, how long it stays frozen
+// -- a title would be all a phone never shows (the customer of 2026-10-26
+// had to ask support) -- and no other row says it. The snowflake is
+// announced as Frozen. The status guide and the disabled box's title state
+// the configured period; with no freeze configured the guide has no Frozen
+// row to explain.
+func TestVaultFrozenRowSaysTimeLeft(t *testing.T) {
+	tpl := parseVault(t)
+	const nb = "\u00a0"
+	render := func(lang string, d *PledgeListData) string {
+		var page bytes.Buffer
+		if err := tpl.ExecuteTemplate(&page, "main", vaultView{Lang: lang, CSRF: "csrf", Data: d}); err != nil {
+			t.Fatal(err)
+		}
+		return page.String()
+	}
+	for lang, want := range map[string][2]string{
+		"en": {"13" + nb + "h 20" + nb + "min left", "A new pledge is frozen for 24" + nb + "h and can&#39;t be removed until then."},
+		"ru": {"ещё 13" + nb + "ч 20" + nb + "мин", "Новый вклад заморожен на 24" + nb + "ч, и до этого его нельзя убрать."},
+	} {
+		out := render(lang, fixturePledges())
+		rows := rowCells(out)
+		vp := rows["loading"][2]
+		if !strings.Contains(vp, ">"+want[0]+"</span>") {
+			t.Errorf("%s: the frozen row's VP cell does not say %q as text: %s", lang, want[0], vp)
+		}
+		if !regexp.MustCompile(`<svg [^>]*role="img" aria-label="[^"]+"`).MatchString(vp) {
+			t.Errorf("%s: the frozen row's snowflake is not announced: %s", lang, vp)
+		}
+		for _, name := range []string{"vaulted", "expiring", "second"} {
+			if strings.Contains(rows[name][2], "data-vault-frozen-left") {
+				t.Errorf("%s: %s is not frozen, but says a time left", lang, name)
+			}
+		}
+		guide := out[strings.Index(out, "collapse-content"):]
+		if !strings.Contains(guide, want[1]) {
+			t.Errorf("%s: the status guide does not state the period: want %q", lang, want[1])
+		}
+		if !strings.Contains(rows["loading"][0], `title="`+want[1]) {
+			t.Errorf("%s: the frozen box's title does not state the period: %s", lang, rows["loading"][0])
+		}
+	}
+
+	d := fixturePledges()
+	d.FreezePeriod = 0
+	for i := range d.Pledges {
+		d.Pledges[i].IsFrozen, d.Pledges[i].FrozenFor = false, 0
+	}
+	out := render("en", d)
+	if guide := out[strings.Index(out, "collapse-content"):]; strings.Contains(guide, "frozen") {
+		t.Error("no freeze configured, but the status guide explains one")
 	}
 }

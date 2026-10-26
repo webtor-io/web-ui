@@ -80,7 +80,7 @@
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors" data-vault-progress data-resource-id="4897aacef168307328e121694dcdb8407e6d62cc" data-csrf="csrf-token" data-status-token="status-token" data-vault-saved-label="Сохранён">
           <td class="text-center">
             
-            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer" title="Очки замораживаются сразу после сохранения в Vault и размораживаются после истечения периода заморозки">
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer" title="Новый вклад заморожен на 24 ч, и до этого его нельзя убрать. Оставшееся время — под очками.">
               <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="4897aacef168307328e121694dcdb8407e6d62cc" aria-label="loading" disabled />
             </label>
             <span class="group-data-[bulk-on]/bulk:hidden">
@@ -99,9 +99,11 @@
           <td class="text-center text-w-cyan">
             
               <span class="inline-flex items-center gap-1 whitespace-nowrap">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" aria-label="Заморожен"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" role="img" aria-label="Заморожен"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
                 3.50
               </span>
+              
+              <span class="block text-[11px] leading-tight text-w-sub mt-0.5" data-vault-frozen-left>ещё 13 ч 20 мин</span>
             
           </td>
           <td class="text-center">
@@ -170,7 +172,7 @@
             
               <div class="flex flex-col items-center gap-0.5">
 <span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="pink" data-icon="clock"><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-clock"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text" title="Истекает"><span data-tx-blabel>Истекает</span> <span class="tx-bx" data-tx-bextra></span></span></span>
-                <span class="text-[11px] text-w-sub">5 hours</span>
+                <span class="text-[11px] text-w-sub">5 ч</span>
               </div>
             
           </td>
@@ -228,13 +230,15 @@
         <div class="collapse-title text-base font-semibold">Гид по статусам</div>
         <div class="collapse-content">
           <dl class="space-y-4 text-sm pt-2">
+            
             <div class="flex items-start gap-3">
               <dt class="inline-flex items-center gap-1 text-w-cyan font-medium mt-0.5 shrink-0 whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
                 VP
               </dt>
-              <dd class="text-w-sub">Очки замораживаются сразу после сохранения в Vault и размораживаются после истечения периода заморозки</dd>
+              <dd class="text-w-sub">Новый вклад заморожен на 24 ч, и до этого его нельзя убрать. Оставшееся время — под очками.</dd>
             </div>
+            
             <div class="flex items-start gap-3">
               <dt class="mt-0.5 shrink-0">
 <span class="tx-badge badge badge-sm gap-1.5 px-3 py-0.5" data-tx-badge tabindex="-1" data-tone="pink" data-icon="clock"><svg class="tx-bi" aria-hidden="true"><use href="#tx-b-clock"></use></svg><span class="tx-bdots loading loading-dots loading-xs" aria-hidden="true"></span><span class="badge-text" title="Истекает"><span data-tx-blabel>Истекает</span> <span class="tx-bx" data-tx-bextra></span></span></span></dt>

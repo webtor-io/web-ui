@@ -30,10 +30,10 @@
 				<button class="btn btn-soft" data-umami-event="vault-pledge-remove-error-confirmed">{{ t .Ctx.Lang "vault.ok" }}</button>
 			</form>
 		</div>
-	{{ else if .Data.Frozen }}
-		<p class="pt-4 pb-2 text-sm text-w-sub">
-			{{ t .Ctx.Lang "vault.frozen" }}
-		</p>
+	{{ else if .Data.FrozenFor }}
+		<div class="pt-1 pb-2">
+			{{ template "vault/pledge-modal/freeze-note" (tp .Ctx.Lang "vault.frozenFor" "Left" (duration .Ctx.Lang .Data.FrozenFor) "Period" (duration .Ctx.Lang .Data.FreezePeriod)) }}
+		</div>
 
 		<div class="modal-action justify-center">
 			<form method="dialog">

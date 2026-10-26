@@ -5,15 +5,22 @@
 		{{ else }}
 			<p class="text-sm text-w-sub">{{ t .Ctx.Lang "vault.pledgeSuccess" }}</p>
 		{{ end }}
+		{{/* The viewer's own pledge still frozen: when Remove will work, in
+		     place of a Remove that is certain to be refused until then. */}}
+		{{ if .Data.FrozenFor }}
+			{{ template "vault/pledge-modal/freeze-note" (tp .Ctx.Lang "vault.frozenFor" "Left" (duration .Ctx.Lang .Data.FrozenFor) "Period" (duration .Ctx.Lang .Data.FreezePeriod)) }}
+		{{ end }}
 	</div>
 	<div class="modal-action justify-center">
 		<form method="dialog">
 			<button class="btn btn-soft" data-umami-event="vault-pledge-confirmed">{{ t .Ctx.Lang "vault.gotIt" }}</button>
 		</form>
+		{{ if not .Data.FrozenFor }}
 		<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
 			<input type="hidden" name="pledge-remove-form" value="true" />
 			<button type="submit" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="vault-pledge-remove-requested">{{ t .Ctx.Lang "vault.removePledge" }}</button>
 		</form>
+		{{ end }}
 	</div>
 	<script>
 		document.querySelector("#pledge-button").reload();

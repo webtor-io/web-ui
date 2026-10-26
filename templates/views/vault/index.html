@@ -35,7 +35,7 @@
             {{/* Select mode (partials/bulk_select.html): the box takes the
                  icon's place. A frozen pledge cannot be removed yet, so its
                  box is there but disabled, saying why on hover. */}}
-            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer"{{ if .IsFrozen }} title="{{ t $.Lang "vault.pledges.frozenDesc" }}"{{ end }}>
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer"{{ if .IsFrozen }} title="{{ tp $.Lang "vault.pledges.frozenDesc" "Period" (duration $.Lang $.Data.FreezePeriod) }}"{{ end }}>
               <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="{{ .ResourceID }}" aria-label="{{ .Resource.Name }}"{{ if .IsFrozen }} disabled{{ end }} />
             </label>
             <span class="group-data-[bulk-on]/bulk:hidden">
@@ -58,9 +58,13 @@
           <td class="text-center {{ if .IsFrozen }}text-w-cyan{{ else }}text-w-sub{{ end }}">
             {{ if .IsFrozen }}
               <span class="inline-flex items-center gap-1 whitespace-nowrap">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" aria-label="{{ t $.Lang "vault.pledges.frozen" }}"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" role="img" aria-label="{{ t $.Lang "vault.pledges.frozen" }}"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
                 {{ printf "%.2f" .Amount }}
               </span>
+              {{/* Visible, not a title: a touch screen never shows one. Its
+                   own line, like Expiring's time under its pill -- the
+                   column is w-24. */}}
+              <span class="block text-[11px] leading-tight text-w-sub mt-0.5" data-vault-frozen-left>{{ tp $.Lang "vault.pledges.frozenLeft" "Left" (duration $.Lang .FrozenFor) }}</span>
             {{ else }}
               {{ printf "%.2f" .Amount }}
             {{ end }}
@@ -78,7 +82,7 @@
             {{ if not .Funded }}
               <div class="flex flex-col items-center gap-0.5">
                 {{- template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}
-                {{ if .ExpiresIn }}<span class="text-[11px] text-w-sub">{{ .ExpiresIn | duration }}</span>{{ end }}
+                {{ if .ExpiresIn }}<span class="text-[11px] text-w-sub">{{ duration $.Lang .ExpiresIn }}</span>{{ end }}
               </div>
             {{ else if .ShowProgress }}
               {{- template "status/badge" (statusBadge "cyan" "dots" (t $.Lang "resource.status.checking")) }}
@@ -232,13 +236,15 @@
         <div class="collapse-title text-base font-semibold">{{ t $.Lang "vault.pledges.statusGuide" }}</div>
         <div class="collapse-content">
           <dl class="space-y-4 text-sm pt-2">
+            {{ if .Data.FreezePeriod }}
             <div class="flex items-start gap-3">
               <dt class="inline-flex items-center gap-1 text-w-cyan font-medium mt-0.5 shrink-0 whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
                 VP
               </dt>
-              <dd class="text-w-sub">{{ t $.Lang "vault.pledges.frozenDesc" }}</dd>
+              <dd class="text-w-sub">{{ tp $.Lang "vault.pledges.frozenDesc" "Period" (duration $.Lang .Data.FreezePeriod) }}</dd>
             </div>
+            {{ end }}
             <div class="flex items-start gap-3">
               <dt class="mt-0.5 shrink-0">{{ template "status/badge" (statusBadge "pink" "clock" (t $.Lang "vault.pledges.expiring")) }}</dt>
               <dd class="text-w-sub">{{ t $.Lang "vault.pledges.expiringDesc" }}</dd>

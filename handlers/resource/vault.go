@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -17,6 +18,11 @@ type VaultPledgeAddForm struct {
 	Funded        bool
 	Vaulted       bool
 	ResourceID    string
+	// FreezePeriod is how long a new pledge stays frozen, said before the
+	// click; FrozenFor what is left of the viewer's own pledge's freeze, 0
+	// when it has none or it is over (Remove is offered only then).
+	FreezePeriod time.Duration
+	FrozenFor    time.Duration
 }
 
 type VaultButton struct {
@@ -24,10 +30,11 @@ type VaultButton struct {
 }
 
 type VaultPledgeRemoveForm struct {
-	Frozen     bool
-	Status     string
-	ErrKey     string
-	ResourceID string
+	FrozenFor    time.Duration // 0: not frozen
+	FreezePeriod time.Duration
+	Status       string
+	ErrKey       string
+	ResourceID   string
 }
 
 func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*VaultPledgeAddForm, error) {
@@ -53,6 +60,7 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 		Funded:        false,
 		Vaulted:       false,
 		ResourceID:    args.ID,
+		FreezePeriod:  s.vault.GetFreezePeriod(),
 	}
 
 	// Check if user is supporting this torrent
@@ -76,6 +84,9 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs) (*Vau
 
 			if pledge != nil && pledge.Funded {
 				vaultForm.Funded = true
+			}
+			if pledge != nil {
+				vaultForm.FrozenFor = s.vault.FrozenFor(pledge)
 			}
 		}
 	}
@@ -133,8 +144,8 @@ func (s *Handler) prepareVaultPledgeRemoveForm(c *gin.Context, args *GetArgs) (*
 	ctx := c.Request.Context()
 
 	form := &VaultPledgeRemoveForm{
-		Frozen:     false,
-		ResourceID: args.ID,
+		FreezePeriod: s.vault.GetFreezePeriod(),
+		ResourceID:   args.ID,
 	}
 
 	// Handle redirect from vault handler
@@ -155,7 +166,7 @@ func (s *Handler) prepareVaultPledgeRemoveForm(c *gin.Context, args *GetArgs) (*
 		return nil, errors.Wrap(err, "failed to get vault resource")
 	}
 
-	// If resource doesn't exist, return form with frozen=false
+	// If resource doesn't exist, return form with nothing frozen
 	if resource == nil {
 		return form, nil
 	}
@@ -166,17 +177,11 @@ func (s *Handler) prepareVaultPledgeRemoveForm(c *gin.Context, args *GetArgs) (*
 		return nil, errors.Wrap(err, "failed to get user pledge")
 	}
 
-	// If pledge doesn't exist, return form with frozen=false
+	// If pledge doesn't exist, return form with nothing frozen
 	if pledge == nil {
 		return form, nil
 	}
 
-	// Check if pledge is frozen
-	isFrozen, err := s.vault.IsPledgeFrozen(ctx, pledge)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check pledge frozen status")
-	}
-
-	form.Frozen = isFrozen
+	form.FrozenFor = s.vault.FrozenFor(pledge)
 	return form, nil
 }

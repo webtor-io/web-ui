@@ -130,7 +130,7 @@ Methods: `GetTxLog`, `GetUserTxLogs`, `GetUserTxLogsByType`, `GetResourceTxLogs`
 | `VAULT_SERVICE_HOST` | — | Vault API host (required) |
 | `VAULT_SERVICE_PORT` | 80 | Vault API port |
 | `VAULT_SECURE` | false | Use HTTPS |
-| `VAULT_PLEDGE_FREEZE_PERIOD` | 24h | Pledge freeze period |
+| `VAULT_PLEDGE_FREEZE_PERIOD` | 24h | Pledge freeze period. `0`: no freeze, and the UI says nothing about one (no confirm line, no Frozen row in the status guide, no help-page step) |
 | `VAULT_RESOURCE_EXPIRE_PERIOD` | 7 days | Deletion delay for expired resources with unfunded pledges |
 | `VAULT_RESOURCE_ABANDONED_EXPIRE_PERIOD` | 1 day | Deletion delay for expired resources with no pledges |
 | `VAULT_RESOURCE_TRANSFER_TIMEOUT_PERIOD` | 7 days | Transfer timeout |
@@ -201,9 +201,9 @@ Idempotent. Returns existing resource or creates new one:
 - Calculates `required_vp` from torrent size via REST API (`size / 1GB`)
 - Extracts torrent name from API response
 
-#### IsPledgeFrozen
+#### IsPledgeFrozen, FrozenFor
 
-Dynamic check: returns `true` if `frozen_at + freeze_period > now()`, regardless of vault status.
+Dynamic check: `FrozenFor(pledge)` is what is left of the freeze, `frozen_at + freeze_period - now()`, 0 once it is over, regardless of vault status; `IsPledgeFrozen` is `FrozenFor > 0`. One computation, so a page that says "frozen" always has a time left to say (`services/vault` `TestFrozenForIsTheFreezeLeft`). `GetUserStats` puts both on each `EnrichedPledge` (`IsFrozen`, `FrozenFor`).
 
 #### recalculatePledgeFunding (internal)
 
@@ -299,6 +299,7 @@ type PledgeDisplay struct {
     Resource     *vaultModels.Resource
     Amount       float64
     IsFrozen     bool          // computed via IsPledgeFrozen
+    FrozenFor    time.Duration // what is left of the freeze, said under the amount
     Funded       bool          // from DB
     CreatedAt    string        // formatted
     ExpiresIn    time.Duration // for unfunded pledges with expired resources
@@ -315,7 +316,11 @@ type PledgeListData struct {
 }
 ```
 
-Per-pledge states in the table: `Frozen` (the VP cell, cyan snowflake — not a pill), `Expiring` (pink pill, clock), `Saved` (Vault's purple pill with its layers). These describe **VP claimability**, not the resource's content state — the dashboard subtitle calls this out for users.
+Per-pledge states in the table: `Frozen` (the VP cell, cyan snowflake — not a pill — with the time left under the amount), `Expiring` (pink pill, clock, the time to removal under it), `Saved` (Vault's purple pill with its layers). These describe **VP claimability**, not the resource's content state — the dashboard subtitle calls this out for users.
+
+**Frozen row** (2026-10-26). The amount keeps its snowflake (`role="img"` added to its `aria-label` `vault.pledges.frozen`: without the role some screen readers skip the label; not checked with one), and under it, as visible text — a `title` is all a phone never shows — `vault.pledges.frozenLeft` ("13 h 20 min left", `text-[11px] text-w-sub`, its own line like Expiring's time under its pill). The VP column is a fixed `w-24`; measured at 360px in headless Chromium with the built CSS, every locale's line wraps inside it without overflowing (two lines, pl three: "jeszcze / 13 godz. / 20 min"), and the columns keep their widths (32/14/96/144px: the name column's 14px is the squeeze described under Width, not this line). The status guide's Frozen row (`vault.pledges.frozenDesc`, also the disabled box's title in select mode) states the configured period: "A new pledge is frozen for 24 h and can't be removed until then. The time left is shown under its points." — absent when no freeze is configured. `handlers/vault` `TestVaultFrozenRowSaysTimeLeft`.
+
+**Durations** — the template func `duration $.Lang d` (`web.Helper.Duration`), here and on the help page: the two largest units in the page's language, from the download ETA's keys (`offer.eta.*`: abbreviated, so no plural forms and short enough for this column, a no-break space before each unit). Rounded up to the minute (to the hour from 48 h), rounding before splitting ("1 h", never "60 min"): it counts a wait, and a rounded-down "13 h" of 13 h 20 min sends the user back into a refusal. Under a minute is "1 min". Days only from 48 h, so the 24 h freeze reads "24 h" and the 7-day expiry "6 d 23 h". It replaced `durafmt`, which is English only: the Russian help page said "замораживаются на 1 day", the dashboard's Expiring time "5 hours" in every language (`services/web` `TestDurationRoundsUpInTheViewersLanguage`). The Expiring time rounds up too — up to a minute (an hour beyond 48 h) more than is left before removal.
 
 **Every status pill on the page is the transfer status's badge** (2026-09-25): the one element `templates/partials/status/badge.html` renders (`status/badge`) — the resource page's badge while nothing moves — with its classes, tones, icons and size, and the one renderer `assets/src/js/lib/statusBadge.js`. The pledge states are that element made in the template (`statusBadge "vault" "vault" (t … "vault.pledges.saved")`, `statusBadge "pink" "clock" …` — `handlers/resource` `Helper.StatusBadge`, no id: a page carries many), the status guide's two pills too (each the `<dt>` of its row in the guide's `<dl>`, the VP snowflake the first); the badge's icons are on the page once (`status/badge_sprite`, outside the async-reloaded table). `pink` is the Vault page's own tone (style.css `.tx-badge[data-tone="pink"]`), which statusview never sends. Before, `vault/progress.js` kept its own `BADGE_CONFIG` copied from the old badge, which had drifted: no `missing_idle` / `vault_missing`, the old pause glyph, green "Saved", no cyan "checking". Tests: `handlers/vault` `TestVaultRowsDrawTheStatusBadge`; `lib/statusBadge.test.js` (the resource page's badge and every pill here have one shape); `lib/vaultProgress.test.js` against a generated page with two live rows (each stream draws into its own row).
 
@@ -344,25 +349,35 @@ Backwards-compat redirect to `/vault`. The page was renamed from "Pledges" to "M
 
 ### Vault Button — `templates/partials/vault/button.html`
 
-Shown on resource pages for authenticated users when vault is available.
-- "Keep This Torrent Available" → opens pledge add modal
-- "Remove Pledge" → opens pledge remove modal
+Shown in the resource page's header for authenticated users when vault is available.
+- "Save to Vault" (`vault.keepAvailable`) → opens the pledge add modal at its confirm step
+- "Saved to Vault" (`vault.supporting`, the viewer's own funded pledge) → opens the same modal at its saved view, where Remove Pledge lives
 - Uses `data-async-target` and `data-async-push-state="false"`
 
-### Pledge Add Modal — `templates/partials/vault/pledge-add-modal.html`
+The help page (`templates/views/instructions/vault.html`) names the button by `vault.keepAvailable`, put into `instructions.vault.howStep1` as `{{.Action}}` at render time — the step had its own copy of the label, which stayed "Keep This Torrent Available" long after the button was renamed (`handlers/instructions` `TestVaultHelpNamesTheRealButton`).
 
-States: sufficient VP → confirm form; insufficient VP → upgrade link; success (funded/not funded); vaulted; error.
+### Pledge Add Modal — `templates/partials/vault/pledge-modal/add.html`, `add/success.html`
 
-### Pledge Remove Modal — `templates/partials/vault/pledge-remove-modal.html`
+States: sufficient VP → confirm form; insufficient VP → upgrade link; success (just pledged) and saved (`Funded`: the viewer's own pledge is funded) — both `add/success.html`, vaulted or not; error.
 
-States: frozen warning; confirmation; success; error.
+**The freeze, before the click** (2026-10-26). A paying user pledged 103.50 VP of 250 to a 111 GB pack 2.7 s after opening this modal, then met the frozen dialog seven times and asked support how long the freeze is. Wherever the Store button is, the last line before it (below "What is Vault?") says what the click commits to: `vault.freezeNotice` "Saving freezes 103.50 VP for 24 h. After that you can remove the pledge at any time, and the points return to your balance." — the amount is `Required` as the table prints it, the period `VaultPledgeAddForm.FreezePeriod` (the configured one, never a hardcoded 24 h). Unlimited points get `vault.freezeNoticeUnlimited` (no amount, no balance to return to: the pledge is still frozen). Not enough points: no button, no line. No freeze configured: no line. Not an alert and not in the button's label (a German label with the amount would not fit beside Cancel): it is a condition of the pledge.
+
+**A frozen pledge offers no Remove.** The saved view — right after pledging and whenever the header button reads "Saved to Vault" — showed Remove Pledge, certain to be refused for the first 24 h. While the viewer's own pledge is frozen (`VaultPledgeAddForm.FrozenFor > 0`, from the pledge `prepareVaultPledgeAddForm` already loads for a funded resource) the view says when it will work instead, `vault.frozenFor`: "This pledge is frozen for another 13 h 20 min. Every pledge stays frozen for 24 h after it is made. After that you can remove it here." — and "Got it!" is its only action. Not frozen: Remove Pledge as before. No live countdown: reopening recomputes, and a freeze only ever ends, so a Remove that is shown never becomes wrong. No amount in this line: an unlimited or a no-longer-funded pledge has none to return.
+
+The three lines are one partial, `vault/pledge-modal/freeze-note` (`freeze-note.html`, called with the sentence): the dashboard's snowflake, `aria-hidden` (the words say frozen), `text-sm text-w-sub`.
+
+### Pledge Remove Modal — `templates/partials/vault/pledge-modal/remove.html`
+
+States: frozen; confirmation; success; error. Frozen — still reachable by its URL (`?pledge-remove-form=true`) and from a page an older deploy rendered: the same `vault.frozenFor` line with the time left (`VaultPledgeRemoveForm.FrozenFor`, `FreezePeriod`) in place of "come back later when the freeze period expires", which gave no time (`vault.frozen`, deleted).
+
+`handlers/resource` `TestVaultConfirmSaysTheFreezeBeforeTheClick`, `TestVaultFrozenPledgeSaysWhenRemoveWorks`, `TestVaultFreezeLinesInEveryLocale` (all 11 locales fill both lines' placeholders with their own durations). Screenshots at 360 and 1280px were taken from these templates with the built CSS (en, de, ru, pl): at 360px a line takes four to five lines, nothing overflows; at the box's full 512px every locale takes two or three, measured.
 
 ### Resource Handler Integration — `handlers/resource/get.go`
 
 - Sets `d.Vault = s.vault != nil`
 - `prepareVaultButton` → determines button text based on pledge status
-- `prepareVaultPledgeAddForm` → calculates VP stats, required VP, torrent size
-- `prepareVaultPledgeRemoveForm` → checks freeze status
+- `prepareVaultPledgeAddForm` → calculates VP stats, required VP, torrent size; the freeze period, and `FrozenFor` of the viewer's own pledge
+- `prepareVaultPledgeRemoveForm` → `FrozenFor` of the viewer's pledge and the freeze period
 
 ## Vault API SDK — `services/vault/api.go`
 

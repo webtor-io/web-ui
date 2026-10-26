@@ -80,9 +80,20 @@
 		<div class="text-left w-full mt-1 mb-2">
 			<a href="{{ langPath .Ctx.Lang "/instructions/vault" }}" class="text-sm text-w-muted hover:text-w-sub link link-hover" data-umami-event="instruction-vault" target="_blank">{{ t .Ctx.Lang "vault.whatIs" }}</a>
 		</div>
+		{{/* What the click commits to, next to the button that does it (the
+		     pledge freezes at once, services/vault CreatePledge) -- wherever
+		     the button is, unlimited points included: they cannot be taken
+		     back before the freeze ends either. No freeze configured, no line. */}}
+		{{ $canStore := or (not .Data.Available) (ge (derefFloat64 .Data.Available) .Data.Required) }}
+		{{ if and $canStore .Data.FreezePeriod }}
+			{{ $period := duration .Ctx.Lang .Data.FreezePeriod }}
+			{{ $note := tp .Ctx.Lang "vault.freezeNoticeUnlimited" "Period" $period }}
+			{{ if .Data.Available }}{{ $note = tp .Ctx.Lang "vault.freezeNotice" "Amount" (printf "%.2f" .Data.Required) "Period" $period }}{{ end }}
+			{{ template "vault/pledge-modal/freeze-note" $note }}
+		{{ end }}
 
 		<div class="modal-action justify-center">
-			{{ if or (not .Data.Available) (ge (derefFloat64 .Data.Available) .Data.Required) }}
+			{{ if $canStore }}
 				<form action="{{ langPath .Ctx.Lang "/vault/add" }}" method="post" data-async-target="#pledge-modal" data-async-push-state="false">
 					<input type="hidden" name="resource_id" value="{{ .Data.ResourceID }}" />
 					<button type="submit" class="btn btn-soft" data-umami-event="vault-store-confirmed">

@@ -1,0 +1,11 @@
+{{/* The freeze, said where it applies: the commitment before the click
+     (add.html), a frozen pledge's time left after it (add/success.html,
+     remove.html). Called with the sentence. The snowflake is the dashboard's
+     Frozen one (views/vault/index.html), aria-hidden: the words say frozen.
+     Plain text, not an alert -- a condition of the pledge, nothing wrong. */}}
+{{ define "vault/pledge-modal/freeze-note" }}
+<p class="flex items-start gap-2 mt-3 text-sm text-w-sub" data-vault-freeze-note>
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mt-0.5 shrink-0 text-w-cyan" aria-hidden="true"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
+	<span>{{ . }}</span>
+</p>
+{{ end }}

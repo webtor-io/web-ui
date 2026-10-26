@@ -33,24 +33,24 @@
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.howTitle" }}</h2>
 
     <ol class="list-decimal pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>{{ tHTML $.Lang "instructions.vault.howStep1" }}</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.howStep1" "Action" (t $.Lang "vault.keepAvailable") }}</li>
         <li>{{ t $.Lang "instructions.vault.howStep2" }}</li>
-        <li>{{ tpHTML $.Lang "instructions.vault.howStep3" "FreezePeriod" (.FreezePeriod | duration) }}</li>
-        <li>{{ tpHTML $.Lang "instructions.vault.howStep4" "TransferTimeout" (.TransferTimeoutPeriod | duration) }}</li>
+        {{ if .FreezePeriod }}<li>{{ tpHTML $.Lang "instructions.vault.howStep3" "FreezePeriod" (duration $.Lang .FreezePeriod) }}</li>{{ end }}
+        <li>{{ tpHTML $.Lang "instructions.vault.howStep4" "TransferTimeout" (duration $.Lang .TransferTimeoutPeriod) }}</li>
     </ol>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.claimTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
         <li>{{ t $.Lang "instructions.vault.claimItem1" }}</li>
-        <li>{{ tpHTML $.Lang "instructions.vault.claimItem2" "ExpirePeriod" (.ExpirePeriod | duration) }}</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.claimItem2" "ExpirePeriod" (duration $.Lang .ExpirePeriod) }}</li>
         <li>{{ t $.Lang "instructions.vault.claimItem3" }}</li>
     </ul>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">{{ t $.Lang "instructions.vault.expireTitle" }}</h2>
 
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
-        <li>{{ tpHTML $.Lang "instructions.vault.expireItem1" "ExpirePeriod" (.ExpirePeriod | duration) }}</li>
+        <li>{{ tpHTML $.Lang "instructions.vault.expireItem1" "ExpirePeriod" (duration $.Lang .ExpirePeriod) }}</li>
         <li>{{ t $.Lang "instructions.vault.expireItem2" }}</li>
     </ul>
     {{ end }}

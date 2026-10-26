@@ -267,10 +267,12 @@ func (s *Vault) UpdateUserVPIfExists(ctx context.Context, user *auth.User) (*vau
 
 // EnrichedPledge bundles a raw pledge with the freeze-status flag.
 // IsPledgeFrozen is mildly expensive and used both for stats counting and
-// per-row badge rendering, so we compute it once and pass it on.
+// per-row badge rendering, so we compute it once and pass it on. FrozenFor
+// is the time left, from the same computation (the dashboard row says it).
 type EnrichedPledge struct {
-	Pledge   vaultModels.Pledge
-	IsFrozen bool
+	Pledge    vaultModels.Pledge
+	IsFrozen  bool
+	FrozenFor time.Duration
 }
 
 // UserStats represents user vault points statistics
@@ -320,15 +322,10 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 
 	// Process pledges
 	for _, pledge := range pledges {
-		// Check if pledge is frozen using IsPledgeFrozen method
-		isFrozen, err := s.IsPledgeFrozen(ctx, &pledge)
-		if err != nil {
-			// If error checking frozen status, skip this pledge — broken
-			// data should not contribute to either stats or the rendered list.
-			continue
-		}
+		frozenFor := s.FrozenFor(&pledge)
+		isFrozen := frozenFor > 0
 
-		enriched = append(enriched, EnrichedPledge{Pledge: pledge, IsFrozen: isFrozen})
+		enriched = append(enriched, EnrichedPledge{Pledge: pledge, IsFrozen: isFrozen, FrozenFor: frozenFor})
 
 		// Frozen: sum of pledges that are frozen AND funded
 		if isFrozen && pledge.Funded {
@@ -633,15 +630,17 @@ func (s *Vault) IsPledgeFrozen(ctx context.Context, pledge *vaultModels.Pledge) 
 	if pledge == nil {
 		return false, errors.New("pledge is nil")
 	}
+	return s.FrozenFor(pledge) > 0, nil
+}
 
-	// Calculate the time when freeze period ends
-	freezeEndTime := pledge.FrozenAt.Add(s.freezePeriod)
-
-	// Check if current time is still within freeze period
-	now := time.Now()
-	isFrozen := now.Before(freezeEndTime)
-
-	return isFrozen, nil
+// FrozenFor is how much longer the pledge stays frozen, 0 once it is not.
+// The one place the freeze is computed: IsPledgeFrozen is FrozenFor > 0, so
+// "frozen" and the time left the page shows can never disagree.
+func (s *Vault) FrozenFor(pledge *vaultModels.Pledge) time.Duration {
+	if left := time.Until(pledge.FrozenAt.Add(s.freezePeriod)); left > 0 {
+		return left
+	}
+	return 0
 }
 
 // RemovePledge removes a pledge and updates the resource accordingly
