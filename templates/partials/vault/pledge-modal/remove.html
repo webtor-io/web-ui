@@ -32,7 +32,7 @@
 		</div>
 	{{ else if .Data.FrozenFor }}
 		<div class="pt-1 pb-2">
-			{{ template "vault/pledge-modal/freeze-note" (tp .Ctx.Lang "vault.frozenFor" "Left" (duration .Ctx.Lang .Data.FrozenFor) "Period" (duration .Ctx.Lang .Data.FreezePeriod)) }}
+			{{ template "vault/pledge-modal/frozen-for" . }}
 		</div>
 
 		<div class="modal-action justify-center">

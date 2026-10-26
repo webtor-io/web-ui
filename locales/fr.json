@@ -573,7 +573,7 @@
     "vault.removeError": "Malheureusement, votre engagement n'a pas pu être retiré suite à une erreur :",
     "vault.frozenFor": "Cet engagement reste gelé encore {{.Left}}. Tout engagement est gelé pendant {{.Period}} après sa création. Ensuite, vous pourrez le retirer ici.",
     "vault.freezeNotice": "L'enregistrement gèle {{.Amount}} VP pendant {{.Period}}. Ensuite, vous pourrez retirer l'engagement à tout moment et les points reviendront sur votre solde.",
-    "vault.freezeNoticeUnlimited": "Une fois enregistré, l'engagement est gelé pendant {{.Period}}. Ensuite, vous pourrez le retirer à tout moment.",
+    "vault.freezeNoticeShort": "Une fois enregistré, l'engagement est gelé pendant {{.Period}}. Ensuite, vous pourrez le retirer à tout moment.",
     "vault.removeConfirm": "Êtes-vous sûr de vouloir retirer votre engagement sur ce torrent ? Cette action est irréversible.",
     "vault.bulkRemoveConfirm": "Retirer les engagements sélectionnés ? Leurs Vault Points reviennent sur votre solde, et les torrents qui n'ont plus assez d'engagements peuvent être retirés du Vault. Cette action est irréversible.",
     "vault.dashboard.badge": "Mon Vault",

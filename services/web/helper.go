@@ -400,14 +400,17 @@ func (s *Helper) ToolFaq(t *hc.Tool) [][2]string {
 // Duration is d in the viewer's language, in its two largest units: "45 min",
 // "13 h 20 min", "24 h", "6 d 23 h". The units are the download ETA's
 // (offer.eta.*): abbreviated, so no plural forms, short enough for the Vault
-// table's narrow column on a phone, a no-break space before each. Rounded up
-// to the minute (the hour from 48 h): what it counts is a wait -- a freeze,
-// an expiry -- and "13 h" said of 13 h 20 min sends the user back into a
+// table's narrow column on a phone. Every space in it is a no-break one, the
+// one between its parts too: the strings keep a plain space there (the
+// download ETA may wrap between them), and a phone broke "13 h / 20 min",
+// the one number a frozen pledge's line is there to say. Rounded up to the
+// minute (the hour from 48 h): what it counts is a wait -- a freeze, an
+// expiry -- and "13 h" said of 13 h 20 min sends the user back into a
 // refusal. Days only from 48 h, so the 24 h freeze reads "24 h", not "1 d".
 // Template usage: {{ duration $.Lang .Data.FreezePeriod }}
 func (s *Helper) Duration(lang string, d time.Duration) string {
 	key, data := durationParts(d)
-	return i18n.TranslateWithLocalizerData(i18n.GlobalService().Localizer(lang), key, data)
+	return strings.ReplaceAll(i18n.TranslateWithLocalizerData(i18n.GlobalService().Localizer(lang), key, data), " ", "\u00a0")
 }
 
 // durationParts rounds before it splits, so 59 min 30 s is "1 h", never

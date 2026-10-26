@@ -36,8 +36,9 @@ func renderVault(t *testing.T, lang string, v *VaultData) string {
 // The help page names the button by the label it has (vault.keepAvailable,
 // put in at render time: a copy of it in the step drifted once, to "Keep
 // This Torrent Available", a label gone since), and says the periods in the
-// page's language (durafmt said "1 day" on every one). No freeze
-// configured, no step about it.
+// page's language (durafmt said "1 day" on every one) -- never right before
+// the sentence's own stop: a dotted unit made "7 дн.." and "7 d.." of four
+// ru and pl sentences. No freeze configured, no step about it.
 func TestVaultHelpNamesTheRealButton(t *testing.T) {
 	ih := i18n.NewHelper(i18n.New(os.DirFS("../../locales")))
 	wh := &web.Helper{}
@@ -53,6 +54,10 @@ func TestVaultHelpNamesTheRealButton(t *testing.T) {
 			if strings.Contains(out, bad) {
 				t.Errorf("%s: %q on the page", lang, bad)
 			}
+		}
+		text := regexp.MustCompile(`<[^>]*>`).ReplaceAllString(out, "")
+		if stop := regexp.MustCompile(`[^.]{0,60}\.\.`).FindString(text); stop != "" {
+			t.Errorf("%s: a double stop on the page: %q", lang, stop)
 		}
 		for _, d := range []time.Duration{v.FreezePeriod, v.ExpirePeriod} {
 			if s := wh.Duration(lang, d); !strings.Contains(out, "<strong>"+s+"</strong>") {

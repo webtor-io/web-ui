@@ -8,7 +8,7 @@
 		{{/* The viewer's own pledge still frozen: when Remove will work, in
 		     place of a Remove that is certain to be refused until then. */}}
 		{{ if .Data.FrozenFor }}
-			{{ template "vault/pledge-modal/freeze-note" (tp .Ctx.Lang "vault.frozenFor" "Left" (duration .Ctx.Lang .Data.FrozenFor) "Period" (duration .Ctx.Lang .Data.FreezePeriod)) }}
+			{{ template "vault/pledge-modal/frozen-for" . }}
 		{{ end }}
 	</div>
 	<div class="modal-action justify-center">

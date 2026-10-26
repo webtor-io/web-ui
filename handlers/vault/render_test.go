@@ -435,8 +435,8 @@ func TestVaultFrozenRowSaysTimeLeft(t *testing.T) {
 		return page.String()
 	}
 	for lang, want := range map[string][2]string{
-		"en": {"13" + nb + "h 20" + nb + "min left", "A new pledge is frozen for 24" + nb + "h and can&#39;t be removed until then."},
-		"ru": {"ещё 13" + nb + "ч 20" + nb + "мин", "Новый вклад заморожен на 24" + nb + "ч, и до этого его нельзя убрать."},
+		"en": {"13" + nb + "h" + nb + "20" + nb + "min left", "A new pledge is frozen for 24" + nb + "h and can&#39;t be removed until then."},
+		"ru": {"ещё 13" + nb + "ч" + nb + "20" + nb + "мин", "Новый вклад заморожен на 24" + nb + "ч, и до тех пор его нельзя убрать."},
 	} {
 		out := render(lang, fixturePledges())
 		rows := rowCells(out)

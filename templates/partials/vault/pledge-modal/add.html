@@ -87,7 +87,7 @@
 		{{ $canStore := or (not .Data.Available) (ge (derefFloat64 .Data.Available) .Data.Required) }}
 		{{ if and $canStore .Data.FreezePeriod }}
 			{{ $period := duration .Ctx.Lang .Data.FreezePeriod }}
-			{{ $note := tp .Ctx.Lang "vault.freezeNoticeUnlimited" "Period" $period }}
+			{{ $note := tp .Ctx.Lang "vault.freezeNoticeShort" "Period" $period }}
 			{{ if .Data.Available }}{{ $note = tp .Ctx.Lang "vault.freezeNotice" "Amount" (printf "%.2f" .Data.Required) "Period" $period }}{{ end }}
 			{{ template "vault/pledge-modal/freeze-note" $note }}
 		{{ end }}

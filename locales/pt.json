@@ -573,7 +573,7 @@
     "vault.removeError": "Infelizmente, seu compromisso não pôde ser removido devido a um erro:",
     "vault.frozenFor": "Este compromisso fica congelado por mais {{.Left}}. Todo compromisso fica congelado por {{.Period}} depois de criado. Depois disso, você pode removê-lo aqui.",
     "vault.freezeNotice": "Ao salvar, {{.Amount}} VP ficam congelados por {{.Period}}. Depois disso, você pode remover o compromisso quando quiser e os pontos voltam para o seu saldo.",
-    "vault.freezeNoticeUnlimited": "Depois de salvo, o compromisso fica congelado por {{.Period}}. Depois disso, você pode removê-lo quando quiser.",
+    "vault.freezeNoticeShort": "Depois de salvo, o compromisso fica congelado por {{.Period}}. Depois disso, você pode removê-lo quando quiser.",
     "vault.removeConfirm": "Tem certeza que quer remover seu compromisso com este torrent? Essa ação não pode ser desfeita.",
     "vault.bulkRemoveConfirm": "Remover os compromissos selecionados? Os Vault Points voltam para o seu saldo, e torrents que ficarem sem compromissos suficientes podem ser removidos do Vault. Essa ação não pode ser desfeita.",
     "vault.dashboard.badge": "Meu Vault",

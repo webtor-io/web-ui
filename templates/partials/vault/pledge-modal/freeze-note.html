@@ -9,3 +9,18 @@
 	<span>{{ . }}</span>
 </p>
 {{ end }}
+
+{{/* The viewer's own frozen pledge (add/success.html, remove.html), called
+     with the modal's context: the time left and the rule. Not in the first
+     minute, while the time left still reads as the whole period: "frozen
+     for another 24 h. Every pledge stays frozen for 24 h" just after the
+     click that froze it -- the rule alone says it then. */}}
+{{ define "vault/pledge-modal/frozen-for" }}
+{{ $left := duration .Ctx.Lang .Data.FrozenFor }}
+{{ $period := duration .Ctx.Lang .Data.FreezePeriod }}
+{{ if eq $left $period }}
+	{{ template "vault/pledge-modal/freeze-note" (tp .Ctx.Lang "vault.freezeNoticeShort" "Period" $period) }}
+{{ else }}
+	{{ template "vault/pledge-modal/freeze-note" (tp .Ctx.Lang "vault.frozenFor" "Left" $left "Period" $period) }}
+{{ end }}
+{{ end }}

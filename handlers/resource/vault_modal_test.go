@@ -104,7 +104,7 @@ func TestVaultConfirmSaysTheFreezeBeforeTheClick(t *testing.T) {
 // Remove is offered as before.
 func TestVaultFrozenPledgeSaysWhenRemoveWorks(t *testing.T) {
 	tpl := vaultModal(t)
-	want := "This pledge is frozen for another 13" + nb + "h 20" + nb + "min. Every pledge stays frozen for 24" + nb + "h after it is made. After that you can remove it here."
+	want := "This pledge is frozen for another 13" + nb + "h" + nb + "20" + nb + "min. Every pledge stays frozen for 24" + nb + "h after it is made. After that you can remove it here."
 
 	for name, f := range map[string]*VaultPledgeAddForm{
 		"just saved":    {Status: "success", FrozenFor: frozenLeft, FreezePeriod: freezePeriod, Funded: true},
@@ -141,8 +141,31 @@ func TestVaultFrozenPledgeSaysWhenRemoveWorks(t *testing.T) {
 	}
 }
 
+// Just after the click the time left rounds up to the whole period, and the
+// line read "frozen for another 24 h. Every pledge stays frozen for 24 h":
+// then it says the period once, the short line -- in the saved view and in
+// the remove dialog alike.
+func TestVaultJustFrozenPledgeSaysThePeriodOnce(t *testing.T) {
+	tpl := vaultModal(t)
+	short := "Once saved, the pledge is frozen for 24" + nb + "h. After that you can remove it at any time."
+	justNow := freezePeriod - 300*time.Millisecond
+	for name, d := range map[string]*GetData{
+		"just saved": {VaultPledgeAddForm: &VaultPledgeAddForm{Status: "success", FrozenFor: justNow, FreezePeriod: freezePeriod, Funded: true}},
+		"remove":     {VaultPledgeRemoveForm: &VaultPledgeRemoveForm{ResourceID: intentHash, FrozenFor: justNow, FreezePeriod: freezePeriod}},
+	} {
+		out := renderModal(t, tpl, "en", d)
+		if !strings.Contains(out, short) || strings.Count(out, "24"+nb+"h") != 1 {
+			t.Errorf("%s, in the first minute: want the period once, in %q:\n%s", name, short, out)
+		}
+		if strings.Contains(out, removeAsk) || strings.Contains(out, removeForm) {
+			t.Errorf("%s, in the first minute: Remove is offered, and would be refused", name)
+		}
+	}
+}
+
 // Every locale fills both lines' placeholders with its own durations: no
-// "<no value>", no raw key, no English unit in a translated page.
+// "<no value>", no raw key, no English unit in a translated page, and no
+// double stop where a dotted unit ends a sentence ("24 Std..").
 func TestVaultFreezeLinesInEveryLocale(t *testing.T) {
 	tpl := vaultModal(t)
 	wh := &w.Helper{}
@@ -161,7 +184,8 @@ func TestVaultFreezeLinesInEveryLocale(t *testing.T) {
 				continue
 			}
 			line := out[i : strings.Index(out[i:], "</p>")+i]
-			for _, bad := range []string{"<no value>", "vault.", "{{"} {
+			line = line[strings.Index(line, "<span>"):]
+			for _, bad := range []string{"<no value>", "vault.", "{{", ".."} {
 				if strings.Contains(line, bad) {
 					t.Errorf("%s %s: %q in %q", lang, name, bad, line)
 				}

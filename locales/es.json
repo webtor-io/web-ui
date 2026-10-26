@@ -573,7 +573,7 @@
     "vault.removeError": "Lamentablemente, tu compromiso no pudo eliminarse debido a un error:",
     "vault.frozenFor": "Este compromiso seguirá congelado {{.Left}} más. Todo compromiso queda congelado durante {{.Period}} desde que se crea. Después podrás eliminarlo aquí.",
     "vault.freezeNotice": "Al guardar, {{.Amount}} VP quedan congelados durante {{.Period}}. Después podrás eliminar el compromiso cuando quieras y los puntos volverán a tu saldo.",
-    "vault.freezeNoticeUnlimited": "Al guardar, el compromiso queda congelado durante {{.Period}}. Después podrás eliminarlo cuando quieras.",
+    "vault.freezeNoticeShort": "Al guardar, el compromiso queda congelado durante {{.Period}}. Después podrás eliminarlo cuando quieras.",
     "vault.removeConfirm": "¿Estás seguro de que quieres eliminar tu compromiso para este torrent? Esta acción no se puede deshacer.",
     "vault.bulkRemoveConfirm": "¿Eliminar los compromisos seleccionados? Sus Vault Points vuelven a tu saldo, y los torrents que se queden sin compromisos suficientes pueden ser eliminados del Vault. Esta acción no se puede deshacer.",
     "vault.dashboard.badge": "Mi Vault",
