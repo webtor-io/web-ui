@@ -790,6 +790,8 @@
     "player.subtitleTranslating": "Перевод… %v%",
     "player.subtitleTranslatingLive": "Перевод идёт вместе с просмотром…",
     "player.subtitleTranslationStopped": "Перевод остановлен — обновите страницу, чтобы повторить",
+    "player.subtitleLoadError": "Не удалось загрузить эти субтитры. Выберите другую дорожку.",
+    "player.subtitleLoadErrorUpload": "Не удалось загрузить ваши субтитры. Пересохраните файл как SRT или VTT в кодировке UTF-8 и загрузите его снова.",
     "player.subtitleTranslationQueued": "Ожидание свободного слота перевода…",
     "player.subtitleCatchUpShort": "ИИ-перевод догоняет…",
     "player.subtitleCatchUpWaitingShort": "Пауза, пока перевод догонит…",

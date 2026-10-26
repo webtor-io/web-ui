@@ -760,6 +760,8 @@
     "player.subtitleTranslating": "Übersetze… %v%",
     "player.subtitleTranslatingLive": "Übersetzung läuft während der Wiedergabe…",
     "player.subtitleTranslationStopped": "Übersetzung gestoppt – zum erneuten Versuch neu laden",
+    "player.subtitleLoadError": "Diese Untertitel konnten nicht geladen werden. Wähle eine andere Spur.",
+    "player.subtitleLoadErrorUpload": "Deine Untertitel konnten nicht geladen werden. Speichere die Datei als UTF-8-SRT oder -VTT neu und lade sie noch einmal hoch.",
     "player.subtitleTranslationQueued": "Warten auf einen freien Übersetzungsplatz…",
     "player.subtitleCatchUpShort": "Die KI-Übersetzung holt auf…",
     "player.subtitleCatchUpWaitingShort": "Pausiert, bis die Übersetzung aufgeholt hat…",

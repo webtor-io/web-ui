@@ -790,6 +790,8 @@
     "player.subtitleTranslating": "Tłumaczenie… %v%",
     "player.subtitleTranslatingLive": "Tłumaczenie trwa razem z odtwarzaniem…",
     "player.subtitleTranslationStopped": "Tłumaczenie przerwane — odśwież stronę, aby spróbować ponownie",
+    "player.subtitleLoadError": "Nie udało się wczytać tych napisów. Wybierz inną ścieżkę.",
+    "player.subtitleLoadErrorUpload": "Nie udało się wczytać Twoich napisów. Zapisz plik ponownie jako SRT lub VTT w UTF-8 i prześlij go jeszcze raz.",
     "player.subtitleTranslationQueued": "Oczekiwanie na wolne miejsce w kolejce tłumaczenia…",
     "player.subtitleCatchUpShort": "Tłumaczenie AI nadrabia zaległości…",
     "player.subtitleCatchUpWaitingShort": "Wstrzymano, aż tłumaczenie nadrobi zaległości…",

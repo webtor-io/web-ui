@@ -854,6 +854,8 @@
     "player.subtitleTranslating": "Translating… %v%",
     "player.subtitleTranslatingLive": "Translating along with playback…",
     "player.subtitleTranslationStopped": "Translation stopped — reload to retry",
+    "player.subtitleLoadError": "Couldn't load these subtitles. Try another track.",
+    "player.subtitleLoadErrorUpload": "Couldn't load your subtitles. Re-save the file as UTF-8 SRT or VTT and upload it again.",
     "player.subtitleTranslationQueued": "Waiting for a translation slot…",
     "player.subtitleCatchUpShort": "AI translation is catching up…",
     "player.subtitleCatchUpWaitingShort": "Paused until the translation catches up…",

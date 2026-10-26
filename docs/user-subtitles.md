@@ -55,6 +55,53 @@ while the toggle and panel inside it are replaced.
 See `docs/subtitle_translate.md` ("Template attributes", "Picker behaviour")
 and `docs/uikit.html` §19 for the full chip contract.
 
+## When the subtitles do not load
+
+The upload checks size and extension only, so a file srt2vtt cannot decode
+(one invalid UTF-8 byte, UTF-16 without a BOM, U+200F before a timing line)
+is accepted and then answered 404 by `~vtt`; and free viewers' uploads were
+answered 403 by `torrent-http-proxy` for months (fixed there). Either way the
+browser fires `error` on the `<track>` and nothing else. Until 2026-10-26
+nobody listened: the MY chip stayed selected under the "uploaded" toast, the
+picture stayed blank, and no event was sent.
+
+`watchSubtitleLoads` (`assets/src/js/lib/player/track-dialog.js`, installed
+by `Player.jsx` on mount) listens for `error` on every `<track>` of the player
+(capture: it does not bubble) and catches up at mount with tracks already in
+`readyState` ERROR — the default track the server rendered starts loading
+with the page. For the track **on screen** (its chip is `data-default`),
+`subtitleLoadFailed`:
+
+- **puts the picker back** where that activation found it: the previous
+  track (or Off when there was none, or the page opened with it), the switch's
+  memory (`data-last-subtitle` never names the dead track) and the saved mark.
+  A pick of this page that was PUT is undone with a PUT of the choice the
+  session held before it — `""` deletes the key, i.e. "no choice", not an Off
+  the viewer never picked. The undo waits for the write it undoes and is
+  dropped when a newer choice was made meanwhile. A saved choice the page
+  opened with is **not** un-saved: a passing failure must not cost the viewer
+  a choice from another session; they see the notice again on the next load
+  until they pick something else.
+- **tells the viewer** with the player toast (`.wt-player-toast`, 6 s,
+  wrapping): `player.subtitleLoadErrorUpload` for an upload ("re-save the file
+  as UTF-8 SRT or VTT"), `player.subtitleLoadError` for OpenSubtitles,
+  sidecar (`et-`) and embed external (`ext-`) tracks. While the subtitles
+  dialog is open the toast waits for it to close — it would play out under the
+  backdrop, which is exactly where an upload fails (auto-selected in the
+  dialog it was dropped into); in the dialog the chip moving back is the
+  signal.
+- **reports** `subtitle-load-error` once per track per page (see the telemetry
+  table in `docs/subtitle_translate.md`).
+
+Picking a failed chip again is a retry: a browser never refetches a src it
+failed on, so `activateSubtitle` gives the `<track>` a new `wt-rf` parameter
+(`retryFailedTrack`, `subtitle-track-reload.js`) and the new load fails or
+loads on its own. Not handled here: AI translations (`useSubtitleTranslation`
+reloads and reports its own track, `subtitle-translate-error` — but it listens
+only to the revisions it swaps in, so a failure of a run's first `<track>` load
+is seen by neither path), and tracks that fail while not on screen (a
+preloaded one nobody picked) — no notice and no event.
+
 ## Storage
 
 - **Blob:** S3, key = SHA-256 hex of the file content. Upload is

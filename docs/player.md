@@ -54,7 +54,8 @@ waiting single that turns out not to be half of a double is delivered late, not 
 
 space / `k` play-pause · ←/→ ∓15 s · ↑/↓ volume · `f` fullscreen · `m` mute · `<`/`>` speed ·
 `g`/`h` subtitles earlier/later. Speed and delay keys answer with a toast (`.wt-player-toast`) —
-they have no other face. While the grace popup is up, Play (space/`k`, the big button, a click
+they have no other face. The same toast, held 6 s instead of 1.2, says that the subtitles on
+screen failed to load (`watchSubtitleLoads`, `docs/user-subtitles.md`). While the grace popup is up, Play (space/`k`, the big button, a click
 on the picture, the headset) is its answer "continue" — below.
 
 ## The grace popup holds the film — `grace-hold.js`

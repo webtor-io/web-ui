@@ -790,6 +790,8 @@
     "player.subtitleTranslating": "Překládání… %v%",
     "player.subtitleTranslatingLive": "Překlad probíhá souběžně s přehráváním…",
     "player.subtitleTranslationStopped": "Překlad zastaven — načtěte stránku znovu a zkuste to znovu",
+    "player.subtitleLoadError": "Tyto titulky se nepodařilo načíst. Vyberte jinou stopu.",
+    "player.subtitleLoadErrorUpload": "Vaše titulky se nepodařilo načíst. Uložte soubor znovu jako SRT nebo VTT v UTF-8 a nahrajte ho znovu.",
     "player.subtitleTranslationQueued": "Čekání na volné místo pro překlad…",
     "player.subtitleCatchUpShort": "Překlad AI dohání…",
     "player.subtitleCatchUpWaitingShort": "Pozastaveno, dokud překlad nedožene…",

@@ -38,6 +38,7 @@ import {
     readUpsellCard,
     releaseTrackDialog,
     toggleDialog,
+    watchSubtitleLoads,
     wireTrackHandlers,
 } from './track-dialog.js';
 import { Controls } from './Controls';
@@ -58,6 +59,11 @@ import {
 } from './stream-restart.js';
 
 let _currentPlayer = null;
+
+// How long the player's toast stays: a key's answer, and the sentence about
+// subtitles that did not load.
+const TOAST_MS = 1200;
+const SUBTITLE_ERROR_TOAST_MS = 6000;
 
 // A stream restart's exact place (exactRestartPlace): how often it looks at
 // the new run, and for how long at most.
@@ -163,14 +169,19 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     const [subDelay, setSubDelayState] = useState(() => normalizeDelay(loadSubtitleDelay(delayKey)));
     const subDelayRef = useRef(subDelay);
     subDelayRef.current = subDelay;
-    const [toast, setToast] = useState(null); // { text, n }
+    const [toast, setToast] = useState(null); // { text, n, ms }
     const toastTimerRef = useRef(null);
-    const showToast = useCallback((text) => {
-        setToast({ text, n: Date.now() });
+    const showToast = useCallback((text, ms = TOAST_MS) => {
+        setToast({ text, n: Date.now(), ms });
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setToast(null), 1200);
+        toastTimerRef.current = setTimeout(() => setToast(null), ms);
     }, []);
     useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+    // Subtitles that failed to load say so, on the picture (track-dialog.js
+    // watchSubtitleLoads). Long enough to read a sentence: a key's toast
+    // names a value, this one an action.
+    useEffect(() => watchSubtitleLoads(trackContainer, videoRef.current, trackHooks,
+        (key) => showToast(t(key), SUBTITLE_ERROR_TOAST_MS)), [trackContainer, trackHooks, showToast]);
     const formatDelay = (d) => `${d > 0 ? '+' : d < 0 ? '\u2212' : ''}${Math.abs(d).toFixed(2)}`;
     // Telemetry (player-telemetry.js): one event per decision.
     const delayEventRef = useRef(null);
@@ -2140,7 +2151,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             {/* What a key just changed (speed, subtitle delay): the keys
                 have no other face. */}
             {toast && (
-                <div key={toast.n} class="wt-player-toast" role="status">{toast.text}</div>
+                <div key={toast.n} class="wt-player-toast" role="status" style={{ animationDuration: `${toast.ms}ms` }}>{toast.text}</div>
             )}
 
             {/* Double-tap seek feedback: which way, and how far the streak

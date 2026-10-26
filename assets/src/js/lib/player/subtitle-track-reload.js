@@ -171,9 +171,11 @@ export function dropDeletedTracks(video, chipIDs) {
 // react to, and a first download for every track that was never loaded.
 // Only the track the viewer actually picks is worth a request.
 
-// HTMLTrackElement.LOADING / LOADED, spelled out: the tests have no DOM.
+// HTMLTrackElement.LOADING / LOADED / ERROR, spelled out: the tests have no
+// DOM.
 const TRACK_LOADING = 1;
 const TRACK_LOADED = 2;
+export const TRACK_ERROR = 3;
 const REFRESH_PARAM = 'wt-rf';
 
 // element -> { loadingAtWipe }. A track that was still loading when
@@ -222,6 +224,17 @@ function refetch(el) {
     if (!src) return false;
     el.setAttribute('src', withRefresh(src));
     return true;
+}
+
+// retryFailedTrack refetches a track whose last load failed, and reports
+// whether it did. Called when the track is switched on again: a browser never
+// fetches a src it has already failed on, so picking that chip a second time
+// put it on with nothing to show and no event to say so -- the silent dead
+// selection the load-error notice exists to end. A new src is a new load,
+// whose own `error` (or `load`) the player hears like the first one's.
+export function retryFailedTrack(el) {
+    if (!el || el.readyState !== TRACK_ERROR) return false;
+    return refetch(el);
 }
 
 // refreshStaleTrack refetches a track a seek emptied, and reports whether it

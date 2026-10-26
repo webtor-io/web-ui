@@ -9,7 +9,7 @@
 // through `hooks` (trackHooks) -- the component listens, this module calls.
 
 import { applySubtitleSelection, selectionFor } from './subtitle-apply.js';
-import { dropDeletedTracks } from './subtitle-track-reload.js';
+import { dropDeletedTracks, retryFailedTrack, TRACK_ERROR } from './subtitle-track-reload.js';
 import { readTracks, selectEventData } from './subtitle-telemetry.js';
 import { withParam } from './subtitle-progress.js';
 import { wirePreferredLang } from './preferred-lang.js';
@@ -215,9 +215,26 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
                 target.getAttribute('data-srclang') || '',
                 target.getAttribute('data-kind') || 'subtitles',
             );
+            // A translation's <track> is the translation hook's to reload.
+            if (provider !== 'Translated') {
+                for (const t of video.querySelectorAll('track')) {
+                    if (t.id === id) retryFailedTrack(t);
+                }
+            }
         }
     }
-    markTrack(container, target, 'subtitle', persist);
+    // What this activation replaces, for subtitleLoadFailed to put back.
+    const s = container.querySelector('#subtitles');
+    const prev = s && s.querySelector('.subtitle[data-default="true"]');
+    const saved = s && s.querySelector('.subtitle[data-saved="true"]');
+    const pick = {
+        id,
+        prevId: prev ? prev.getAttribute('data-id') : '',
+        last: s ? s.getAttribute('data-last-subtitle') || '' : '',
+        savedId: saved ? saved.getAttribute('data-id') : '',
+    };
+    pick.write = markTrack(container, target, 'subtitle', persist);
+    lastPick = pick;
     // Both halves of "what is on screen" — the hls.js selection and the
     // element modes — are written by applySubtitleSelection and nowhere
     // else, so a chip and the player cannot disagree about which of the two
@@ -231,6 +248,122 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
     // on the first canplay.
     const player = container.querySelector('video.player, audio.player');
     applySubtitleSelection(player, window.hlsPlayer || null, selectionFor(target));
+}
+
+// ---- a side-loaded track that fails to load ----------------------------
+//
+// Free viewers' uploads answered 403 for months, and srt2vtt answers 404 for
+// a file it cannot decode (one invalid UTF-8 byte, UTF-16 without a BOM).
+// The picker showed the MY chip selected, the upload's toast said it worked,
+// the screen stayed blank -- and nothing measured it, so nobody knew. A
+// <track> says so only through its `error` event, which does not bubble and
+// which nothing listened to.
+
+// The last activation and what it replaced: { id, prevId, last, savedId,
+// write }. One is enough -- only the chip on screen is put back, and that is
+// the one activated last.
+let lastPick = null;
+// Track ids already reported this page: one event per failed track, however
+// often the viewer picks it again.
+const reportedLoadErrors = new Set();
+
+// subtitleLoadFailed handles the `error` of the <track> behind a chip and
+// returns the i18n key of what to tell the viewer, or null when there is
+// nothing to tell: no chip, a translation (useSubtitleTranslation reports
+// and recovers its own track), or a track that is not the one on screen.
+//
+// The chip is not left as the choice. The activation is put back the way it
+// found the picker -- the previous track, the switch's memory, the saved
+// mark -- and a pick that was written to the session is written back, so the
+// next page load does not restore subtitles that do not load. Only once the
+// write it undoes has landed, and only while no newer choice was made since:
+// the two PUTs race otherwise, and the stale one may land last. A track the
+// page opened with (no pick of this page) lands on Off and is not
+// un-saved: the failure may be a passing one, and a choice the viewer made
+// in another session is theirs to change.
+export function subtitleLoadFailed(container, trackEl, hooks) {
+    const modal = findSubtitlesModal(container);
+    const id = trackEl ? trackEl.id : '';
+    const chip = modal && id ? findSubtitleItem(modal, id) : null;
+    if (!chip || chip.getAttribute('data-provider') === 'Translated') return null;
+    if (chip.getAttribute('data-default') !== 'true') return null;
+
+    if (!reportedLoadErrors.has(id)) {
+        reportedLoadErrors.add(id);
+        const video = container.querySelector('video.player, audio.player');
+        if (window.umami) window.umami.track('subtitle-load-error', {
+            ...selectEventData(chip),
+            route: (video && video.dataset.videoRoute) || '',
+        });
+    }
+
+    const pick = lastPick && lastPick.id === id && lastPick.prevId !== id ? lastPick : null;
+    const back = (pick && findSubtitleItem(modal, pick.prevId)) || findSubtitleItem(modal, 'none');
+    if (back) activateSubtitle(container, back, { persist: false });
+    lastPick = null;
+    // markTrack moved the switch's memory onto the failed chip when "back"
+    // is Off; a memory pointing at it would bring it back on the next flip.
+    const last = pick ? pick.last : modal.getAttribute('data-last-subtitle') || '';
+    if (last && last !== id) modal.setAttribute('data-last-subtitle', last);
+    else modal.removeAttribute('data-last-subtitle');
+    if (pick && pick.write) {
+        chip.removeAttribute('data-saved');
+        const was = pick.savedId ? findSubtitleItem(modal, pick.savedId) : null;
+        if (was) was.setAttribute('data-saved', 'true');
+        const body = {
+            id: pick.savedId,
+            resourceID: modal.getAttribute('data-resource-id'),
+            itemID: modal.getAttribute('data-item-id'),
+        };
+        const savedNow = () => {
+            const el = modal.querySelector('.subtitle[data-saved="true"]');
+            return el ? el.getAttribute('data-id') : '';
+        };
+        // An empty id deletes the session key: no choice, as before the pick.
+        pick.write.then(() => {
+            if (savedNow() === pick.savedId) persistTrackChoice('subtitle', body);
+        });
+    }
+    applyOffState(modal);
+    refreshMarks(modal);
+    // The component hears what is playing now: a translation the failed pick
+    // stopped polling resumes through the same path a click takes.
+    if (pick && back && hooks && hooks.onSubtitleSelect) hooks.onSubtitleSelect(back);
+    return chip.getAttribute('data-provider') === 'UserSubtitle'
+        ? 'player.subtitleLoadErrorUpload'
+        : 'player.subtitleLoadError';
+}
+
+// watchSubtitleLoads hears every <track> error of the player (capture: the
+// event does not bubble) and hands the viewer's message to `notify`. Tracks
+// that failed before the player mounted -- the one the server rendered as
+// default starts loading with the page -- are caught up with at once.
+//
+// While the subtitles dialog is open the message waits for it to close: the
+// player's toast is under the dialog's backdrop, and a failed pick there
+// (above all an upload, auto-selected in the dialog it was dropped into)
+// would otherwise be explained to nobody. The chip moving back is what the
+// dialog itself shows. Returns the teardown.
+export function watchSubtitleLoads(container, video, hooks, notify) {
+    if (!container || !video) return () => {};
+    let live = true;
+    const onError = (e) => {
+        if (!e.target || e.target.tagName !== 'TRACK') return;
+        const key = subtitleLoadFailed(container, e.target, hooks);
+        if (!key) return;
+        const say = () => { if (live) notify(key); };
+        const modal = findSubtitlesModal(container);
+        if (modal && modal.open) modal.addEventListener('close', say, { once: true });
+        else say();
+    };
+    for (const el of video.querySelectorAll('track')) {
+        if (el.readyState === TRACK_ERROR) onError({ target: el });
+    }
+    video.addEventListener('error', onError, true);
+    return () => {
+        live = false;
+        video.removeEventListener('error', onError, true);
+    };
 }
 
 export function toggleDialog(id) {
@@ -703,6 +836,10 @@ export function persistTrackChoice(type, body) {
 // and which therefore outlives the mount.
 export function releaseTrackDialog() {
     playerGeneration++;
+    // The next page reports its own failures: `et-1` is another file's
+    // sidecar there.
+    lastPick = null;
+    reportedLoadErrors.clear();
     if (asyncSwapListener) {
         window.removeEventListener('async', asyncSwapListener);
         asyncSwapListener = null;

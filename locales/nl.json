@@ -760,6 +760,8 @@
     "player.subtitleTranslating": "Vertalen… %v%",
     "player.subtitleTranslatingLive": "Vertaling loopt mee met het afspelen…",
     "player.subtitleTranslationStopped": "Vertaling gestopt — herlaad de pagina om het opnieuw te proberen",
+    "player.subtitleLoadError": "Deze ondertitels konden niet worden geladen. Kies een ander spoor.",
+    "player.subtitleLoadErrorUpload": "Je ondertitels konden niet worden geladen. Sla het bestand opnieuw op als UTF-8 SRT of VTT en upload het nog een keer.",
     "player.subtitleTranslationQueued": "Wachten op een vertaalplek…",
     "player.subtitleCatchUpShort": "De AI-vertaling loopt bij…",
     "player.subtitleCatchUpWaitingShort": "Gepauzeerd tot de vertaling is bijgelopen…",
