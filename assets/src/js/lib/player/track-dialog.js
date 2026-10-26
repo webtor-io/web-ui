@@ -312,7 +312,14 @@ export function subtitleLoadFailed(container, trackEl, hooks) {
     }
 
     const pick = lastPick && lastPick.id === id ? lastPick : null;
-    const back = (pick && findSubtitleItem(modal, pick.prevId)) || findSubtitleItem(modal, 'none');
+    // A track that failed too (off screen, while this one loaded) is no way
+    // back: going there retries it, it fails again, and its id is what the
+    // undo would save. Off, and no saved choice, instead.
+    const dead = (tid) => !!tid && Array.from(container.querySelectorAll('track'))
+        .some((el) => el.id === tid && el.readyState === TRACK_ERROR);
+    const prevId = pick && !dead(pick.prevId) ? pick.prevId : 'none';
+    const savedId = pick && !dead(pick.savedId) ? pick.savedId : '';
+    const back = findSubtitleItem(modal, prevId) || findSubtitleItem(modal, 'none');
     if (back) activateSubtitle(container, back, { persist: false });
     lastPick = null;
     // markTrack moved the switch's memory onto the failed chip when "back"
@@ -322,10 +329,10 @@ export function subtitleLoadFailed(container, trackEl, hooks) {
     else modal.removeAttribute('data-last-subtitle');
     if (pick && pick.write) {
         chip.removeAttribute('data-saved');
-        const was = pick.savedId ? findSubtitleItem(modal, pick.savedId) : null;
+        const was = savedId ? findSubtitleItem(modal, savedId) : null;
         if (was) was.setAttribute('data-saved', 'true');
         const body = {
-            id: pick.savedId,
+            id: savedId,
             resourceID: modal.getAttribute('data-resource-id'),
             itemID: modal.getAttribute('data-item-id'),
         };
@@ -335,7 +342,7 @@ export function subtitleLoadFailed(container, trackEl, hooks) {
         };
         // An empty id deletes the session key: no choice, as before the pick.
         pick.write.then(() => {
-            if (savedNow() === pick.savedId) persistTrackChoice('subtitle', body);
+            if (savedNow() === savedId) persistTrackChoice('subtitle', body);
         });
     }
     applyOffState(modal);

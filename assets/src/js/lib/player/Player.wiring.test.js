@@ -898,6 +898,34 @@ test('a second press on the chip still loading changes nothing the failure puts 
     w.stop();
 });
 
+// Two slow failures in a row (OpenSubtitles down): the first pick fails off
+// screen after the viewer moved on, then the second fails too. Negative
+// control: without the `dead` test this goes back to the first, retries it,
+// lands on Off anyway, and the undo saves the dead first track.
+test('a failed pick does not go back to a track that has failed as well', async (t) => {
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
+    t.after(() => destroyPlayer());
+    const p = mount();
+    p.wire();
+    const w = watch(p);
+    click(p.chip('os-os-ru'));
+    await flush();
+    click(p.chip('os-os-en'));
+    await flush();
+    failLoad(p.video.querySelector('track#os-os-ru'));
+    await flush();
+    assert.deepEqual(w.said, [], 'a track off screen fails unheard');
+
+    failLoad(p.video.querySelector('track#os-os-en'));
+    await flush();
+
+    assert.equal(p.chip('none').getAttribute('data-default'), 'true', 'Off, not the dead track before it');
+    assert.doesNotMatch(p.video.querySelector('track#os-os-ru').getAttribute('src') || '', /wt-rf=/, 'the dead track is not asked for again');
+    assert.deepEqual(p.puts().map((c) => c.body.id), ['os-os-ru', 'os-os-en', ''], 'the session holds no choice, not the dead one');
+    assert.deepEqual(savedIds(p), []);
+    w.stop();
+});
+
 // The audio-switch re-pick is a rule, not a choice (persist:false), and so is
 // its way back. Negative control: without the pick.write test the component
 // hears a choice, and the next audio switch no longer runs the ladder.

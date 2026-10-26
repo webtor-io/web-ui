@@ -765,7 +765,7 @@
     "player.subtitleTranslatingLive": "Traduction en cours pendant la lecture…",
     "player.subtitleTranslationStopped": "Traduction arrêtée — rechargez la page pour réessayer",
     "player.subtitleLoadError": "Impossible de charger ces sous-titres. Choisissez une autre piste.",
-    "player.subtitleLoadErrorUpload": "Impossible de charger vos sous-titres. Réenregistrez le fichier en SRT ou VTT (UTF-8) et importez-le à nouveau.",
+    "player.subtitleLoadErrorUpload": "Impossible d'afficher vos sous-titres. Réenregistrez le fichier en SRT ou VTT (UTF-8) et importez-le à nouveau.",
     "player.subtitleTranslationQueued": "En attente d'un créneau de traduction…",
     "player.subtitleCatchUpShort": "La traduction IA rattrape son retard…",
     "player.subtitleCatchUpWaitingShort": "En pause le temps que la traduction rattrape son retard…",

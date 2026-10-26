@@ -765,7 +765,7 @@
     "player.subtitleTranslatingLive": "Traduzindo junto com a reprodução…",
     "player.subtitleTranslationStopped": "Tradução interrompida — recarregue a página para tentar de novo",
     "player.subtitleLoadError": "Não foi possível carregar estas legendas. Escolha outra faixa.",
-    "player.subtitleLoadErrorUpload": "Não foi possível carregar suas legendas. Salve o arquivo de novo como SRT ou VTT em UTF-8 e envie-o outra vez.",
+    "player.subtitleLoadErrorUpload": "Não foi possível exibir suas legendas. Salve o arquivo de novo como SRT ou VTT em UTF-8 e envie-o outra vez.",
     "player.subtitleTranslationQueued": "Aguardando uma vaga de tradução…",
     "player.subtitleCatchUpShort": "A tradução por IA está alcançando…",
     "player.subtitleCatchUpWaitingShort": "Pausado até a tradução alcançar…",

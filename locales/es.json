@@ -761,7 +761,7 @@
     "player.subtitleTranslatingLive": "Traduciendo junto con la reproducción…",
     "player.subtitleTranslationStopped": "Traducción detenida: recarga la página para reintentar",
     "player.subtitleLoadError": "No se pudieron cargar estos subtítulos. Prueba con otra pista.",
-    "player.subtitleLoadErrorUpload": "No se pudieron cargar tus subtítulos. Vuelve a guardar el archivo como SRT o VTT en UTF-8 y súbelo de nuevo.",
+    "player.subtitleLoadErrorUpload": "No se pudieron mostrar tus subtítulos. Vuelve a guardar el archivo como SRT o VTT en UTF-8 y súbelo de nuevo.",
     "player.subtitleTranslationQueued": "Esperando un turno de traducción…",
     "player.subtitleCatchUpShort": "La traducción con IA se está poniendo al día…",
     "player.subtitleCatchUpWaitingShort": "En pausa hasta que la traducción se ponga al día…",
