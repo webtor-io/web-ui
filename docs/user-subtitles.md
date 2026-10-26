@@ -82,25 +82,36 @@ with the page. For the track **on screen** (its chip is `data-default`),
   opened with is **not** un-saved: a passing failure must not cost the viewer
   a choice from another session; they see the notice again on the next load
   until they pick something else.
-- **tells the viewer** with the player toast (`.wt-player-toast`, 6 s,
-  wrapping): `player.subtitleLoadErrorUpload` for an upload ("re-save the file
-  as UTF-8 SRT or VTT"), `player.subtitleLoadError` for OpenSubtitles,
-  sidecar (`et-`) and embed external (`ext-`) tracks. While the subtitles
-  dialog is open the toast waits for it to close — it would play out under the
-  backdrop, which is exactly where an upload fails (auto-selected in the
-  dialog it was dropped into); in the dialog the chip moving back is the
-  signal.
-- **reports** `subtitle-load-error` once per track per page (see the telemetry
-  table in `docs/subtitle_translate.md`).
+- **tells the viewer**: `player.subtitleLoadErrorUpload` for an upload
+  ("re-save the file as UTF-8 SRT or VTT"), `player.subtitleLoadError` for
+  OpenSubtitles, sidecar (`et-`) and embed external (`ext-`) tracks. With the
+  subtitles dialog closed it is the player toast (`.wt-player-toast`, 6 s,
+  wrapping). With the dialog open it is a line under the track row
+  (`#subtitle-load-error`, `role="alert"`): that is where an upload fails —
+  auto-selected in the dialog it was dropped into, right under the toast
+  saying the upload worked — and the player toast would play out under the
+  backdrop. The line goes with the next activation and with the dialog
+  closing; no toast follows it.
+- **reports** `subtitle-load-error` once per track per player mount (see the
+  telemetry table in `docs/subtitle_translate.md`). A background restart or
+  the next item mounts a new player, and a saved choice that still fails
+  there reports again, as it does on a reload.
 
 Picking a failed chip again is a retry: a browser never refetches a src it
 failed on, so `activateSubtitle` gives the `<track>` a new `wt-rf` parameter
 (`retryFailedTrack`, `subtitle-track-reload.js`) and the new load fails or
-loads on its own. Not handled here: AI translations (`useSubtitleTranslation`
-reloads and reports its own track, `subtitle-translate-error` — but it listens
-only to the revisions it swaps in, so a failure of a run's first `<track>` load
-is seen by neither path), and tracks that fail while not on screen (a
-preloaded one nobody picked) — no notice and no event.
+loads on its own. The new src goes in after the modes are written: Chrome does
+not load a `disabled` track whose src changes, and switching a track in ERROR
+on afterwards does not load it either (measured in headless Chrome,
+2026-10-26) — retried in that order, the second pick was the silent dead
+selection again, with a PUT nothing undid. A second press on the chip that is
+still loading is no pick: the failure goes back to what the first press
+replaced, and undoes its PUT. Not handled here: AI translations
+(`useSubtitleTranslation` reloads and reports its own track,
+`subtitle-translate-error` — but it listens only to the revisions it swaps in,
+so a failure of a run's first `<track>` load is seen by neither path), and
+tracks that fail while not on screen (a preloaded one nobody picked) — no
+notice and no event.
 
 ## Storage
 

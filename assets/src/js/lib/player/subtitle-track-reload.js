@@ -231,7 +231,9 @@ function refetch(el) {
 // fetches a src it has already failed on, so picking that chip a second time
 // put it on with nothing to show and no event to say so -- the silent dead
 // selection the load-error notice exists to end. A new src is a new load,
-// whose own `error` (or `load`) the player hears like the first one's.
+// whose own `error` (or `load`) the player hears like the first one's -- once
+// the track is showing: Chrome loads nothing for a src changed on a disabled
+// track, so the caller switches it on first (activateSubtitle).
 export function retryFailedTrack(el) {
     if (!el || el.readyState !== TRACK_ERROR) return false;
     return refetch(el);

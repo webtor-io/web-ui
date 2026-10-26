@@ -181,7 +181,7 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
     // watchSubtitleLoads). Long enough to read a sentence: a key's toast
     // names a value, this one an action.
     useEffect(() => watchSubtitleLoads(trackContainer, videoRef.current, trackHooks,
-        (key) => showToast(t(key), SUBTITLE_ERROR_TOAST_MS)), [trackContainer, trackHooks, showToast]);
+        (key) => showToast(t(key), SUBTITLE_ERROR_TOAST_MS), t), [trackContainer, trackHooks, showToast]);
     const formatDelay = (d) => `${d > 0 ? '+' : d < 0 ? '\u2212' : ''}${Math.abs(d).toFixed(2)}`;
     // Telemetry (player-telemetry.js): one event per decision.
     const delayEventRef = useRef(null);

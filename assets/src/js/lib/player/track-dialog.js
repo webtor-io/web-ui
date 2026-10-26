@@ -215,15 +215,13 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
                 target.getAttribute('data-srclang') || '',
                 target.getAttribute('data-kind') || 'subtitles',
             );
-            // A translation's <track> is the translation hook's to reload.
-            if (provider !== 'Translated') {
-                for (const t of video.querySelectorAll('track')) {
-                    if (t.id === id) retryFailedTrack(t);
-                }
-            }
         }
     }
-    // What this activation replaces, for subtitleLoadFailed to put back.
+    // What this activation replaces, for subtitleLoadFailed to put back --
+    // unless it replaces nothing. A second press on the chip that is still
+    // loading is no pick (markTrack returns early, nothing is written), and
+    // recording it threw the real one away: the failure then landed on Off
+    // instead of the previous track, and the PUT it should undo stayed.
     const s = container.querySelector('#subtitles');
     const prev = s && s.querySelector('.subtitle[data-default="true"]');
     const saved = s && s.querySelector('.subtitle[data-saved="true"]');
@@ -234,7 +232,11 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
         savedId: saved ? saved.getAttribute('data-id') : '',
     };
     pick.write = markTrack(container, target, 'subtitle', persist);
-    lastPick = pick;
+    if (pick.prevId !== id) lastPick = pick;
+    // The sentence about the last failure (watchSubtitleLoads) is stale once
+    // anything else is activated.
+    const said = s && s.querySelector('#subtitle-load-error');
+    if (said) said.hidden = true;
     // Both halves of "what is on screen" — the hls.js selection and the
     // element modes — are written by applySubtitleSelection and nowhere
     // else, so a chip and the player cannot disagree about which of the two
@@ -248,6 +250,17 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
     // on the first canplay.
     const player = container.querySelector('video.player, audio.player');
     applySubtitleSelection(player, window.hlsPlayer || null, selectionFor(target));
+    // Picking a chip whose <track> failed is a retry, and only after the
+    // modes: Chrome does not load a disabled track whose src changes, and
+    // switching a track in ERROR on afterwards does not load it either
+    // (measured in headless Chrome, 2026-10-26) -- the new src has to land
+    // on a track that is already showing. A translation's <track> is the
+    // translation hook's to reload.
+    if (player && provider !== 'Translated') {
+        for (const el of player.querySelectorAll('track')) {
+            if (el.id === id) retryFailedTrack(el);
+        }
+    }
 }
 
 // ---- a side-loaded track that fails to load ----------------------------
@@ -263,8 +276,9 @@ export function activateSubtitle(container, target, { persist = true } = {}) {
 // write }. One is enough -- only the chip on screen is put back, and that is
 // the one activated last.
 let lastPick = null;
-// Track ids already reported this page: one event per failed track, however
-// often the viewer picks it again.
+// Track ids already reported by this player: one event per failed track,
+// however often the viewer picks it again. Per mount, like a page load: a
+// background restart or the next item mounts anew (releaseTrackDialog).
 const reportedLoadErrors = new Set();
 
 // subtitleLoadFailed handles the `error` of the <track> behind a chip and
@@ -297,7 +311,7 @@ export function subtitleLoadFailed(container, trackEl, hooks) {
         });
     }
 
-    const pick = lastPick && lastPick.id === id && lastPick.prevId !== id ? lastPick : null;
+    const pick = lastPick && lastPick.id === id ? lastPick : null;
     const back = (pick && findSubtitleItem(modal, pick.prevId)) || findSubtitleItem(modal, 'none');
     if (back) activateSubtitle(container, back, { persist: false });
     lastPick = null;
@@ -327,43 +341,52 @@ export function subtitleLoadFailed(container, trackEl, hooks) {
     applyOffState(modal);
     refreshMarks(modal);
     // The component hears what is playing now: a translation the failed pick
-    // stopped polling resumes through the same path a click takes.
-    if (pick && back && hooks && hooks.onSubtitleSelect) hooks.onSubtitleSelect(back);
+    // stopped polling resumes through the same path a click takes. Only after
+    // a pick of the viewer's (one that was written): the hook is also what
+    // marks subtitles as chosen by hand, and a rule's activation going back
+    // (the audio-switch re-pick) is nobody's choice -- the next audio switch
+    // has to run the ladder again.
+    if (pick && pick.write && back && hooks && hooks.onSubtitleSelect) hooks.onSubtitleSelect(back);
     return chip.getAttribute('data-provider') === 'UserSubtitle'
         ? 'player.subtitleLoadErrorUpload'
         : 'player.subtitleLoadError';
 }
 
 // watchSubtitleLoads hears every <track> error of the player (capture: the
-// event does not bubble) and hands the viewer's message to `notify`. Tracks
+// event does not bubble) and hands the viewer's message -- an i18n key -- to
+// `notify`, the player's toast, or puts `t(key)` in the dialog. Tracks
 // that failed before the player mounted -- the one the server rendered as
 // default starts loading with the page -- are caught up with at once.
 //
-// While the subtitles dialog is open the message waits for it to close: the
-// player's toast is under the dialog's backdrop, and a failed pick there
-// (above all an upload, auto-selected in the dialog it was dropped into)
-// would otherwise be explained to nobody. The chip moving back is what the
-// dialog itself shows. Returns the teardown.
-export function watchSubtitleLoads(container, video, hooks, notify) {
+// While the subtitles dialog is open the message is a line in it
+// (#subtitle-load-error), under the row the viewer just picked from: the
+// player's toast is under the dialog's backdrop, and a failed pick there --
+// above all an upload, auto-selected in the dialog it was dropped into, right
+// under the toast saying the upload worked -- moved back without a word. The
+// line goes with the next activation (activateSubtitle) and with the dialog;
+// no toast follows it, the viewer has read it where they were looking.
+// Returns the teardown.
+export function watchSubtitleLoads(container, video, hooks, notify, t) {
     if (!container || !video) return () => {};
-    let live = true;
     const onError = (e) => {
         if (!e.target || e.target.tagName !== 'TRACK') return;
         const key = subtitleLoadFailed(container, e.target, hooks);
         if (!key) return;
-        const say = () => { if (live) notify(key); };
         const modal = findSubtitlesModal(container);
-        if (modal && modal.open) modal.addEventListener('close', say, { once: true });
-        else say();
+        const line = modal && modal.open ? modal.querySelector('#subtitle-load-error') : null;
+        if (!line) {
+            notify(key);
+            return;
+        }
+        line.hidden = false;
+        line.textContent = t(key);
+        modal.addEventListener('close', () => { line.hidden = true; }, { once: true });
     };
     for (const el of video.querySelectorAll('track')) {
         if (el.readyState === TRACK_ERROR) onError({ target: el });
     }
     video.addEventListener('error', onError, true);
-    return () => {
-        live = false;
-        video.removeEventListener('error', onError, true);
-    };
+    return () => video.removeEventListener('error', onError, true);
 }
 
 export function toggleDialog(id) {
@@ -836,8 +859,9 @@ export function persistTrackChoice(type, body) {
 // and which therefore outlives the mount.
 export function releaseTrackDialog() {
     playerGeneration++;
-    // The next page reports its own failures: `et-1` is another file's
-    // sidecar there.
+    // The next mount reports its own failures: `et-1` is another file's
+    // sidecar after Next, and a background restart of this file reports a
+    // saved choice that still fails again, as a reload would.
     lastPick = null;
     reportedLoadErrors.clear();
     if (asyncSwapListener) {

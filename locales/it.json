@@ -765,7 +765,7 @@
     "player.subtitleTranslatingLive": "Traduzione in corso durante la riproduzione…",
     "player.subtitleTranslationStopped": "Traduzione interrotta — ricarica la pagina per riprovare",
     "player.subtitleLoadError": "Impossibile caricare questi sottotitoli. Scegli un'altra traccia.",
-    "player.subtitleLoadErrorUpload": "Impossibile caricare i tuoi sottotitoli. Salva di nuovo il file come SRT o VTT in UTF-8 e caricalo ancora.",
+    "player.subtitleLoadErrorUpload": "Impossibile mostrare i tuoi sottotitoli. Salva di nuovo il file come SRT o VTT in UTF-8 e caricalo ancora.",
     "player.subtitleTranslationQueued": "In attesa di uno slot di traduzione…",
     "player.subtitleCatchUpShort": "La traduzione IA sta recuperando…",
     "player.subtitleCatchUpWaitingShort": "In pausa finché la traduzione non recupera…",

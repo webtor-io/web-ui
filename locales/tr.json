@@ -761,7 +761,7 @@
     "player.subtitleTranslatingLive": "Çeviri, oynatmayla birlikte devam ediyor…",
     "player.subtitleTranslationStopped": "Çeviri durduruldu — yeniden denemek için sayfayı yenileyin",
     "player.subtitleLoadError": "Bu altyazılar yüklenemedi. Başka bir parça seçin.",
-    "player.subtitleLoadErrorUpload": "Altyazılarınız yüklenemedi. Dosyayı UTF-8 SRT veya VTT olarak yeniden kaydedip tekrar yükleyin.",
+    "player.subtitleLoadErrorUpload": "Altyazılarınız gösterilemedi. Dosyayı UTF-8 SRT veya VTT olarak yeniden kaydedip tekrar yükleyin.",
     "player.subtitleTranslationQueued": "Çeviri sırası bekleniyor…",
     "player.subtitleCatchUpShort": "Yapay zekâ çevirisi yetişiyor…",
     "player.subtitleCatchUpWaitingShort": "Çeviri yetişene kadar duraklatıldı…",

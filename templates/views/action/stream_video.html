@@ -348,6 +348,16 @@
                 {{ end }}
                 </div>
 
+                {{/* Subtitles picked here that did not load, said where the
+                     viewer is looking: under the row they picked from or
+                     dropped a file into, which moved back without a word
+                     otherwise -- the player's toast plays under this
+                     dialog's backdrop. Filled by watchSubtitleLoads
+                     (track-dialog.js), hidden again by the next pick and by
+                     closing the dialog; the same sentence is the toast when
+                     the dialog is closed. */}}
+                <p id="subtitle-load-error" class="text-sm text-error mb-3" role="alert" hidden></p>
+
                 {{/* What the offer above means, in words: this language has
                      no subtitles yet and the translation is there to be
                      started. All three conditions, because the sentence has

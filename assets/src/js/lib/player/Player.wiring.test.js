@@ -777,7 +777,8 @@ function failLoad(el) {
 
 function watch(p) {
     const said = [];
-    const stop = watchSubtitleLoads(p.container, p.video, p.hooks, (key) => said.push(key));
+    // `t` is the identity, like the player's before its locale has loaded.
+    const stop = watchSubtitleLoads(p.container, p.video, p.hooks, (key) => said.push(key), (key) => key);
     return { said, stop };
 }
 
@@ -790,7 +791,7 @@ const savedIds = (p) => Array.from(p.modal.querySelectorAll('.subtitle[data-save
 // switch remembers the dead track; without retryFailedTrack the second pick
 // asks nothing of the network and nothing fails again.
 test('subtitles that fail to load are put back, said, reported once, and asked for again on the next pick', async (t) => {
-    // destroyPlayer is what resets the page's failures (releaseTrackDialog).
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
     t.after(() => destroyPlayer());
     const p = mount();
     p.wire();
@@ -821,14 +822,26 @@ test('subtitles that fail to load are put back, said, reported once, and asked f
 
     // Picking it again is "try again": a browser never refetches a src it
     // failed on, so without a new one this pick was the silent dead
-    // selection all over again.
+    // selection all over again. And the new src has to land on a track that
+    // is already showing: Chrome loads nothing for a src changed while the
+    // track is disabled, nor when a track in ERROR is switched on afterwards
+    // -- which jsdom cannot show, so the mode at that moment is the
+    // assertion. (Negative control: the retry moved back above markTrack
+    // sees 'disabled'.)
+    const modeAtRetry = [];
+    const setAttribute = track.setAttribute.bind(track);
+    track.setAttribute = (name, value) => {
+        if (name === 'src') modeAtRetry.push(track.track.mode);
+        return setAttribute(name, value);
+    };
     click(p.chip('os-os-en'));
     await flush();
     assert.match(track.getAttribute('src'), /[?&]wt-rf=\d+$/, 'the second pick is a new request');
+    assert.deepEqual(modeAtRetry, ['showing'], 'the new src goes to a track that is showing');
     failLoad(track);
     await flush();
     assert.deepEqual(w.said, ['player.subtitleLoadError', 'player.subtitleLoadError'], 'said each time');
-    assert.equal(loadErrors(p).length, 1, 'reported once per track per page');
+    assert.equal(loadErrors(p).length, 1, 'reported once per track per player mount');
     assert.equal(p.chip('none').getAttribute('data-default'), 'true');
     w.stop();
 });
@@ -836,7 +849,7 @@ test('subtitles that fail to load are put back, said, reported once, and asked f
 // Negative control: with `prevId` ignored (always Off) the first assertion
 // fails; without the saved-mark restore and the PUT the next two do.
 test('a failed pick goes back to the track it replaced, and the session to the choice it held', async (t) => {
-    // destroyPlayer is what resets the page's failures (releaseTrackDialog).
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
     t.after(() => destroyPlayer());
     const p = mount();
     p.wire();
@@ -858,12 +871,60 @@ test('a failed pick goes back to the track it replaced, and the session to the c
     w.stop();
 });
 
+// The impatient viewer: nothing shows yet, so they press the chip again.
+// That press activates the chip already marked -- no move, no PUT -- and must
+// not stand in for the pick it repeats. Negative control: recording every
+// activation lands this on Off, with the PUT of the dead track never undone
+// and the saved mark left on it.
+test('a second press on the chip still loading changes nothing the failure puts back', async (t) => {
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
+    t.after(() => destroyPlayer());
+    const p = mount();
+    p.wire();
+    const w = watch(p);
+    click(p.chip('os-os-ru'));
+    await flush();
+    click(p.chip('os-os-en'));
+    await flush();
+    click(p.chip('os-os-en'));
+    await flush();
+
+    failLoad(p.video.querySelector('track#os-os-en'));
+    await flush();
+
+    assert.equal(p.chip('os-os-ru').getAttribute('data-default'), 'true', 'back on what played before the first press');
+    assert.deepEqual(p.puts().map((c) => c.body.id), ['os-os-ru', 'os-os-en', 'os-os-ru']);
+    assert.deepEqual(savedIds(p), ['os-os-ru']);
+    w.stop();
+});
+
+// The audio-switch re-pick is a rule, not a choice (persist:false), and so is
+// its way back. Negative control: without the pick.write test the component
+// hears a choice, and the next audio switch no longer runs the ladder.
+test('a rule’s pick that fails goes back without counting as the viewer’s choice', async (t) => {
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
+    t.after(() => destroyPlayer());
+    const p = mount();
+    p.wire();
+    const w = watch(p);
+    activateSubtitle(p.container, p.chip('os-os-en'), { persist: false });
+
+    failLoad(p.video.querySelector('track#os-os-en'));
+    await flush();
+
+    assert.deepEqual(w.said, ['player.subtitleLoadError']);
+    assert.equal(p.chip('none').getAttribute('data-default'), 'true');
+    assert.deepEqual(p.hooks.selected, [], 'nobody chose anything');
+    assert.equal(p.puts().length, 0);
+    w.stop();
+});
+
 // Negative controls: without the savedNow() check the undo is sent after the
 // newer choice and the session ends up holding the old one; sent without
 // waiting for pick.write, it goes out while the write it undoes is still in
 // flight.
 test('the undo waits for the write it undoes, and stands down for a newer choice', async (t) => {
-    // destroyPlayer is what resets the page's failures (releaseTrackDialog).
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
     t.after(() => destroyPlayer());
     const p = mount();
     p.wire();
@@ -889,14 +950,20 @@ test('the undo waits for the write it undoes, and stands down for a newer choice
     w.stop();
 });
 
-// Negative control: without the modal.open branch the sentence is said at
-// once, behind the dialog's backdrop, and the first assertion fails.
-test('a failed upload says what to do with the file -- once the dialog is closed', async (t) => {
-    // destroyPlayer is what resets the page's failures (releaseTrackDialog).
+// The upload is where this fails most: dropped into the open dialog,
+// auto-selected there, under a toast saying it worked. The sentence is said
+// in the dialog, not to the player toast behind its backdrop. Negative
+// controls: without the modal.open branch it goes to the toast (the first
+// assertion); without the close listener it greets the next opening; without
+// the hiding in activateSubtitle it outlives the next pick.
+test('a failed upload in the open dialog is explained there, until the next pick or the dialog closing', async (t) => {
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
     t.after(() => destroyPlayer());
     const p = mount();
     p.wire();
     const w = watch(p);
+    const line = p.modal.querySelector('#subtitle-load-error');
+    assert.equal(line.hidden, true, 'rendered empty and hidden');
     p.modal.setAttribute('open', '');
     asyncSwap(p.modal, 'upload');
     await flush();
@@ -905,19 +972,34 @@ test('a failed upload says what to do with the file -- once the dialog is closed
     failLoad(p.video.querySelector('track#us-2'));
     await flush();
     assert.deepEqual(w.said, [], 'not to the backdrop');
-    assert.equal(p.chip('us-2').getAttribute('data-default'), null, 'the dialog shows the chip moving back');
+    assert.equal(line.hidden, false);
+    assert.equal(line.textContent, 'player.subtitleLoadErrorUpload');
+    assert.equal(p.chip('us-2').getAttribute('data-default'), null, 'the chip moves back under it');
     assert.equal(loadErrors(p)[0].data.provider, 'UserSubtitle');
 
     p.modal.removeAttribute('open');
     p.modal.dispatchEvent(new dom.window.Event('close'));
-    assert.deepEqual(w.said, ['player.subtitleLoadErrorUpload']);
+    assert.equal(line.hidden, true, 'it goes with the dialog');
+    assert.deepEqual(w.said, [], 'and no toast follows what was read in the dialog');
+
+    // Once more, then a press on something else: the line is about the
+    // track that failed, and now stale.
+    p.modal.setAttribute('open', '');
+    click(p.chip('us-2'));
+    await flush();
+    failLoad(p.video.querySelector('track#us-2'));
+    await flush();
+    assert.equal(line.hidden, false);
+    click(p.chip('os-os-en'));
+    await flush();
+    assert.equal(line.hidden, true, 'the next pick takes it away');
     w.stop();
 });
 
 // Negative controls: without the `data-default` test the first failure is
 // said and reported; without the `Translated` test the AI chip is taken off.
 test('only the track on screen is a failure the viewer hears of; a translation recovers its own', async (t) => {
-    // destroyPlayer is what resets the page's failures (releaseTrackDialog).
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
     t.after(() => destroyPlayer());
     const p = mount({ tracks: [['os-os-ru', false]] });
     p.wire();
@@ -940,7 +1022,7 @@ test('only the track on screen is a failure the viewer hears of; a translation r
 // Negative control: without the readyState scan the server's default fails
 // before anybody listens and nothing is said.
 test('a saved upload that failed before the player mounted lands on Off, and stays saved', async (t) => {
-    // destroyPlayer is what resets the page's failures (releaseTrackDialog).
+    // destroyPlayer is what resets the mount's failures (releaseTrackDialog).
     t.after(() => destroyPlayer());
     const p = mount({ tracks: [['us-1', true]] });
     // The server's render of a saved upload: the chip default and saved.
@@ -963,12 +1045,13 @@ test('a saved upload that failed before the player mounted lands on Off, and sta
     w.stop();
 });
 
-// Negative control: without the watchSubtitleLoads effect in Player.jsx the
-// toast never appears.
-test('in the mounted player the sentence is the player toast, held long enough to read', async (t) => {
+// Negative controls: without the watchSubtitleLoads effect in Player.jsx the
+// toast never appears; without its `t` the dialog's line throws.
+test('in the mounted player the sentence is the player toast, held long enough to read, or the dialog’s line', async (t) => {
     t.after(() => destroyPlayer());
     const p = await mountPlayer();
-    click(p.container.querySelector('#subtitles .subtitle[data-id="os-os-en"]'));
+    const modal = p.container.querySelector('#subtitles');
+    click(modal.querySelector('.subtitle[data-id="os-os-en"]'));
     await settle();
 
     failLoad(p.video.querySelector('track#os-os-en'));
@@ -979,6 +1062,13 @@ test('in the mounted player the sentence is the player toast, held long enough t
     assert.equal(toast.textContent, 'player.subtitleLoadError');
     assert.equal(toast.style.animationDuration, '6000ms');
     assert.equal(loadErrors(p).length, 1);
+
+    modal.setAttribute('open', '');
+    click(modal.querySelector('.subtitle[data-id="os-os-en"]'));
+    await settle();
+    failLoad(p.video.querySelector('track#os-os-en'));
+    await settle();
+    assert.equal(modal.querySelector('#subtitle-load-error').textContent, 'player.subtitleLoadError');
 });
 
 // ---- the translation offer ------------------------------------------
