@@ -568,7 +568,7 @@
         "many": "{{.Done}} z {{.Total}} částí na serveru",
         "other": "{{.Done}} z {{.Total}} částí na serveru"
     },
-    "vault.supporting": "Uloženo do Vault",
+    "vault.supporting": "Uloženo do Vaultu",
     "vault.keepAvailable": "Uložit do Vaultu",
     "vault.error": "Bohužel tvůj závazek nemohl být uložen kvůli chybě:",
     "vault.ok": "Ok",
