@@ -10,6 +10,7 @@ import (
 
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	services "github.com/webtor-io/common-services"
 	ra "github.com/webtor-io/rest-api/services"
 	j "github.com/webtor-io/web-ui/jobs"
@@ -74,7 +75,18 @@ func (s *TorrentLibraryDirectory) Create(ctx context.Context, name string, body 
 	if err != nil {
 		return nil, false, err
 	}
+	// Record the size of what GET serves, not of the upload: rest-api strips
+	// a private torrent's trackers. Same source the UI's add button measures.
+	// Still a snapshot — the store can merge more trackers later, and GET
+	// takes its length from the bytes, so the upload's size is a fine fallback.
 	size := int64(len(t))
+	if wcc, err := getWebContext(ctx); err == nil {
+		if served, err := s.api.GetTorrentCached(ctx, wcc.ApiClaims, resp.ID); err == nil {
+			size = int64(len(served))
+		} else {
+			log.WithError(err).WithField("resource_id", resp.ID).Warn("failed to read stored torrent size, using upload size")
+		}
+	}
 	l, err := s.storeToLibrary(ctx, resp.ID, info, torrentToName(name), size)
 	if err != nil {
 		return nil, false, err
@@ -158,8 +170,19 @@ func (s *TorrentLibraryDirectory) readTorrent(ctx context.Context, l *models.Lib
 	if err != nil {
 		return nil, nil, err
 	}
-	return io.NopCloser(bytes.NewReader(resp)), nil, nil
+	return torrentBody{bytes.NewReader(resp)}, nil, nil
 }
+
+// torrentBody keeps the .torrent bytes seekable, so the webdav handler serves
+// them through http.ServeContent, which takes Content-Length from the bytes.
+// io.NopCloser hid Seek and the handler declared the stored torrent_size_bytes
+// instead — recorded at upload, while rest-api serves torrent-store's current
+// record (merged announce lists grow it, private torrents served without
+// trackers shrink it) — and the response broke off short of that length
+// either way (net/http rejects a write past it whole).
+type torrentBody struct{ *bytes.Reader }
+
+func (torrentBody) Close() error { return nil }
 
 func (s *TorrentLibraryDirectory) removeFromLibrary(ctx context.Context, l *models.Library) error {
 	db := s.pg.Get()
