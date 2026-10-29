@@ -54,7 +54,7 @@
     <script>
     (function () {
         if (!window.umami) return;
-        window.umami.track('donate-download-shown', { tier: '{{ .Data.TierName }}', target: '{{ $target }}', eta: {{ if $pitch }}1{{ else }}0{{ end }} });
+        window.umami.track('donate-download-shown', { tier: '{{ .Data.TierName }}', target: '{{ $target }}', eta: {{ if $pitch }}1{{ else }}0{{ end }}, kind: '{{ if .Data.IsArchive }}dir{{ else }}file{{ end }}', cached: '{{ .Data.Cached }}' });
     })();
     </script>
     {{- end }}
@@ -79,21 +79,21 @@
          ✕ (style.css). */}}
     <div class="pt-3 px-5 flex sm:flex-wrap gap-1.5 sm:gap-2 items-center">
         <div class="flex gap-1.5 sm:mr-auto">
-            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" data-umami-event="download-copy" data-umami-event-kind="wget" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 wget
             </button>
-            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" data-umami-event="download-copy" data-umami-event-kind="curl" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 curl
             </button>
-            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" data-umami-event="download-copy" data-umami-event-kind="url" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>

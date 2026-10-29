@@ -79,7 +79,8 @@ Two measurements were added to follow it:
   Read the ratio as a trend per `kind` and `cached`, before and after a change, not as a
   conversion rate: a replayed card (the same visitor pressing Download again inside the
   job id's 10-minute bucket) sends another click and no counter, every click counts,
-  copying wget/curl/URL sends nothing, and blocked trackers are missing from the
+  copying wget/curl/URL is its own event (`download-copy`, prop `kind` wget|curl|url,
+  since 2026-10-29), and blocked trackers are missing from the
   numerator. Deduplicate the clicks on (session, url, kind, 10-minute bucket) and divide
   by `sum by (kind, cached) (increase(webui_download_ready_total[1d]))`.
 
