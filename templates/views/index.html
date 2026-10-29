@@ -193,9 +193,9 @@
     {{/* Shown to whoever does not have a paid plan yet: a sales banner
          follows the sale, not the ads claim. */}}
     {{ if and (not ($.Claims | isPaid)) promoOffer }}
-    <div id="promo-banner" class="relative max-w-[680px] mx-auto z-10">
+    <div id="promo-banner" class="relative max-w-[680px] mx-auto z-10" data-umami-impression="promo-shown">
         {{ template "promo" $ }}
-        <button data-promo-dismiss class="promo-close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <button data-promo-dismiss data-umami-event="promo-dismiss" class="promo-close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
         {{ "promo.js" | asset }}
     </div>
     {{ end }}

@@ -1028,6 +1028,14 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         // else (jsdom, a page rendered before the dialog markup) is shown
         // by its class, as the popup used to be.
         const modal = typeof el.showModal === 'function';
+        // iPhone fullscreen is the system player (video.webkitEnterFullscreen,
+        // hooks/usePlayerState.js): no page is drawn over it, top layer
+        // included, and the hold puts its Play back -- the film would stop
+        // with nothing on screen to say why. Out of it first, whichever way
+        // the popup opens; the answer, a tap, takes the viewer back.
+        const fs = videoEl.webkitDisplayingFullscreen ? 'native'
+            : (document.fullscreenElement || document.webkitFullscreenElement) ? 'element' : 'none';
+        if (fs === 'native') videoEl.webkitExitFullscreen();
         if (modal) {
             if (!el.open) el.showModal();
         } else {
@@ -1041,7 +1049,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
         setGraceOpen(true);
         // `paused`: the popup stopped a playing film. A seek's run held
         // behind it is known only at the answer (its `paused` below).
-        if (window.umami) window.umami.track('grace-soft-cta-shown', { paused: hold.held() });
+        // `fs`: the fullscreen the popup found -- `native` is the iPhone's,
+        // left for it above.
+        if (window.umami) window.umami.track('grace-soft-cta-shown', { paused: hold.held(), fs });
         // `via`: the popup's own button, or Play (the key, the big button,
         // a click on the picture, the headset) -- the answer "continue".
         const hide = (action, via = 'button') => {
@@ -1065,6 +1075,12 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
             setGraceOpen(false);
             const paused = hold.held();
             hold.release({ play: via === 'play' });
+            // Back into the fullscreen the popup took them out of. iOS lets
+            // it only from a tap: the buttons and Play are one, Esc is not
+            // on a phone.
+            if (fs === 'native') {
+                try { videoEl.webkitEnterFullscreen(); } catch (e) { /* stays inline */ }
+            }
             if (window.umami) window.umami.track('grace-soft-cta-click', { action, via, paused });
             // A stream restart that waited for this answer goes now
             // (stream-restart.js createRecoveryPolicy).
