@@ -2372,7 +2372,7 @@ for (const [button, answer] of [['.grace-cta-continue', 'continue'], ['.grace-ct
         assert.ok('graceCtaHold' in p.video.dataset, 'the page’s pause, on the element');
         assert.equal(activity.streaming(), true, 'the status keeps the viewer on the chain: not their pause');
         assert.equal(activity.state(), 'playing');
-        assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: true });
+        assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: true, fs: 'none' });
         await settle();
         assert.equal(p.video.paused, true, 'it stays stopped');
 
@@ -2403,7 +2403,7 @@ test('a film the viewer had paused stays paused after the answer', async (t) => 
     assert.ok(popupUp(), 'fixture: the popup came up over a film the viewer paused');
     assert.equal(log.pause, 1, 'their pause, and no other');
     assert.equal('graceCtaHold' in p.video.dataset, false, 'not the page’s pause');
-    assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: false });
+    assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: false, fs: 'none' });
 
     graceCta().querySelector('.grace-cta-continue').click();
     await settle();
@@ -2538,6 +2538,44 @@ test('in fullscreen the popup leaves it, and the film stops', async (t) => {
     assert.equal(exited, 1, 'out of fullscreen: the popup lives outside it');
     assert.ok(popupUp());
     assert.equal(p.video.paused, true);
+});
+
+// iPhone fullscreen is the system player (video.webkitEnterFullscreen):
+// nothing of the page is drawn over it, the <dialog> in the top layer
+// included, and the hold puts back the system Play -- the film stopped at the
+// end of the window with nothing on screen to say why. The popup takes the
+// viewer out of it, and the answer (a tap) back in.
+test('in iPhone fullscreen the popup leaves it, and the answer goes back', async (t) => {
+    const calls = stubDialog(t);
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => {
+        page.video.dataset.graceDurationSec = '30';
+        const cta = document.createElement('dialog');
+        cta.id = 'grace-cta';
+        cta.className = 'modal';
+        cta.setAttribute('data-upsell-surface', 'grace');
+        cta.innerHTML = '<button type="button" class="grace-cta-close"></button>'
+            + '<a class="btn" href="/trial?from=grace" target="_blank">trial</a>'
+            + '<button type="button" class="grace-cta-continue"></button>';
+        page.container.appendChild(cta);
+    });
+    const log = playback(p.video);
+    const fs = { exit: 0, enter: 0 };
+    p.video.webkitDisplayingFullscreen = true;
+    p.video.webkitExitFullscreen = () => { fs.exit++; p.video.webkitDisplayingFullscreen = false; };
+    p.video.webkitEnterFullscreen = () => { fs.enter++; p.video.webkitDisplayingFullscreen = true; };
+    await playPast(p, 31);
+    assert.deepEqual(calls, ['showModal'], 'the popup, as a dialog');
+    assert.equal(fs.exit, 1, 'out of the system player: the popup is on the page');
+    assert.equal(p.video.paused, true);
+    assert.deepEqual(p.events.find((e) => e.name === 'grace-soft-cta-shown').data, { paused: true, fs: 'native' });
+    assert.equal(fs.enter, 0, 'not back before the answer');
+
+    graceCta().querySelector('.grace-cta-continue').click();
+    await settle();
+    assert.equal(p.video.dataset.graceCtaAnswered, 'continue');
+    assert.equal(log.play, 1, 'the answer starts it');
+    assert.equal(fs.enter, 1, 'and takes the viewer back into fullscreen');
 });
 
 // A session seek past the window: the timeline shows the target at once, so
