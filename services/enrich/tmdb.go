@@ -7,7 +7,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
@@ -23,6 +25,9 @@ import (
 type localizedText struct {
 	Title string
 	Plot  string
+	// Names maps a TMDB person id to the person's name in this language
+	// (see localizedNames).
+	Names map[string]string
 }
 
 // maxReviews caps the number of reviews kept per title; maxReviewRunes
@@ -48,10 +53,11 @@ func reviewHasLink(content string) bool {
 }
 
 type TMDB struct {
-	api      *tmdb.Api
-	pg       *cs.PG
-	locCache *lazymap.LazyMap[*localizedText]
-	revCache *lazymap.LazyMap[[]Review]
+	api       *tmdb.Api
+	pg        *cs.PG
+	locCache  *lazymap.LazyMap[*localizedText]
+	revCache  *lazymap.LazyMap[[]Review]
+	refresher *locRefresher
 }
 
 func (s *TMDB) GetName() string {
@@ -62,7 +68,7 @@ func NewTMDB(pg *cs.PG, api *tmdb.Api) *TMDB {
 	if api == nil {
 		return nil
 	}
-	return &TMDB{
+	s := &TMDB{
 		pg:  pg,
 		api: api,
 		locCache: lazymap.New[*localizedText](&lazymap.Config{
@@ -79,6 +85,8 @@ func NewTMDB(pg *cs.PG, api *tmdb.Api) *TMDB {
 			Capacity: 1000,
 		}),
 	}
+	s.refresher = newLocRefresher(s.refreshLocalized)
+	return s
 }
 
 func (s *TMDB) makeVideoMetadata(info *tm.Info) *models.VideoMetadata {
@@ -458,10 +466,13 @@ func (s *TMDB) Localize(ctx context.Context, videoID string, lang string) (strin
 	}
 
 	tl := tmdbLang(lang)
-	cacheKey := fmt.Sprintf("%d:%s", tmdbID, tl)
 
-	text, err := s.locCache.Get(cacheKey, func() (*localizedText, error) {
-		return s.localizeFromDBOrAPI(ctx, tmdbID, tmdbType, tl)
+	text, err := s.locCache.Get(locCacheKey(tmdbID, tl), func() (*localizedText, error) {
+		t, err := s.localizeFromDBOrAPI(ctx, tmdbID, tmdbType, tl)
+		if t != nil {
+			t.Names = nil // stored by now; Credits reads names from the DB, the cache keeps title and plot
+		}
+		return t, err
 	})
 	if err != nil {
 		return "", "", err
@@ -472,6 +483,10 @@ func (s *TMDB) Localize(ctx context.Context, videoID string, lang string) (strin
 	return text.Title, text.Plot, nil
 }
 
+func locCacheKey(tmdbID int, lang string) string {
+	return fmt.Sprintf("%d:%s", tmdbID, lang)
+}
+
 func (s *TMDB) resolveLocalizeIDs(ctx context.Context, videoID string) (int, tmdb.TmdbType, error) {
 	if strings.HasPrefix(videoID, "tmdb") {
 		id, err := strconv.Atoi(strings.TrimPrefix(videoID, "tmdb"))
@@ -480,7 +495,13 @@ func (s *TMDB) resolveLocalizeIDs(ctx context.Context, videoID string) (int, tmd
 		}
 		db := s.pg.Get()
 		if db != nil {
-			info, _ := tm.GetInfoByID(ctx, db, id)
+			// A failed read must not guess "movie": a series asked for as a
+			// movie answers 404, and that is now stored as a permanent empty
+			// row for (id, lang).
+			info, err := tm.GetInfoByID(ctx, db, id)
+			if err != nil {
+				return 0, "", err
+			}
 			if info != nil && info.Type == tm.TmdbTypeSeries {
 				return id, tmdb.TmdbTypeTV, nil
 			}
@@ -526,17 +547,36 @@ func (s *TMDB) localizeFromDBOrAPI(ctx context.Context, tmdbID int, tmdbType tmd
 		return nil, errors.Wrap(err, "localize: db lookup failed")
 	}
 	if cached != nil {
-		return &localizedText{Title: cached.Title, Plot: cached.Plot}, nil
+		if cached.Names == nil {
+			// Stored before names were: title and plot serve as they are,
+			// the names come with a refresh off the request path.
+			s.refresher.enqueue(locKey{id: tmdbID, typ: tmdbType, lang: lang})
+		}
+		return &localizedText{Title: cached.Title, Plot: cached.Plot, Names: cached.Names}, nil
 	}
 
 	raw, err := s.api.GetLocalizedDetails(ctx, tmdbID, tmdbType, lang)
 	if err != nil {
 		return nil, errors.Wrap(err, "localize: api call failed")
 	}
-	if raw == nil {
-		return nil, nil
+	text := localizedFromDetails(raw)
+	if text == nil {
+		err = tm.MarkLocalizedEmpty(ctx, db, tmdbID, lang)
+	} else {
+		_, err = tm.UpsertLocalized(ctx, db, tmdbID, lang, text.Title, text.Plot, text.Names)
+	}
+	if err != nil {
+		log.WithError(err).WithField("tmdb_id", tmdbID).WithField("lang", lang).Warn("localize: failed to persist cache")
 	}
 
+	return text, nil
+}
+
+// localizedFromDetails reads title, plot and person names off a localized
+// details response; nil when there is none (404) or it has neither title
+// nor plot, which is stored as tm.MarkLocalizedEmpty. Names is never nil,
+// so a stored row reads as fetched.
+func localizedFromDetails(raw map[string]any) *localizedText {
 	var title string
 	if t, ok := raw["title"].(string); ok && t != "" {
 		title = t
@@ -550,15 +590,151 @@ func (s *TMDB) localizeFromDBOrAPI(ctx context.Context, tmdbID int, tmdbType tmd
 	}
 
 	if title == "" && plot == "" {
-		return nil, nil
+		return nil
 	}
+	return &localizedText{Title: title, Plot: plot, Names: localizedNames(raw)}
+}
 
-	_, err = tm.UpsertLocalized(ctx, db, tmdbID, lang, title, plot)
+// localizedNamesCast is how many of a localized response's cast entries are
+// read, by position like the 8 creditsFromMetadata shows (a series' TMDB
+// order has gaps: 0, 2, ..., 22): past those 8, because the English credits
+// in tmdb.info can be older than this response and the shown eight may since
+// have moved down.
+const localizedNamesCast = 20
+
+// localizedNames reads person names off a localized details response, keyed
+// by TMDB person id as a decimal string: crew with job "Director",
+// created_by, and the first localizedNamesCast cast entries -- the people
+// creditsFromMetadata shows. TMDB answers the English name for a person it
+// has no translation for, and that is stored like any other. A name with no
+// letter in it is left out, and the English one shows instead. Never nil.
+func localizedNames(raw map[string]any) map[string]string {
+	out := map[string]string{}
+	add := func(v any, keep func(map[string]any) bool) {
+		list, _ := v.([]any)
+		for _, e := range list {
+			p, _ := e.(map[string]any)
+			if keep != nil && !keep(p) {
+				continue
+			}
+			id, ok := personID(p)
+			name, _ := p["name"].(string)
+			if name = strings.TrimSpace(name); ok && strings.ContainsFunc(name, unicode.IsLetter) {
+				out[id] = name
+			}
+		}
+	}
+	credits, _ := raw["credits"].(map[string]any)
+	add(credits["crew"], isDirector)
+	add(raw["created_by"], nil)
+	cast, _ := credits["cast"].([]any)
+	add(cast[:min(len(cast), localizedNamesCast)], nil)
+	return out
+}
+
+// personID is a TMDB person entry's id as the key of localized names.
+func personID(p map[string]any) (string, bool) {
+	id, ok := p["id"].(float64)
+	if !ok {
+		return "", false
+	}
+	return strconv.Itoa(int(id)), true
+}
+
+// locKey names one tmdb.localized row and the details call that fills it;
+// lang is TMDB's tag (pt-BR, not pt).
+type locKey struct {
+	id   int
+	typ  tmdb.TmdbType
+	lang string
+}
+
+// The background refresh of tmdb.localized rows: a bounded queue, two
+// workers, and the time one TMDB call may take.
+const (
+	locRefreshQueue   = 256
+	locRefreshWorkers = 2
+	locRefreshTimeout = 10 * time.Second
+)
+
+// locRefresher fills tmdb.localized rows off the request path: rows stored
+// before names were, and rows the hash page's credits need but nobody has
+// localized yet (that path never calls TMDB itself). In-process and
+// bounded: a full queue drops the key, and the next credits read queues it
+// again (Localize serves it from locCache for 10 minutes first); a
+// key already queued or in flight is not queued twice, so a library page of
+// old rows costs one call per row.
+type locRefresher struct {
+	run     func(locKey)
+	jobs    chan locKey
+	once    sync.Once
+	mu      sync.Mutex
+	pending map[locKey]bool
+}
+
+func newLocRefresher(run func(locKey)) *locRefresher {
+	return &locRefresher{run: run, jobs: make(chan locKey, locRefreshQueue), pending: map[locKey]bool{}}
+}
+
+// enqueue never blocks; it reports whether k was queued. The workers start
+// on the first call, so a process that never needs a refresh (the CLI
+// commands) runs none, and nothing waits for them on exit.
+func (r *locRefresher) enqueue(k locKey) bool {
+	r.once.Do(func() {
+		for range locRefreshWorkers {
+			go r.work()
+		}
+	})
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.pending[k] {
+		return false
+	}
+	select {
+	case r.jobs <- k:
+		r.pending[k] = true
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *locRefresher) work() {
+	for k := range r.jobs {
+		r.run(k)
+		r.mu.Lock()
+		delete(r.pending, k)
+		r.mu.Unlock()
+	}
+}
+
+// refreshLocalized is one background refresh: TMDB's details in k's
+// language, stored over the row (title and plot included) or, when there is
+// nothing usable (404, no title and no plot), as tm.MarkLocalizedEmpty; then
+// the in-memory copy is dropped so the next Localize reads the row. A
+// failure stores nothing and drops nothing, and a later read queues it
+// again. The worker is a top level, so it logs; the error never carries the
+// API URL (Api.do redacts the key out of transport errors).
+func (s *TMDB) refreshLocalized(k locKey) {
+	db := s.pg.Get()
+	if db == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), locRefreshTimeout)
+	defer cancel()
+	raw, err := s.api.GetLocalizedDetails(ctx, k.id, k.typ, k.lang)
+	if err == nil {
+		if text := localizedFromDetails(raw); text != nil {
+			_, err = tm.UpsertLocalized(ctx, db, k.id, k.lang, text.Title, text.Plot, text.Names)
+		} else {
+			err = tm.MarkLocalizedEmpty(ctx, db, k.id, k.lang)
+		}
+	}
 	if err != nil {
-		log.WithError(err).WithField("tmdb_id", tmdbID).WithField("lang", lang).Warn("localize: failed to persist cache")
+		log.WithError(err).WithField("tmdb_id", k.id).WithField("lang", k.lang).Warn("localize: background refresh failed")
+		return
 	}
-
-	return &localizedText{Title: title, Plot: plot}, nil
+	s.locCache.Drop(locCacheKey(k.id, k.lang))
 }
 
 // Reviews implements ReviewsProvider. Resolves the id against tmdb.info
@@ -625,7 +801,8 @@ const (
 // Credits implements CreditsProvider off the cached tmdb.info row only, like
 // IsAiring: no upstream call. Rows last written before GetDetails asked
 // for credits (c3ef013e, in prod by ~2026-04-15) have none and answer empty.
-func (s *TMDB) Credits(ctx context.Context, videoID string, ct models.ContentType) (*Credits, error) {
+// Person names are in lang where tmdb.localized has them (creditNames).
+func (s *TMDB) Credits(ctx context.Context, videoID string, ct models.ContentType, lang string) (*Credits, error) {
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("db is nil")
@@ -647,7 +824,43 @@ func (s *TMDB) Credits(ctx context.Context, videoID string, ct models.ContentTyp
 	if err != nil || info == nil {
 		return nil, err
 	}
-	return creditsFor(info, videoID, ct), nil
+	if otherTitle(info, videoID, ct) {
+		return &Credits{}, nil
+	}
+	// Nobody to rename (no credits, MarkNoCredits, adult): no names read,
+	// nothing queued.
+	if c := creditsFromMetadata(info.Metadata, nil); len(c.Directors)+len(c.Creators)+len(c.Cast) == 0 {
+		return c, nil
+	}
+	names, err := s.creditNames(ctx, db, info, lang)
+	if err != nil {
+		return nil, err
+	}
+	return creditsFromMetadata(info.Metadata, names), nil
+}
+
+// creditNames reads the person names of info's title in lang from
+// tmdb.localized, and never from TMDB: Credits serves the hash page, whose
+// render must not wait on it. nil (the English names) for English, and for
+// a row stored before names were or no row at all, which queues a background
+// refresh of it.
+func (s *TMDB) creditNames(ctx context.Context, db *pg.DB, info *tm.Info, lang string) (map[string]string, error) {
+	if lang == "" || lang == "en" {
+		return nil, nil
+	}
+	k := locKey{id: info.TmdbID, typ: tmdb.TmdbTypeMovie, lang: tmdbLang(lang)}
+	if info.Type == tm.TmdbTypeSeries {
+		k.typ = tmdb.TmdbTypeTV
+	}
+	loc, err := tm.GetLocalized(ctx, db, k.id, k.lang)
+	if err != nil {
+		return nil, errors.Wrap(err, "credits: localized names lookup failed")
+	}
+	if loc == nil || loc.Names == nil {
+		s.refresher.enqueue(k)
+		return nil, nil
+	}
+	return loc.Names, nil
 }
 
 // backfillMaxFailuresInARow ends a backfill run early: that many failed
@@ -807,44 +1020,49 @@ func tmdbNumber(videoID string) (int, bool) {
 	return id, err == nil
 }
 
-// creditsFor answers for the row a video id resolved to. TMDB numbers films
-// and series independently and tmdb.info keys on the number alone, so for a
-// tmdbN id a row of the other type is another title: checked, nothing shown.
-func creditsFor(info *tm.Info, videoID string, ct models.ContentType) *Credits {
+// otherTitle reports whether the row a video id resolved to is another
+// title. TMDB numbers films and series independently and tmdb.info keys on
+// the number alone, so for a tmdbN id a row of the other type is another
+// title: checked, nothing shown.
+func otherTitle(info *tm.Info, videoID string, ct models.ContentType) bool {
 	want := tm.TmdbTypeMovie
 	if ct == models.ContentTypeSeries {
 		want = tm.TmdbTypeSeries
 	}
-	if strings.HasPrefix(videoID, "tmdb") && info.Type != want {
-		return &Credits{}
-	}
-	return creditsFromMetadata(info.Metadata)
+	return strings.HasPrefix(videoID, "tmdb") && info.Type != want
 }
 
 // creditsFromMetadata reads the people line off a TMDB details response:
 // crew with job "Director" (films, and about a quarter of series),
 // created_by (series only) and the first cast entries in billing order. An adult title answers empty.
-func creditsFromMetadata(md map[string]any) *Credits {
+// localized (person id → name, see localizedNames) is laid over TMDB's
+// English names one by one: a person it lacks keeps the English name.
+func creditsFromMetadata(md map[string]any, localized map[string]string) *Credits {
 	c := &Credits{}
 	if adult, _ := md["adult"].(bool); adult {
 		return c
 	}
 	credits, _ := md["credits"].(map[string]any)
-	c.Directors = names(creditPeople(credits["crew"], maxCreditDirectors, func(p map[string]any) bool {
-		job, _ := p["job"].(string)
-		return job == "Director"
-	}))
-	c.Creators = names(creditPeople(md["created_by"], maxCreditDirectors, nil))
-	c.Cast = creditPeople(credits["cast"], maxCreditCast, nil)
+	c.Directors = names(creditPeople(credits["crew"], maxCreditDirectors, isDirector, localized))
+	c.Creators = names(creditPeople(md["created_by"], maxCreditDirectors, nil, localized))
+	c.Cast = creditPeople(credits["cast"], maxCreditCast, nil, localized)
 	return c
 }
 
-// creditPeople collects up to max people with distinct names from a TMDB
-// person array, optionally only the entries keep accepts. profile_path
-// comes as "/abc.jpg"; the leading slash is dropped.
-func creditPeople(v any, max int, keep func(map[string]any) bool) []CastMember {
+func isDirector(p map[string]any) bool {
+	job, _ := p["job"].(string)
+	return job == "Director"
+}
+
+// creditPeople collects up to max distinct people from a TMDB person array,
+// optionally only the entries keep accepts, each under its name in
+// localized when it has one there. Distinct by person id (two people may
+// share a name, more so once localized), by name for an entry without one.
+// profile_path comes as "/abc.jpg"; the leading slash is dropped.
+func creditPeople(v any, max int, keep func(map[string]any) bool, localized map[string]string) []CastMember {
 	list, _ := v.([]any)
 	var out []CastMember
+	seen := map[string]bool{}
 	for _, e := range list {
 		if len(out) == max {
 			break
@@ -854,8 +1072,23 @@ func creditPeople(v any, max int, keep func(map[string]any) bool) []CastMember {
 			continue
 		}
 		name, _ := p["name"].(string)
-		if name = strings.TrimSpace(name); name == "" || slices.ContainsFunc(out, func(m CastMember) bool { return m.Name == name }) {
+		name = strings.TrimSpace(name)
+		id, hasID := personID(p)
+		if hasID {
+			if seen[id] {
+				continue
+			}
+			if loc := localized[id]; loc != "" {
+				name = loc
+			}
+		} else if slices.ContainsFunc(out, func(m CastMember) bool { return m.Name == name }) {
 			continue
+		}
+		if name == "" {
+			continue
+		}
+		if hasID {
+			seen[id] = true
 		}
 		profile, _ := p["profile_path"].(string)
 		out = append(out, CastMember{Name: name, Profile: strings.TrimPrefix(profile, "/")})

@@ -2,21 +2,16 @@ package models
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
-	"github.com/go-pg/migrations/v8"
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
+	"github.com/webtor-io/web-ui/models/pgtest"
 )
 
-// startTestPostgres brings up a disposable postgres:17-alpine container,
-// runs this repo's real migrations against it, and returns a connected
-// *pg.DB. The container is removed via t.Cleanup.
+// startTestPostgres is pgtest.Start: a disposable Postgres with this repo's
+// migrations applied.
 //
 // PruneNotificationsKeepingNewest's whole risk is a window-function
 // partition boundary: whether DELETE ranks rows per user_id or across the
@@ -24,131 +19,9 @@ import (
 // server, not of Go code -- every other store test in this codebase (see
 // services/notification/notification_test.go's mockStore) stubs the
 // interface instead, which cannot catch this class of bug. Hence a real,
-// disposable database for this one test. Skips if docker is not on PATH.
+// disposable database for this one test.
 func startTestPostgres(t *testing.T) *pg.DB {
-	t.Helper()
-
-	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker not available, skipping Postgres-backed test")
-	}
-
-	const (
-		user     = "notiftest"
-		password = "notiftest"
-		database = "notiftest"
-	)
-	containerName := fmt.Sprintf("web-ui-notification-prune-test-%d", time.Now().UnixNano())
-
-	runArgs := []string{
-		"run", "--rm", "-d",
-		"--name", containerName,
-		"-e", "POSTGRES_USER=" + user,
-		"-e", "POSTGRES_PASSWORD=" + password,
-		"-e", "POSTGRES_DB=" + database,
-		"-p", "127.0.0.1::5432",
-		"postgres:17-alpine",
-	}
-	if out, err := exec.Command("docker", runArgs...).CombinedOutput(); err != nil {
-		t.Fatalf("docker run postgres: %v\n%s", err, out)
-	}
-	// -v: the image's data directory is an anonymous volume, which `rm -f`
-	// leaves behind (--rm removes it only when the container exits by
-	// itself) -- ~50 MB a run, until Docker's disk is full and every
-	// container fails at initdb.
-	t.Cleanup(func() {
-		_ = exec.Command("docker", "rm", "-f", "-v", containerName).Run()
-	})
-
-	// pg_isready is checked from inside the container (over its own unix
-	// socket) rather than by dialing a host port: the official postgres
-	// image starts, stops and restarts its server once during first-time
-	// initdb, and a host-side TCP probe can catch it mid-restart and
-	// report false readiness.
-	deadline := time.Now().Add(60 * time.Second)
-	for {
-		if time.Now().After(deadline) {
-			t.Fatalf("postgres container %s did not become ready in time", containerName)
-		}
-		cmd := exec.Command("docker", "exec", containerName, "pg_isready", "-U", user, "-d", database)
-		if err := cmd.Run(); err == nil {
-			break
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-
-	portOut, err := exec.Command("docker", "port", containerName, "5432/tcp").Output()
-	if err != nil {
-		t.Fatalf("docker port: %v", err)
-	}
-	addr := lastLine(string(portOut))
-	if addr == "" {
-		t.Fatalf("could not determine published port for %s", containerName)
-	}
-
-	db := pg.Connect(&pg.Options{
-		Addr:     addr,
-		User:     user,
-		Password: password,
-		Database: database,
-	})
-	t.Cleanup(func() { _ = db.Close() })
-
-	// The TCP port can accept connections slightly before the server is
-	// fully ready to serve queries; retry the actual ping too.
-	pingDeadline := time.Now().Add(30 * time.Second)
-	var lastErr error
-	for time.Now().Before(pingDeadline) {
-		lastErr = db.Ping(context.Background())
-		if lastErr == nil {
-			break
-		}
-		time.Sleep(300 * time.Millisecond)
-	}
-	if lastErr != nil {
-		t.Fatalf("postgres did not become queryable: %v", lastErr)
-	}
-
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("failed to resolve this file's path")
-	}
-	migrationsDir := filepath.Join(filepath.Dir(thisFile), "..", "migrations")
-
-	col := migrations.NewCollection()
-	if err := col.DiscoverSQLMigrations(migrationsDir); err != nil {
-		t.Fatalf("discover migrations in %s: %v", migrationsDir, err)
-	}
-	if _, _, err := col.Run(db, "init"); err != nil {
-		t.Fatalf("init migrations table: %v", err)
-	}
-	if _, _, err := col.Run(db, "up"); err != nil {
-		t.Fatalf("run migrations: %v", err)
-	}
-
-	return db
-}
-
-func lastLine(s string) string {
-	line := ""
-	for _, l := range splitLines(s) {
-		if l != "" {
-			line = l
-		}
-	}
-	return line
-}
-
-func splitLines(s string) []string {
-	var lines []string
-	start := 0
-	for i, r := range s {
-		if r == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	lines = append(lines, s[start:])
-	return lines
+	return pgtest.Start(t)
 }
 
 // createTestUser inserts a minimal row into "user" -- notification.user_id

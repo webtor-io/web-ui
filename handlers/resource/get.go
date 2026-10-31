@@ -319,6 +319,23 @@ func creditsTarget(d *GetData, u *auth.User) (string, models.ContentType, bool) 
 	return md.VideoID, ct, true
 }
 
+// addTitleText localizes the title's metadata (title, plot) to the page
+// language and puts its credits on d, names in that language where known.
+func (s *Handler) addTitleText(ctx context.Context, d *GetData, u *auth.User, lang string) {
+	if s.enricher == nil {
+		return
+	}
+	if d.Movie != nil {
+		s.enricher.Localize(ctx, d.Movie.GetMetadata(), lang)
+	}
+	if d.Series != nil {
+		s.enricher.Localize(ctx, d.Series.GetMetadata(), lang)
+	}
+	if id, ct, ok := creditsTarget(d, u); ok {
+		d.Credits = s.enricher.CachedCredits(ctx, id, ct, lang)
+	}
+}
+
 func (s *Handler) get(c *gin.Context) {
 	getTpl := s.tb.Build("resource/get")
 	args, err := s.bindGetArgs(c)
@@ -345,20 +362,7 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 
-	// Localize content metadata (title, plot) to the user's language
-	if s.enricher != nil {
-		lang := i18n.GetLang(c)
-		if d.Movie != nil {
-			s.enricher.Localize(ctx, d.Movie.GetMetadata(), lang)
-		}
-		if d.Series != nil {
-			s.enricher.Localize(ctx, d.Series.GetMetadata(), lang)
-		}
-	}
-
-	if id, ct, ok := creditsTarget(d, args.User); ok && s.enricher != nil {
-		d.Credits = s.enricher.CachedCredits(ctx, id, ct)
-	}
+	s.addTitleText(ctx, d, args.User, i18n.GetLang(c))
 
 	// Set vault availability
 	d.Vault = s.vault != nil

@@ -1,6 +1,8 @@
 package resource
 
 import (
+	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -78,5 +80,32 @@ func TestCreditsBlock(t *testing.T) {
 		if got := render("en", cr); strings.Contains(got, "credits.") || strings.Contains(got, "<details") || strings.Contains(got, "space-y-1") {
 			t.Errorf("%s credits rendered the block", name)
 		}
+	}
+}
+
+// langCredits is a credits mapper that records the language it is asked in.
+type langCredits struct{ langs []string }
+
+func (f *langCredits) Map(context.Context, *models.VideoContent, models.ContentType, bool) (*models.VideoMetadata, error) {
+	return nil, nil
+}
+func (f *langCredits) GetName() string { return "fake" }
+func (f *langCredits) Credits(_ context.Context, _ string, _ models.ContentType, lang string) (*enrich.Credits, error) {
+	f.langs = append(f.langs, lang)
+	return &enrich.Credits{Directors: []string{"Режиссёр А"}}, nil
+}
+
+func TestAddTitleTextAsksCreditsInThePageLanguage(t *testing.T) {
+	fake := &langCredits{}
+	s := &Handler{enricher: enrich.NewEnricher(nil, nil, []enrich.MetadataMapper{fake}, nil, nil)}
+	d := &GetData{Movie: creditsMovie("tt1")}
+	s.addTitleText(context.Background(), d, signedIn, "ru")
+	if !reflect.DeepEqual(fake.langs, []string{"ru"}) || d.Credits == nil || d.Credits.Directors[0] != "Режиссёр А" {
+		t.Errorf("asked in %v, credits %+v", fake.langs, d.Credits)
+	}
+	anon := &GetData{Movie: creditsMovie("tt1")}
+	s.addTitleText(context.Background(), anon, &auth.User{}, "ru")
+	if len(fake.langs) != 1 || anon.Credits != nil {
+		t.Errorf("anonymous visitor got credits: %v, %+v", fake.langs, anon.Credits)
 	}
 }

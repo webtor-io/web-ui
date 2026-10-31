@@ -1,12 +1,14 @@
 package discover
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -34,7 +36,8 @@ func newCreditsView(cr *enrich.Credits) creditsView {
 }
 
 // credits is the handler for POST /discover/credits: directors / creators /
-// cast from TMDB for the title open in the stream modal. Same request shape
+// cast from TMDB for the title open in the stream modal, names in the page
+// language where known. Same request shape
 // and response contract as reviews: 200 with a (possibly empty) object is a
 // verdict the client may cache, 502 means the pipeline couldn't check.
 func (h *Handler) credits(c *gin.Context) {
@@ -51,7 +54,16 @@ func (h *Handler) credits(c *gin.Context) {
 	if req.Type == "series" {
 		ct = models.ContentTypeSeries
 	}
-	cr, err := h.en.CreditsByID(c.Request.Context(), req.ID, ct)
+	ctx, lang := c.Request.Context(), i18n.GetLang(c)
+	// Localize first (a no-op in English): a modal opened before the grid's
+	// /discover/localize finished shares its call (locCache), so the row
+	// with names is stored before Credits reads it. Result and error unused.
+	// Bounded like availability: the TMDB client has no timeout of its own,
+	// and a cold id waits on a synchronous details call here.
+	lctx, cancel := context.WithTimeout(ctx, availabilityTimeout)
+	_, _, _ = h.en.LocalizeByID(lctx, req.ID, ct, lang)
+	cancel()
+	cr, err := h.en.CreditsByID(ctx, req.ID, ct, lang)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "credits lookup failed"})
 		return
