@@ -18,12 +18,13 @@ function StarRating({ rating }) {
     const items = useMemo(() => {
         const result = [];
         const step = 0.5;
-        for (let i = 0; i <= 5; i += step) {
+        // No DaisyUI rating-hidden: it is the "0 stars" radio slot, and
+        // rating-xs leaves it 1.5rem tall, so a card with stars got a row
+        // 8px taller than one without and its genre line sat lower.
+        for (let i = step; i <= 5; i += step) {
             const isHalf = (i * 2) % 2 === 1;
             const selected = stars5 >= i && stars5 < i + step;
-            if (i === 0) {
-                result.push(<div key="h" class="rating-hidden" />);
-            } else if (isHalf) {
+            if (isHalf) {
                 result.push(<div key={i} class="mask mask-star-2 mask-half-1" aria-current={selected ? 'true' : undefined} />);
             } else {
                 result.push(<div key={i} class="mask mask-star-2 mask-half-2" aria-current={selected ? 'true' : undefined} />);
