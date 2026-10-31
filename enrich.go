@@ -96,6 +96,12 @@ func configureEnrich(c *cli.Command) {
 			Value:  2000,
 			EnvVar: "ENRICH_CREDITS_BACKFILL_LIMIT",
 		},
+		cli.IntFlag{
+			Name:   "genres-backfill-limit",
+			Usage:  "max movie/series metadata rows without genres to derive from cached TMDB data per run, no TMDB calls (0 disables)",
+			Value:  100000,
+			EnvVar: "ENRICH_GENRES_BACKFILL_LIMIT",
+		},
 	)
 
 	cleanupCmd := cli.Command{
@@ -255,6 +261,9 @@ func enrichPopular(c *cli.Context) error {
 	}
 	if n := c.Int("credits-backfill-limit"); n > 0 {
 		en.BackfillCredits(ctx, n)
+	}
+	if n := c.Int("genres-backfill-limit"); n > 0 {
+		en.BackfillGenres(ctx, n)
 	}
 
 	log.Info("enrich popular completed")

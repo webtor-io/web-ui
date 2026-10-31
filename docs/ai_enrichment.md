@@ -1,6 +1,6 @@
 # AI enrichment fallback
 
-When a torrent is added, `enrich.Enricher.Enrich` runs the parsed `(title, year)` through the metadata mappers in priority order — TMDB → OMDB → Kinopoisk Unofficial. For most releases at least one mapper hits and the pipeline persists posters, plot, rating, and IMDB id.
+When a torrent is added, `enrich.Enricher.Enrich` runs the parsed `(title, year)` through the metadata mappers in priority order — TMDB → OMDB → Kinopoisk Unofficial. For most releases at least one mapper hits and the pipeline persists posters, plot, rating, and IMDB id, plus genres when TMDB is the source (`docs/genres.md`).
 
 For some releases every mapper misses. The most common causes:
 
