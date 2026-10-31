@@ -1,0 +1,17 @@
+{{ define "library/genre_filter" }}
+{{/*
+    Genre filter, a select of the library's filter form
+    (views/library/index.html). .Data is *library.IndexData: its Genres are
+    the genres present in the section, labelled and sorted by the handler;
+    none (the torrents section, or titles without genres) hides the select.
+    Adds ?genre=<slug>; an empty value means all genres.
+*/}}
+{{ with .Data.Genres }}
+<select class="select select-sm w-auto max-w-full bg-base-300 border-w-line focus:border-w-purple focus:outline-none" name="genre" aria-label="{{ t $.Ctx.Lang "genre.label" }}" onchange="this.form.requestSubmit()">
+    <option value="">{{ t $.Ctx.Lang "genre.all" }}</option>
+    {{ range . }}
+    <option value="{{ .Slug }}" {{ if .Selected }}selected{{ end }}>{{ .Label }}</option>
+    {{ end }}
+</select>
+{{ end }}
+{{ end }}

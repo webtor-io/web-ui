@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,8 +16,11 @@ import (
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
+	"golang.org/x/text/collate"
+	"golang.org/x/text/language"
 )
 
 type RateFormData struct {
@@ -26,12 +30,64 @@ type RateFormData struct {
 }
 
 type IndexData struct {
-	Args          *shared.IndexArgs
-	Items         []any
-	TorrentCount  int
-	MovieCount    int
-	SeriesCount   int
-	RateForm      *RateFormData
+	Args         *shared.IndexArgs
+	Items        []any
+	TorrentCount int
+	MovieCount   int
+	SeriesCount  int
+	RateForm     *RateFormData
+	// Genres are the options of the genre filter; empty hides it.
+	Genres []GenreOption
+}
+
+// SectionEmpty reports whether the section has nothing at all, as opposed to
+// nothing that matches the filters: only then the page shows its "no torrents
+// yet" state instead of the list.
+func (d *IndexData) SectionEmpty() bool {
+	if len(d.Items) > 0 {
+		return false
+	}
+	switch d.Args.Section {
+	case shared.SectionTypeTorrents:
+		return d.TorrentCount == 0
+	case shared.SectionTypeMovies:
+		return d.MovieCount == 0
+	case shared.SectionTypeSeries:
+		return d.SeriesCount == 0
+	}
+	return true
+}
+
+type GenreOption struct {
+	Slug     string
+	Label    string
+	Selected bool
+}
+
+// sectionContentType is the content type of each section that has a genre
+// filter.
+var sectionContentType = map[shared.SectionType]models.ContentType{
+	shared.SectionTypeMovies: models.ContentTypeMovie,
+	shared.SectionTypeSeries: models.ContentTypeSeries,
+}
+
+// makeGenreOptions turns the section's genres into the filter's options,
+// sorted by label in the page language. The selected genre is always among
+// them, even when nothing in the section has it any more, so the select
+// shows what the list is filtered by.
+func makeGenreOptions(present []string, selected string, lang string, label func(slug string) string) []GenreOption {
+	if selected != "" && !slices.Contains(present, selected) {
+		present = append(present, selected)
+	}
+	var opts []GenreOption
+	for _, g := range present {
+		if genre.IsSlug(g) {
+			opts = append(opts, GenreOption{Slug: g, Label: label(g), Selected: g == selected})
+		}
+	}
+	c := collate.New(language.Make(lang))
+	slices.SortFunc(opts, func(a, b GenreOption) int { return c.CompareString(a.Label, b.Label) })
+	return opts
 }
 
 func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
@@ -55,6 +111,10 @@ func (s *Handler) bindIndexArgs(c *gin.Context) (args *shared.IndexArgs) {
 		args.Watched = shared.WatchedFilterWatched
 	default:
 		args.Watched = shared.WatchedFilterAll
+	}
+	// Anything outside the vocabulary means no genre filter.
+	if g := c.Query("genre"); genre.IsSlug(g) {
+		args.Genre = g
 	}
 	return
 }
@@ -124,6 +184,19 @@ func (s *Handler) index(c *gin.Context) {
 		SeriesCount:  sc,
 	}
 
+	// The genre options come from the whole section, not from the filtered
+	// list, so picking one genre does not take the others away.
+	if ct, ok := sectionContentType[args.Section]; ok {
+		present, err := models.GetLibraryGenres(ctx, db, u.ID, ct)
+		if err != nil {
+			_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get library genres"))
+			return
+		}
+		indexData.Genres = makeGenreOptions(present, args.Genre, i18n.GetLang(c), func(slug string) string {
+			return i18n.T(c, "genre."+slug)
+		})
+	}
+
 	// Detect rate-form prompt (from mark-watched redirect or explicit rate badge click).
 	if c.Query("rate-form") == "true" {
 		rf := &RateFormData{}
@@ -165,9 +238,9 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	case shared.SectionTypeTorrents:
 		return s.getTorrentList(ctx, u.ID, db, args.Sort)
 	case shared.SectionTypeMovies:
-		return s.getMovieList(ctx, u.ID, db, args.Sort, args.Watched)
+		return s.getMovieList(ctx, u.ID, db, args.Sort, libraryFilter(args))
 	case shared.SectionTypeSeries:
-		return s.getSeriesList(ctx, u.ID, db, args.Sort, args.Watched)
+		return s.getSeriesList(ctx, u.ID, db, args.Sort, libraryFilter(args))
 	}
 	return
 }
@@ -184,8 +257,12 @@ func (s *Handler) getTorrentList(ctx context.Context, id uuid.UUID, db *pg.DB, s
 	return
 }
 
-func (s *Handler) getMovieList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, watched shared.WatchedFilter) (items []any, err error) {
-	ls, err := models.GetLibraryMovieList(ctx, db, id, sort, string(watched))
+func libraryFilter(args *shared.IndexArgs) models.LibraryFilter {
+	return models.LibraryFilter{Watched: string(args.Watched), Genre: args.Genre}
+}
+
+func (s *Handler) getMovieList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, f models.LibraryFilter) (items []any, err error) {
+	ls, err := models.GetLibraryMovieListFiltered(ctx, db, id, sort, f)
 	if err != nil {
 		return
 	}
@@ -196,8 +273,8 @@ func (s *Handler) getMovieList(ctx context.Context, id uuid.UUID, db *pg.DB, sor
 	return
 }
 
-func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, watched shared.WatchedFilter) (items []any, err error) {
-	ls, err := models.GetLibrarySeriesList(ctx, db, id, sort, string(watched))
+func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, f models.LibraryFilter) (items []any, err error) {
+	ls, err := models.GetLibrarySeriesListFiltered(ctx, db, id, sort, f)
 	if err != nil {
 		return
 	}

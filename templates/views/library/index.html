@@ -17,16 +17,30 @@
 
     <!-- Menu + Filters + Sort (sticky on scroll) -->
     <div class="sticky top-[72px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 mb-3 bg-w-bg/90 backdrop-blur-lg border-b border-w-line/30">
-      <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+      <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
         {{ template "library/menu" . }}
         <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-          {{/* Filter and sort make way for the selection's buttons: on a
-               phone the row has no room for both. */}}
-          <div class="flex items-center gap-2 group-data-[bulk-on]/bulk:hidden">
+          {{/* Filters and sort make way for the selection's buttons: on a
+               phone the row has no room for both.
+
+               One form, so a change of any select sends all of them. It
+               renders main again, this bar with it, so Back restores the
+               selects together with the list: a #list swap left them at
+               the newer values, and a #list entry replayed on a resource
+               page blanked its file list. The price: the changed select
+               loses keyboard focus. Shown while the section has titles, so
+               filters that match nothing can be changed; "Select" only
+               while there is something to select.
+               `contents`: the selects wrap in this row together with the
+               select-mode button, two lines on a 360px phone. */}}
+          {{ if not .Data.SectionEmpty }}
+          <form action="{{ langPath $.Lang $.Path }}" data-async-target="main" data-async-no-scroll="true" class="contents group-data-[bulk-on]/bulk:hidden">
             {{ template "library/watched_filter" (withContext $ .Data.Args) }}
+            {{ template "library/genre_filter" (withContext $ .Data) }}
             {{ template "library/sort" (withContext $ .Data.Args) }}
-          </div>
+          </form>
           {{ if .Data.Items }}{{ template "bulk_select/bar" (withContext $ "/lib/remove") }}{{ end }}
+          {{ end }}
         </div>
       </div>
     </div>
@@ -34,7 +48,7 @@
     {{ if $.ErrKey }}<p role="alert" class="text-sm text-error mb-3">{{ t $.Lang $.ErrKey }}</p>{{ end }}
 
     <!-- Content -->
-    {{ if .Data.Items }}
+    {{ if not .Data.SectionEmpty }}
       {{ template "library/list" . }}
     {{ else }}
       <!-- Empty state -->

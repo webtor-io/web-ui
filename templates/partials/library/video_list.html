@@ -5,6 +5,15 @@
 {{/* isolate: the cards' overlays (the select-mode label, z-20; the 18+
      badge, z-10) stack inside the grid, under the page's sticky bar (z-10),
      whose buttons they otherwise cover once the list scrolls under it. */}}
+{{ if not $.Data }}
+{{/* The filters match nothing in a section that has titles (an empty section
+     gets the page's own empty state instead). Reset keeps the sort: it is
+     not a filter. */}}
+<div class="text-center py-16">
+    <p class="text-sm text-w-sub mb-4">{{ t $.Ctx.Lang "library.filterEmpty" }}</p>
+    <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-purple/30 hover:text-w-purpleL" href="{{ langPath $.Ctx.Lang $.Ctx.Path }}?sort={{ printf "%d" $.Ctx.Data.Args.Sort }}" data-async-target="main">{{ t $.Ctx.Lang "library.filterReset" }}</a>
+</div>
+{{ else }}
 <div class="isolate grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
     {{ range $.Data }}
     {{/* flex-col + flex-1: the anchor stays as tall as the grid row, as it
@@ -60,6 +69,7 @@
                       data-async-target="main" data-async-no-scroll="true" data-async-push-state="false"
                       onclick="event.stopPropagation()">
                     <input type="hidden" name="rate-form" value="true" />
+                    {{ template "library/filter_inputs" $.Ctx.Data.Args }}
                     <input type="hidden" name="rate-video-id" value="{{ . | getVideoID }}" />
                     <input type="hidden" name="rate-type" value="{{ . | getVideoType }}" />
                     <input type="hidden" name="rate-current" value="{{ derefInt16 .UserRating }}" />
@@ -73,6 +83,7 @@
                       data-async-target="main" data-async-no-scroll="true" data-async-push-state="false"
                       onclick="event.stopPropagation()">
                     <input type="hidden" name="rate-form" value="true" />
+                    {{ template "library/filter_inputs" $.Ctx.Data.Args }}
                     <input type="hidden" name="rate-video-id" value="{{ . | getVideoID }}" />
                     <input type="hidden" name="rate-type" value="{{ . | getVideoType }}" />
                     <input type="hidden" name="rate-current" value="0" />
@@ -101,6 +112,9 @@
                         </div>
                     {{ end }}
                 </div>
+                {{ with getCardGenres . }}
+                <p class="mt-1 text-xs text-w-muted line-clamp-1">{{ range $i, $g := . }}{{ if $i }}, {{ end }}{{ t $.Ctx.Lang (printf "genre.%s" $g) }}{{ end }}</p>
+                {{ end }}
             </div>
         </div>
     </a>
@@ -113,4 +127,14 @@
     </div>
     {{ end }}
 </div>
+{{ end }}
+{{ end }}
+
+{{/* The list's sort and filters (*shared.IndexArgs), for a form that renders
+     the page again: without them it comes back sorted and filtered by the
+     defaults while the address keeps the old query. */}}
+{{ define "library/filter_inputs" }}
+<input type="hidden" name="sort" value="{{ printf "%d" .Sort }}" />
+<input type="hidden" name="watched" value="{{ .Watched }}" />
+<input type="hidden" name="genre" value="{{ .Genre }}" />
 {{ end }}

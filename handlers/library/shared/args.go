@@ -16,4 +16,6 @@ type IndexArgs struct {
 	Sort    models.SortType
 	Section SectionType
 	Watched WatchedFilter
+	// Genre is a genre slug (services/genre), "" for all genres.
+	Genre string
 }

@@ -1,6 +1,8 @@
 package helpers
 
 import (
+	"slices"
+
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
 )
@@ -45,7 +47,9 @@ var sorts = map[shared.SectionType]Sort{
 }
 
 func (s *SortHelper) MakeSort(args *shared.IndexArgs) *Sort {
-	sort := sorts[args.Section]
+	// A copy: the options are shared by every request, and marking the
+	// selected one in place let concurrent renders show each other's sort.
+	sort := slices.Clone(sorts[args.Section])
 	for k, opt := range sort {
 		sort[k].Selected = opt.SortType == args.Sort
 	}

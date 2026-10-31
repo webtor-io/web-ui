@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -54,6 +55,27 @@ func (s *VideoContentHelper) GetRating(m models.VideoContentWithMetadata) float6
 		return r
 	}
 	return 0
+}
+
+// GetCardGenres returns the genre slugs for the card's genre line: at most
+// three, in stored (TMDB) order. Anything outside the vocabulary is dropped,
+// because the template shows each slug as its genre.<slug> label.
+func (s *VideoContentHelper) GetCardGenres(m models.VideoContentWithMetadata) []string {
+	md := m.GetMetadata()
+	if md == nil {
+		return nil
+	}
+	var out []string
+	for _, g := range md.Genres {
+		if !genre.IsSlug(g) {
+			continue
+		}
+		out = append(out, g)
+		if len(out) == 3 {
+			break
+		}
+	}
+	return out
 }
 
 func (s *VideoContentHelper) HasPoster(m models.VideoContentWithMetadata) bool {

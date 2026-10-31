@@ -5,7 +5,8 @@ import av from '../lib/av';
 // shows and hides itself from it. The boxes carry no name: the selection goes
 // as one comma-joined field (a multipart part per box is cut off at 1000
 // parts without a word, web.FormBulkIDs). A list re-rendered inside the root
-// (the library's sort and filter, the Vault table renewing its status tokens)
+// (the Vault table renewing its status tokens; the library's filters swap the
+// whole main, and they are hidden in select mode anyway)
 // comes back unchecked, so the chosen ids are kept by this root's view (a
 // closure per init, not module scope -- CLAUDE.md) and put back on the boxes
 // still there.
