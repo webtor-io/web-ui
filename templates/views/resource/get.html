@@ -162,6 +162,8 @@
 {{ end }}
 {{ define "head_extra" }}
 {{ with .Data }}{{ if . | hasEnrichment }}
+{{/* No "genre" here, nor credits: the header shows them, the schema carries
+     nothing beyond what it already had (owner: no extra content schema). */}}
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
@@ -267,6 +269,8 @@
                     </span>
                     {{ end }}
                     {{ if . | isEnrichedSeries }}<span class="badge badge-sm bg-w-cyan/10 text-w-cyan border-0">{{ t $.Lang "resource.series" }}</span>{{ end }}
+                    {{/* Up to four, for everyone and on adult torrents too, like year and rating (docs/genres.md). One flex item, last: on a phone it wraps to its own line and then within it, so it goes after the Series badge (the only Series marker there) or that badge would sit alone below it. */}}
+                    {{ with . | getEnrichedGenres }}<span>{{ range $i, $g := . }}{{ if lt $i 4 }}{{ if $i }}, {{ end }}{{ t $.Lang (printf "genre.%s" $g) }}{{ end }}{{ end }}</span>{{ end }}
                 </div>
                 {{ if or .Movie .Series }}
                 <div class="flex items-center gap-2 mt-2 mb-3">

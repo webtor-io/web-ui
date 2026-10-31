@@ -8,6 +8,7 @@ import (
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/pagination"
 	"github.com/webtor-io/web-ui/services/statusview"
 	w "github.com/webtor-io/web-ui/services/web"
@@ -255,6 +256,23 @@ func (s *Helper) GetEnrichedRating(gd *GetData) float64 {
 		return *md.Rating
 	}
 	return 0
+}
+
+// GetEnrichedGenres returns the title's genre slugs, each a genre.<slug>
+// locale key. A stored value outside the vocabulary is dropped, so the page
+// never prints a raw key.
+func (s *Helper) GetEnrichedGenres(gd *GetData) []string {
+	md := s.getMetadata(gd)
+	if md == nil {
+		return nil
+	}
+	var out []string
+	for _, g := range md.Genres {
+		if genre.IsSlug(g) {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 func (s *Helper) HasEnrichedPoster(gd *GetData) bool {
