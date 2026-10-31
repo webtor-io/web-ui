@@ -2,6 +2,8 @@ import { useMemo, useCallback } from 'preact/hooks';
 import { getSearchResultsForType } from './discoverReducer';
 import { chipClass } from './discoverUtils';
 import { t, tf } from '../i18n';
+import { getLang } from '../../i18n';
+import { filterOptions } from '../genres';
 
 function typeLabel(type) {
     const key = `discover.type.${type.toLowerCase()}`;
@@ -116,6 +118,29 @@ export function CatalogSelector({ catalogs, selectedCatalog, onSelect }) {
                             {cat.disabled ? `⚠ ${cat.name} (${cat.addonName})` : `${cat.name} (${cat.addonName})`}
                         </option>
                     ))}
+            </select>
+        </div>
+    );
+}
+
+// GenreSelector is the selected catalog's genre extra (genres.js
+// catalogFilter): a genre select with "All genres" first, or for a year
+// catalog a year select with no "All". Values are sent as they are; only
+// the labels are localized.
+export function GenreSelector({ filter, value, onSelect }) {
+    const options = useMemo(() => filter ? filterOptions(filter, t, getLang()) : [], [filter]);
+    if (!filter) return null;
+    const year = filter.mode === 'year';
+    return (
+        <div>
+            <select
+                class="select select-sm bg-w-surface border-w-line text-w-text w-full sm:w-auto"
+                aria-label={t(year ? 'genre.yearLabel' : 'genre.label')}
+                onChange={(e) => onSelect(e.target.value || null)}
+                value={value || ''}
+            >
+                {!year && <option value="">{t('genre.all')}</option>}
+                {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
         </div>
     );

@@ -1,6 +1,7 @@
 import { useCallback, useState, useMemo } from 'preact/hooks';
 import { StarIcon } from './StarIcon';
 import { t } from '../i18n';
+import { genreLabels } from '../genres';
 
 // 5-star half-step rating from 0-10 scale, matching library/stars.html exactly.
 // DaisyUI fills stars via :has(~[aria-current=true]) — all siblings before the
@@ -208,6 +209,8 @@ function ItemCard({ item, showBadge, watched, rating, inWatchlist, onClick, onTo
     }, [item, onToggleWatchlist]);
 
     const isImdb = item.id && item.id.startsWith('tt');
+    // The same line as the library card's (video_list.html): up to 3.
+    const genres = genreLabels(item.genres || item.genre, t).slice(0, 3);
 
     return (
         <div class="group cursor-pointer flex" onClick={handleClick}>
@@ -249,6 +252,9 @@ function ItemCard({ item, showBadge, watched, rating, inWatchlist, onClick, onTo
                         </div>
                         {item.imdbRating && <StarRating rating={item.imdbRating} />}
                     </div>
+                    {genres.length > 0 && (
+                        <p class="mt-1 text-xs text-w-muted line-clamp-1">{genres.join(', ')}</p>
+                    )}
                 </div>
             </div>
         </div>

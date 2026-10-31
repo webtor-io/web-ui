@@ -16,6 +16,7 @@ import { switchStates, switchCounts, hiddenBy, emptyStateKey, browserDecodesHevc
 import { rememberRelease } from '../release-check';
 import { StarIcon } from './StarIcon';
 import { t, tf } from '../i18n';
+import { genreLabels } from '../genres';
 
 export function StreamModal({ modal, onClose, onEpisodeSelect, onStreamClick, onBackToEpisodes, onSeasonChange, hasCustomAddons, onSetupAddons, onRetryStreams, userStatuses, watchlistIds, onToggleWatched, onRate, onToggleWatchlist, onTabChange, subscriptionKeys, onToggleSubscription, hasSources, playback }) {
     const dialogRef = useRef(null);
@@ -97,6 +98,10 @@ function ModalBody({ modal, onClose, onEpisodeSelect, onStreamClick, onSeasonCha
         year: modal.year || modal.releaseInfo,
         imdbRating: modal.imdbRating,
         description: modal.description,
+        // The episodes view holds the series' full meta, and an episode's
+        // streams carry it in backToEpisodes: its genres stand in when the
+        // card had none (a deep link, a watchlist card).
+        genres: genreLabels(modal.genres?.length ? modal.genres : (modal.meta?.genres || modal.backToEpisodes?.meta?.genres), t).slice(0, 4),
         afterDescription: isImdb && videoType ? <Credits id={videoId} type={videoType} /> : null,
     };
 
@@ -298,7 +303,7 @@ function CastPhoto({ member }) {
     );
 }
 
-function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, imdbRating, description }) {
+function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, imdbRating, genres, description }) {
     const [imgError, setImgError] = useState(false);
 
     return (
@@ -320,7 +325,7 @@ function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, i
             </div>
             <div class="flex flex-col justify-center min-w-0">
                 <h3 class="font-bold text-lg line-clamp-2">{title || t('discover.unknown')}</h3>
-                {(year || imdbRating) && (
+                {(year || imdbRating || genres?.length > 0) && (
                     <div class="flex flex-wrap items-center gap-2 mt-1 text-sm text-w-sub">
                         {year && <span>{year}</span>}
                         {imdbRating && (
@@ -329,6 +334,7 @@ function ModalHeader({ title, poster, subtitle, extra, afterDescription, year, i
                                 {parseFloat(imdbRating).toFixed(1)}
                             </span>
                         )}
+                        {genres?.length > 0 && <span>{genres.join(', ')}</span>}
                     </div>
                 )}
                 {extra}

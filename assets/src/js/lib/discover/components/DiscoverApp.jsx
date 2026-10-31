@@ -21,7 +21,7 @@ import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
 import { CalendarView } from './CalendarView';
-import { TypeTabs, SearchTabs, CatalogSelector } from './Tabs';
+import { TypeTabs, SearchTabs, CatalogSelector, GenreSelector } from './Tabs';
 import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults, CatalogUnavailable } from './EmptyStates';
 import { AddonHealthChip } from './AddonHealthChip';
 import { AISection } from './ai/AISection';
@@ -29,6 +29,7 @@ import { t, langPath } from '../i18n';
 import { fetchTorznabStreams, hasIndexers, indexerLabel } from '../torznabClient';
 import { startProbe, decodedTokens, declaredTokens, takesPart } from '../../player/decode-declaration';
 import { usePlaybackContext } from '../usePlaybackContext';
+import { genreFor } from '../genres';
 
 // The declaration module as the stream modal's switches ask it
 // (usePlaybackContext): one object, so the context is not gathered again on
@@ -51,6 +52,7 @@ function episodesModalFromBack(back, { tab, defaultSeason } = {}) {
         releaseInfo: back.releaseInfo,
         imdbRating: back.imdbRating,
         description: back.description,
+        genres: back.genres,
         tab,
         defaultSeason: defaultSeason != null ? defaultSeason : (back.season != null ? Number(back.season) : undefined),
     };
@@ -69,6 +71,7 @@ function modalIdentity(m) {
         releaseInfo: m?.releaseInfo,
         imdbRating: m?.imdbRating,
         description: m?.description,
+        genres: m?.genres,
     };
 }
 
@@ -118,7 +121,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     }
 
     // --- Load catalog ---
-    const loadCatalog = useCallback(async (catalog, skip, currentItems) => {
+    const loadCatalog = useCallback(async (catalog, skip, currentItems, genre) => {
         if (!catalog) return;
         // Skip the fetch for catalogs whose addon is currently down — the
         // UI renders CatalogUnavailable for these so users see why nothing
@@ -131,7 +134,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const { signal } = abortRef.current;
 
         try {
-            const data = await client.fetchCatalog(catalog.baseUrl, catalog.type, catalog.id, skip, { signal });
+            const data = await client.fetchCatalog(catalog.baseUrl, catalog.type, catalog.id, skip, { signal, genre });
             let metas = data.metas || [];
             if (skip > 0) {
                 const existingIds = new Set(currentItems.map(i => i.id));
@@ -174,6 +177,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 const urlEpisode = urlParams.get('episode');
                 const urlCatalogBase = urlParams.get('catalog-base');
                 const urlCatalogId = urlParams.get('catalog-id');
+                const urlGenre = urlParams.get('genre');
 
                 const prefs = loadPrefs();
                 let selectedType = types[0];
@@ -199,7 +203,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     if (match) selectedCatalog = match;
                 }
 
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons, viewMode: getViewMode() });
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, selectedGenre: urlGenre, addons, viewMode: getViewMode() });
 
                 // Store page/modal restore targets
                 if (urlPage > 0) restoredPageRef.current = urlPage;
@@ -243,11 +247,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     useEffect(() => {
         if (state.phase !== 'ready' || state.isSearchMode) return;
         if (!state.selectedCatalog) return;
-        const key = `${state.selectedCatalog.baseUrl}::${state.selectedCatalog.id}::${state.selectedType}`;
+        const key = `${state.selectedCatalog.baseUrl}::${state.selectedCatalog.id}::${state.selectedType}::${state.selectedGenre ?? ''}`;
         if (prevCatalogRef.current === key && state.skip > 0) return;
         prevCatalogRef.current = key;
-        loadCatalog(state.selectedCatalog, 0, []);
-    }, [state.phase, state.selectedCatalog, state.selectedType, state.isSearchMode, loadCatalog]);
+        loadCatalog(state.selectedCatalog, 0, [], state.selectedGenre);
+    }, [state.phase, state.selectedCatalog, state.selectedType, state.selectedGenre, state.isSearchMode, loadCatalog]);
 
     // Batch-localize whatever grid surface is on screen through the server
     // enrichment pipeline (POST /discover/localize). localizeClient holds a
@@ -265,13 +269,16 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     }, [state.items, state.searchResults, state.watchlistItems, state.isSearchMode, state.watchlistFilterEnabled, state.selectedType]);
 
     // --- Type/Catalog selection ---
+    // Each push writes the URL the state→URL sync is about to write (genre
+    // and page as the reducer resets them), so a switch writes one URL and
+    // Umami counts one pageview.
     const selectType = useCallback((type) => {
         abortCatalog();
         savePrefs({ type });
         const catalogs = getCatalogsForType(state.catalogs, type);
         const catalog = catalogs[0] || null;
         url.push({
-            type, 'catalog-base': client.addonKey(catalog?.baseUrl), 'catalog-id': catalog?.id,
+            type, 'catalog-base': client.addonKey(catalog?.baseUrl), 'catalog-id': catalog?.id, genre: null, page: null,
             id: null, season: null, episode: null, search: null, 'search-type': null,
         });
         dispatch({ type: 'SELECT_TYPE', selectedType: type });
@@ -281,16 +288,26 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         abortCatalog();
         savePrefs({ catalogBase: catalog.baseUrl, catalogId: catalog.id });
         url.push({
-            'catalog-base': client.addonKey(catalog.baseUrl), 'catalog-id': catalog.id,
+            'catalog-base': client.addonKey(catalog.baseUrl), 'catalog-id': catalog.id, genre: null, page: null,
             id: null, season: null, episode: null,
         });
         dispatch({ type: 'SELECT_CATALOG', catalog });
     }, []);
 
+    // genre is the select's value, null for "All genres". The reducer
+    // validates it against the catalog's options (genres.js genreFor).
+    const selectGenre = useCallback((genre) => {
+        const catalog = state.selectedCatalog;
+        abortCatalog();
+        url.push({ genre: genre === genreFor(catalog) ? null : genre, page: null, id: null, season: null, episode: null });
+        dispatch({ type: 'SELECT_GENRE', genre });
+        window.umami?.track('discover-genre-selected', { type: catalog?.type, catalog: catalog?.id, genre: genre || 'all' });
+    }, [state.selectedCatalog]);
+
     // --- Load more ---
     const loadMore = useCallback(() => {
-        loadCatalog(state.selectedCatalog, state.items.length, state.items);
-    }, [state.selectedCatalog, state.items, loadCatalog]);
+        loadCatalog(state.selectedCatalog, state.items.length, state.items, state.selectedGenre);
+    }, [state.selectedCatalog, state.selectedGenre, state.items, loadCatalog]);
 
     // --- Search ---
     const exitSearch = useCallback(() => {
@@ -318,7 +335,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
 
         // Push history entry when first entering search mode (not during popstate)
         if (!state.isSearchMode && !url.isPopstate.current) {
-            url.push({ search: query, 'search-type': null, type: null, 'catalog-base': null, 'catalog-id': null, id: null, season: null, episode: null });
+            url.push({ search: query, 'search-type': null, type: null, 'catalog-base': null, 'catalog-id': null, genre: null, page: null, id: null, season: null, episode: null });
         }
 
         const gen = ++searchGenRef.current;
@@ -387,6 +404,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const releaseInfo = item.releaseInfo;
         const imdbRating = item.imdbRating;
         const description = item.description;
+        const genres = item.genres || item.genre;
         const addons = client.getStreamAddons();
         // Seed the tab from the URL so deep links / reloads with
         // ?tab=reviews land on the reviews tab — a freshly built modal
@@ -397,7 +415,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         // external source can resolve — offers nothing, and the empty states
         // render without the CTA.
         const subTarget = subscriptionTargetFor(type, id, metaId, modalExtra?.backToEpisodes?.meta);
-        const itemMeta = { year, releaseInfo, imdbRating, description, tab: reviewsTab(), subTarget };
+        const itemMeta = { year, releaseInfo, imdbRating, description, genres, tab: reviewsTab(), subTarget };
 
         // Addons we couldn't even probe for streams because their manifest
         // is unreachable or returned a 4xx. Without surfacing these, an
@@ -550,7 +568,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         }
 
         // Build metadata from catalog item; fetchMeta will fill in missing fields.
-        const cardMeta = { year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description };
+        const cardMeta = { year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description, genres: item.genres || item.genre };
 
         // Enrich cardMeta from Stremio meta response (has description, imdbRating, etc.)
         function enrichFromMeta(meta) {
@@ -559,6 +577,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             if (!cardMeta.imdbRating && meta.imdbRating) cardMeta.imdbRating = meta.imdbRating;
             if (!cardMeta.releaseInfo && meta.releaseInfo) cardMeta.releaseInfo = meta.releaseInfo;
             if (!cardMeta.year && meta.year) cardMeta.year = meta.year;
+            if (!cardMeta.genres?.length && meta.genres?.length) cardMeta.genres = meta.genres;
         }
 
         if (type === 'series') {
@@ -638,11 +657,12 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // Fetch meta in parallel with stream loading so we can offer "back to episodes"
             const metaPromise = client.fetchMeta(type, id).catch(() => null);
 
-            await loadStreams(type, epId, { name: epName, poster, year: item?.year, releaseInfo: item?.releaseInfo, imdbRating: item?.imdbRating, description: item?.description }, {});
+            const genres = item?.genres || item?.genre;
+            await loadStreams(type, epId, { name: epName, poster, year: item?.year, releaseInfo: item?.releaseInfo, imdbRating: item?.imdbRating, description: item?.description, genres }, {});
 
             const meta = await metaPromise;
             if (meta?.videos?.length > 0) {
-                const backToEpisodes = { title: name, poster, meta, itemId: id, itemType: type, season: ep.season, year: item?.year, releaseInfo: item?.releaseInfo, imdbRating: item?.imdbRating, description: item?.description };
+                const backToEpisodes = { title: name, poster, meta, itemId: id, itemType: type, season: ep.season, year: item?.year, releaseInfo: item?.releaseInfo, imdbRating: item?.imdbRating, description: item?.description, genres };
                 const cur = stateRef.current?.modal;
                 if (cur) dispatch({ type: 'SHOW_MODAL', modal: { ...cur, backToEpisodes } });
             }
@@ -673,9 +693,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             releaseInfo: item.releaseInfo,
             imdbRating: item.imdbRating,
             description: item.description,
+            genres: item.genres,
         };
 
-        await loadStreams(type, epId, { name: epName, poster: item.poster, year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description }, { backToEpisodes });
+        await loadStreams(type, epId, { name: epName, poster: item.poster, year: item.year, releaseInfo: item.releaseInfo, imdbRating: item.imdbRating, description: item.description, genres: item.genres }, { backToEpisodes });
     }, [loadStreams]);
 
     // Direct jump to the episodes view — NOT history.back(): the history
@@ -846,25 +867,33 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             return;
         }
 
+        // The type and catalog checks compare the URL against `base`, the
+        // state as the dispatches below leave it: EXIT_SEARCH and
+        // SELECT_TYPE land on the type's first catalog, so comparing
+        // against `cur` (taken before them) would keep that one.
+        let base = cur;
+
         // If no search param but currently in search mode — exit search
         if (cur.isSearchMode) {
             url.withPopstate(() => { abortCatalog(); dispatch({ type: 'EXIT_SEARCH' }); });
+            base = discoverReducer(base, { type: 'EXIT_SEARCH' });
         }
 
         // Handle type change
-        if (type && cur && type !== cur.selectedType) {
-            const types = getTypes(cur.catalogs);
+        if (type && type !== base.selectedType) {
+            const types = getTypes(base.catalogs);
             if (types.includes(type)) {
                 savePrefs({ type });
                 dispatch({ type: 'SELECT_TYPE', selectedType: type });
+                base = discoverReducer(base, { type: 'SELECT_TYPE', selectedType: type });
             }
         }
 
         // Handle catalog change
-        if (catalogBase && catalogId && cur) {
-            const curCat = cur.selectedCatalog;
+        if (catalogBase && catalogId) {
+            const curCat = base.selectedCatalog;
             if (!curCat || !client.namesAddon(catalogBase, curCat.baseUrl) || curCat.id !== catalogId) {
-                const match = getCatalogsForType(cur.catalogs, type || cur.selectedType)
+                const match = getCatalogsForType(base.catalogs, type || base.selectedType)
                     .find(c => client.namesAddon(catalogBase, c.baseUrl) && c.id === catalogId);
                 if (match) {
                     savePrefs({ catalogBase: match.baseUrl, catalogId: match.id });
@@ -872,6 +901,10 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 }
             }
         }
+
+        // After the catalog: SELECT_CATALOG resets the genre to the
+        // catalog's default, and the reducer drops a value already shown.
+        dispatch({ type: 'SELECT_GENRE', genre: urlParams.get('genre') });
 
         // Handle modal state
         if (!id) {
@@ -920,7 +953,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         if (restoredPageRef.current > 0 && state.hasMore) {
             restoredPageRef.current--;
             restoreInProgressRef.current = true;
-            loadCatalog(state.selectedCatalog, state.items.length, state.items);
+            loadCatalog(state.selectedCatalog, state.items.length, state.items, state.selectedGenre);
             return;
         }
 
@@ -967,6 +1000,9 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 params['catalog-base'] = client.addonKey(state.selectedCatalog.baseUrl);
                 params['catalog-id'] = state.selectedCatalog.id;
             }
+            // The catalog's default (all genres, the newest year) is left
+            // out, so a saved "New" link keeps meaning the newest year.
+            if (state.selectedGenre && state.selectedGenre !== genreFor(state.selectedCatalog)) params.genre = state.selectedGenre;
             if (state.page > 0) params.page = state.page;
         }
 
@@ -975,7 +1011,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         ['id', 'season', 'episode', 'tab'].forEach(k => { const v = cur.get(k); if (v != null) params[k] = v; });
 
         url.replaceAll(params);
-    }, [state.phase, state.selectedType, state.selectedCatalog, state.isSearchMode, state.searchQuery, state.searchType, state.watchlistFilterEnabled, state.watchlistType, state.page]);
+    }, [state.phase, state.selectedType, state.selectedCatalog, state.selectedGenre, state.isSearchMode, state.searchQuery, state.searchType, state.watchlistFilterEnabled, state.watchlistType, state.page]);
 
     const retry = useCallback(() => {
         dispatch({ type: 'SET_PHASE', phase: 'loading' });
@@ -1027,6 +1063,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             releaseInfo: m.releaseInfo,
             imdbRating: m.imdbRating,
             description: m.description,
+            genres: m.genres,
         };
         await loadStreams(type, streamId, item, m.backToEpisodes ? { backToEpisodes: m.backToEpisodes } : {});
     }, [client]);
@@ -1061,7 +1098,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // Force a fresh catalog load when the previous selection
             // becomes available again or changes.
             prevCatalogRef.current = null;
-            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, addons, viewMode: stateRef.current?.viewMode });
+            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, selectedGenre: cur?.selectedGenre, addons, viewMode: stateRef.current?.viewMode });
         } catch (e) {
             // Keep the page rendered as-is; chip retains failure state.
         }
@@ -1287,7 +1324,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // when entering watchlist (they don't apply); on the way out
             // they get restored from prefs by the catalog effect.
             url.push(wantWatchlist
-                ? { watchlist: '1', 'catalog-base': null, 'catalog-id': null, type: null, page: null, id: null, season: null, episode: null }
+                ? { watchlist: '1', 'catalog-base': null, 'catalog-id': null, type: null, genre: null, page: null, id: null, season: null, episode: null }
                 : { watchlist: null, id: null, season: null, episode: null });
         }
         dispatch({ type: 'WATCHLIST_FILTER_SET', enabled: wantWatchlist });
@@ -1515,6 +1552,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             releaseInfo: item.releaseInfo,
             imdbRating: item.imdbRating,
             description: item.description,
+            genres: item.genres || item.genre,
         };
         const backToEpisodes = meta?.videos?.length > 0 ? {
             title: seriesName,
@@ -1555,6 +1593,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 releaseInfo: item.releaseInfo,
                 imdbRating: item.imdbRating,
                 description: item.description,
+                genres: item.genres || item.genre,
             },
         });
     }, []);
@@ -1708,9 +1747,12 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                             )}
                             </div>
                         </div>
-                        {!state.watchlistFilterEnabled && catalogsForType.length > 1 && (
-                            <div class="mt-2">
+                        {/* The genre select comes after the catalog one, and
+                            shows on a catalog with no others to choose from. */}
+                        {!state.watchlistFilterEnabled && (catalogsForType.length > 1 || state.selectedCatalog?.filter) && (
+                            <div class="mt-2 flex flex-col sm:flex-row gap-2">
                                 <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
+                                <GenreSelector filter={state.selectedCatalog?.filter} value={state.selectedGenre} onSelect={selectGenre} />
                             </div>
                         )}
                     </>
