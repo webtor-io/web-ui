@@ -1,5 +1,7 @@
 // Discover page state reducer
 
+import { catalogFilter, genreFor } from '../genres';
+
 export const TYPE_PRIORITY = ['movie', 'series'];
 
 export function sortByPriority(types, priority) {
@@ -32,6 +34,7 @@ export function buildCatalogs(addonStatuses) {
                 baseUrl: a.baseUrl,
                 disabled,
                 addonStatus: a.status,
+                filter: catalogFilter(cat),
             });
         }
     }
@@ -153,6 +156,10 @@ export const initialState = {
     addons: [],
     selectedType: null,
     selectedCatalog: null,
+    // The selected catalog's genre extra value (genres.js genreFor): null
+    // for all genres, a year in a year catalog. In the URL as ?genre=, not
+    // in discover-prefs.
+    selectedGenre: null,
     items: [],
     skip: 0,
     hasMore: true,
@@ -213,6 +220,7 @@ export function discoverReducer(state, action) {
                 phase: 'ready', manifests, catalogs,
                 addons: addons || state.addons,
                 selectedType, selectedCatalog,
+                selectedGenre: genreFor(selectedCatalog, action.selectedGenre),
                 viewMode: viewMode || state.viewMode,
             };
         }
@@ -226,10 +234,18 @@ export function discoverReducer(state, action) {
             return { ...state, phase: action.phase, errorMessage: action.message || '' };
         case 'SELECT_TYPE': {
             const selectedCatalog = getCatalogsForType(state.catalogs, action.selectedType)[0] || null;
-            return { ...state, selectedType: action.selectedType, selectedCatalog, items: [], skip: 0, hasMore: true, page: 0 };
+            return { ...state, selectedType: action.selectedType, selectedCatalog, selectedGenre: genreFor(selectedCatalog), items: [], skip: 0, hasMore: true, page: 0 };
         }
         case 'SELECT_CATALOG':
-            return { ...state, selectedCatalog: action.catalog, items: [], skip: 0, hasMore: true, page: 0 };
+            return { ...state, selectedCatalog: action.catalog, selectedGenre: genreFor(action.catalog), items: [], skip: 0, hasMore: true, page: 0 };
+        case 'SELECT_GENRE': {
+            // A value the catalog doesn't offer lands on its default, and
+            // the same value again is no change — popstate dispatches this
+            // on every catalog-mode step, a modal close included.
+            const selectedGenre = genreFor(state.selectedCatalog, action.genre);
+            if (selectedGenre === state.selectedGenre) return state;
+            return { ...state, selectedGenre, items: [], skip: 0, hasMore: true, page: 0 };
+        }
         case 'CATALOG_LOADING':
             return { ...state, catalogLoading: true };
         case 'CATALOG_LOADED': {
@@ -256,7 +272,7 @@ export function discoverReducer(state, action) {
             return {
                 ...state,
                 isSearchMode: false, searchQuery: '', searchResults: [], searchType: 'all', searchLoading: false,
-                selectedType, selectedCatalog, items: [], skip: 0, hasMore: true, page: 0,
+                selectedType, selectedCatalog, selectedGenre: genreFor(selectedCatalog), items: [], skip: 0, hasMore: true, page: 0,
             };
         }
         case 'SHOW_MODAL':

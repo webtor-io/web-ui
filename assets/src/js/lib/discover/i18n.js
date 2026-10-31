@@ -6,11 +6,12 @@ export { langPath };
 // to the locale-filter-loader, and emits `locale-discover-{lang}.js` for
 // each match. New locales added to lib/i18n.js SUPPORTED need zero changes
 // here — the `[request]` magic resolves at build time from the matched
-// file basename.
+// file basename. The chunk also carries `genre.*`: the genre labels are
+// shared with the library and torrent pages, which read them server-side.
 function load(lang) {
     return import(
         /* webpackChunkName: "locale-discover-[request]" */
-        `../../../../../locales/${lang}.json?prefix=discover`
+        `../../../../../locales/${lang}.json?prefix=discover,genre`
     );
 }
 

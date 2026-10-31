@@ -1,4 +1,5 @@
-// The credits line in the stream modal header, rendered: the real
+// The credits line (and, at the end, the genre labels) in the stream modal
+// header, rendered: the real
 // StreamModal in jsdom, through preact (setup as in
 // StreamModal.switches.test.js). Faked: fetch for /discover/credits and the
 // <dialog>'s showModal/close. t() answers with the key.
@@ -103,5 +104,21 @@ test('the cast strip draws no photo until it is opened, and stays open across vi
     show({ view: 'streams', metaId: 'tt1', itemType: 'movie', title: 'One', streams: [] });
     assert.ok(details().open, 'the view switch did not fold it');
     assert.equal(root.querySelectorAll('img[src^="/lib/person/photo/"]').length, 1);
+    render(null, root);
+});
+
+test('genre labels sit in the year/rating row: up to four; the episodes view falls back to its meta', async () => {
+    const row = () => root.querySelector('h3 + div.text-w-sub');
+    show({ view: 'streams', metaId: 'tt2', itemType: 'movie', title: 'Two', year: '1999', streams: [],
+        genres: ['Action', 'Sci-Fi', 'Science Fiction', 'Drama', 'Anime', 'Crime'] });
+    assert.equal(row().lastElementChild.textContent, 'genre.action, genre.scifi, genre.drama, Anime');
+
+    show({ view: 'episodes', itemId: 'tt3', itemType: 'series', title: 'Three', meta: { genres: ['Western'], videos: [{ id: 'tt3:1:1', season: 1, episode: 1 }] } });
+    assert.equal(row().textContent, 'genre.western', 'no year, no rating: the row holds the genres alone');
+
+    show({ view: 'streams', metaId: 'tt2', itemType: 'movie', title: 'Two', streams: [], genres: ['Bogus', 7] });
+    assert.equal(row().textContent, 'Bogus');
+    show({ view: 'streams', metaId: 'tt2', itemType: 'movie', title: 'Two', streams: [] });
+    assert.equal(row(), null, 'nothing to show, no row');
     render(null, root);
 });

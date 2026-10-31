@@ -16,6 +16,7 @@ import (
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
 	tm "github.com/webtor-io/web-ui/models/tmdb"
+	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/tmdb"
 )
 
@@ -105,6 +106,7 @@ func (s *TMDB) makeVideoMetadata(info *tm.Info) *models.VideoMetadata {
 		Plot:      plot,
 		PosterURL: posterURL,
 		Rating:    rating,
+		Genres:    genre.FromTMDB(info.Metadata["genres"]),
 	}
 }
 
@@ -702,6 +704,109 @@ func (s *TMDB) BackfillCredits(ctx context.Context, limit int) (int, error) {
 	return done, nil
 }
 
+// genresBackfillBatch is how many metadata rows one round of BackfillGenres
+// handles: one read of them, one indexed read of tmdb.info, one UPDATE.
+const genresBackfillBatch = 500
+
+// BackfillGenres implements GenresBackfiller: derives genres for up to limit
+// movie_metadata / series_metadata rows that have none yet (NULL) from the
+// cached tmdb.info rows. No TMDB call: a row with nothing cached gets '{}'.
+func (s *TMDB) BackfillGenres(ctx context.Context, limit int) (int, error) {
+	db := s.pg.Get()
+	if db == nil {
+		return 0, errors.New("db is nil")
+	}
+	done := 0
+	for _, ct := range []models.ContentType{models.ContentTypeMovie, models.ContentTypeSeries} {
+		for done < limit {
+			rows, err := models.ListMetadataWithoutGenres(ctx, db, ct, min(genresBackfillBatch, limit-done))
+			if err != nil {
+				return done, err
+			}
+			if len(rows) == 0 {
+				break
+			}
+			imdbIDs, tmdbIDs := []string{}, []int{}
+			for _, r := range rows {
+				if strings.HasPrefix(r.VideoID, "tt") {
+					imdbIDs = append(imdbIDs, r.VideoID)
+				} else if id, ok := tmdbNumber(r.VideoID); ok {
+					tmdbIDs = append(tmdbIDs, id)
+				}
+			}
+			infos, err := tm.ListGenres(ctx, db, imdbIDs, tmdbIDs)
+			if err != nil {
+				return done, err
+			}
+			n, err := models.SetMetadataGenres(ctx, db, ct, genresFor(rows, ct, infos))
+			if err != nil {
+				return done, err
+			}
+			if n == 0 {
+				// Every row was filled by someone else meanwhile, or the
+				// write did not take: either way, no progress to loop on.
+				break
+			}
+			done += n
+		}
+	}
+	return done, nil
+}
+
+// genresFor derives the genres of one content type's metadata rows from the
+// tmdb.info rows ListGenres found for them (lowest tmdb_id first):
+//   - tt…: the row with that IMDB id, preferring the table's type. imdb_id is
+//     not unique in tmdb.info, but an IMDB id names one title, so a row of the
+//     other type is still that title, the one MapByID would have stored.
+//   - tmdbN: the row with that number, of the table's type only. TMDB numbers
+//     films and series independently, so the other type is another title.
+//   - kp…, anything else, or no row: none.
+//
+// Every row comes back with a non-nil slice, so none is written back as NULL.
+func genresFor(rows []models.MetadataGenres, ct models.ContentType, infos []tm.Genres) []models.MetadataGenres {
+	want := tm.TmdbTypeMovie
+	if ct == models.ContentTypeSeries {
+		want = tm.TmdbTypeSeries
+	}
+	byImdb := map[string]tm.Genres{}
+	byTmdb := map[int]tm.Genres{}
+	for _, in := range infos {
+		if in.ImdbID != nil {
+			if cur, ok := byImdb[*in.ImdbID]; !ok || cur.Type != want && in.Type == want {
+				byImdb[*in.ImdbID] = in
+			}
+		}
+		byTmdb[in.TmdbID] = in
+	}
+	out := make([]models.MetadataGenres, len(rows))
+	for i, r := range rows {
+		var in tm.Genres
+		ok := false
+		if strings.HasPrefix(r.VideoID, "tt") {
+			in, ok = byImdb[r.VideoID]
+		} else if id, isTmdb := tmdbNumber(r.VideoID); isTmdb {
+			in, ok = byTmdb[id]
+			ok = ok && in.Type == want
+		}
+		r.Genres = []string{}
+		if ok {
+			r.Genres = genre.FromTMDB(in.Genres)
+		}
+		out[i] = r
+	}
+	return out
+}
+
+// tmdbNumber reads the number off our own tmdbN video id.
+func tmdbNumber(videoID string) (int, bool) {
+	n, ok := strings.CutPrefix(videoID, "tmdb")
+	if !ok {
+		return 0, false
+	}
+	id, err := strconv.Atoi(n)
+	return id, err == nil
+}
+
 // creditsFor answers for the row a video id resolved to. TMDB numbers films
 // and series independently and tmdb.info keys on the number alone, so for a
 // tmdbN id a row of the other type is another title: checked, nothing shown.
@@ -870,3 +975,4 @@ var _ SeasonAiringChecker = (*TMDB)(nil)
 var _ ReviewsProvider = (*TMDB)(nil)
 var _ CreditsProvider = (*TMDB)(nil)
 var _ CreditsBackfiller = (*TMDB)(nil)
+var _ GenresBackfiller = (*TMDB)(nil)

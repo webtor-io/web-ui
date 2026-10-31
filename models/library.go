@@ -6,6 +6,7 @@ import (
 
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/go-pg/pg/v10"
+	"github.com/go-pg/pg/v10/orm"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 )
@@ -369,10 +370,39 @@ func GetLibrarySeriesTorrentList(ctx context.Context, db *pg.DB, uID uuid.UUID, 
 	return list, nil
 }
 
+// LibraryFilter narrows the movie and series lists of the library page.
+// Watched is "", "unwatched" or "watched" and matches the status table's
+// watched column; Genre is a genre slug (services/genre), "" for any.
+type LibraryFilter struct {
+	Watched string
+	Genre   string
+}
+
+// where adds the filter's conditions; md and st are the aliases the query
+// joins the metadata and status tables under.
+func (f LibraryFilter) where(q *orm.Query, md, st string) {
+	switch f.Watched {
+	case "unwatched":
+		q.Where(st + ".video_id IS NULL")
+	case "watched":
+		q.Where(st + ".video_id IS NOT NULL")
+	}
+	if f.Genre != "" {
+		// NULL genres (not derived yet) match no genre.
+		q.Where("? = ANY("+md+".genres)", f.Genre)
+	}
+}
+
 // GetLibraryMovieList loads movies in the user's library, optionally filtered
 // by watched state. watchedFilter is one of "", "unwatched", or "watched" and
 // matches against movie_status.watched column.
 func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, watchedFilter string) ([]*Movie, error) {
+	return GetLibraryMovieListFiltered(ctx, db, uID, sort, LibraryFilter{Watched: watchedFilter})
+}
+
+// GetLibraryMovieListFiltered is GetLibraryMovieList with every filter of
+// the library page.
+func GetLibraryMovieListFiltered(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, f LibraryFilter) ([]*Movie, error) {
 	var list []*Movie
 
 	query := db.Model(&list).
@@ -387,12 +417,7 @@ func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort Sor
 		Relation("MovieMetadata").
 		Relation("ResourceMetadata")
 
-	switch watchedFilter {
-	case "unwatched":
-		query.Where("ums.video_id IS NULL")
-	case "watched":
-		query.Where("ums.video_id IS NOT NULL")
-	}
+	f.where(query, "mmd", "ums")
 
 	switch sort {
 	case SortTypeRecentlyAdded:
@@ -417,6 +442,12 @@ func GetLibraryMovieList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort Sor
 // Filtering considers only series-level series_status (manual declaration
 // or auto_all_episodes); per-episode rows are not included in the filter.
 func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, watchedFilter string) ([]*Series, error) {
+	return GetLibrarySeriesListFiltered(ctx, db, uID, sort, LibraryFilter{Watched: watchedFilter})
+}
+
+// GetLibrarySeriesListFiltered is GetLibrarySeriesList with every filter of
+// the library page.
+func GetLibrarySeriesListFiltered(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, f LibraryFilter) ([]*Series, error) {
 	var list []*Series
 
 	query := db.Model(&list).
@@ -431,12 +462,7 @@ func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort So
 		Relation("SeriesMetadata").
 		Relation("ResourceMetadata")
 
-	switch watchedFilter {
-	case "unwatched":
-		query.Where("uss.video_id IS NULL")
-	case "watched":
-		query.Where("uss.video_id IS NOT NULL")
-	}
+	f.where(query, "smd", "uss")
 
 	switch sort {
 	case SortTypeRecentlyAdded:
@@ -455,4 +481,36 @@ func GetLibrarySeriesList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort So
 	}
 
 	return list, nil
+}
+
+// GetLibraryGenres returns the distinct genre slugs of the user's movies or
+// series, in no particular order: the options of the library's genre filter.
+func GetLibraryGenres(ctx context.Context, db *pg.DB, uID uuid.UUID, ct ContentType) ([]string, error) {
+	var query *orm.Query
+	switch ct {
+	case ContentTypeMovie:
+		query = db.Model((*Movie)(nil)).
+			Join("join movie_metadata as md").
+			JoinOn("movie.movie_metadata_id = md.movie_metadata_id").
+			Join("join library as l").
+			JoinOn("movie.resource_id = l.resource_id")
+	case ContentTypeSeries:
+		query = db.Model((*Series)(nil)).
+			Join("join series_metadata as md").
+			JoinOn("series.series_metadata_id = md.series_metadata_id").
+			Join("join library as l").
+			JoinOn("series.resource_id = l.resource_id")
+	default:
+		return nil, errors.Errorf("no library genres for content type %q", ct)
+	}
+	var genres []string
+	err := query.
+		Context(ctx).
+		ColumnExpr("DISTINCT unnest(md.genres)").
+		Where("l.user_id = ?", uID).
+		Select(&genres)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch library genres")
+	}
+	return genres, nil
 }

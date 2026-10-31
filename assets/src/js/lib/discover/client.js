@@ -221,16 +221,22 @@ export class StremioClient {
         return !!param && (param === this.addonKey(baseUrl) || param === baseUrl);
     }
 
-    async fetchCatalog(baseUrl, type, catalogId, skip = 0, { signal } = {}) {
-        const cacheKey = `${baseUrl}/${type}/${catalogId}/${skip}`;
-        const cached = this.cache.get(cacheKey);
+    // genre is the catalog's genre extra (a year in Cinemeta's "New"
+    // catalogs, see genres.js), sent as the addon protocol's one extra
+    // segment: /catalog/movie/top/genre=Action&skip=50.json. The URL is the
+    // cache key, so every genre and page has its own slot.
+    async fetchCatalog(baseUrl, type, catalogId, skip = 0, { signal, genre } = {}) {
+        const extra = [];
+        if (genre) extra.push(`genre=${encodeURIComponent(genre)}`);
+        if (skip > 0) extra.push(`skip=${skip}`);
+        const url = `${baseUrl}/catalog/${type}/${catalogId}${extra.length ? `/${extra.join('&')}` : ''}.json`;
+        const cached = this.cache.get(url);
         if (cached) return cached;
 
-        const url = `${baseUrl}/catalog/${type}/${catalogId}${skip > 0 ? `/skip=${skip}` : ''}.json`;
         const res = await fetchWithTimeout(url, signal);
         if (!res.ok) throw new Error('Failed to fetch catalog');
         const data = await res.json();
-        this.cache.set(cacheKey, data);
+        this.cache.set(url, data);
         return data;
     }
 

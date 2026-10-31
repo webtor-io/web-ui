@@ -41,6 +41,9 @@ func UpsertMovieMetadata(
 		VideoMetadata: md,
 	}
 
+	// genres keeps the stored value when this write has none (NULL, from a
+	// mapper without genre data): the same video id is the same title, so
+	// TMDB's genres stay true when OMDB or Kinopoisk rewrites the row.
 	_, err := db.Model(meta).
 		Context(ctx).
 		OnConflict("(video_id) DO UPDATE").
@@ -49,7 +52,8 @@ func UpsertMovieMetadata(
 			year = EXCLUDED.year,
 			plot = EXCLUDED.plot,
 			poster_url = EXCLUDED.poster_url,
-			rating = EXCLUDED.rating
+			rating = EXCLUDED.rating,
+			genres = COALESCE(EXCLUDED.genres, movie_metadata.genres)
 		`).
 		Returning("movie_metadata_id").
 		Insert()

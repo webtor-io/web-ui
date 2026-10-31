@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"slices"
 	"testing"
 
 	uuid "github.com/satori/go.uuid"
@@ -74,5 +75,22 @@ func TestGetTitleWithoutContent(t *testing.T) {
 	}
 	if got := h.GetTitle(stub{metadata: &models.VideoMetadata{Title: "From metadata"}}); got != "From metadata" {
 		t.Errorf("want the metadata title, got %q", got)
+	}
+}
+
+func TestGetCardGenres(t *testing.T) {
+	h := NewVideoContentHelper()
+	for name, c := range map[string]struct {
+		md   *models.VideoMetadata
+		want []string
+	}{
+		"at most three, stored order": {&models.VideoMetadata{Genres: []string{"war", "drama", "action", "comedy"}}, []string{"war", "drama", "action"}},
+		"outside the vocabulary":      {&models.VideoMetadata{Genres: []string{"Drama", "drama", "genre.war", "war"}}, []string{"drama", "war"}},
+		"not derived yet":             {&models.VideoMetadata{}, nil},
+		"no metadata":                 {nil, nil},
+	} {
+		if got := h.GetCardGenres(stub{metadata: c.md}); !slices.Equal(got, c.want) {
+			t.Errorf("%s: got %v, want %v", name, got, c.want)
+		}
 	}
 }

@@ -56,6 +56,13 @@ type CreditsBackfiller interface {
 	BackfillCredits(ctx context.Context, limit int) (int, error)
 }
 
+// GenresBackfiller is an optional capability of a MetadataMapper: derive
+// genres for movie_metadata / series_metadata rows stored without them, from
+// the mapper's own cache. Today only TMDB.
+type GenresBackfiller interface {
+	BackfillGenres(ctx context.Context, limit int) (int, error)
+}
+
 // LocalizableMapper is an optional capability of a MetadataMapper. Mappers
 // that can return localized title/plot for a given language implement this
 // interface. Today only TMDB supports it; OMDB is English-only, Kinopoisk
@@ -174,6 +181,24 @@ func (s *Enricher) BackfillCredits(ctx context.Context, limit int) {
 			continue
 		}
 		l.Info("credits backfilled")
+	}
+}
+
+// BackfillGenres runs GenresBackfiller on every mapper that has it, up to
+// limit rows each. Errors are logged, not returned, like BackfillCredits.
+func (s *Enricher) BackfillGenres(ctx context.Context, limit int) {
+	for _, m := range s.mappers {
+		gb, ok := m.(GenresBackfiller)
+		if !ok {
+			continue
+		}
+		count, err := gb.BackfillGenres(ctx, limit)
+		l := log.WithFields(log.Fields{"mapper": m.GetName(), "count": count})
+		if err != nil {
+			l.WithError(err).Error("genres backfill failed")
+			continue
+		}
+		l.Info("genres backfilled")
 	}
 }
 

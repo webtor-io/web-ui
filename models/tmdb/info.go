@@ -125,6 +125,28 @@ func MarkNoCredits(ctx context.Context, db *pg.DB, tmdbID int) error {
 	return err
 }
 
+// Genres is what the genres backfill reads off a tmdb.info row.
+type Genres struct {
+	TmdbID int      `pg:"tmdb_id"`
+	ImdbID *string  `pg:"imdb_id"`
+	Type   TmdbType `pg:"type"`
+	Genres []any    `pg:"genres"` // metadata->'genres': [{"id": N, "name": "..."}]
+}
+
+// ListGenres returns the rows with any of these IMDB or TMDB ids, lowest
+// tmdb_id first. Both ids are indexed, so only the matched rows' metadata is
+// read, and of it only genres comes back.
+func ListGenres(ctx context.Context, db *pg.DB, imdbIDs []string, tmdbIDs []int) ([]Genres, error) {
+	var rows []Genres
+	_, err := db.QueryContext(ctx, &rows, `
+		SELECT tmdb_id, imdb_id, type, metadata->'genres' AS genres
+		FROM tmdb.info
+		WHERE imdb_id = ANY(?::text[]) OR tmdb_id = ANY(?::integer[])
+		ORDER BY tmdb_id`,
+		pg.Array(imdbIDs), pg.Array(tmdbIDs))
+	return rows, err
+}
+
 // GetInfoByIMDBID looks up a cached TMDB record by its IMDB id. Used by the
 // release-subscribe fake-door eligibility check to read `status` /
 // `in_production` / `next_episode_to_air` off `metadata` without a TMDB API
