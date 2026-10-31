@@ -95,8 +95,8 @@ type ReviewsProvider interface {
 }
 
 // Credits is the people line under a title: directors, creators (series)
-// and the top-billed cast. Names are the upstream API's as they are;
-// person names are not localized.
+// and the top-billed cast. Names are in the requested language where the
+// upstream API has them in it, its English ones otherwise, person by person.
 type Credits struct {
 	Directors []string     `json:"directors,omitempty"`
 	Creators  []string     `json:"creators,omitempty"`
@@ -115,9 +115,10 @@ type CastMember struct {
 // only TMDB implements it, off its local cache. Same three-valued contract
 // as ReviewsProvider: a non-nil (possibly empty) Credits means "checked";
 // nil with nil error means the id isn't known locally; an error means the
-// check failed.
+// check failed. lang is our locale code; "" or "en" asks for no
+// translation at all.
 type CreditsProvider interface {
-	Credits(ctx context.Context, videoID string, ct models.ContentType) (*Credits, error)
+	Credits(ctx context.Context, videoID string, ct models.ContentType, lang string) (*Credits, error)
 }
 
 // AiringChecker is an optional capability of a MetadataMapper. Mappers that
@@ -368,9 +369,9 @@ func (s *Enricher) ReviewsByID(ctx context.Context, videoID string, ct models.Co
 }
 
 // CreditsByID returns directors / creators / cast for a bare video ID
-// (IMDB tt* / tmdb*), with the same walkByID semantics and error contract
-// as ReviewsByID.
-func (s *Enricher) CreditsByID(ctx context.Context, videoID string, ct models.ContentType) (*Credits, error) {
+// (IMDB tt* / tmdb*), names in lang where known, with the same walkByID
+// semantics and error contract as ReviewsByID.
+func (s *Enricher) CreditsByID(ctx context.Context, videoID string, ct models.ContentType, lang string) (*Credits, error) {
 	if videoID == "" {
 		return nil, nil
 	}
@@ -380,7 +381,7 @@ func (s *Enricher) CreditsByID(ctx context.Context, videoID string, ct models.Co
 		if !ok {
 			return false, false, nil
 		}
-		c, err := cp.Credits(ctx, videoID, ct)
+		c, err := cp.Credits(ctx, videoID, ct, lang)
 		if err != nil {
 			return true, false, err
 		}
@@ -398,14 +399,16 @@ func (s *Enricher) CreditsByID(ctx context.Context, videoID string, ct models.Co
 
 // CachedCredits is CreditsByID without the MapByID fallback: locally cached
 // rows only, never an upstream call -- for the torrent page, whose render
-// must not wait on TMDB. Unknown ids and errors read as no credits.
-func (s *Enricher) CachedCredits(ctx context.Context, videoID string, ct models.ContentType) *Credits {
+// must not wait on TMDB (names not yet stored in lang are fetched in the
+// background, see TMDB.creditNames). Unknown ids and errors read as no
+// credits.
+func (s *Enricher) CachedCredits(ctx context.Context, videoID string, ct models.ContentType, lang string) *Credits {
 	for _, m := range s.mappers {
 		cp, ok := m.(CreditsProvider)
 		if !ok {
 			continue
 		}
-		if c, err := cp.Credits(ctx, videoID, ct); err == nil && c != nil {
+		if c, err := cp.Credits(ctx, videoID, ct, lang); err == nil && c != nil {
 			return c
 		}
 	}

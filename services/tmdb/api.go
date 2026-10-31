@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	tmdbApiKeyFlag        = "tmdb-api-key"
-	tmdbApiSecureFlag     = "tmdb-api-secure"
-	tmdbApiHostFlag       = "tmdb-api-host"
-	tmdbApiPortFlag       = "tmdb-api-port"
-	tmdbImageBaseURLFlag  = "tmdb-image-base-url"
+	tmdbApiKeyFlag       = "tmdb-api-key"
+	tmdbApiSecureFlag    = "tmdb-api-secure"
+	tmdbApiHostFlag      = "tmdb-api-host"
+	tmdbApiPortFlag      = "tmdb-api-port"
+	tmdbImageBaseURLFlag = "tmdb-image-base-url"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
@@ -234,12 +234,15 @@ func (api *Api) GetDetails(ctx context.Context, tmdbID int, tmdbType TmdbType) (
 	return raw, nil
 }
 
-// GetLocalizedDetails fetches title and overview for a specific language.
-// Unlike GetDetails, it does NOT append credits (lighter response).
+// GetLocalizedDetails fetches title and overview for a specific language,
+// with credits: person names in credits.cast / credits.crew and the
+// top-level created_by come back in that language too, where TMDB has a
+// translation (the English name where it has none).
 func (api *Api) GetLocalizedDetails(ctx context.Context, tmdbID int, tmdbType TmdbType, lang string) (map[string]any, error) {
 	u, _ := url.Parse(fmt.Sprintf("%s/3/%s/%d", api.url, tmdbType, tmdbID))
 	q := u.Query()
 	q.Set("language", lang)
+	q.Set("append_to_response", "credits")
 	u.RawQuery = q.Encode()
 
 	raw, err := api.doRequest(ctx, u.String())

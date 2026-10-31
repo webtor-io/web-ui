@@ -1,0 +1,87 @@
+{
+ "credits": {
+  "cast": [
+   {
+    "id": 17419,
+    "name": "Брайан Крэнстон",
+    "original_name": "Bryan Cranston",
+    "order": 0
+   },
+   {
+    "id": 84497,
+    "name": "Аарон Пол",
+    "original_name": "Aaron Paul",
+    "order": 1
+   },
+   {
+    "id": 134531,
+    "name": "Анна Ганн",
+    "original_name": "Anna Gunn",
+    "order": 2
+   },
+   {
+    "id": 209674,
+    "name": "Ар-Джей Митт",
+    "original_name": "RJ Mitte",
+    "order": 3
+   },
+   {
+    "id": 14329,
+    "name": "Дин Норрис",
+    "original_name": "Dean Norris",
+    "order": 4
+   },
+   {
+    "id": 1217934,
+    "name": "Бетси Брандт",
+    "original_name": "Betsy Brandt",
+    "order": 5
+   },
+   {
+    "id": 59410,
+    "name": "Боб Оденкёрк",
+    "original_name": "Bob Odenkirk",
+    "order": 7
+   },
+   {
+    "id": 783,
+    "name": "Джонатан Бэнкс",
+    "original_name": "Jonathan Banks",
+    "order": 9
+   }
+  ],
+  "crew": [
+   {
+    "id": 24951,
+    "name": "Питер Гулд",
+    "job": "Co-Executive Producer"
+   },
+   {
+    "id": 103009,
+    "name": "Томас Шнауз",
+    "job": "Co-Executive Producer"
+   },
+   {
+    "id": 1223193,
+    "name": "Джордж Мастрас",
+    "job": "Co-Executive Producer"
+   },
+   {
+    "id": 1537674,
+    "name": "Дженнифер Брайан",
+    "job": "Costume Design"
+   },
+   {
+    "id": 17419,
+    "name": "Брайан Крэнстон",
+    "job": "Producer"
+   }
+  ]
+ },
+ "created_by": [
+  {
+   "id": 66633,
+   "name": "Винс Гиллиган"
+  }
+ ]
+}
