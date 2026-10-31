@@ -36,11 +36,11 @@ function StarRating({ rating }) {
     return (
         <>
             <div class="w-card-stars-compact flex items-center gap-0.5 text-w-purpleL">
-                <StarIcon class="w-3 h-3 -mt-px" />
+                <StarIcon class="w-3 h-3 -translate-y-px" />
                 <span class="text-xs text-w-text">{r.toFixed(1)}</span>
             </div>
             <div class="w-card-stars-full flex items-center gap-1">
-                <div class="rating rating-xs rating-half flex items-center text-w-purpleL">
+                <div class="rating rating-xs rating-half flex items-center -translate-y-px text-w-purpleL">
                     {items}
                 </div>
                 <span class="text-xs text-w-text">{r.toFixed(1)}</span>
