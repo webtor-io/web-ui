@@ -312,3 +312,59 @@ func TestSkiplist20261012(t *testing.T) {
 		}
 	}
 }
+
+// Weekly skiplist mining 2026-10-19 (research 133) and 2026-11-02:
+// flag-only brands, so Studio stays empty.
+func TestSkiplist20261106(t *testing.T) {
+	cases := []struct {
+		name          string
+		adult, course bool
+	}{
+		{"Asian.Domestic.Zone.Jane.2026.mp4", true, false},
+		{"JacquieEtMichelTV - Jane", true, false},
+		{"XDreamsTV.26.10.01.Jane", true, false},
+		{"BBCPie.26.10.01.Jane.1080p", true, false},
+		{"Chaturbate jane 2026-10-01", true, false},
+		{"VRBangers.26.10.01.Jane.8K", true, false},
+		{"BangBus.26.10.01.Jane", true, false},
+		{"PornNow - Jane", true, false},
+		{"TransSensual.26.10.01.Jane", true, false},
+		{"Shoplyfter.26.10.01.Jane", true, false},
+		{"AbbyWinters - Jane", true, false},
+		{"PacoPacoMama 100126_001", true, false},
+		{"JockPack.26.10.01.John", true, false},
+		{"FirstAnalQuest - Jane", true, false},
+		{"FTVGirls.26.10.01.Jane", true, false},
+		{"DigitalPlayground.26.10.01.Jane", true, false},
+		{"Digital Playground - Jane", true, false},
+		{"Girlfriends Films - Jane", true, false},
+		{"GirlfriendsFilms.26.10.01.Jane", true, false},
+		{"NaughtyAmericaVR.26.10.01.Jane.4K", true, false},
+		{"IO Music Academy - Mixing Drums", false, true},
+		{"IO.Music.Academy.Lesson.01", false, true},
+		{"IO_Music_Academy_Lesson_01", false, true},
+		// Word-boundary and single-word guards.
+		{"Sample.Movie.chaturbaters.2019", false, false},
+		{"Sample.Movie.Playground.2019.1080p", false, false},
+		{"Digital.Sample.2020.1080p", false, false},
+		{"Girlfriends.S01E01.1080p", false, false},
+		{"Friends.S01E01.1080p", false, false},
+		{"Sample.Films.Collection.2020", false, false},
+		{"Domestic.Zone.2020", false, false},
+		{"Music.Academy.2020", false, false},
+		{"Radio.Music.Academy.2020", false, false},
+		{"Bus.Bang.2020", false, false},
+	}
+	for _, c := range cases {
+		ti, err := Parse(&TorrentInfo{}, c.name)
+		if err != nil {
+			t.Fatalf("%q: %v", c.name, err)
+		}
+		if ti.Adult != c.adult || ti.Course != c.course {
+			t.Errorf("%q: Adult, Course = %v, %v, want %v, %v", c.name, ti.Adult, ti.Course, c.adult, c.course)
+		}
+		if ti.Studio != "" {
+			t.Errorf("%q: Studio = %q, want empty", c.name, ti.Studio)
+		}
+	}
+}
