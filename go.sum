@@ -35,8 +35,8 @@ github.com/anacrolix/dht/v2 v2.2.1-0.20191103020011-1dba080fb358/go.mod h1:d7ARx
 github.com/anacrolix/dht/v2 v2.3.2-0.20200103043204-8dce00767ebd/go.mod h1:cgjKyErDnKS6Mej5D1fEqBKg3KwFF2kpFZJp3L6/fGI=
 github.com/anacrolix/dht/v2 v2.5.1-0.20200317023935-129f05e9b752/go.mod h1:7RLvyOjm+ZPA7vgFRP+1eRjFzrh27p/nF0VCk5LcjoU=
 github.com/anacrolix/dht/v2 v2.6.1/go.mod h1:7jf6kAZRU7FFwyeLP3f4LVH8WglAHdMte1mGcq8HQAg=
-github.com/anacrolix/dht/v2 v2.23.0 h1:EuD17ykTTEkAMPLjBsS5QjGOwuBgLTdQhds6zPAjeVY=
-github.com/anacrolix/dht/v2 v2.23.0/go.mod h1:seXRz6HLw8zEnxlysf9ye2eQbrKUmch6PyOHpe/Nb/U=
+github.com/anacrolix/dht/v2 v2.23.1-0.20260525063928-ec3a9bd99456 h1:5ylkQM8XiZxJw1yhWlV8ICyzl4DNRbEPR4FNlYKpEgs=
+github.com/anacrolix/dht/v2 v2.23.1-0.20260525063928-ec3a9bd99456/go.mod h1:0IpTSbqYnFcjmexGvnINUGq/kbx93S5cKIryH4oJL8U=
 github.com/anacrolix/envpprof v0.0.0-20180404065416-323002cec2fa/go.mod h1:KgHhUaQMc8cC0+cEflSgCFNFbKwi5h54gqtVn8yhP7c=
 github.com/anacrolix/envpprof v1.0.0/go.mod h1:KgHhUaQMc8cC0+cEflSgCFNFbKwi5h54gqtVn8yhP7c=
 github.com/anacrolix/envpprof v1.0.1/go.mod h1:My7T5oSqVfEn4MD4Meczkw/f5lSIndGAKu/0SM/rkf4=
@@ -70,8 +70,8 @@ github.com/anacrolix/missinggo/v2 v2.3.0/go.mod h1:ZzG3/cc3t+5zcYWAgYrJW0MBsSwNw
 github.com/anacrolix/missinggo/v2 v2.3.1/go.mod h1:3XNH0OEmyMUZuvXmYdl+FDfXd0vvSZhvOLy8CFx8tLg=
 github.com/anacrolix/missinggo/v2 v2.4.1-0.20200227072623-f02f6484f997/go.mod h1:KY+ij+mWvwGuqSuecLjjPv5LFw5ICUc1UvRems3VAZE=
 github.com/anacrolix/missinggo/v2 v2.5.1/go.mod h1:WEjqh2rmKECd0t1VhQkLGTdIWXO6f6NLjp5GlMZ+6FA=
-github.com/anacrolix/missinggo/v2 v2.10.0 h1:pg0iO4Z/UhP2MAnmGcaMtp5ZP9kyWsusENWN9aolrkY=
-github.com/anacrolix/missinggo/v2 v2.10.0/go.mod h1:nCRMW6bRCMOVcw5z9BnSYKF+kDbtenx+hQuphf4bK8Y=
+github.com/anacrolix/missinggo/v2 v2.11.0 h1:9vYHTNHa5q8tLeDbA6XWFyYeKrxrhfw7GZe9KpS2Wnw=
+github.com/anacrolix/missinggo/v2 v2.11.0/go.mod h1:gcZICf9xhHZEuLIaxXG1gRg4hpbL7lqgVrq5jsYtQU4=
 github.com/anacrolix/mmsg v0.0.0-20180515031531-a4a3ba1fc8bb/go.mod h1:x2/ErsYUmT77kezS63+wzZp8E3byYB0gzirM/WMBLfw=
 github.com/anacrolix/mmsg v1.0.0/go.mod h1:x8kRaJY/dCrY9Al0PEcj1mb/uFHwP6GCJ9fLl4thEPc=
 github.com/anacrolix/multiless v0.0.0-20191223025854-070b7994e841/go.mod h1:TrCLEZfIDbMVfLoQt5tOoiBS/uq4y8+ojuEVVvTNPX4=
@@ -97,8 +97,8 @@ github.com/anacrolix/torrent v1.9.0/go.mod h1:jJJ6lsd2LD1eLHkUwFOhy7I0FcLYH0tHKw
 github.com/anacrolix/torrent v1.11.0/go.mod h1:FwBai7SyOFlflvfEOaM88ag/jjcBWxTOqD6dVU/lKKA=
 github.com/anacrolix/torrent v1.15.0/go.mod h1:MFc6KcbpAyfwGqOyRkdarUK9QnKA/FkVg0usFk1OQxU=
 github.com/anacrolix/torrent v1.15.2/go.mod h1:sJtcAZtlGaZLo7wCXT/EZV+hATsq0Bg6pVhhzACY0E0=
-github.com/anacrolix/torrent v1.60.1-0.20251217073903-486bcbe758e0 h1:lzjUG5O/Vzn4vodFZnrmVny08kMnujjmMLQw0X7cetI=
-github.com/anacrolix/torrent v1.60.1-0.20251217073903-486bcbe758e0/go.mod h1:yKUKuZSSDdyOsCbuH+rDOpswl/g546gICapdrU7aUmQ=
+github.com/anacrolix/torrent v1.61.1-0.20260911233437-76452a2c8a2f h1:Qd2S/HI+0pR+EMyPS58AB573G3W92zSngOmH/e0qqP8=
+github.com/anacrolix/torrent v1.61.1-0.20260911233437-76452a2c8a2f/go.mod h1:pkyH7KHvJcqehMuraryq6Rs4U8KbZuLdLOfSHmNKvG0=
 github.com/anacrolix/upnp v0.1.1/go.mod h1:LXsbsp5h+WGN7YR+0A7iVXm5BL1LYryDev1zuJMWYQo=
 github.com/anacrolix/utp v0.0.0-20180219060659-9e0e1d1d0572/go.mod h1:MDwc+vsGEq7RMw6lr2GKOEqjWny5hO5OZXRVNaBJ2Dk=
 github.com/anthropics/anthropic-sdk-go v1.34.0 h1:IV+Wwxkwypit9Md8dr48zc626NS4o9PoQieESoNE0TE=
@@ -263,8 +263,8 @@ github.com/go-playground/universal-translator v0.18.1 h1:Bcnm0ZwsGyWbCzImXv+pAJn
 github.com/go-playground/universal-translator v0.18.1/go.mod h1:xekY+UJKNuX9WP91TpwSH2VMlDf28Uj24BCp08ZFTUY=
 github.com/go-playground/validator/v10 v10.28.0 h1:Q7ibns33JjyW48gHkuFT91qX48KG0ktULL6FgHdG688=
 github.com/go-playground/validator/v10 v10.28.0/go.mod h1:GoI6I1SjPBh9p7ykNE/yj3fFYbyDOpwMn5KXd+m2hUU=
-github.com/go-quicktest/qt v1.101.0 h1:O1K29Txy5P2OK0dGo59b7b0LR6wKfIhttaAhHUyn7eI=
-github.com/go-quicktest/qt v1.101.0/go.mod h1:14Bz/f7NwaXPtdYEgzsx46kqSxVwTbzVZsDC26tQJow=
+github.com/go-quicktest/qt v1.102.0 h1:HSQxCeh5YZH3EL3W39ixjtyaEhcWSXQHtHnMBzSs474=
+github.com/go-quicktest/qt v1.102.0/go.mod h1:p4lGIVX+8Wa6ZPNDvqcxq36XpUDLh42FLetFU7odllI=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
 github.com/go-task/slim-sprig/v3 v3.0.0/go.mod h1:W848ghGpv3Qj3dhTPRyJypKRiqCdHZiAzKg9hl15HA8=
