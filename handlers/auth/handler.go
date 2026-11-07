@@ -1,11 +1,15 @@
 package auth
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-contrib/sessions"
+	log "github.com/sirupsen/logrus"
 	"github.com/webtor-io/web-ui/services/adminauth"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/libapi"
@@ -148,6 +152,18 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.
 		return
 	}
 
+	// Sign-in pages start a new session and never read the old one, so they
+	// are registered above the expiry middleware: behind it, a magic link
+	// opened in a browser still holding an expired token went through the
+	// interstitial, and with a dead refresh token on to /login -- with the
+	// link's #linkCode gone.
+	r.GET("/auth/verify", h.verify)
+	r.GET("/auth/callback/google", h.callback)
+	r.GET("/auth/callback/patreon", h.callback)
+	// Nothing links here. It used to render the interstitial, which with a
+	// valid session refreshed and reloaded itself forever.
+	r.GET("/refresh", func(c *gin.Context) { c.Redirect(http.StatusFound, "/") })
+
 	// Session expiry is a SuperTokens notion: Expired is set only from its
 	// TryRefreshTokenError, and the view this renders exists to hand the
 	// refresh back to its client. Both are meaningless -- and unreachable --
@@ -161,15 +177,43 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.
 			return
 		}
 	})
-
-	r.GET("/refresh", h.refresh)
-	r.GET("/auth/verify", h.verify)
-	r.GET("/auth/callback/google", h.callback)
-	r.GET("/auth/callback/patreon", h.callback)
 }
 
+// refresh renders the interstitial a page load gets when its access token
+// has expired: auth.js refreshes the session and reloads (templates/views/
+// auth/refresh.html). no-store, because a stored copy would answer that
+// reload and loop it.
 func (s *Handler) refresh(c *gin.Context) {
+	f := log.Fields{"path": c.Request.URL.Path}
+	if d, ok := expiredFor(c.Request); ok {
+		f["expired_s"] = int64(d.Seconds())
+	}
+	log.WithFields(f).Info("session refresh interstitial")
+	c.Header("Cache-Control", "no-store")
 	s.tb.Build("auth/refresh").HTML(http.StatusOK, web.NewContext(c))
+}
+
+// expiredFor is how long ago the access token expired, read from the "ate"
+// (ms) of the SDK's sFrontToken cookie. That cookie is unsigned and written
+// by page script, so the value only ever goes to the log above -- it tells
+// how long visitors stay away, which is what accessTokenValidity trades
+// against -- and never into a decision.
+func expiredFor(r *http.Request) (time.Duration, bool) {
+	ck, err := r.Cookie("sFrontToken")
+	if err != nil {
+		return 0, false
+	}
+	b, err := base64.StdEncoding.DecodeString(ck.Value)
+	if err != nil {
+		return 0, false
+	}
+	var ft struct {
+		Ate int64 `json:"ate"`
+	}
+	if json.Unmarshal(b, &ft) != nil || ft.Ate <= 0 {
+		return 0, false
+	}
+	return time.Since(time.UnixMilli(ft.Ate)), true
 }
 
 // renderPassword renders auth/password with the given status. It guards
@@ -213,9 +257,12 @@ func (s *Handler) loginView(c *gin.Context) (view string, data any) {
 }
 
 func (s *Handler) login(c *gin.Context) {
-	if c.Query("return-url") != "" {
+	// Only a site-relative path is kept: passwordLogin redirects to this
+	// value as-is, and processAuth hands it to a link, so anything else made
+	// /login?return-url=https://… an open redirect.
+	if ru := c.Query("return-url"); ru != "" && auth.IsSafeReturnPath(ru) {
 		session := sessions.Default(c)
-		session.Set("return-url", c.Query("return-url"))
+		session.Set("return-url", ru)
 		_ = session.Save()
 	}
 	view, data := s.loginView(c)
