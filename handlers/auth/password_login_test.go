@@ -167,6 +167,30 @@ func TestPasswordLoginRedirectsToStoredReturnURL(t *testing.T) {
 	}
 }
 
+// passwordLogin redirects to the stored return-url as-is, so the GET must
+// refuse to store anything but a site-relative path: otherwise
+// /login?return-url=https://evil.example is an open redirect.
+func TestPasswordLoginIgnoresOffSiteReturnURL(t *testing.T) {
+	h, err := adminauth.Hash("the right password")
+	if err != nil {
+		t.Fatalf("Hash: %v", err)
+	}
+	for _, ru := range []string{"https://evil.example/", "//evil.example/", "/\\evil.example/"} {
+		r := newLoginRouter(t, adminauth.NewStore("", &memRepo{hash: h}))
+		getW := getLogin(r, "return-url="+url.QueryEscape(ru))
+		cookie := ""
+		for _, c := range getW.Result().Cookies() {
+			if c.Name == "session" {
+				cookie = c.Name + "=" + c.Value
+			}
+		}
+		postW := postWithCookie(r, "the right password", cookie)
+		if got := postW.Header().Get("Location"); got != "/" {
+			t.Errorf("return-url %q: Location %q, want %q", ru, got, "/")
+		}
+	}
+}
+
 // The common case — no bounce, someone just visits /login directly — must
 // still land somewhere sane.
 func TestPasswordLoginDefaultsToRootWithoutReturnURL(t *testing.T) {

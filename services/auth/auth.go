@@ -420,11 +420,14 @@ func (s *Auth) myVerifySession(c *gin.Context, options *sessmodels.VerifySession
 		ctx := context.WithValue(r.Context(), ErrorContext{}, err)
 		r := r.WithContext(ctx)
 		if defaultErrors.As(err, &errors.TryRefreshTokenError{}) {
-			if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+			// session exists but the access token expired
+			if !fromScript(r) {
 				otherHandler(w, r)
 				return
 			}
-			// session exists but the access token expired
+			// A script gets SuperTokens' 401 "try refresh token" below, which
+			// the SDK on every page (layouts/main.html → auth.js) answers by
+			// refreshing and retrying. Pages get handlers/auth's interstitial.
 		} else if defaultErrors.As(err, &errors.UnauthorizedError{}) {
 			otherHandler(w, r)
 			return
@@ -849,7 +852,7 @@ func HasAuth(c *gin.Context) {
 	if !u.HasAuth() {
 		if isNavigation(c.Request) {
 			target := "/login"
-			if p := c.Request.URL.Path; isSafeReturnPath(p) {
+			if p := c.Request.URL.Path; IsSafeReturnPath(p) {
 				target += "?return-url=" + url.QueryEscape(p)
 			}
 			c.Redirect(http.StatusFound, target)
@@ -860,6 +863,21 @@ func HasAuth(c *gin.Context) {
 		return
 	}
 	c.Next()
+}
+
+// fromScript reports whether page script made the request: lib/async.js marks
+// its own with X-Requested-With, and fetch, XHR, EventSource and sendBeacon
+// carry Sec-Fetch-Dest "empty". Only a script can act on SuperTokens' 401;
+// anything else holding an expired token is handed the refresh interstitial.
+//
+// Telling the script apart by X-Requested-With alone sent every plain fetch
+// the interstitial's HTML with a 200: PUT /watch/position reported success
+// for saves it never made (~14k a day, 2026-11-06), once an hour of playback
+// outlived the access token. Images and media (dest image/video) keep the
+// old path, so a subresource never turns into a 401 it did not get before;
+// browsers without Fetch Metadata (Safari < 16.4) fall back to the header.
+func fromScript(r *http.Request) bool {
+	return r.Header.Get("X-Requested-With") == "XMLHttpRequest" || r.Header.Get("Sec-Fetch-Dest") == "empty"
 }
 
 // isNavigation reports whether the request is a browser navigating to a page,
@@ -875,7 +893,7 @@ func isNavigation(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
 }
 
-// isSafeReturnPath reports whether p is safe to hand back to /login as
+// IsSafeReturnPath reports whether p is safe to hand back to /login as
 // return-url. The login template renders that value straight into an href
 // with no escaping (templates/partials/auth/form.html), so p must be a
 // site-relative path that resolves the same way in every browser as it does
@@ -893,7 +911,7 @@ func isNavigation(r *http.Request) bool {
 //     the time it's dereferenced, even though it looks like an ordinary
 //     same-origin path here. Go will decode a percent-encoded control byte
 //     (e.g. "%09") straight into r.URL.Path, so this is reachable.
-func isSafeReturnPath(p string) bool {
+func IsSafeReturnPath(p string) bool {
 	if p == "" || p[0] != '/' {
 		return false
 	}

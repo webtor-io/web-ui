@@ -20,15 +20,18 @@ export async function isCsrfMismatch(err) {
 // A reloaded page brings a fresh session and token, so one reload is the fix.
 // A second mismatch within the window means reloading does not help, and the
 // viewer gets a message instead of a reload loop. Without storage there is no
-// way to tell the second time from the first, so no reload either.
-export function claimReload(storage, now) {
+// way to tell the second time from the first, so no reload either -- unless
+// the caller says a reload is the only way forward (withoutStorage), as after
+// a successful session refresh. Each mark is its own window, so one kind of
+// reload never uses up another's.
+export function claimReload(storage, now, mark = RELOAD_MARK, withoutStorage = false) {
     try {
-        const last = Number(storage.getItem(RELOAD_MARK));
+        const last = Number(storage.getItem(mark));
         if (last && now - last < RELOAD_WINDOW_MS) return false;
-        storage.setItem(RELOAD_MARK, String(now));
+        storage.setItem(mark, String(now));
         return true;
     } catch {
-        return false;
+        return withoutStorage;
     }
 }
 

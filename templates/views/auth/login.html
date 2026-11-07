@@ -15,6 +15,14 @@
     </div>
 
     <!-- Instruction notices -->
+    {{/* from=session-ended: the refresh interstitial found the session gone
+         (refresh token expired after long inactivity, or revoked). Say so,
+         instead of a login form that appears from nowhere. */}}
+    {{ if eq .Data.Instruction "session-ended" }}
+    <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
+      <p class="text-sm text-w-sub">{{ t $.Lang "auth.login.sessionEndedNote" }}</p>
+    </div>
+    {{ end }}
     {{ if eq .Data.Instruction "stremio-configure" }}
     <div class="bg-w-cyan/5 border border-w-cyan/20 rounded-xl p-4 mb-6 text-center">
       <p class="text-sm text-w-sub"><strong class="text-w-cyan">{{ t $.Lang "auth.login.note" }}</strong> {{ t $.Lang "auth.login.stremioNote" }}</p>

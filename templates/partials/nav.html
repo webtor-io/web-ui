@@ -26,6 +26,16 @@
         </ul>
     </div>
     {{ end }}
+    {{/* The expired-session interstitial (views/auth/refresh.html) does not
+         know who is signing in until the refresh lands, and the anonymous
+         controls ("Login", "Donate") would tell a paying user they are
+         signed out. A placeholder where the account controls go, until the
+         reload brings the real bar. */}}
+    {{ if .SessionRefresh }}
+    <div class="navbar-end">
+        <span class="skeleton h-8 w-9 lg:w-40" aria-hidden="true"></span>
+    </div>
+    {{ else }}
     <div class="navbar-end gap-0.5 min-[400px]:gap-1 sm:gap-2">
         {{/* Quick search — the home hero form, reachable from any page so the
              next infohash doesn't require navigating back. Hidden where the
@@ -236,6 +246,7 @@
             </a>
         </div>
     </div>
+    {{ end }}
 </div>
 {{ "nav.js" | asset }}
 {{ end }}
