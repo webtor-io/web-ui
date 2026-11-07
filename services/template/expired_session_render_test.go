@@ -122,12 +122,14 @@ func TestNavOnExpiredSessionShowsNoAnonymousControls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	ctx := map[string]any{"Lang": "en", "User": &auth.User{Expired: true}}
-	if err := tpl.ExecuteTemplate(&buf, "nav", ctx); err != nil {
-		t.Fatal(err)
+	render := func(ctx map[string]any) string {
+		var buf bytes.Buffer
+		if err := tpl.ExecuteTemplate(&buf, "nav", ctx); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
 	}
-	out := buf.String()
+	out := render(map[string]any{"Lang": "en", "User": &auth.User{Expired: true}, "SessionRefresh": true})
 	if !strings.Contains(out, "skeleton") {
 		t.Errorf("no placeholder where the account controls go:\n%s", out)
 	}
@@ -135,5 +137,12 @@ func TestNavOnExpiredSessionShowsNoAnonymousControls(t *testing.T) {
 		if strings.Contains(out, bad) {
 			t.Errorf("expired-session navbar contains %q:\n%s", bad, out)
 		}
+	}
+
+	// /login and the sign-in callbacks render with an expired user too, and
+	// they are real pages: the placeholder there never went away.
+	out = render(map[string]any{"Lang": "en", "User": &auth.User{Expired: true}})
+	if strings.Contains(out, "skeleton") || !strings.Contains(out, "Login") {
+		t.Errorf("a real page with an expired user got the interstitial's navbar:\n%s", out)
 	}
 }

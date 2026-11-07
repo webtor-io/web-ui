@@ -108,6 +108,13 @@ type Context struct {
 	// requests and for any request that middleware did not run on.
 	UnreadNotifications int
 	ginCtx              *gin.Context
+
+	// SessionRefresh is set only by the expired-session interstitial
+	// (handlers/auth refresh), which reloads into the real page at once: the
+	// layout leaves analytics, Turnstile and the account controls out of it.
+	// Not User.Expired -- /login and the sign-in callbacks render with an
+	// expired user too, and they are real pages.
+	SessionRefresh bool
 }
 
 func (c *Context) WithData(obj any) *Context {

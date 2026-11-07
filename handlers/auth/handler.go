@@ -190,7 +190,9 @@ func (s *Handler) refresh(c *gin.Context) {
 	}
 	log.WithFields(f).Info("session refresh interstitial")
 	c.Header("Cache-Control", "no-store")
-	s.tb.Build("auth/refresh").HTML(http.StatusOK, web.NewContext(c))
+	ctx := web.NewContext(c)
+	ctx.SessionRefresh = true
+	s.tb.Build("auth/refresh").HTML(http.StatusOK, ctx)
 }
 
 // expiredFor is how long ago the access token expired, read from the "ate"

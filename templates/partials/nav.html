@@ -31,7 +31,7 @@
          controls ("Login", "Donate") would tell a paying user they are
          signed out. A placeholder where the account controls go, until the
          reload brings the real bar. */}}
-    {{ if .User.Expired }}
+    {{ if .SessionRefresh }}
     <div class="navbar-end">
         <span class="skeleton h-8 w-9 lg:w-40" aria-hidden="true"></span>
     </div>

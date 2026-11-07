@@ -12,6 +12,20 @@ export function addPopstateFilter(fn) {
     };
 }
 
+// A full navigation to href. location.assign() of the current document with
+// only another fragment is a same-document fragment navigation -- nothing is
+// requested, so the server never gets to answer -- hence the reload there,
+// with the URL swapped in first so the fragment survives it.
+function navigate(href) {
+    const u = new URL(href, window.location.href);
+    if (u.pathname + u.search === window.location.pathname + window.location.search) {
+        history.replaceState(history.state, '', u.href);
+        window.location.reload();
+        return;
+    }
+    window.location.assign(u.href);
+}
+
 async function asyncFetch(url, targetSelector, fetchParams, params, options) {
     let target;
     if (typeof targetSelector === 'string' || targetSelector instanceof String) {
@@ -78,14 +92,18 @@ async function asyncFetch(url, targetSelector, fetchParams, params, options) {
     // goes to the login form, back to where it was headed. Anything else
     // (the sign-in service not answering, or no refresh tried at all) is the
     // server's to explain on a full navigation. A form keeps the page, and
-    // what was typed in it, and says why instead.
+    // what was typed in it, and says why instead. A background reload
+    // (el.reload: status streams and the like) nobody asked for leaves the
+    // page alone -- taking the tab away from a playing video over it would be
+    // worse than the stale block; the next click explains.
     const fromRefresh = !!res.url && new URL(res.url).pathname === '/auth/session/refresh';
     const sessionJSON = res.status === 401 && (res.headers.get('Content-Type') || '').includes('application/json');
     if ((fromRefresh && !res.ok) || sessionJSON) {
+        if (options?.background) return res;
         const ended = res.status === 401;
         const dest = new URL(url, window.location.href);
         if ((fetchParams.method || 'GET').toUpperCase() === 'GET') {
-            window.location.assign(fromRefresh && ended ? loginLocation(dest) : dest.href);
+            navigate(fromRefresh && ended ? loginLocation(dest) : dest.href);
         } else {
             const i18n = await import('./auth/i18n');
             await i18n.init();
@@ -136,7 +154,7 @@ async function async(selector, params = {}, scope = null) {
     for (const el of els) {
         el.reload = function() {
             let {url, fetchParams} = params.fetchParams.call(el);
-            return asyncFetch.call(el, url, el, fetchParams, params);
+            return asyncFetch.call(el, url, el, fetchParams, params, {background: true});
         }
         // In case if reload was already invoked
         if (el.reloadResolve) {
