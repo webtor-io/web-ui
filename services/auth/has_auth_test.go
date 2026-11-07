@@ -216,7 +216,7 @@ func TestHasAuthRedirectsBrowsersButNotAPIClients(t *testing.T) {
 	}
 }
 
-// isSafeReturnPath is the gatekeeper for what HasAuth is willing to echo
+// IsSafeReturnPath is the gatekeeper for what HasAuth is willing to echo
 // back as return-url; the table above already proves it end-to-end through
 // the router for the shapes reachable via a real request, but a few shapes
 // (an empty path) can't occur through net/http's request parsing at all —
@@ -246,8 +246,8 @@ func TestIsSafeReturnPath(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got := isSafeReturnPath(tc.path); got != tc.want {
-				t.Errorf("isSafeReturnPath(%q) = %v, want %v", tc.path, got, tc.want)
+			if got := IsSafeReturnPath(tc.path); got != tc.want {
+				t.Errorf("IsSafeReturnPath(%q) = %v, want %v", tc.path, got, tc.want)
 			}
 		})
 	}
