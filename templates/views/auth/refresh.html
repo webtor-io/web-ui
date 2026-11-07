@@ -1,13 +1,37 @@
 {{ define "title" }}{{ t $.Lang "auth.refresh.title" }}{{ end }}
 {{ define "main" }}
-{{/* Shown by auth/refresh.js when the refresh request fails (an outage), the
-     same message the error page gives a signed-in request that hits one. */}}
-<section id="auth-refresh-failed" class="hidden min-h-[70vh] flex-col items-center justify-center text-center px-6 py-24">
-    <div class="max-w-[520px] relative z-10">
-        <div class="font-logo text-[clamp(2.6rem,7vw,4rem)] font-light tracking-tight leading-none mb-8">web<span class="text-w-pink">tor</span></div>
-        <h1 class="text-[clamp(1.5rem,4vw,2.2rem)] font-extrabold tracking-tight leading-tight mb-6">{{ t $.Lang "error.service_unavailable" }}</h1>
-        <a href="{{ langPath $.Lang "/" }}" data-async-target="main" class="btn btn-pink">{{ t $.Lang "error.back_home" }}</a>
+{{/* A page load whose access token expired (handlers/auth). auth.js, on every
+     page, refreshes the session and reloads into the page that was asked for;
+     the visitor should only see a moment of "signing you in".
+
+     Everything that has to work without the bundle is here, in markup and
+     CSS: the spinner appears only after .4s (most refreshes are done by
+     then, and a flash of it reads as a glitch), the "taking longer" block
+     after 10s whatever JS did or did not run, and <noscript> explains itself
+     instead of leaving an empty page. auth.js swaps in #auth-refresh-failed
+     once the refresh has failed for good. */}}
+<style>
+    @keyframes auth-refresh-reveal { to { opacity: 1; visibility: visible; } }
+    .auth-refresh-reveal { opacity: 0; visibility: hidden; animation: auth-refresh-reveal .2s ease-out var(--reveal-after, .4s) forwards; }
+</style>
+<section class="min-h-[70vh] flex flex-col items-center justify-center text-center px-6 py-24">
+    <div id="auth-refresh" role="status" class="flex flex-col items-center gap-10">
+        <div class="auth-refresh-reveal flex flex-col items-center gap-5">
+            <span class="loading loading-spinner loading-lg text-w-pink" aria-hidden="true"></span>
+            <p class="text-lg font-semibold">{{ t $.Lang "auth.refresh.title" }}…</p>
+        </div>
+        <div class="auth-refresh-reveal flex flex-col items-center gap-3" style="--reveal-after: 10s">
+            <p class="text-sm text-w-sub">{{ t $.Lang "auth.refresh.slow" }}</p>
+            <button type="button" onclick="location.reload()" class="btn btn-sm btn-ghost border border-w-line">{{ t $.Lang "auth.refresh.reload" }}</button>
+        </div>
     </div>
+    <div id="auth-refresh-failed" role="alert" class="hidden max-w-[520px] flex-col items-center gap-6">
+        <p class="text-[clamp(1.25rem,3vw,1.6rem)] font-bold tracking-tight leading-snug">{{ t $.Lang "auth.refresh.unavailable" }}</p>
+        <button type="button" onclick="location.reload()" class="btn btn-pink">{{ t $.Lang "auth.refresh.retry" }}</button>
+    </div>
+    <noscript>
+        <style>#auth-refresh { display: none; }</style>
+        <p class="max-w-[520px] text-w-sub">{{ t $.Lang "auth.refresh.noscript" }}</p>
+    </noscript>
 </section>
-{{ "auth/refresh.js" | asset }}
 {{ end }}

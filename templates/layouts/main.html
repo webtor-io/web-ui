@@ -29,7 +29,9 @@
             window._sessionID = "{{ .SessionID }}";
             window._domain = "{{ domain }}";
             window._showAdult = {{ if and .UserSettings .UserSettings.ShowAdult }}true{{ else }}false{{ end }};
-            {{- if useUmami }}
+            {{- /* Not on the expired-session interstitial: it reloads into the
+                   real page at once, which records the visit itself. */}}
+            {{- if and useUmami (not .User.Expired) }}
             window._umami = {{ umamiConfig | json }};
             {{- end }}
         </script>
@@ -79,7 +81,7 @@
              so the counter cannot disagree with the modal the user is looking
              at. */}}
         <div id="onboarding-modal" data-async-layout="{{`{{ template "onboarding_checklist/modal" (withContext $ .Onboarding) }}`}}" data-async-update-nav="{{`{{ template "nav" . }}`}}"></div>
-        {{ if and useActionTurnstile (not (.User | hasAuth)) }}
+        {{ if and useActionTurnstile (not (.User | hasAuth)) (not .User.Expired) }}
         {{/* Turnstile for job starts (lib/turnstileAction.js), anonymous visitors only — the
              server does not check a signed-in account (handlers/action.verifyAction), so no
              widget and no "checking" step for one either. A managed widget, appearance

@@ -1,6 +1,7 @@
 import loadAsyncView from "./loadAsyncView";
 import { isActionForm, isBusy, markBusy, clearPress, countBusyPress } from "./actionBusy";
 import { seedInitialEntry } from "./historySeed";
+import { loginLocation } from "./auth/nextLocation";
 
 if (!window.__popstateFilters) window.__popstateFilters = [];
 export function addPopstateFilter(fn) {
@@ -67,6 +68,29 @@ async function asyncFetch(url, targetSelector, fetchParams, params, options) {
     // blank form, so the emptiness -- not the status -- is what decides.
     if (res.status === 401 && text.trim() === '') {
         window.location.assign(url);
+        return res;
+    }
+    // The SDK gave up on this request's expired session. It hands back either
+    // the refresh call's own answer or, when it already believes there is no
+    // session, the original 401 -- SuperTokens JSON either way, which must
+    // never be swapped into the page (supertokens-website fetch.js doRequest).
+    // A refresh that answered 401 means the session is gone: a navigation
+    // goes to the login form, back to where it was headed. Anything else
+    // (the sign-in service not answering, or no refresh tried at all) is the
+    // server's to explain on a full navigation. A form keeps the page, and
+    // what was typed in it, and says why instead.
+    const fromRefresh = !!res.url && new URL(res.url).pathname === '/auth/session/refresh';
+    const sessionJSON = res.status === 401 && (res.headers.get('Content-Type') || '').includes('application/json');
+    if ((fromRefresh && !res.ok) || sessionJSON) {
+        const ended = res.status === 401;
+        const dest = new URL(url, window.location.href);
+        if ((fetchParams.method || 'GET').toUpperCase() === 'GET') {
+            window.location.assign(fromRefresh && ended ? loginLocation(dest) : dest.href);
+        } else {
+            const i18n = await import('./auth/i18n');
+            await i18n.init();
+            window.toast?.error(i18n.t(ended ? 'auth.refresh.sessionEndedForm' : 'auth.refresh.unavailable'));
+        }
         return res;
     }
     const fragments = parseFragments(text);

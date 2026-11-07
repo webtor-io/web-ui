@@ -69,3 +69,18 @@ test('messages and status texts pass through as before', async () => {
     assert.equal((await describeAuthError({status: 500, statusText: 'Internal'}, i18n)).message, 'Internal');
     assert.equal((await describeAuthError({}, i18n)).message, 'auth.progress.unknownError');
 });
+
+test('marks are separate windows', () => {
+    const storage = memStorage();
+    assert.equal(claimReload(storage, 1_000_000, 'a'), true);
+    assert.equal(claimReload(storage, 1_000_001, 'b'), true);
+    assert.equal(claimReload(storage, 1_000_002, 'a'), false);
+    assert.equal(claimReload(storage, 1_000_003), true);
+});
+
+test('withoutStorage decides when storage is unavailable', () => {
+    const broken = {getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }};
+    assert.equal(claimReload(broken, 1, 'a', true), true);
+    assert.equal(claimReload(undefined, 1, 'a', true), true);
+    assert.equal(claimReload(broken, 1, 'a', false), false);
+});

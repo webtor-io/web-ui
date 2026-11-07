@@ -1,3 +1,5 @@
+import {claimReload} from './errors.js';
+
 // Where the refresh interstitial sends the browser once the SDK's refresh
 // attempt settles. attemptRefreshingSession() resolves false — it does not
 // throw, and makes no network call — when the SDK's local session state says
@@ -14,11 +16,18 @@
 // page is never re-requested and the blank interstitial stays up even though
 // the session was refreshed. location.reload() re-requests unconditionally
 // and keeps the whole URL, fragment included.
-export function nextLocation(refreshed, {pathname, search}) {
+//
+// The login form says why it is there (from=session-ended), and return-url
+// keeps the fragment too: the visitor asked for this page, not a session.
+export function nextLocation(refreshed, loc) {
     if (refreshed) {
         return null;
     }
-    return '/login?return-url=' + encodeURIComponent(pathname + search);
+    return loginLocation(loc);
+}
+
+export function loginLocation({pathname, search, hash = ''}) {
+    return '/login?return-url=' + encodeURIComponent(pathname + search + hash) + '&from=session-ended';
 }
 
 // Runs the refresh attempt and settles where the interstitial goes next.
@@ -37,4 +46,34 @@ export async function settleRefresh(attempt, loc) {
         return {error};
     }
     return {next: nextLocation(refreshed, loc)};
+}
+
+const RETRY_MARK = 'auth.refreshRetryAt';
+const RELOADED_MARK = 'auth.refreshReloadAt';
+
+// What the interstitial does once the refresh settles; env is injectable for
+// tests ({location, storage, now, failed}).
+//
+// - No answer (outage, network, or a CSRF mismatch once the gin session
+//   behind the page expired): reload, at most once a minute. A reload brings
+//   a fresh CSRF token and outlasts a blip; past that, failed() says so
+//   instead of looping.
+// - No session: the login form, back to this page.
+// - Refreshed: reload into the page. A second success in this tab within a
+//   minute means the reload came straight back here -- the new cookies were
+//   not stored -- and reloading again would loop. Without storage the reload
+//   still happens: it is the only way to show the refreshed page.
+export async function resumeRefresh(attempt, {location, storage, now, failed}) {
+    const {next, error} = await settleRefresh(attempt, location);
+    if (error) {
+        if (claimReload(storage, now, RETRY_MARK)) location.reload();
+        else failed(error);
+        return;
+    }
+    if (next !== null) {
+        location.replace(next);
+        return;
+    }
+    if (claimReload(storage, now, RELOADED_MARK, true)) location.reload();
+    else failed(new Error('refreshed twice within a minute: the session cookies are not being stored'));
 }
