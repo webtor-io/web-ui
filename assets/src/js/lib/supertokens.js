@@ -2,24 +2,7 @@ import SuperTokens from 'supertokens-web-js';
 import Session from 'supertokens-web-js/recipe/session';
 import Passwordless, { createCode, consumeCode, signOut } from "supertokens-web-js/recipe/passwordless";
 import ThirdParty, { getAuthorisationURLWithQueryParamsAndSetState, signInAndUp } from "supertokens-web-js/recipe/thirdparty";
-
-function preAPIHook(csrf) {
-    return function(context) {
-        let requestInit = context.requestInit;
-        let url = context.url;
-        let headers = {
-            ...requestInit.headers,
-            'X-CSRF-TOKEN': csrf,
-        };
-        requestInit = {
-            ...requestInit,
-            headers,
-        }
-        return {
-            requestInit, url
-        };
-    }
-}
+import { preAPIHook } from './auth/preAPIHook';
 
 export async function sendMagicLink({email}, csrf) {
     await initSuperTokens(csrf);

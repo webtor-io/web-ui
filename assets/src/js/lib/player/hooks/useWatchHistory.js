@@ -10,11 +10,21 @@ const MIN_POSITION_CHANGE = 5; // minimum seconds change before sending update
 export const MIN_SAVED_POSITION = 30;
 export const worthSaving = (pos) => pos >= MIN_SAVED_POSITION;
 
+// A tab playing for hours can outlive the web-ui session its CSRF token was
+// issued for, and then every later save got the same 400 until a reload. That
+// 400 carries the session's current token (handlers/session); taking it here
+// loses one save instead of the rest of the evening. window._CSRF is read at
+// each send, the SuperTokens refresh included (lib/supertokens.js).
+const takeFreshCSRF = (res) => {
+    const token = res.status === 400 && res.headers.get('X-CSRF-Token');
+    if (token) window._CSRF = token;
+};
+
 /**
  * Hook for tracking watch position and fetching resume position.
  * - On mount: fetches saved position from server
  * - During playback: sends position updates every 15s
- * - On pause/visibilitychange/beforeunload: sends current position
+ * - On pause/visibilitychange: sends current position
  * - Returns resumePosition (null until fetched)
  */
 // `creditsAtRef`: where the credits begin, once the player knows
@@ -102,23 +112,7 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
             },
             body,
             keepalive: true,
-        }).catch(() => {});
-    }, [resourceID, path]);
-
-    // Send position via sendBeacon (for beforeunload)
-    const sendBeaconPosition = useCallback(() => {
-        if (!resourceID || !path || durationRef.current <= 0 || !worthSaving(currentTimeRef.current)) return;
-        const body = JSON.stringify(withCredits({
-            resource_id: resourceID,
-            path,
-            position: currentTimeRef.current,
-            duration: durationRef.current,
-        }, creditsAtRef));
-        try {
-            navigator.sendBeacon('/watch/position', new Blob([body], { type: 'application/json' }));
-        } catch (e) {
-            // sendBeacon not available — ignore
-        }
+        }).then(takeFreshCSRF).catch(() => {});
     }, [resourceID, path]);
 
     // Periodic save during playback
@@ -141,7 +135,11 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
         }
     }, [playing]);
 
-    // Save on visibility change and beforeunload
+    // Save when the tab is hidden -- which is also the last event a closing
+    // tab fires that can still send: sendPosition's PUT is keepalive. (There
+    // used to be a sendBeacon on beforeunload as well. A beacon cannot carry
+    // the CSRF header and /watch/position has no POST route, so every one of
+    // them -- ~2k a day -- was a 400 that saved nothing.)
     useEffect(() => {
         if (!resourceID || !path) return;
 
@@ -151,18 +149,9 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
             }
         };
 
-        const onBeforeUnload = () => {
-            if (!pausedRef.current) sendBeaconPosition();
-        };
-
         document.addEventListener('visibilitychange', onVisibilityChange);
-        window.addEventListener('beforeunload', onBeforeUnload);
-
-        return () => {
-            document.removeEventListener('visibilitychange', onVisibilityChange);
-            window.removeEventListener('beforeunload', onBeforeUnload);
-        };
-    }, [resourceID, path, sendPosition, sendBeaconPosition]);
+        return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    }, [resourceID, path, sendPosition]);
 
     // Force-send position (bypasses debounce and paused flag) — use after seek
     const forceSendPosition = useCallback((pos, dur) => {
@@ -175,7 +164,7 @@ export function useWatchHistory(videoRef, { resourceID, path, currentTime, durat
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window._CSRF || '' },
             body,
             keepalive: true,
-        }).catch(() => {});
+        }).then(takeFreshCSRF).catch(() => {});
     }, [resourceID, path]);
 
     return { resumePosition, resumeReady, forceSendPosition };

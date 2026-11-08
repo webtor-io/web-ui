@@ -43,6 +43,9 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 	)
 }
 
+// CSRFTokenHeader carries the session's current CSRF token on a CSRF 400.
+const CSRFTokenHeader = "X-CSRF-Token"
+
 type Session struct {
 	ID   string
 	CSRF string
@@ -107,6 +110,16 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, csrfIgnorePrefixes []string)
 					return
 				}
 			}
+			// The token is derived from a salt kept in the session, and a page
+			// holds the one it was rendered with. A tab left playing for hours
+			// (audiobooks, mostly) can outlive that session -- its cookie lasts
+			// 30 days from the last write, not the last visit -- and then
+			// failed every later position save with this 400 until reloaded:
+			// 1133 on 2026-11-07, from three tabs. The current token travels
+			// back so script callers can carry on. Nothing new is exposed:
+			// this answer leaves before the CORS middleware, so another origin
+			// cannot read it, and every page here already embeds the token.
+			c.Header(CSRFTokenHeader, csrf.GetToken(c))
 			c.String(400, "CSRF token mismatch")
 			c.Abort()
 		},

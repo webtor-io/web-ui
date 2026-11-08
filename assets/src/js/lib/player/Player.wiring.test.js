@@ -8272,3 +8272,40 @@ test('a paused direct-file seek updates the displayed position', async (t) => {
     const shown = p.container.querySelector('.wt-player-time span').textContent;
     assert.equal(shown, '2:00');
 });
+
+// ---- a stale CSRF token is replaced, not repeated ---------------------------
+
+// A tab can outlive the web-ui session its token was issued for, and then
+// every save got the same 400 until a reload (1133 on 2026-11-07, three tabs).
+// The 400 carries the session's current token (handlers/session) and the
+// player takes it, so the next save -- window._CSRF is read at each send --
+// goes out with it.
+test('a position save refused for a stale CSRF token: the token the 400 hands back replaces the page\'s', async (t) => {
+    withHlsJs(t);
+    cleanRestart();
+    t.after(() => { destroyPlayer(); cleanRestart(); });
+    const p = await mountPlayer((page) => sessionWithSaved(page));
+    const harnessFetch = globalThis.fetch;
+    t.after(() => { globalThis.fetch = window.fetch = harnessFetch; });
+    globalThis.fetch = window.fetch = (url, params) => {
+        const res = harnessFetch(url, params);
+        return String(url) === '/watch/position' && params && params.method === 'PUT'
+            ? res.then(() => ({ ok: false, status: 400, headers: new dom.window.Headers({ 'X-CSRF-Token': 'fresh-token' }) }))
+            : res;
+    };
+    t.after(() => { delete document.hidden; });
+    click(resumePrompt(p).querySelector('.wt-resume-btn--primary'));
+    await settle();
+    assert.equal(positionPuts(p).length, 1, 'the answer\'s PUT');
+    assert.equal(positionPuts(p)[0].params.headers['X-CSRF-TOKEN'], 'csrf-token', 'sent with the page\'s token');
+    // Playing on, then the tab goes to the background: the next save.
+    p.video.paused = false;
+    p.video.currentTime = 620;
+    for (const type of ['play', 'playing', 'timeupdate']) p.video.dispatchEvent(new dom.window.Event(type));
+    await settle();
+    setHidden(true);
+    await settle();
+    const puts = positionPuts(p);
+    assert.equal(puts.length, 2, 'the hidden tab\'s save');
+    assert.equal(puts[1].params.headers['X-CSRF-TOKEN'], 'fresh-token', 'carries the token the 400 handed back');
+});
