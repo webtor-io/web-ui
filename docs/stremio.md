@@ -342,6 +342,8 @@ night palette, the logo polygons of `logo-night.svg`, the Comfortaa wordmark
 embedded in `assets/src/styles/comfortaa.css`, Inter 4.1 downloaded once from
 its pinned release and checked against a SHA-256 — the site's embedded Inter
 is an ASCII subset) and encodes them with ffmpeg:
+Inter has no Chinese glyphs, so the `zh` clip uses Noto Sans SC, pinned the same
+way, and breaks lines between characters instead of at spaces.
 
 The short way, from the web-ui root — it sets up the venv, renders all eleven
 clips and runs the test that checks them against the locales:
