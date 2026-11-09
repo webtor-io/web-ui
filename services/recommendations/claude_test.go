@@ -46,7 +46,7 @@ func TestChipsCacheKey_DeterministicAndTimeBucketed(t *testing.T) {
 	// flipping the language switcher would see chips in the previous
 	// locale until the TTL expires.
 	seen := map[string]string{"en": k1}
-	for _, loc := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs"} {
+	for _, loc := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"} {
 		ucL := &UserContext{Locale: loc, DayOfWeek: "Monday", TimeOfDay: "evening"}
 		k := chipsCacheKey(uid, ucL)
 		for prevLoc, prevKey := range seen {
@@ -78,6 +78,8 @@ func TestNormalizeLocale(t *testing.T) {
 		{"tr", "tr"},
 		{"nl", "nl"},
 		{"cs", "cs"},
+		{"zh", "zh"},
+		{"zh-CN", "zh"},
 		// Country / region subtags get clipped to the 2-letter base.
 		{"en-US", "en"},
 		{"ru-RU", "ru"},

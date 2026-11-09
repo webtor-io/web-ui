@@ -445,10 +445,13 @@ func (s *TMDB) RefreshPopular(ctx context.Context, releaseDateGte string, limit 
 }
 
 // tmdbLang maps our 2-letter locale code to the TMDB language tag.
-// Special case: our "pt" is PT-BR.
+// Special cases: our "pt" is PT-BR and our "zh" is Simplified Chinese.
 func tmdbLang(lang string) string {
-	if lang == "pt" {
+	switch lang {
+	case "pt":
 		return "pt-BR"
+	case "zh":
+		return "zh-CN"
 	}
 	return lang
 }
