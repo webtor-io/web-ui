@@ -56,7 +56,7 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 	if !strings.Contains(invalid, "magnet link is broken") || strings.Contains(invalid, "magnet-retry-long") || strings.Contains(invalid, "Searched for") {
 		t.Errorf("invalid: must explain the link and offer no retry:\n%s", invalid)
 	}
-	for _, lang := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs"} {
+	for _, lang := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"} {
 		out := render(lang, &MagnetErrorData{Kind: "dead", WaitedSec: 60, Query: "m"})
 		if strings.Contains(out, "load.magnet.") {
 			t.Errorf("%s: unresolved key in %s", lang, out)

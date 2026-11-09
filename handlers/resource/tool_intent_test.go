@@ -28,7 +28,7 @@ import (
 
 const intentHash = "08ada5a7a6183aae1e09d831df6748d566095a10"
 
-var allLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs"}
+var allLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"}
 
 // helperFuncs registers a helper's methods the way template.Manager.WithHelper
 // does (serve.go): every exported method under its name with the first letter
