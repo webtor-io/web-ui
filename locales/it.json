@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Qui il ritmo lo detta lo sciame, non il tuo piano: i pochi peer online inviano dati troppo lentamente per avviare la riproduzione.",
     "action.noPeers.timeoutTitle": "Ancora non ci sono dati sufficienti per iniziare",
     "action.noPeers.timeoutBody": "Abbiamo atteso l’intero tempo di riscaldamento e lo sciame non ha fornito abbastanza per iniziare. Potrebbe accelerare tra qualche minuto, oppure questo torrent ha semplicemente pochi seeder.",
+    "action.noPeers.refusedTitle": "Questo tracker privato non ci lascia passare",
+    "action.noPeers.refusedBody": "Questo torrent proviene da un tracker privato, e il tracker ha rifiutato la nostra richiesta o non ha risposto. Senza di esso non possiamo raggiungere nessun peer, quindi riprovare per ora non servirà. Se sei iscritto a quel tracker, apri il torrent nel tuo client torrent.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} ricevuti da {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} ricevuti da {{.Peers}} peer in {{.Sec}} s"

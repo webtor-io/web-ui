@@ -323,10 +323,12 @@ func (e *SlowDownloadError) Error() string {
 }
 
 // NoPeersError ends a warmup that produced nothing to play. Reason tells the
-// modal (and analytics) WHICH of three different situations it was, because
+// modal (and analytics) WHICH of four different situations it was, because
 // they call for different words and different next steps:
 //
 //	dead    — zero peers and zero bytes for NoPeersTimeoutSec: the swarm is gone
+//	refused — the same, on a private torrent whose trackers all failed their
+//	          latest announce: the swarm may be there, it is out of reach
 //	slow    — peers exist but under 1 MiB arrived in SlowPeersTimeoutSec
 //	timeout — the hard warmup deadline passed before the measurement window
 //
@@ -637,6 +639,8 @@ func (s *ActionScript) streamContent(ctx context.Context, j *job.Job, c *web.Con
 		return &NoPeersError{Reason: "slow", Peers: 7, Seeders: 2, Leechers: 5, Bytes: 320 * 1024, Elapsed: 120 * time.Second}
 	case "no_peers":
 		return &NoPeersError{Reason: "dead", Elapsed: 60 * time.Second}
+	case "no_peers_refused":
+		return &NoPeersError{Reason: "refused", Elapsed: 60 * time.Second}
 	case "no_peers_slow":
 		return &NoPeersError{Reason: "slow", Peers: 3, Seeders: 1, Leechers: 2, Bytes: 340 * 1024, Elapsed: 120 * time.Second}
 	case "no_peers_timeout":
@@ -1399,6 +1403,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	// seeder's stats events; Peers is the older combined count and the
 	// fallback when a seeder reports neither.
 	var seederCount, leecherCount atomic.Int32
+	var trackerRefused atomic.Bool
 	const earlyMinBytes = 1 * 1024 * 1024
 	noPeersAfter := time.Duration(s.warmup.NoPeersTimeoutSec) * time.Second
 	slowPeersAfter := time.Duration(s.warmup.SlowPeersTimeoutSec) * time.Second
@@ -1445,6 +1450,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 			peerCount.Store(int32(probeEvent.Peers))
 			seederCount.Store(int32(probeEvent.Seeders))
 			leecherCount.Store(int32(probeEvent.Leechers))
+			trackerRefused.Store(probeEvent.TrackerRefused)
 			updateWarmupLine()
 		}
 		if statsCh != nil {
@@ -1459,6 +1465,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 						peerCount.Store(int32(ev.Peers))
 						seederCount.Store(int32(ev.Seeders))
 						leecherCount.Store(int32(ev.Leechers))
+						trackerRefused.Store(ev.TrackerRefused)
 						updateWarmupLine()
 					case <-warmupCtx.Done():
 						return
@@ -1479,7 +1486,7 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 	//     but the rate is so low (<17 KB/s avg for 1 MB threshold) that probe
 	//     will hang on its own 1-min deadline anyway. Surface CTA now instead
 	//     of waiting.
-	var noPeersReason atomic.Value // string: "dead" | "slow"
+	var noPeersReason atomic.Value // string: "dead" | "refused" | "slow"
 	// The card's "N received" is progress, as the line's percent: by the
 	// verified bytes, "70%" was followed by "0 B received from 5 peers".
 	snapshot := func(reason string) *NoPeersError {
@@ -1507,7 +1514,11 @@ func (s *ActionScript) warmUp(ctx context.Context, j *job.Job, m string, su stri
 				bytes := totalDownloaded()
 				elapsed := time.Since(warmupStart)
 				if elapsed > noPeersAfter && bytes == 0 && peerCount.Load() == 0 && statsEverSeen.Load() {
-					noPeersReason.Store("dead")
+					if trackerRefused.Load() {
+						noPeersReason.Store("refused")
+					} else {
+						noPeersReason.Store("dead")
+					}
 					noPeersFlag.Store(true)
 					warmupCancel()
 					return

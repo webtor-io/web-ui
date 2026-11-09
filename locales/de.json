@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Das Tempo bestimmt hier der Schwarm, nicht dein Tarif: die wenigen Peers online liefern zu langsam, um die Wiedergabe zu starten.",
     "action.noPeers.timeoutTitle": "Immer noch nicht genug Daten zum Starten",
     "action.noPeers.timeoutBody": "Wir haben die volle Aufwärmzeit gewartet, und der Schwarm hat nicht genug geliefert. In ein paar Minuten kann es anziehen – oder dieser Torrent hat einfach zu wenige Seeder.",
+    "action.noPeers.refusedTitle": "Dieser private Tracker lässt uns nicht durch",
+    "action.noPeers.refusedBody": "Dieser Torrent stammt von einem privaten Tracker, und der Tracker hat unsere Anfrage abgelehnt oder nicht beantwortet. Ohne ihn erreichen wir keine Peers, ein neuer Versuch hilft also vorerst nicht. Wenn du Mitglied dieses Trackers bist, öffne den Torrent in deinem eigenen Torrent-Client.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} von {{.Peers}} Peer in {{.Sec}} s empfangen",
         "other": "{{.Bytes}} von {{.Peers}} Peers in {{.Sec}} s empfangen"

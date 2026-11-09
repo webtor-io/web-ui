@@ -789,6 +789,8 @@
     "action.noPeers.slowBody": "The swarm sets the pace here, not your plan: the few peers online are sending data too slowly to start playback.",
     "action.noPeers.timeoutTitle": "Still not enough data to start",
     "action.noPeers.timeoutBody": "We waited the full warm-up time and the swarm did not deliver enough to begin. It may pick up in a few minutes — or this torrent is simply short on seeders.",
+    "action.noPeers.refusedTitle": "This private tracker isn't letting us through",
+    "action.noPeers.refusedBody": "This torrent comes from a private tracker, and the tracker refused our request or didn't answer. Without it we can't reach any peers, so trying again won't help for now. If you're a member of that tracker, open the torrent in your own torrent client.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} received from {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} received from {{.Peers}} peers in {{.Sec}} s"

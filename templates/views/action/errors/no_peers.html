@@ -1,18 +1,21 @@
 {{ define "main" }}
 {{ $isFree := eq .Data.TierName "free" }}
-{{/* Three different situations used to share one screen. Reason (see
+{{/* Four different situations used to share one screen. Reason (see
      NoPeersError) picks the words: a dead swarm asks for Vault/another
      torrent; a slow swarm says the pace is the swarm's, not the plan's; a
-     hard timeout says nothing is known yet. All three can be retried. */}}
+     hard timeout says nothing is known yet; a private tracker that turned us
+     away may have seeders, but Vault could not reach them either and a retry
+     meets the same answer, so that one offers neither. */}}
 {{ $slow := eq .Data.Reason "slow" }}
 {{ $timeout := eq .Data.Reason "timeout" }}
+{{ $refused := eq .Data.Reason "refused" }}
 {{/* A dead swarm is not a speed problem, so a faster plan is not the pitch —
      Vault is: it keeps the torrent and fetches it when a seeder returns. Sold
      only when the promo plan includes Vault; no catalog, no pitch. */}}
 {{ $offer := promoOffer }}
-{{ $pitch := and $isFree (not $slow) (not $timeout) $offer }}
+{{ $pitch := and $isFree (not $slow) (not $timeout) (not $refused) $offer }}
 {{ if $pitch }}{{ $pitch = $offer.HasVault }}{{ end }}
-{{ $body := or $slow $timeout $pitch (not $isFree) }}
+{{ $body := or $slow $timeout $refused $pitch (not $isFree) }}
 <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40">
     <div class="flex items-start gap-3 flex-wrap">
         <div class="flex items-start gap-3 flex-1 min-w-[200px]">
@@ -23,6 +26,7 @@
             <h3 class="font-semibold text-base text-base-content leading-snug">
                 {{- if $slow }}{{ t $.Lang "action.noPeers.slowTitle" }}
                 {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutTitle" }}
+                {{- else if $refused }}{{ t $.Lang "action.noPeers.refusedTitle" }}
                 {{- else }}{{ t $.Lang "action.noPeers.title" }}{{ end -}}
             </h3>
         </div>
@@ -45,6 +49,7 @@
     <p class="text-sm text-w-sub mt-3 leading-relaxed">
         {{- if $slow }}{{ t $.Lang "action.noPeers.slowBody" }}
         {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutBody" }}
+        {{- else if $refused }}{{ t $.Lang "action.noPeers.refusedBody" }}
         {{- else if $pitch }}{{ t $.Lang "action.noPeers.vaultPitch" }}
         {{- else }}{{ t $.Lang "action.noPeers.vaultUse" }}{{ end -}}
     </p>
@@ -52,7 +57,7 @@
 
     {{- if or (gt .Data.Peers 0) (gt .Data.BytesRaw 0) }}
     <p class="text-xs text-w-muted mt-3 tabular-nums">{{ tn $.Lang "action.noPeers.stats" .Data.Peers "Bytes" .Data.Bytes "Peers" .Data.Peers "Sec" .Data.ElapsedSec }}</p>
-    {{- else if not $timeout }}
+    {{- else if not (or $timeout $refused) }}
     {{- /* "or try another..." needs something to be an alternative TO: with no
          body sentence above (a free viewer and nothing to sell) it stands on
          its own. */}}
@@ -62,7 +67,7 @@
 
 <div class="pt-3 px-5 flex flex-wrap gap-2 justify-end items-center">
     <button type="button" class="close closeable-close">{{ t $.Lang "action.noPeers.gotIt" }}</button>
-    {{- if .Data.Endpoint }}
+    {{- if and .Data.Endpoint (not $refused) }}
     {{/* Same resubmit shape as slow_download.html, without force-slow: a
          retry is a fresh warm-up, and the seeder pod is usually still warm. */}}
     <form action="{{ langPath $.Lang .Data.Endpoint }}" method="post" enctype="multipart/form-data"
