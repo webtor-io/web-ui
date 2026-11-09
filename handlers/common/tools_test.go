@@ -152,7 +152,7 @@ func TestToolByURL(t *testing.T) {
 func TestStremioAddonLandingSaysThePlanIsPaid(t *testing.T) {
 	paid := map[string]string{
 		"en": "paid", "ru": "платн", "es": "de pago", "de": "bezahlt", "fr": "payante", "pt": "pago",
-		"it": "a pagamento", "pl": "płatn", "tr": "ücretli", "nl": "betaald", "cs": "placen",
+		"it": "a pagamento", "pl": "płatn", "tr": "ücretli", "nl": "betaald", "cs": "placen", "zh": "付费",
 	}
 	for lang, d := range locales(t) {
 		stem, ok := paid[lang]

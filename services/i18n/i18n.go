@@ -58,6 +58,7 @@ var LangNames = map[string]string{
 	"tr": "Türkçe",
 	"nl": "Nederlands",
 	"cs": "Čeština",
+	"zh": "简体中文",
 }
 
 type Service struct {

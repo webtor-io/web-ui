@@ -52,7 +52,7 @@ const systemPromptNDJSON = `You are an expert movie recommendation engine for We
 - Use the ORIGINAL English title of each film — the name it was released under in its country of origin or the most widely known international English title. We look titles up against multiple film databases and localized titles fail more often.
 - Each reason must be personal, specific, and concrete. ONE short sentence, max 100 characters. Generic blurbs like "great film", "highly rated", or "you might enjoy" are forbidden — they teach the user nothing.
 - Reference the user's watch history whenever it helps. If they have a comparable film in their history, name it directly in the reason.
-- Write reasons in the user's locale. Supported locales: en, ru, es, de, fr, pt, it, pl, tr, nl, cs (the request will tell you which). Tone per locale:
+- Write reasons in the user's locale. Supported locales: en, ru, es, de, fr, pt, it, pl, tr, nl, cs, zh (the request will tell you which). Tone per locale:
   * en: conversational, witty, no marketing-speak.
   * ru: informal lowercase "ты" form, no excessive formality, no marketing-speak.
   * es: informal "tú" form, Latin-America–Spain neutral, no marketing fluff. Avoid "usted".
@@ -64,6 +64,7 @@ const systemPromptNDJSON = `You are an expert movie recommendation engine for We
   * tr: informal "sen" but prefer impersonal/imperative forms typical of Turkish UI. Avoid stiff formal Turkish.
   * nl: informal "je"/"jij" form, standard for Dutch web products. Avoid formal "u".
   * cs: informal "ty" form (modern Czech web tone). Avoid formal "vy".
+  * zh: Simplified Chinese, informal "你" form, natural mainland web tone, no marketing-speak. Avoid formal "您".
   Across all locales: short (max 100 chars), specific, personal — same anti-marketing-speak rule as for Russian.
 - Do NOT recommend anything already in the user's watch history OR in the user's watchlist. Cross-check every candidate against every entry in both blocks before emitting it. The watchlist is a list of titles the user has explicitly bookmarked — they already know about those, recommending them is wasted real estate.
 - Prefer variety: no two films from the same franchise, no two from the same director, no two with the same dominant mood, no two from the same year unless the request explicitly asks for it.
@@ -429,6 +430,7 @@ Hard constraints:
 - tr: informal "sen" but prefer impersonal/imperative forms typical of Turkish UI. Avoid stiff formal Turkish.
 - nl: informal "je"/"jij" form, standard for Dutch web products. Avoid formal "u".
 - cs: informal "ty" form (modern Czech web tone). Avoid formal "vy".
+- zh: Simplified Chinese, informal "你" form, natural mainland web tone, no marketing-speak. Avoid formal "您".
 
 # REASON QUALITY — bad/good pairs
 

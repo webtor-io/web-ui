@@ -13,7 +13,7 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-var allLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs"}
+var allLangs = []string{"en", "ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"}
 
 func renderVault(t *testing.T, lang string, v *VaultData) string {
 	t.Helper()

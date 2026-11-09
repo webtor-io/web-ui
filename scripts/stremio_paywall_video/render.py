@@ -29,7 +29,8 @@ default "ffmpeg"); with Docker and nothing installed:
 Inter (the site's font) is downloaded once from its pinned release and
 checked against a digest; the copy embedded in assets/src/styles/inter.css is
 an ASCII subset and cannot draw Cyrillic or most accented letters. Comfortaa
-for the wordmark is the site's own embedded subset.
+for the wordmark is the site's own embedded subset. Inter has no Chinese, so
+the zh clip uses Noto Sans SC, pinned the same way.
 """
 
 import argparse
@@ -58,6 +59,9 @@ OUT_DIR = ROOT / "pub" / "stremio"
 
 INTER_URL = "https://raw.githubusercontent.com/rsms/inter/v4.1/docs/font-files/InterVariable.ttf"
 INTER_SHA256 = "4989b125924991b90d05b2d16e0e388c48f7d5bb8b30539bbf9c755278d0ccaf"
+NOTO_SC_URL = "https://raw.githubusercontent.com/google/fonts/a85815a42757630ce188fdad368c2dfc444d4773/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+NOTO_SC_SHA256 = "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+CJK_LANGS = {"zh"}
 
 # The keys, in the order the source digest reads them. handlers/stremio's
 # test recomputes the digest with the same order and format, so a changed
@@ -104,18 +108,26 @@ def source_digest(texts: dict, lang: str) -> str:
 
 # --- fonts -----------------------------------------------------------------
 
-def inter_path() -> Path:
-    p = CACHE / "InterVariable-4.1.ttf"
-    if not p.exists() or hashlib.sha256(p.read_bytes()).hexdigest() != INTER_SHA256:
+def pinned_font(name: str, url: str, sha256: str) -> Path:
+    p = CACHE / name
+    if not p.exists() or hashlib.sha256(p.read_bytes()).hexdigest() != sha256:
         CACHE.mkdir(parents=True, exist_ok=True)
-        print(f"downloading {INTER_URL}", file=sys.stderr)
-        with urllib.request.urlopen(INTER_URL, timeout=60) as r:
+        print(f"downloading {url}", file=sys.stderr)
+        with urllib.request.urlopen(url, timeout=120) as r:
             data = r.read()
         got = hashlib.sha256(data).hexdigest()
-        if got != INTER_SHA256:
-            sys.exit(f"Inter digest mismatch: got {got}, want {INTER_SHA256}")
+        if got != sha256:
+            sys.exit(f"{name} digest mismatch: got {got}, want {sha256}")
         p.write_bytes(data)
     return p
+
+
+def inter_path() -> Path:
+    return pinned_font("InterVariable-4.1.ttf", INTER_URL, INTER_SHA256)
+
+
+def noto_sc_path() -> Path:
+    return pinned_font("NotoSansSC-wght.ttf", NOTO_SC_URL, NOTO_SC_SHA256)
 
 
 def comfortaa_bytes() -> bytes:
@@ -131,10 +143,16 @@ def comfortaa_bytes() -> bytes:
 
 _INTER = None
 _COMFORTAA = None
+_CJK_FONT = None  # set while drawing a locale Inter cannot write
 
 
 def inter(size: float, weight: int) -> ImageFont.FreeTypeFont:
-    """Inter at size (1x px); optical size follows the pixel size."""
+    """Inter at size (1x px); optical size follows the pixel size. For
+    Chinese, Noto Sans SC, which has only the weight axis."""
+    if _CJK_FONT:
+        f = ImageFont.truetype(str(_CJK_FONT), round(size * S))
+        f.set_variation_by_axes([weight])
+        return f
     f = ImageFont.truetype(str(_INTER), round(size * S))
     f.set_variation_by_axes([max(14, min(32, size)), weight])
     return f
@@ -145,12 +163,12 @@ def comfortaa(size: float) -> ImageFont.FreeTypeFont:
 
 
 def check_glyphs(texts: dict, lang: str):
-    """Fail on a character Inter cannot draw rather than render a box."""
-    cmap = TTFont(str(_INTER)).getBestCmap()
+    """Fail on a character the font cannot draw rather than render a box."""
+    cmap = TTFont(str(_CJK_FONT or _INTER)).getBestCmap()
     for k in KEYS:
         for ch in texts[k]:
             if ch not in " \u00a0" and ord(ch) not in cmap:
-                sys.exit(f"{lang}: stremio.paywall.{k} has {ch!r} (U+{ord(ch):04X}), which Inter has no glyph for")
+                sys.exit(f"{lang}: stremio.paywall.{k} has {ch!r} (U+{ord(ch):04X}), which the font has no glyph for")
 
 
 # --- drawing ---------------------------------------------------------------
@@ -207,10 +225,35 @@ def lockup(im: Image.Image, x: float, top: float, icon_px: int, word_px: int, ce
     d.text((tx + w_web, base_y), "tor", font=wm, fill=PINK)
 
 
+CJK = re.compile(r"[\u3400-\u9fff]")
+NO_LINE_START = "，。、；：！？）》”’"
+
+
+def cjk_tokens(text: str) -> list:
+    """Chinese has no spaces: any character may start a line, except closing
+    punctuation, and a Latin word stays whole. Joined with "" the tokens give
+    the text back."""
+    out = []
+    for ch in text:
+        starts_new = (
+            not out
+            or CJK.match(ch) is not None
+            or (not ch.isspace() and ch not in NO_LINE_START
+                and (CJK.match(out[-1][-1]) is not None or out[-1][-1].isspace() or out[-1][-1] in NO_LINE_START))
+        )
+        if starts_new:
+            out.append(ch)
+        else:
+            out[-1] += ch
+    return out
+
+
 def tokens(text: str) -> list:
     """Words, with a word of one or two letters kept on the line of the word
     after it (Russian, Polish and Czech typesetting: no "в", "z", "a" left
     hanging at a line end), and a lone dash kept with the word before it."""
+    if CJK.search(text):
+        return cjk_tokens(text)
     out = []
     for w in text.split(" "):
         if out and w in ("—", "–"):
@@ -226,10 +269,11 @@ def wrap(d: ImageDraw.ImageDraw, text: str, font, max_w: float, n: int):
     """Split text into at most n lines no wider than max_w, as evenly as
     possible (a headline of one long line and one word reads badly on a
     TV); None when it does not fit."""
+    sep = "" if CJK.search(text) else " "
     words = tokens(text)
-    width = lambda ws: d.textlength(" ".join(ws), font=font)
+    width = lambda ws: d.textlength(sep.join(ws).strip(), font=font)
     if width(words) <= max_w:
-        return [" ".join(words)]
+        return [sep.join(words).strip()]
     best = None
     if n >= 2:
         for i in range(1, len(words)):
@@ -239,7 +283,7 @@ def wrap(d: ImageDraw.ImageDraw, text: str, font, max_w: float, n: int):
             if width(b) <= max_w:
                 cost = max(width(a), width(b))
                 if best is None or cost < best[0]:
-                    best = (cost, [" ".join(a), " ".join(b)])
+                    best = (cost, [sep.join(a).strip(), sep.join(b).strip()])
     return best[1] if best else None
 
 
@@ -430,7 +474,7 @@ def encode(s1: Path, s2: Path, out: Path, digest: str, lang: str):
 
 def lang_639_2(lang: str) -> str:
     return {"en": "eng", "ru": "rus", "es": "spa", "de": "deu", "fr": "fra", "pt": "por", "it": "ita",
-            "pl": "pol", "tr": "tur", "nl": "nld", "cs": "ces"}.get(lang, "und")
+            "pl": "pol", "tr": "tur", "nl": "nld", "cs": "ces", "zh": "zho"}.get(lang, "und")
 
 
 def locales() -> dict:
@@ -448,7 +492,7 @@ def locales() -> dict:
 
 
 def main():
-    global _INTER, _COMFORTAA
+    global _INTER, _COMFORTAA, _CJK_FONT
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--lang", action="append", help="render only this language (repeatable)")
     ap.add_argument("--frames", type=Path, help="also save each screen as <lang>-1.png / <lang>-2.png here")
@@ -468,6 +512,7 @@ def main():
     with tempfile.TemporaryDirectory(dir=CACHE) as tmp:
         for lang in langs:
             texts = all_texts[lang]
+            _CJK_FONT = noto_sc_path() if lang in CJK_LANGS else None
             check_glyphs(texts, lang)
             s1, s2 = Path(tmp) / f"{lang}-1.png", Path(tmp) / f"{lang}-2.png"
             screen1(texts).save(s1)

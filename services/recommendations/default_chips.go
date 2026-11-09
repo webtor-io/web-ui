@@ -393,6 +393,39 @@ var defaultChipDefsCS = []defaultChipDef{
 	},
 }
 
+var defaultChipDefsZH = []defaultChipDef{
+	{
+		Label: "近十年获奖佳作",
+		Icon:  "🏆",
+		Query: "Recommend critically acclaimed films from the last decade that won major awards (Oscars, Cannes, BAFTA, Golden Globes). Mix genres.",
+	},
+	{
+		Label: "烧脑科幻片",
+		Icon:  "🌌",
+		Query: "Recommend mind-bending science fiction films with non-linear time, philosophical themes, or reality-warping concepts.",
+	},
+	{
+		Label: "慢热惊悚片",
+		Icon:  "🥶",
+		Query: "Recommend slow-burn psychological thrillers that build tension gradually rather than rely on action set pieces.",
+	},
+	{
+		Label: "外语片遗珠",
+		Icon:  "🌍",
+		Query: "Recommend acclaimed non-English films from around the world — Korean, Iranian, French, Japanese, Spanish, etc. Avoid the obvious mainstream picks.",
+	},
+	{
+		Label: "1990 年以前的经典",
+		Icon:  "📽️",
+		Query: "Recommend essential film classics released before 1990 that hold up brilliantly today and would surprise a modern viewer.",
+	},
+	{
+		Label: "毁掉第一次约会的电影",
+		Icon:  "💀",
+		Query: "Recommend deeply weird, uncomfortable, or unhinged films that would absolutely ruin a first date — the kind that leave you staring at the wall afterwards.",
+	},
+}
+
 // defaultChipDefsByLocale maps a normalized locale code to its chip set.
 // Locales not present here fall back to English in defaultChips().
 var defaultChipDefsByLocale = map[string][]defaultChipDef{
@@ -407,6 +440,7 @@ var defaultChipDefsByLocale = map[string][]defaultChipDef{
 	"tr": defaultChipDefsTR,
 	"nl": defaultChipDefsNL,
 	"cs": defaultChipDefsCS,
+	"zh": defaultChipDefsZH,
 }
 
 // defaultChips returns the static chip set for the given locale, with stable
