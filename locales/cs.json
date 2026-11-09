@@ -691,6 +691,8 @@
     "action.noPeers.slowBody": "Tempo tu určuje roj, ne váš tarif: těch několik peerů online posílá data příliš pomalu, aby se přehrávání rozběhlo.",
     "action.noPeers.timeoutTitle": "Stále málo dat na start",
     "action.noPeers.timeoutBody": "Počkali jsme celou dobu zahřívání a roj nedodal dost na začátek. Za pár minut se může rozjet — nebo má tento torrent prostě málo seederů.",
+    "action.noPeers.refusedTitle": "Tento soukromý tracker nás nepouští",
+    "action.noPeers.refusedBody": "Tento torrent pochází ze soukromého trackeru a ten náš požadavek odmítl nebo neodpověděl. Bez něj se nespojíme s žádnými peery, takže opakování teď nepomůže. Pokud jste členem tohoto trackeru, otevřete torrent ve svém vlastním torrent klientu.",
     "action.noPeers.stats": {
         "one": "Přijato {{.Bytes}} od {{.Peers}} peera za {{.Sec}} s",
         "few": "Přijato {{.Bytes}} od {{.Peers}} peerů za {{.Sec}} s",

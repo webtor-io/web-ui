@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Hier bepaalt de zwerm het tempo, niet je abonnement: de paar peers online sturen te langzaam om het afspelen te starten.",
     "action.noPeers.timeoutTitle": "Nog steeds niet genoeg data om te starten",
     "action.noPeers.timeoutBody": "We hebben de volledige opwarmtijd gewacht en de zwerm leverde niet genoeg om te beginnen. Het kan over een paar minuten aantrekken — of deze torrent heeft simpelweg te weinig seeders.",
+    "action.noPeers.refusedTitle": "Deze privétracker laat ons niet door",
+    "action.noPeers.refusedBody": "Deze torrent komt van een privétracker, en die heeft ons verzoek geweigerd of niet beantwoord. Zonder die tracker kunnen we geen peers bereiken, dus opnieuw proberen helpt voorlopig niet. Ben je lid van die tracker, open de torrent dan in je eigen torrentclient.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} ontvangen van {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} ontvangen van {{.Peers}} peers in {{.Sec}} s"

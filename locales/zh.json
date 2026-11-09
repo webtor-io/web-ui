@@ -661,6 +661,8 @@
     "action.noPeers.slowBody": "这里决定速度的是 BT 网络，而不是你的套餐：在线的少量节点发送数据过慢，无法开始播放。",
     "action.noPeers.timeoutTitle": "数据仍不足以开始播放",
     "action.noPeers.timeoutBody": "已等待完整的预缓冲时间，BT 网络仍未提供足够的数据。几分钟后速度可能会改善，也可能只是此种子做种者不足。",
+    "action.noPeers.refusedTitle": "此私有 Tracker 拒绝了我们的连接",
+    "action.noPeers.refusedBody": "此种子来自私有 Tracker，该 Tracker 拒绝了我们的请求或没有响应。没有它我们无法连接到任何节点，因此暂时重试也没有用。如果你是该 Tracker 的成员，请用你自己的 BT 客户端打开此种子。",
     "action.noPeers.stats": {
         "other": "{{.Sec}} 秒内从 {{.Peers}} 个节点收到 {{.Bytes}}"
     },

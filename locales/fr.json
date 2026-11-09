@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Ici le rythme est dicté par l’essaim, pas par votre offre : les quelques pairs en ligne envoient trop lentement pour démarrer la lecture.",
     "action.noPeers.timeoutTitle": "Toujours pas assez de données pour démarrer",
     "action.noPeers.timeoutBody": "Nous avons attendu tout le temps de préchauffage et l’essaim n’a pas livré assez pour commencer. Cela peut s’accélérer dans quelques minutes — ou ce torrent manque simplement de seeders.",
+    "action.noPeers.refusedTitle": "Ce tracker privé ne nous laisse pas passer",
+    "action.noPeers.refusedBody": "Ce torrent provient d’un tracker privé, et le tracker a refusé notre requête ou n’a pas répondu. Sans lui, nous ne pouvons joindre aucun pair : réessayer ne servira à rien pour le moment. Si vous êtes membre de ce tracker, ouvrez le torrent dans votre propre client torrent.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} reçus de {{.Peers}} pair en {{.Sec}} s",
         "other": "{{.Bytes}} reçus de {{.Peers}} pairs en {{.Sec}} s"

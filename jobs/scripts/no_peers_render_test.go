@@ -70,6 +70,16 @@ func TestNoPeersModalRenders(t *testing.T) {
 		}, []string{"crawling", "not your plan", "340 KiB", "from 3 peers", "in 120\u00a0s", "no-peers-retry", `reason: 'slow'`}, []string{"donate-no-peers", "another torrent"}},
 		{"timeout", trial, func() NoPeersData { d := base; d.Reason = "timeout"; d.ElapsedSec = 180; return d },
 			[]string{"not enough data", "no-peers-retry", `reason: 'timeout'`}, []string{"donate-no-peers", "another torrent"}},
+		// A private tracker that refuses: the seeders may be there, so the
+		// words are not "no seeders"; Vault could not fetch it and a retry
+		// would be refused too, so neither is offered. The passkey in the
+		// store may be another user's: nothing is said about an account.
+		{"refused", trial, func() NoPeersData { d := base; d.Reason = "refused"; d.ElapsedSec = 60; return d },
+			[]string{"private tracker", "your own torrent client", `reason: 'refused'`},
+			[]string{"donate-no-peers", "Vault", "no-peers-retry", "no active seeders", "another torrent", "your account"}},
+		{"refused", trial, func() NoPeersData { d := base; d.TierName = "silver"; d.Reason = "refused"; return d },
+			[]string{"private tracker"},
+			[]string{"Save it to Vault", "no-peers-retry", "another torrent"}},
 	}
 	for _, c := range cases {
 		promo = c.offer

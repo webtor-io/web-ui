@@ -243,7 +243,8 @@ The project uses a custom design system on top of DaisyUI (night theme). All tok
     - `debug=slow_download` — cap-modal (`IsRateLimited=true`, fake 5/10/15 Mbps, rate=5M). Useful because under grace=ON this branch is otherwise unreachable for free users.
     - `debug=slow_download_bt` — BT-slow variant (`IsRateLimited=false`, 1/10/15 Mbps).
     - `debug=no_peers` — no_peers modal, "dead swarm" variant, with the real tier from claims.
-    - `debug=no_peers_slow` / `debug=no_peers_timeout` — the other two variants of the same modal (peers exist but crawl; hard warm-up deadline), with sample counters.
+    - `debug=no_peers_refused` — the same modal when a private tracker turned the seeder away: its own words, no Vault offer, no retry.
+    - `debug=no_peers_slow` / `debug=no_peers_timeout` — the two remaining variants of the same modal (peers exist but crawl; hard warm-up deadline), with sample counters.
     - **Magnet failure card (dev-only)** — open `/magnet:?xt=urn:btih:<40 hex>&debug=magnet_dead|magnet_dead_long|magnet_invalid`: the load job plays an 8 s countdown and renders `load/errors/magnet` (dead: retry for 10 minutes via `magnet-wait=long`; `_long`: the ten-minute attempt failed; `invalid`: broken link, no retry). Inert under release.
     - `debug=swarm_demo` — plays the warm-up status line for ~16 s (silent-swarm countdown, then the percent of the warm-up range) and ends in the slow variant. No network involved.
     - `debug=no-os` — skips the OpenSubtitles lookup for this stream start, so a file with embedded subtitles exercises the live (transcoder playlist) translation source instead of a file source (`jobs/scripts/action.go`, `DebugNoOpenSubtitles`).

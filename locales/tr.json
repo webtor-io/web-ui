@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Burada hızı planınız değil sürü belirler: çevrimiçi birkaç eş, oynatmayı başlatmak için veriyi fazla yavaş gönderiyor.",
     "action.noPeers.timeoutTitle": "Başlamak için hâlâ yeterli veri yok",
     "action.noPeers.timeoutBody": "Tüm ısınma süresini bekledik ve sürü başlamaya yetecek kadar veri vermedi. Birkaç dakikada hızlanabilir — ya da bu torrentin seeder'ı az.",
+    "action.noPeers.refusedTitle": "Bu özel tracker bizi içeri almıyor",
+    "action.noPeers.refusedBody": "Bu torrent özel bir tracker'dan geliyor ve tracker isteğimizi reddetti ya da yanıt vermedi. O olmadan hiçbir eşe ulaşamıyoruz, bu yüzden yeniden denemek şimdilik işe yaramaz. O tracker'a üyeyseniz torrenti kendi torrent istemcinizde açın.",
     "action.noPeers.stats": {
         "one": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı",
         "other": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı"

@@ -133,6 +133,10 @@ type EventData struct {
 	// or from disk for a torrent nobody is streaming (false). Seeders
 	// before 2026-09-09 do not send it: nil reads as live.
 	Live *bool `json:"live"`
+	// TrackerRefused says the torrent is private and the latest announce to
+	// every one of its trackers failed (torrent-web-seeder StatReply field 15;
+	// a seeder without it sends none, which reads as false).
+	TrackerRefused bool `json:"tracker_refused"`
 	// The swarm's availability over the same pieces, at the same positions
 	// (torrent-web-seeder StatReply fields 9-14; a seeder without them sends
 	// none, which reads as AvailabilityKnown false and nothing missing).

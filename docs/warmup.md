@@ -274,22 +274,24 @@ Redis publish, log line or observer push per tick. Before that (2026-09-02,
 `44382e9`) the same lines were Info and made web-ui's log volume grow fivefold
 at the same number of jobs.
 
-## Three no-peers reasons
+## Four no-peers reasons
 
 `NoPeersError` carries `Reason` and the counters at decision time:
 
 | Reason | Trigger | Modal |
 |---|---|---|
 | `dead` | `WARMUP_NO_PEERS_TIMEOUT_SEC` with 0 bytes and 0 peers (stats seen) | "no active seeders" + Vault / another torrent |
+| `refused` | the same as `dead`, and the last stats event said `tracker_refused`: the torrent is private and the latest announce to every tracker failed | "this private tracker isn't letting us through" + the viewer's own client. No Vault offer (it could not reach the swarm either), no "Try again" (the tracker would answer the same). Nothing about an account: torrent-store keeps the first uploader's .torrent, so the refused passkey may be someone else's, and the tracker's own text is never shown for the same reason |
 | `slow` | `WARMUP_SLOW_PEERS_TIMEOUT_SEC` with &lt; 1 MiB | "peers are there, but crawling" — the swarm sets the pace, not the plan |
 | `timeout` | hard `WARMUP_TIMEOUT_MIN` before the measurement window, or a bare context deadline | "still not enough data" |
 
-All three render `action/errors/no_peers.html` with a "Try again" resubmit
-(same shape as slow_download's continue form, without `force-slow`) and report
+All four render `action/errors/no_peers.html`, all but `refused` with a "Try
+again" resubmit (same shape as slow_download's continue form, without
+`force-slow`), and report
 `no-peers-shown` with `reason`, `peers`, `seeders`, `leechers`, `bytes`,
 `elapsed_s` — the props that let the 35K/month impressions be split into
 classes before deciding what else to change. Review each variant with
-`#action=stream&debug=no_peers|no_peers_slow|no_peers_timeout`, and the status
+`#action=stream&debug=no_peers|no_peers_refused|no_peers_slow|no_peers_timeout`, and the status
 line with `debug=swarm_demo` (see CLAUDE.md, Debugging).
 
 ## Tuning

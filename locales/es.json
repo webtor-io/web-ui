@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Aquí el ritmo lo marca el enjambre, no tu plan: los pocos pares conectados envían datos demasiado despacio para empezar la reproducción.",
     "action.noPeers.timeoutTitle": "Aún no hay datos suficientes para empezar",
     "action.noPeers.timeoutBody": "Esperamos todo el tiempo de calentamiento y el enjambre no entregó lo suficiente para empezar. Puede acelerarse en unos minutos, o este torrent simplemente tiene pocos seeders.",
+    "action.noPeers.refusedTitle": "Este tracker privado no nos deja pasar",
+    "action.noPeers.refusedBody": "Este torrent viene de un tracker privado, y el tracker rechazó nuestra solicitud o no respondió. Sin él no podemos llegar a ningún par, así que volver a intentarlo no servirá por ahora. Si eres miembro de ese tracker, abre el torrent en tu propio cliente de torrent.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} recibidos de {{.Peers}} par en {{.Sec}} s",
         "other": "{{.Bytes}} recibidos de {{.Peers}} pares en {{.Sec}} s"

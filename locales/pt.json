@@ -671,6 +671,8 @@
     "action.noPeers.slowBody": "Aqui o ritmo é do swarm, não do seu plano: os poucos peers online enviam dados devagar demais para iniciar a reprodução.",
     "action.noPeers.timeoutTitle": "Ainda não há dados suficientes para começar",
     "action.noPeers.timeoutBody": "Esperamos todo o tempo de aquecimento e o swarm não entregou o bastante para começar. Pode acelerar em alguns minutos — ou este torrent simplesmente tem poucos seeders.",
+    "action.noPeers.refusedTitle": "Este tracker privado não está nos deixando passar",
+    "action.noPeers.refusedBody": "Este torrent vem de um tracker privado, e o tracker recusou nosso pedido ou não respondeu. Sem ele não conseguimos chegar a nenhum peer, então tentar de novo não vai adiantar por enquanto. Se você é membro desse tracker, abra o torrent no seu próprio cliente de torrent.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} recebidos de {{.Peers}} peer em {{.Sec}} s",
         "other": "{{.Bytes}} recebidos de {{.Peers}} peers em {{.Sec}} s"

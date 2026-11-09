@@ -691,6 +691,8 @@
     "action.noPeers.slowBody": "Tempo narzuca tu rój, nie Twój plan: nieliczne peery online wysyłają dane zbyt wolno, by zacząć odtwarzanie.",
     "action.noPeers.timeoutTitle": "Nadal za mało danych, by zacząć",
     "action.noPeers.timeoutBody": "Odczekaliśmy cały czas rozgrzewki, a rój nie dostarczył dość, by zacząć. Może przyspieszyć za kilka minut — albo ten torrent ma po prostu mało seedów.",
+    "action.noPeers.refusedTitle": "Ten prywatny tracker nas nie przepuszcza",
+    "action.noPeers.refusedBody": "Ten torrent pochodzi z prywatnego trackera, który odrzucił nasze żądanie albo nie odpowiedział. Bez niego nie dotrzemy do żadnych peerów, więc ponowna próba na razie nie pomoże. Jeśli jesteś członkiem tego trackera, otwórz torrent we własnym kliencie torrent.",
     "action.noPeers.stats": {
         "one": "Odebrano {{.Bytes}} od {{.Peers}} peera w {{.Sec}} s",
         "few": "Odebrano {{.Bytes}} od {{.Peers}} peerów w {{.Sec}} s",
