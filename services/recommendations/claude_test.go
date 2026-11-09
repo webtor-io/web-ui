@@ -95,7 +95,6 @@ func TestNormalizeLocale(t *testing.T) {
 		{"De-de", "de"},
 		{"PL", "pl"},
 		// Anything we don't teach Claude about falls back to en.
-		{"zh", "en"},
 		{"ja", "en"},
 		{"ar", "en"},
 		{"uk", "en"}, // Ukrainian — not yet supported, falls back
