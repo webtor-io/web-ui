@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	log "github.com/sirupsen/logrus"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/adminauth"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/libapi"
@@ -184,7 +185,9 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], a *auth.
 // auth/refresh.html). no-store, because a stored copy would answer that
 // reload and loop it.
 func (s *Handler) refresh(c *gin.Context) {
-	f := log.Fields{"path": c.Request.URL.Path}
+	// Through the magnet: handler the path is the whole magnet, trackers
+	// and their passkeys included.
+	f := log.Fields{"path": helpers.RedactURL(c.Request.URL.Path)}
 	if d, ok := expiredFor(c.Request); ok {
 		f["expired_s"] = int64(d.Seconds())
 	}

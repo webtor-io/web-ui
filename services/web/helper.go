@@ -61,7 +61,9 @@ func wantsJSON(c *gin.Context) bool {
 func RedirectWithErrorAndPath(c *gin.Context, path string, serr error) {
 	errKey := ClassifyError(serr)
 	args := ErrArgsOf(serr)
-	log.WithError(serr).WithField("error_key", errKey).WithField("path", path).Warn("redirect with error")
+	// The return URL of a form on a magnet page is that magnet, trackers
+	// and their passkeys included: the redirect keeps it, the log does not.
+	log.WithError(serr).WithField("error_key", errKey).WithField("path", helpers.RedactURL(path)).Warn("redirect with error")
 
 	if wantsJSON(c) {
 		body := gin.H{"status": "error", "message": errKey}
