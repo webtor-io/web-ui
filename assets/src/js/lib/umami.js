@@ -49,6 +49,31 @@ export function init(window, config) {
         return encodeURI(str);
     };
 
+    // A magnet page's address is the magnet, trackers included, and a
+    // private tracker's passkey is part of a tracker URL: GET /magnet:?…,
+    // the same through the browser's magnet: handler (manifest "/%s", the
+    // whole magnet encoded into the path) and the extension's
+    // /ext/magnet?url=<magnet>. Umami gets such a page as its bare path;
+    // every other page keeps its query (UTM and the like).
+    const magnetPage = /^((?:\/[a-z]{2})?\/)(magnet(?::|%3a)|ext\/magnet(?=[?#]|$))/i;
+    const dropMagnet = path => {
+        const m = magnetPage.exec(path);
+        if (!m) return path;
+        return m[1] + (/^ext/i.test(m[2]) ? 'ext/magnet' : 'magnet:');
+    };
+    // The same for a whole URL: the referrer.
+    const dropMagnetHref = href => {
+        try {
+            const u = new URL(href);
+            const path = u.pathname + u.search;
+            const dropped = dropMagnet(path);
+            if (dropped !== path) return u.origin + dropped;
+        } catch (e) {
+            /* not a URL: as it was */
+        }
+        return href;
+    };
+
     const parseURL = url => {
         try {
             const { pathname, search } = new URL(url);
@@ -56,6 +81,7 @@ export function init(window, config) {
         } catch (e) {
             /* empty */
         }
+        url = dropMagnet(url);
         return excludeSearch ? url.split('?')[0] : url;
     };
 
@@ -360,7 +386,7 @@ export function init(window, config) {
     }
 
     let currentUrl = parseURL(href);
-    let currentRef = referrer !== hostname ? referrer : '';
+    let currentRef = referrer !== hostname ? dropMagnetHref(referrer) : '';
     let title = document.title;
     let cache;
     let initialized;

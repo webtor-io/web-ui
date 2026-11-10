@@ -10,8 +10,8 @@ import { init } from './umami.js';
 
 const SESSION = 'abc123sessioncookie';
 
-function setup({ id, autoTrack = false, reply } = {}) {
-    const dom = new JSDOM('<!doctype html><title>t</title><body></body>', { url: 'https://webtor.io/' });
+function setup({ id, autoTrack = false, reply, url = 'https://webtor.io/', referrer } = {}) {
+    const dom = new JSDOM('<!doctype html><title>t</title><body></body>', { url, referrer });
     const window = dom.window;
     Object.defineProperty(window, 'crypto', { value: globalThis.crypto });
     // The tracker uses the bare globals a browser has; jsdom keeps them on window.
@@ -88,4 +88,54 @@ test('the first automatic pageview carries the id', async () => {
     assert.equal(sent[0].type, 'event');
     assert.equal(sent[0].payload.name, undefined);
     assert.equal(typeof sent[0].payload.id, 'string');
+});
+
+// A magnet page's address is the magnet, trackers included, and a private
+// tracker's passkey is part of a tracker URL. Umami gets such a page -- as the
+// page and as the next page's referrer -- as its bare path; every other page
+// keeps its query.
+const HASH = '08ada5a7a6183aae1e09d831df6748d566095a10';
+const PASSKEY = '0123456789abcdef0123456789abcdef';
+const MAGNET = `magnet:?xt=urn:btih:${HASH}&tr=http%3A%2F%2Ftracker.invalid%2Fannounce%3Fpasskey%3D${PASSKEY}`;
+
+test('a magnet page reaches Umami without its magnet', async () => {
+    for (const [page, want] of [
+        [`https://webtor.io/${MAGNET}`, '/magnet:'],
+        // The browser's magnet: handler (manifest "/%s"): the whole magnet
+        // percent-encoded into the path, no query at all.
+        [`https://webtor.io/${encodeURIComponent(MAGNET)}`, '/magnet:'],
+        [`https://webtor.io/ru/${MAGNET}`, '/ru/magnet:'],
+        [`https://webtor.io/ext/magnet?${new URLSearchParams({ url: MAGNET, utm_source: 'ext' })}`, '/ext/magnet'],
+    ]) {
+        const { umami, sent } = setup({ url: page });
+        await umami.track('x');
+        const { url } = sent.at(-1).payload;
+        assert.equal(url, want, page);
+        assert.ok(!url.includes(PASSKEY));
+    }
+});
+
+test('the page after a magnet page gets it as a bare referrer', async () => {
+    const { umami, sent } = setup({ url: `https://webtor.io/${HASH}`, referrer: `https://webtor.io/ext/magnet?${new URLSearchParams({ url: MAGNET })}` });
+    await umami.track('x');
+    assert.equal(sent.at(-1).payload.referrer, 'https://webtor.io/ext/magnet');
+    const h = setup({ url: `https://webtor.io/${HASH}`, referrer: `https://webtor.io/${MAGNET}` });
+    await h.umami.track('x');
+    assert.equal(h.sent.at(-1).payload.referrer, 'https://webtor.io/magnet:');
+});
+
+test('every other page keeps its query', async () => {
+    for (const [page, want] of [
+        ['https://webtor.io/?utm_source=reddit&utm_medium=post', '/?utm_source=reddit&utm_medium=post'],
+        [`https://webtor.io/${HASH}?file=/a.mkv`, `/${HASH}?file=/a.mkv`],
+        ['https://webtor.io/magnet-to-torrent?utm_source=x', '/magnet-to-torrent?utm_source=x'],
+        ['https://webtor.io/ext/magnetic?x=1', '/ext/magnetic?x=1'],
+    ]) {
+        const { umami, sent } = setup({ url: page });
+        await umami.track('x');
+        assert.equal(sent.at(-1).payload.url, want, page);
+    }
+    const { umami, sent } = setup({ url: `https://webtor.io/${HASH}`, referrer: 'https://www.google.com/search?q=sintel' });
+    await umami.track('x');
+    assert.equal(sent.at(-1).payload.referrer, 'https://www.google.com/search?q=sintel');
 });
