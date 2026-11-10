@@ -42,12 +42,15 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 	// stays what it was.
 	private := render("en", &MagnetErrorData{Kind: "private", WaitedSec: 12, Magnet: "magnet:?xt=urn:btih:00", HintVideoID: "tt0000000"})
 	for _, w := range []string{"private torrent", "no tracker address", "magnet link that includes your tracker", ".torrent file", `type="file"`, `name="resource"`, `accept=".torrent,application/x-bittorrent"`,
-		`data-async-target="#log-load"`, `enctype="multipart/form-data"`, `name="hint_video_id" value="tt0000000"`, "this.form.requestSubmit()", "magnet-private-upload", "magnet-private-shown"} {
+		`data-async-target="#log-load"`, `enctype="multipart/form-data"`, `name="hint_video_id" value="tt0000000"`, "this.form.requestSubmit()",
+		// Umami gets the event names alone: no data argument that could
+		// carry the link (the page URL itself is cut in lib/umami.js).
+		"umami.track('magnet-private-upload')", "umami.track('magnet-private-shown')"} {
 		if !strings.Contains(private, w) {
 			t.Errorf("private: missing %q", w)
 		}
 	}
-	for _, w := range []string{"magnet-retry-long", "magnet-wait", "Searched for", "magnet-failed-shown", "Nobody is sharing", "Vault", "donate", `name="resource" value=`, "accepted", "passkey"} {
+	for _, w := range []string{"magnet-retry-long", "magnet-wait", "Searched for", "magnet-failed-shown", "Nobody is sharing", "Vault", "donate", `name="resource" value=`, "urn:btih", "accepted", "passkey"} {
 		if strings.Contains(private, w) {
 			t.Errorf("private: must not carry %q:\n%s", w, private)
 		}
