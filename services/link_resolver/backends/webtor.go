@@ -58,6 +58,13 @@ func (s *Webtor) EnsureResource(ctx context.Context, apiClaims *api.Claims, hash
 		return s.api.StoreResource(ctx, apiClaims, []byte(magnet))
 	})
 	if err != nil {
+		// A private torrent's magnet is refused for good: rest-api takes it
+		// only as the .torrent file. Said even to a caller whose deadline
+		// ran out while it waited on another one's store of this hash --
+		// a background store would only be refused again.
+		if errors.Is(err, api.ErrPrivateMagnet) {
+			return errors.Wrap(err, "failed to store resource")
+		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			go s.backgroundStore(apiClaims, hash, magnet)
 			return nil
