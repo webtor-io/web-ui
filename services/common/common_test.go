@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -254,5 +255,53 @@ func TestResolveQueryHash_RefusalKeepsNoTracker(t *testing.T) {
 	}
 	if msg := err.Error(); !strings.Contains(msg, "invalid control character") {
 		t.Errorf("the refusal lost its reason: %s", msg)
+	}
+}
+
+// A refused query is logged (redirect with error, the load job's error): its
+// length, and the query itself for the refused-input analyses (titles,
+// broken magnets), without what can carry a private tracker's key: a
+// magnet's parameters other than its hash and name (helpers.RedactURL), and
+// a link's path and query. Cut to 200 bytes; the type stays for
+// web.ClassifyError.
+func TestRefusedQuery(t *testing.T) {
+	const key = "0123456789abcdef0123456789abcdef"
+	// 801 bytes: the 200-byte cut falls inside a 2-byte rune, which goes.
+	title := "x" + strings.Repeat("Сила", 100)
+	for _, c := range []struct {
+		name, query string
+		is          error
+		has, miss   []string
+	}{
+		{"a broken magnet",
+			"magnet:?xt=urn:btih:5e4bd524&dn=Sintel&tr=http%3A%2F%2Ftracker.invalid%2F" + key + "%2Fannounce&as=https://tracker.invalid/1." + key,
+			ErrMagnetInvalid, []string{`query="magnet:?xt=urn:btih:5e4bd524&dn=Sintel&tr=<redacted>&as=<redacted>"`}, []string{key, "tracker.invalid"}},
+		{"free text", "Big Buck Bunny 2008", ErrQueryFreeText, []string{`query="Big Buck Bunny 2008"`}, nil},
+		{"a web page", "https://tracker.invalid/download.php?id=1&torrent_pass=" + key, ErrQueryWebPage, []string{`query="https://tracker.invalid"`}, []string{key, "download.php"}},
+		{"a .torrent link", "www.tracker.invalid/rss/" + key + "/x.torrent", ErrQueryTorrentURL, []string{`query="http://www.tracker.invalid"`}, []string{key}},
+		{"a link that does not parse", "https://tracker.invalid/dl/" + key + "/%zz", ErrQueryWebPage, []string{`query=""`}, []string{key}},
+		{"a long title", title, ErrQueryFreeText, []string{`query="` + title[:199] + `"`}, []string{title[:201]}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, _, err := ResolveQueryHash(c.query)
+			if !errors.Is(err, c.is) {
+				t.Fatalf("ResolveQueryHash(%q) = %v, want %v", c.query, err, c.is)
+			}
+			err = RefusedQuery(err, c.query)
+			if !errors.Is(err, c.is) {
+				t.Errorf("the wrapper lost the type: %v", err)
+			}
+			msg := err.Error()
+			for _, w := range append(c.has, "wrong resource provided query_len="+strconv.Itoa(len(c.query))) {
+				if !strings.Contains(msg, w) {
+					t.Errorf("%s\nlacks %s", msg, w)
+				}
+			}
+			for _, w := range c.miss {
+				if strings.Contains(msg, w) {
+					t.Errorf("%s\nkeeps %s", msg, w)
+				}
+			}
+		})
 	}
 }

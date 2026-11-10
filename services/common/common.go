@@ -13,6 +13,8 @@ import (
 	infohash_v2 "github.com/anacrolix/torrent/types/infohash-v2"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+
+	"github.com/webtor-io/web-ui/helpers"
 )
 
 // SHA1R is a sanity check that a resource id from the URL carries some hex
@@ -62,6 +64,31 @@ func (e *HashLengthError) Error() string {
 }
 
 func (e *HashLengthError) Is(target error) bool { return target == ErrHashLength }
+
+// maxRefusedQuery bounds the query RefusedQuery quotes, in bytes.
+const maxRefusedQuery = 200
+
+// RefusedQuery is err, ResolveQueryHash's refusal of query, as the form and
+// the load job report it, and the logs keep it: the query's length and the
+// query itself, which is what the refused-input analyses read (titles,
+// broken magnets). The query goes through helpers.RedactURL, so a magnet
+// keeps its hash and name alone, and a link the query was (a web page, a
+// .torrent) keeps its scheme and host alone: a private tracker's download
+// link carries the user's key in its path, or under a name RedactURL does
+// not know.
+func RefusedQuery(err error, query string) error {
+	q := helpers.RedactURL(query)
+	if errors.Is(err, ErrQueryWebPage) || errors.Is(err, ErrQueryTorrentURL) {
+		q = ""
+		if u, perr := parseWebURL(strings.TrimSpace(query)); perr == nil {
+			q = u.Scheme + "://" + u.Host
+		}
+	}
+	if len(q) > maxRefusedQuery {
+		q = strings.ToValidUTF8(q[:maxRefusedQuery], "")
+	}
+	return errors.Wrapf(err, "wrong resource provided query_len=%d query=%q", len(query), q)
+}
 
 // ResolveQueryHash resolves a user query to a lowercase v1 infohash plus a
 // magnet URI safe to pass downstream. It accepts, after trimming:
@@ -271,14 +298,20 @@ func isWebURL(s string) bool {
 // form does not fetch it (the embed does, from its own settings); the person
 // is told to download the file and upload it.
 func isTorrentFileURL(s string) bool {
-	if hasPrefixFold(s, "www.") {
-		s = "http://" + s
-	}
-	u, err := url.Parse(s)
+	u, err := parseWebURL(s)
 	if err != nil {
 		return false
 	}
 	return strings.HasSuffix(strings.ToLower(u.Path), ".torrent")
+}
+
+// parseWebURL parses a URL isWebURL took, one that starts with "www." as
+// http.
+func parseWebURL(s string) (*url.URL, error) {
+	if hasPrefixFold(s, "www.") {
+		s = "http://" + s
+	}
+	return url.Parse(s)
 }
 
 func hasPrefixFold(s, prefix string) bool {

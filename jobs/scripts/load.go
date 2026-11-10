@@ -240,9 +240,9 @@ func Load(api *api.Api, i18nSvc *i18n.Service, c *web.Context, args *LoadArgs) (
 	if args.Query != "" {
 		hash, _, err = common.ResolveQueryHash(args.Query)
 		if err != nil {
-			// Logged as the job's error: the length, not the query, whose
-			// tr= can carry a private tracker's passkey.
-			return nil, "", errors.Wrapf(err, "wrong resource provided query_len=%d", len(args.Query))
+			// Logged as the job's error: RefusedQuery keeps a private
+			// tracker's key out of it.
+			return nil, "", common.RefusedQuery(err, args.Query)
 		}
 	} else if args.File != nil {
 		b := io.NopCloser(bytes.NewReader(args.File))
