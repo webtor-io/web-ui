@@ -135,7 +135,7 @@ test('every other page keeps its query', async () => {
         await umami.track('x');
         assert.equal(sent.at(-1).payload.url, want, page);
     }
-    const { umami, sent } = setup({ url: `https://webtor.io/${HASH}`, referrer: 'https://www.google.com/search?q=sintel' });
+    const { umami, sent } = setup({ url: `https://webtor.io/${HASH}`, referrer: 'https://search.example/?q=sintel' });
     await umami.track('x');
-    assert.equal(sent.at(-1).payload.referrer, 'https://www.google.com/search?q=sintel');
+    assert.equal(sent.at(-1).payload.referrer, 'https://search.example/?q=sintel');
 });
