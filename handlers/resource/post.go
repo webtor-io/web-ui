@@ -123,6 +123,7 @@ func (s *Handler) post(c *gin.Context) {
 		HintVideoID: args.HintVideoID,
 		MagnetWait:  args.MagnetWait,
 		Debug:       args.Debug,
+		Source:      "site",
 	})
 	if err != nil {
 		web.RedirectWithError(c, errors.Wrap(err, "failed to load resource"))

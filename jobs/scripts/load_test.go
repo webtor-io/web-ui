@@ -1,6 +1,7 @@
 package scripts
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"net/http"
@@ -11,6 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anacrolix/torrent/bencode"
+	"github.com/anacrolix/torrent/metainfo"
+	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -107,5 +112,30 @@ func TestLoad_RefusedQueryKeepsNoTracker(t *testing.T) {
 	}
 	if got := web.ClassifyError(err); got != "error.magnet_invalid" {
 		t.Errorf("ClassifyError = %s, want error.magnet_invalid", got)
+	}
+}
+
+// A private .torrent submitted on the site (or fetched for an embed) is
+// counted once, by the door it came through (services/private_torrent).
+func TestLoad_CountsAPrivateUpload(t *testing.T) {
+	hook := test.NewGlobal()
+	defer hook.Reset()
+	info := metainfo.Info{Name: "probe", PieceLength: 16384, Length: 1, Pieces: make([]byte, 20), Private: &[]bool{true}[0]}
+	mi := metainfo.MetaInfo{InfoBytes: bencode.MustMarshal(info), Announce: "http://tracker.invalid/announce?passkey=0123456789abcdef0123456789abcdef"}
+	var b bytes.Buffer
+	if err := mi.Write(&b); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Load(nil, nil, &web.Context{Lang: "en"}, &LoadArgs{File: b.Bytes(), Source: "embed"}); err != nil {
+		t.Fatal(err)
+	}
+	var lines []*log.Entry
+	for _, e := range hook.AllEntries() {
+		if e.Data["event"] == "private_torrent_upload" {
+			lines = append(lines, e)
+		}
+	}
+	if len(lines) != 1 || lines[0].Data["source"] != "embed" || lines[0].Data["trackers"] != "http://tracker.invalid" {
+		t.Fatalf("lines %v, want one from the embed", hook.AllEntries())
 	}
 }

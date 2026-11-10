@@ -37,7 +37,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, at *at.AccessToke
 	// the response has to be echoed back with that prefix intact.
 	fs := &PrefixDirectory{
 		Separator: "webdav",
-		Inner:     libfs.New(pg, sapi, jobs),
+		Inner:     libfs.New(pg, sapi, jobs, "webdav"),
 	}
 	wh := &webdav.Handler{FileSystem: fs}
 	h := &Handler{

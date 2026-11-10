@@ -16,6 +16,7 @@ import (
 	j "github.com/webtor-io/web-ui/jobs"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/vfs"
 )
 
@@ -24,6 +25,9 @@ type TorrentLibraryDirectory struct {
 	pg   *services.PG
 	api  *api.Api
 	jobs *j.Jobs
+	// source names the protocol that mounted the tree, for the
+	// private-torrent count (services/private_torrent).
+	source string
 }
 
 func (s *TorrentLibraryDirectory) Open(ctx context.Context, name string) (io.ReadCloser, *url.URL, error) {
@@ -154,6 +158,7 @@ func (s *TorrentLibraryDirectory) storeTorrentToAPI(ctx context.Context, t []byt
 	if err != nil {
 		return nil, nil, err
 	}
+	private_torrent.LogUpload(t, wcc.User, s.source)
 	resp, err := s.api.StoreResource(ctx, wcc.ApiClaims, t)
 	if err != nil {
 		return nil, nil, err

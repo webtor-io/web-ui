@@ -12,9 +12,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anacrolix/torrent/bencode"
+	"github.com/anacrolix/torrent/metainfo"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/vfs"
 	"github.com/webtor-io/web-ui/services/web"
 	"github.com/webtor-io/web-ui/services/webdav"
@@ -110,5 +115,56 @@ func TestWebDAVGetTorrentSendsActualBytes(t *testing.T) {
 				t.Errorf("HEAD Content-Length = %s, want %d", got, len(actual))
 			}
 		})
+	}
+}
+
+// A private .torrent put into the library over WebDAV or S3 is counted once,
+// by the protocol it came through (services/private_torrent): the tree is
+// shared, so the name is the one the protocol gave New.
+func TestStoreTorrentCountsAPrivateUpload(t *testing.T) {
+	info := metainfo.Info{Name: "probe", PieceLength: 16384, Length: 1, Pieces: make([]byte, 20), Private: &[]bool{true}[0]}
+	mi := metainfo.MetaInfo{InfoBytes: bencode.MustMarshal(info), Announce: "udp://tracker.invalid:6969/" + "0123456789abcdef0123456789abcdef" + "/announce"}
+	var torrent bytes.Buffer
+	if err := mi.Write(&torrent); err != nil {
+		t.Fatal(err)
+	}
+	hash := mi.HashInfoBytes().HexString()
+	restAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/resource" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"` + hash + `"}`))
+	}))
+	t.Cleanup(restAPI.Close)
+	u, _ := url.Parse(restAPI.URL)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range api.RegisterFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
+		"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+		t.Fatal(err)
+	}
+	sapi := api.New(cli.NewContext(cli.NewApp(), fs, nil), restAPI.Client())
+	id := uuid.NewV4()
+	ctx := context.WithValue(context.Background(), web.Context{}, &web.Context{ApiClaims: &api.Claims{}, User: &auth.User{ID: id}})
+
+	for _, source := range []string{"webdav", "s3"} {
+		hook := test.NewGlobal()
+		dir := New(nil, sapi, nil, source).(*DebugDirectory).Inner.(*RootDirectory).Children[RootTorrents].(*TorrentLibraryDirectory)
+		if _, _, err := dir.storeTorrentToAPI(ctx, torrent.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+		var lines []map[string]any
+		for _, e := range hook.AllEntries() {
+			if e.Data["event"] == "private_torrent_upload" {
+				lines = append(lines, e.Data)
+			}
+		}
+		hook.Reset()
+		if len(lines) != 1 || lines[0]["source"] != source || lines[0]["user"] != auth.LogHash(id) || lines[0]["trackers"] != "udp://tracker.invalid:6969" {
+			t.Errorf("%s: lines %v, want one", source, lines)
+		}
 	}
 }

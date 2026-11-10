@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -33,6 +34,9 @@ type LoadArgs struct {
 	// Debug is a dev-only switch (see CLAUDE.md, Debugging): "magnet_dead",
 	// "magnet_dead_long", "magnet_invalid" play the failure without a network.
 	Debug string
+	// Source is the door a File came in by, "site" or "embed", for the
+	// private-torrent count (services/private_torrent).
+	Source string
 }
 
 const (
@@ -247,6 +251,7 @@ func Load(api *api.Api, i18nSvc *i18n.Service, c *web.Context, args *LoadArgs) (
 			return nil, "", err
 		}
 		hash = mi.HashInfoBytes().HexString()
+		private_torrent.LogUpload(args.File, c.User, args.Source)
 	}
 	r = NewLoadScript(api, i18nSvc, c, args)
 	return

@@ -25,8 +25,10 @@ const (
 
 // New builds the library tree. The caller owns any protocol-specific wrapping —
 // handlers/webdav puts a PrefixDirectory on top because its URLs carry an alias
-// prefix, while S3 addresses the tree directly as bucket + key.
-func New(pg *services.PG, sapi *api.Api, jobs *j.Jobs) vfs.FileSystem {
+// prefix, while S3 addresses the tree directly as bucket + key. source is the
+// caller's name ("webdav", "s3") for the log lines that count what comes in;
+// nothing behaves differently by it.
+func New(pg *services.PG, sapi *api.Api, jobs *j.Jobs, source string) vfs.FileSystem {
 	td := &TorrentDirectory{
 		api: sapi,
 	}
@@ -34,9 +36,10 @@ func New(pg *services.PG, sapi *api.Api, jobs *j.Jobs) vfs.FileSystem {
 		Inner: &RootDirectory{
 			Children: map[string]vfs.FileSystem{
 				RootTorrents: &TorrentLibraryDirectory{
-					pg:   pg,
-					api:  sapi,
-					jobs: jobs,
+					pg:     pg,
+					api:    sapi,
+					jobs:   jobs,
+					source: source,
 				},
 				RootAll: &ContentDirectory{
 					Library:          &AllLibrary{},
