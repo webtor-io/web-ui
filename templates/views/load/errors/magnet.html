@@ -37,9 +37,14 @@
     {{/* Same shape as the streaming retries: the form targets the log host
          (#log-load, see partials/load/progress), whose data-async-layout
          makes the server answer with a fresh host bound to the new job —
-         the log is replaced in place, the page around it stays. */}}
+         the log is replaced in place, the page around it stays.
+         The card is stored with the job and replayed to whoever loads the
+         same torrent, so it knows the infohash only (jobs/load.go,
+         MagnetErrorData.Magnet): progressLog.js puts the query this
+         browser submitted, trackers and all, into the data-load-query
+         input from its host. */}}
     <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="#log-load" data-async-push-state="false">
-        <input type="hidden" name="resource" value="{{ .Data.Query }}" />
+        <input type="hidden" name="resource" value="{{ .Data.Magnet }}" data-load-query />
         <input type="hidden" name="magnet-wait" value="long" />
         {{- if .Data.HintVideoID }}
         <input type="hidden" name="hint_video_id" value="{{ .Data.HintVideoID }}" />

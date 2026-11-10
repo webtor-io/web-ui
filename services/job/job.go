@@ -291,15 +291,23 @@ func (s *Job) logToLogger(l LogItem) {
 	if message == "" {
 		message = string(l.Level)
 	}
-	log.WithFields(log.Fields{
+	fields := log.Fields{
 		"ID":       s.ID,
 		"Queue":    s.Queue,
 		"Tag":      l.Tag,
 		"Location": helpers.RedactURL(l.Location),
 		"Template": l.Template,
-		"Body":     helpers.RedactURL(l.Body),
 		"Status":   l.Status,
-	}).Log(levelMap[l.Level], helpers.RedactURL(message))
+	}
+	// A card (Custom) is rendered from what the job was asked, which can be
+	// the visitor's own input -- the dead-magnet card's retry held the
+	// magnet, a private tracker's passkey included -- in shapes no pattern
+	// can all tell (escaped for a script, for an attribute). The log keeps
+	// the card's name, not its body.
+	if l.Level != Custom {
+		fields["Body"] = helpers.RedactURL(l.Body)
+	}
+	log.WithFields(fields).Log(levelMap[l.Level], helpers.RedactURL(message))
 }
 
 func (s *Job) log(l LogItem) error {
