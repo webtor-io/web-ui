@@ -105,6 +105,13 @@ func (s *Job) DoNotCache() *Job {
 	return s
 }
 
+// Cacheable reports whether this run's result will be kept for later
+// requests with the same id: false once the script called DoNotCache. Read
+// it once Run has returned, as retire does.
+func (s *Job) Cacheable() bool {
+	return !s.noCache
+}
+
 type LogItemLevel string
 
 const (

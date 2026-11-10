@@ -25,8 +25,10 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 	// A load job is keyed by hash+lang and its log is kept in Redis, so a
 	// second visit replays the first run — including a failure. The
 	// dead-magnet retry must run again, not replay the card it was clicked
-	// on; the dev playback likewise. Purge drops the stored log first.
-	purge := args.MagnetWait > 0 || args.Debug != ""
+	// on; the dev playback likewise. So must an upload: a magnet card asks
+	// for the .torrent, which has the same infohash. Purge drops the stored
+	// log first.
+	purge := args.MagnetWait > 0 || args.Debug != "" || args.File != nil
 	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, id, job.NewScript(func(j *job.Job) (err error) {
 		err = ls.Run(ctx, j)
 		if me, ok := err.(*scripts.MagnetError); ok {
@@ -96,6 +98,12 @@ func magnetErrKey(me *scripts.MagnetError) string {
 
 func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadArgs, me *scripts.MagnetError, hash string) error {
 	key := magnetErrKey(me)
+	if me.Kind == "private" {
+		// The refusal answers the link that was submitted (no tracker in
+		// it), not the torrent. The stored card goes when this run retires,
+		// so a later magnet with the tracker runs instead of replaying it.
+		j.DoNotCache()
+	}
 	log.WithError(me).WithField("err_key", key).WithField("long", me.Long).WithField("waited_s", int(me.Waited.Seconds())).Info("user error shown")
 	data := newMagnetErrorData(args, me, hash)
 	tpl := s.tb.Build("load/errors/magnet").WithLayoutBody(`{{ template "main" . }}`)
