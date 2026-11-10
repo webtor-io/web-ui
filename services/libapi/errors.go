@@ -78,8 +78,9 @@ func NewError(status int, code string, message string, cause error) *Error {
 func WriteError(c *gin.Context, e *Error) {
 	// The cause can quote what the client sent: rest-api answers a magnet
 	// it cannot parse with url.Parse's error, the whole URI in it, and a
-	// private tracker's passkey is part of a tracker URL.
-	entry := log.WithField(log.ErrorKey, helpers.RedactURL(e.Error())).WithField("path", c.Request.URL.Path).WithField("method", c.Request.Method)
+	// private tracker's passkey is part of a tracker URL. So can the path:
+	// a resource id may be a magnet, which URL.Path holds decoded.
+	entry := log.WithField(log.ErrorKey, helpers.RedactURL(e.Error())).WithField("path", helpers.RedactURL(c.Request.URL.Path)).WithField("method", c.Request.Method)
 	switch {
 	case e.Status >= http.StatusInternalServerError:
 		entry.Error("api request failed")

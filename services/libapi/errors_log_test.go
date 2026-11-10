@@ -44,3 +44,27 @@ func TestWriteError_LogKeepsNoMagnetTrackers(t *testing.T) {
 		t.Errorf("the cause reached the client: %s", w.Body.String())
 	}
 }
+
+// The JSON API takes a resource id in the path the way rest-api does, so a
+// client can send a magnet there, escaped: the path WriteError logs is the
+// decoded URL.Path, the magnet's trackers and sources in it.
+func TestWriteError_PathKeepsNoMagnetTrackers(t *testing.T) {
+	const passkey = "0123456789abcdef0123456789abcdef"
+	hook := test.NewGlobal()
+	defer hook.Reset()
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/resource/magnet%3A%3Fxt%3Durn%3Abtih%3A5e4bd524%26tr%3Dhttp%253A%252F%252Ftracker.invalid%252Fannounce%253Fpasskey%253D"+passkey+"%26as%3Dhttps%253A%252F%252Ftracker.invalid%252F1."+passkey, nil)
+	WriteError(c, NewError(http.StatusBadRequest, CodeBadRequest, "the request could not be parsed", errors.New("failed to parse magnet")))
+
+	if len(hook.AllEntries()) != 1 {
+		t.Fatalf("want one line, got %d", len(hook.AllEntries()))
+	}
+	path := fmt.Sprint(hook.LastEntry().Data["path"])
+	if strings.Contains(path, passkey) || strings.Contains(path, "tracker.invalid") {
+		t.Errorf("the path keeps the tracker: %s", path)
+	}
+	if want := "/api/v1/resource/magnet:?xt=urn:btih:5e4bd524&tr=<redacted>&as=<redacted>"; path != want {
+		t.Errorf("path = %s, want %s", path, want)
+	}
+}
