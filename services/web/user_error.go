@@ -76,6 +76,14 @@ func ClassifyError(err error) string {
 	case errors.Is(err, common.ErrQueryFreeText):
 		return "error.free_text"
 
+	case errors.Is(err, api.ErrPrivateMagnet):
+		// rest-api took the magnet of a private torrent and wants its
+		// .torrent file. By identity, above the text below: the load job
+		// carries it inside the magnet card's error ("failed to magnetize:
+		// ..."), which would read "nobody is sharing it" -- an embed, which
+		// shows no card, renders exactly that.
+		return "error.private_magnet"
+
 	case strings.Contains(msg, "PermissionDenied"),
 		strings.Contains(msg, "access is forbidden"),
 		strings.Contains(msg, "restricted by the rightholder"):

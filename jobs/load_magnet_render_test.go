@@ -33,6 +33,23 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 	if !strings.Contains(invalid, "magnet link is broken") || strings.Contains(invalid, "magnet-retry-long") || strings.Contains(invalid, "Searched for") {
 		t.Errorf("invalid: must explain the link and offer no retry:\n%s", invalid)
 	}
+	// A private torrent: the magnet resolved, rest-api stored nothing. Its
+	// own words and its own way out -- upload the .torrent, into the same log
+	// host the retry targets -- and none of the dead card: no "searched for",
+	// no ten-minute retry, nothing to sell, and its own Umami event so the
+	// dead/invalid series stays what it was.
+	private := render("en", &MagnetErrorData{Kind: "private", WaitedSec: 12, Magnet: "magnet:?xt=urn:btih:00", HintVideoID: "tt0000000"})
+	for _, w := range []string{"private torrent", "Magnet links for private torrents", ".torrent file", `type="file"`, `name="resource"`, `accept=".torrent,application/x-bittorrent"`,
+		`data-async-target="#log-load"`, `enctype="multipart/form-data"`, `name="hint_video_id" value="tt0000000"`, "this.form.requestSubmit()", "magnet-private-upload", "magnet-private-shown"} {
+		if !strings.Contains(private, w) {
+			t.Errorf("private: missing %q", w)
+		}
+	}
+	for _, w := range []string{"magnet-retry-long", "magnet-wait", "Searched for", "magnet-failed-shown", "Nobody is sharing", "Vault", "donate", `name="resource" value=`} {
+		if strings.Contains(private, w) {
+			t.Errorf("private: must not carry %q:\n%s", w, private)
+		}
+	}
 	for _, lang := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"} {
 		out := render(lang, &MagnetErrorData{Kind: "dead", WaitedSec: 60, Magnet: "m"})
 		if strings.Contains(out, "load.magnet.") {
@@ -229,4 +246,18 @@ func progressPartial(t *testing.T) *template.Template {
 		t.Fatalf("parse: %v", err)
 	}
 	return tpl
+}
+
+// Each face of the card is counted under its own err_key in "user error
+// shown": a private torrent must not swell the dead-magnet count.
+func TestMagnetErrKey(t *testing.T) {
+	for kind, want := range map[string]string{
+		"dead":    "error.magnet_no_metadata",
+		"invalid": "error.magnet_invalid",
+		"private": "error.private_magnet",
+	} {
+		if got := magnetErrKey(&scripts.MagnetError{Kind: kind}); got != want {
+			t.Errorf("%s: %s, want %s", kind, got, want)
+		}
+	}
 }

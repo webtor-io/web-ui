@@ -2,23 +2,36 @@
 {{/* A magnet that did not become a torrent. Same card as action/errors/no_peers:
      what happened, how long we looked, what to do. Kind "dead" — no peer had
      the metadata within the wait; "invalid" — the link itself is broken, so
-     there is nothing to retry. Long — the ten-minute attempt is what failed. */}}
+     there is nothing to retry; "private" — it resolved to a private torrent,
+     which rest-api takes only as its .torrent file: no retry and nothing to
+     sell, the upload instead. Long — the ten-minute attempt is what failed. */}}
 {{ $dead := eq .Data.Kind "dead" }}
+{{ $private := eq .Data.Kind "private" }}
 {{/* text-left: the home page's hero centres its text and this card lives
      inside it; the no-peers card on a resource page has no such parent. */}}
 <div class="mx-5 mt-1 p-4 rounded-xl bg-base-300/20 border border-w-line/40 text-left">
     <div class="flex items-start gap-3">
+        {{- if $private }}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        {{- else }}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-pinkL">
             <path d="M6 15a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1a2 2 0 0 0-2 2v10a1 1 0 0 1-2 0V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2z"/>
             <path d="M6 9h4M14 9h4"/>
         </svg>
+        {{- end }}
         <h3 class="font-semibold text-base text-base-content leading-snug">
-            {{- if $dead }}{{ t $.Lang "load.magnet.deadTitle" }}{{ else }}{{ t $.Lang "load.magnet.invalidTitle" }}{{ end -}}
+            {{- if $dead }}{{ t $.Lang "load.magnet.deadTitle" }}
+            {{- else if $private }}{{ t $.Lang "load.magnet.privateTitle" }}
+            {{- else }}{{ t $.Lang "load.magnet.invalidTitle" }}{{ end -}}
         </h3>
     </div>
 
     <p class="text-sm text-w-sub mt-3 leading-relaxed">
-        {{- if not $dead }}{{ t $.Lang "load.magnet.invalidBody" }}
+        {{- if $private }}{{ t $.Lang "load.magnet.privateBody" }}
+        {{- else if not $dead }}{{ t $.Lang "load.magnet.invalidBody" }}
         {{- else if .Data.Long }}{{ t $.Lang "load.magnet.deadBodyLong" }}
         {{- else }}{{ t $.Lang "load.magnet.deadBody" }}{{ end -}}
     </p>
@@ -51,16 +64,39 @@
         {{- end }}
         <button type="submit" class="btn btn-sm btn-soft-cyan" data-umami-event="magnet-retry-long" data-umami-event-after_long="{{ if .Data.Long }}1{{ else }}0{{ end }}">{{ t $.Lang "load.magnet.retryLong" }}</button>
     </form>
+    {{- else if $private }}
+    {{/* The way out is the file, so the upload is in the card: it also shows
+         where there is no dropzone (Discover's stream modal). The home page's
+         upload, aimed like the retry at the log host, which comes back with
+         the new job in place. No resource text field next to the file: the
+         load job would be keyed by the text's hash (scripts.Load) while the
+         file is what gets stored. The input sits inside
+         the label (no id to clash) and stays focusable (sr-only, not hidden);
+         the pick itself is counted, a click that ends in "cancel" is not. */}}
+    <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="#log-load" data-async-push-state="false">
+        {{- if .Data.HintVideoID }}
+        <input type="hidden" name="hint_video_id" value="{{ .Data.HintVideoID }}" />
+        {{- end }}
+        <label class="btn btn-sm btn-soft-cyan focus-within:outline-2 focus-within:outline-offset-2">
+            {{- t $.Lang "load.magnet.privateUpload" -}}
+            <input type="file" name="resource" accept=".torrent,application/x-bittorrent" class="sr-only" onchange="if (window.umami) window.umami.track('magnet-private-upload'); this.form.requestSubmit()" />
+        </label>
+    </form>
     {{- end }}
 </div>
 <script>
 (function () {
     if (!window.umami) return;
+    {{- if $private }}
+    {{/* Its own name: magnet-failed-shown stays dead and invalid only. */}}
+    window.umami.track('magnet-private-shown');
+    {{- else }}
     window.umami.track('magnet-failed-shown', {
         kind: '{{ .Data.Kind }}',
         long: {{ if .Data.Long }}1{{ else }}0{{ end }},
         waited_s: {{ .Data.WaitedSec }}
     });
+    {{- end }}
 })();
 </script>
 {{ end }}

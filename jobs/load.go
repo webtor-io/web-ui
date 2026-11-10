@@ -58,7 +58,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 
 // MagnetErrorData feeds templates/views/load/errors/magnet.html.
 type MagnetErrorData struct {
-	Kind      string // dead | invalid
+	Kind      string // dead | invalid | private
 	WaitedSec int
 	Long      bool // the ten-minute attempt is what failed
 	// Magnet is what the retry submits when the browser cannot give it the
@@ -82,11 +82,20 @@ func newMagnetErrorData(args *scripts.LoadArgs, me *scripts.MagnetError, hash st
 	}
 }
 
-func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadArgs, me *scripts.MagnetError, hash string) error {
-	key := "error.magnet_no_metadata"
-	if me.Kind == "invalid" {
-		key = "error.magnet_invalid"
+// magnetErrKey is the err_key a magnet card is counted under in "user error
+// shown": the key the same failure reads as a plain line.
+func magnetErrKey(me *scripts.MagnetError) string {
+	switch me.Kind {
+	case "invalid":
+		return "error.magnet_invalid"
+	case "private":
+		return "error.private_magnet"
 	}
+	return "error.magnet_no_metadata"
+}
+
+func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadArgs, me *scripts.MagnetError, hash string) error {
+	key := magnetErrKey(me)
 	log.WithError(me).WithField("err_key", key).WithField("long", me.Long).WithField("waited_s", int(me.Waited.Seconds())).Info("user error shown")
 	data := newMagnetErrorData(args, me, hash)
 	tpl := s.tb.Build("load/errors/magnet").WithLayoutBody(`{{ template "main" . }}`)
