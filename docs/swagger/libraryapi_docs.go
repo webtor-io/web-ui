@@ -644,6 +644,12 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "422": {
+                        "description": "The magnet is of a private torrent (code ` + "`" + `private_magnet` + "`" + `): upload its .torrent file instead",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {

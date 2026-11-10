@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -41,6 +42,7 @@ const maxResourceBody = 8 << 20
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse	"The torrent could not be fetched"
 //	@Failure		408			{object}	libapi.ErrorResponse	"A magnet took too long to resolve"
+//	@Failure		422			{object}	libapi.ErrorResponse	"The magnet is of a private torrent (code `private_magnet`): upload its .torrent file instead"
 //	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource [post]
 func (s *Handler) postResource(c *gin.Context) {
@@ -337,6 +339,12 @@ func parseExportTypes(param string) (map[string]bool, *libapi.Error) {
 func upstreamError(err error, message string) *libapi.Error {
 	e := strings.ToLower(err.Error())
 	switch {
+	case errors.Is(err, restapi.ErrPrivateMagnet):
+		// rest-api's 422 to a magnet of a private torrent, which the client
+		// keeps by identity. Passed on as it came, with a code a client can
+		// act on -- send the .torrent instead.
+		return libapi.NewError(http.StatusUnprocessableEntity, libapi.CodePrivateMagnet,
+			"private torrent: magnet links are not accepted, upload the .torrent file", err)
 	case strings.Contains(e, "forbidden"):
 		return libapi.NewError(http.StatusForbidden, libapi.CodeForbidden,
 			"your plan does not allow this operation on this resource", err)
