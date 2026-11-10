@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/urfave/cli"
@@ -83,5 +85,27 @@ func TestStoreQueryRefusal(t *testing.T) {
 				t.Fatalf("ClassifyError(%q)=%s, want %s", err, got, tc.key)
 			}
 		})
+	}
+}
+
+// The embed hands Load a magnet from the embedding page's settings; one Load
+// refuses becomes the job's error, which is logged ("got job error"). It
+// says how long the query was, never the trackers in it: a private
+// tracker's passkey rides in a tracker URL.
+func TestLoad_RefusedQueryKeepsNoTracker(t *testing.T) {
+	const passkey = "0123456789abcdef0123456789abcdef"
+	q := "magnet:?xt=urn:btih:5e4bd524&tr=http%3A%2F%2Ftracker.invalid%2Fannounce%3Fpasskey%3D" + passkey
+	_, _, err := Load(nil, nil, &web.Context{Lang: "en"}, &LoadArgs{Query: q})
+	if err == nil {
+		t.Fatal("the broken magnet was accepted")
+	}
+	if msg := err.Error(); strings.Contains(msg, passkey) || strings.Contains(msg, "tracker.invalid") {
+		t.Errorf("the error quotes the query: %s", msg)
+	}
+	if msg := err.Error(); !strings.Contains(msg, "query_len="+strconv.Itoa(len(q))) {
+		t.Errorf("want query_len=%d in %s", len(q), msg)
+	}
+	if got := web.ClassifyError(err); got != "error.magnet_invalid" {
+		t.Errorf("ClassifyError = %s, want error.magnet_invalid", got)
 	}
 }

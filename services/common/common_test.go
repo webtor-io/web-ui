@@ -236,3 +236,23 @@ func TestResolveQueryHash_FormInputs(t *testing.T) {
 		})
 	}
 }
+
+// A magnet's tr= values are tracker URLs, and a private tracker's passkey is
+// in them. A magnet the parser refuses goes into an error that is logged
+// ("redirect with error", "user error shown"); url.Parse quotes the URI it
+// refused whole, so that error must say why without the URI. A line break
+// pasted into the middle of the link is the realistic way to get there.
+func TestResolveQueryHash_RefusalKeepsNoTracker(t *testing.T) {
+	const passkey = "0123456789abcdef0123456789abcdef"
+	q := "magnet:?xt=urn:btih:5e4bd524\n&tr=http%3A%2F%2Ftracker.invalid%2Fannounce%3Fpasskey%3D" + passkey
+	_, _, err := ResolveQueryHash(q)
+	if !errors.Is(err, ErrMagnetInvalid) {
+		t.Fatalf("err = %v, want ErrMagnetInvalid", err)
+	}
+	if msg := err.Error(); strings.Contains(msg, passkey) || strings.Contains(msg, "tracker.invalid") {
+		t.Errorf("the refusal quotes the magnet: %s", msg)
+	}
+	if msg := err.Error(); !strings.Contains(msg, "invalid control character") {
+		t.Errorf("the refusal lost its reason: %s", msg)
+	}
+}

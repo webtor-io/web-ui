@@ -150,6 +150,13 @@ func resolveMagnet(query string) (hash string, magnet string, err error) {
 	query = "magnet:?" + strings.TrimPrefix(query[len("magnet:"):], "?")
 	m, err := metainfo.ParseMagnetV2Uri(upperBase32Btih(query))
 	if err != nil {
+		// url.Parse quotes the URI it refused, tr= included, and a private
+		// tracker's passkey rides in a tracker URL. This error is logged:
+		// it keeps the reason and drops the URI.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = fmt.Errorf("error parsing uri: %w", ue.Err)
+		}
 		return "", "", fmt.Errorf("%w: %w", ErrMagnetInvalid, err)
 	}
 	if !m.InfoHash.Ok {

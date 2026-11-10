@@ -39,8 +39,11 @@ func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
 		query = strings.TrimPrefix(c.Request.URL.Path, "/") + c.Request.URL.RawQuery
 	}
 	if query != "" {
+		// The error is logged (RedirectWithError), so it gives the query's
+		// length, not the query: a magnet's tr= can carry a private
+		// tracker's passkey. A refused query has no infohash to give.
 		if _, _, err := sv.ResolveQueryHash(query); err != nil {
-			return &PostArgs{Query: query}, errors.Wrapf(err, "wrong resource provided query=%v", query)
+			return &PostArgs{Query: query}, errors.Wrapf(err, "wrong resource provided query_len=%d", len(query))
 		}
 	}
 
