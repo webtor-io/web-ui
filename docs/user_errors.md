@@ -10,9 +10,11 @@ How an `error` becomes the sentence a person reads, and which sentences exist.
 - `ClassifyError(err)` — everything else: a switch over the error, falling back
   to `error.generic`. It opens with `errors.Is` cases for the query errors of
   `common.ResolveQueryHash` (below) — by identity, not text, because the form
-  wraps them as `wrong resource provided query=<what was pasted>`, and a pasted
-  title containing "Unavailable" or "PermissionDenied" would otherwise match a
-  backend class. The rest is a substring switch over `err.Error()`. Order
+  wrapped them as `wrong resource provided query=<what was pasted>` until
+  2026-11 (now `query_len=<n>`: a magnet's trackers can carry a private
+  tracker's passkey, `docs/private_torrent_logs.md`), and a pasted title
+  containing "Unavailable" or "PermissionDenied" would otherwise match a
+  backend class; text relayed from rest-api still can. The rest is a substring switch over `err.Error()`. Order
   matters: the more specific wrappers (`forbidden`, `not_found`,
   `resolution_not_supported`, `status=415`) sit above the broader
   streaming-chain classes, and `failed to parse magnet` sits above

@@ -47,7 +47,10 @@ level=info msg="private torrent upload" event=private_torrent_upload user=<auth.
   name to `libfs.New`).
 - It is written when the file is received and parses, before it is stored: a
   submit that the job queue answers with a run already in flight for the same
-  torrent counts too, and so does an upload the store then refuses.
+  torrent counts too, and so does an upload the store then refuses. The embed
+  fetches its `torrentUrl` once per run of its job, which is keyed by visitor
+  session and hour, so `source=embed` counts views of an embed more than
+  torrents.
 
 ```
 {app="web-ui"} |= "private_torrent_upload"

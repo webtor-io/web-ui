@@ -44,10 +44,11 @@ func TestBindArgs_RefusedQueryKeepsNoTracker(t *testing.T) {
 			if strings.Contains(msg, passkey) || strings.Contains(msg, "tracker.invalid") {
 				t.Errorf("the error quotes the query: %s", msg)
 			}
-			// The magnet route loses the "?" (path + RawQuery), so one less.
 			if !strings.Contains(msg, "query_len=") || !strings.Contains(msg, "wrong resource provided") {
 				t.Errorf("the error lost its shape: %s", msg)
 			}
+			// The magnet route's query is path + RawQuery, without the "?":
+			// only the form's length is the magnet's own.
 			if name == "the form" && !strings.Contains(msg, "query_len="+strconv.Itoa(len(magnet))) {
 				t.Errorf("want query_len=%d in %s", len(magnet), msg)
 			}
