@@ -873,7 +873,7 @@
     "load.magnet.waited": "Hledali jsme {{.Seconds}} s",
     "load.magnet.retryLong": "Zkusit znovu na 10 minut",
     "load.magnet.privateTitle": "Tohle je soukromý torrent",
-    "load.magnet.privateBody": "Sdílí se jen přes svůj tracker a tento odkaz neobsahuje adresu trackeru, takže ho nelze otevřít. Nahraj soubor .torrent ze svého trackeru nebo vlož magnet odkaz, který obsahuje adresu trackeru.",
+    "load.magnet.privateBody": "Sdílí se jen přes svůj tracker a tento odkaz neobsahuje adresu trackeru, takže ho nelze otevřít. Nahraj soubor .torrent ze svého trackeru nebo použij magnet odkaz, který obsahuje adresu trackeru.",
     "load.magnet.privateUpload": "Nahrát soubor .torrent",
     "job.enrichingContent": "Získáváme název a plakát",
     "job.redirecting": "Hotovo! Otevíráme stránku",

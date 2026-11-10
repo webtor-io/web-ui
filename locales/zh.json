@@ -828,7 +828,7 @@
     "load.magnet.waited": "已查找 {{.Seconds}} 秒",
     "load.magnet.retryLong": "再查找 10 分钟",
     "load.magnet.privateTitle": "这是私有种子",
-    "load.magnet.privateBody": "它只通过自己的 Tracker 分享，而此链接不含 Tracker 地址，因此无法打开。请上传从你的 Tracker 获取的 .torrent 文件，或粘贴包含 Tracker 地址的磁力链接。",
+    "load.magnet.privateBody": "它只通过自己的 Tracker 分享，而此链接不含 Tracker 地址，因此无法打开。请上传从你的 Tracker 获取的 .torrent 文件，或使用包含 Tracker 地址的磁力链接。",
     "load.magnet.privateUpload": "上传 .torrent 文件",
     "job.enrichingContent": "正在获取标题和海报",
     "job.redirecting": "完成！正在打开页面",

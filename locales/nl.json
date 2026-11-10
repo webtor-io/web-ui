@@ -843,7 +843,7 @@
     "load.magnet.waited": "Gezocht: {{.Seconds}} s",
     "load.magnet.retryLong": "Nog eens 10 minuten proberen",
     "load.magnet.privateTitle": "Dit is een privétorrent",
-    "load.magnet.privateBody": "Deze wordt alleen via de eigen tracker gedeeld, en deze link bevat geen trackeradres, dus de torrent kan niet worden geladen. Upload het .torrent-bestand van je tracker of plak een magnetlink met het adres van je tracker.",
+    "load.magnet.privateBody": "Deze wordt alleen via de eigen tracker gedeeld, en deze link bevat geen trackeradres, dus de torrent kan niet worden geladen. Upload het .torrent-bestand van je tracker of gebruik een magnetlink met het adres van je tracker.",
     "load.magnet.privateUpload": "Het .torrent-bestand uploaden",
     "job.enrichingContent": "Titel en poster ophalen",
     "job.redirecting": "Klaar! De pagina wordt geopend",

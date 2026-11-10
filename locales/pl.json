@@ -873,7 +873,7 @@
     "load.magnet.waited": "Szukaliśmy {{.Seconds}} s",
     "load.magnet.retryLong": "Spróbuj ponownie przez 10 minut",
     "load.magnet.privateTitle": "To prywatny torrent",
-    "load.magnet.privateBody": "Jest udostępniany tylko przez swój tracker, a ten link nie zawiera adresu trackera, więc nie da się go otworzyć. Wgraj plik .torrent ze swojego trackera albo wklej link magnet, który zawiera adres trackera.",
+    "load.magnet.privateBody": "Jest udostępniany tylko przez swój tracker, a ten link nie zawiera adresu trackera, więc nie da się go otworzyć. Wgraj plik .torrent ze swojego trackera albo użyj linku magnet, który zawiera adres trackera.",
     "load.magnet.privateUpload": "Wgraj plik .torrent",
     "job.enrichingContent": "Pobieramy tytuł i plakat",
     "job.redirecting": "Gotowe! Otwieramy stronę",

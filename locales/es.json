@@ -843,7 +843,7 @@
     "load.magnet.waited": "Buscamos {{.Seconds}} s",
     "load.magnet.retryLong": "Reintentar durante 10 minutos",
     "load.magnet.privateTitle": "Este es un torrent privado",
-    "load.magnet.privateBody": "Solo se comparte a través de su tracker, y este enlace no incluye la dirección del tracker, así que no se puede cargar. Sube el archivo .torrent de tu tracker o pega un enlace magnet que incluya la dirección de tu tracker.",
+    "load.magnet.privateBody": "Solo se comparte a través de su tracker, y este enlace no incluye la dirección del tracker, así que no se puede cargar. Sube el archivo .torrent de tu tracker o usa un enlace magnet que incluya la dirección de tu tracker.",
     "load.magnet.privateUpload": "Subir el archivo .torrent",
     "job.enrichingContent": "Obteniendo el título y el póster",
     "job.redirecting": "¡Listo! Abriendo la página",

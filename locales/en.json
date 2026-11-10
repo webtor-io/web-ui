@@ -966,7 +966,7 @@
     "load.magnet.waited": "Searched for {{.Seconds}} s",
     "load.magnet.retryLong": "Try again for 10 minutes",
     "load.magnet.privateTitle": "This is a private torrent",
-    "load.magnet.privateBody": "It's shared only through its tracker, and this link has no tracker address, so it can't be loaded. Upload the .torrent file from your tracker, or paste a magnet link that includes your tracker's address.",
+    "load.magnet.privateBody": "It's shared only through its tracker, and this link has no tracker address, so it can't be loaded. Upload the .torrent file from your tracker, or use a magnet link that includes your tracker's address.",
     "load.magnet.privateUpload": "Upload the .torrent file",
     "job.enrichingContent": "Getting the title and poster",
     "job.redirecting": "Done! Opening the page",

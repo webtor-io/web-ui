@@ -843,7 +843,7 @@
     "load.magnet.waited": "{{.Seconds}} sn arandı",
     "load.magnet.retryLong": "10 dakika daha dene",
     "load.magnet.privateTitle": "Bu özel bir torrent",
-    "load.magnet.privateBody": "Yalnızca kendi tracker'ı üzerinden paylaşılıyor ve bu bağlantıda tracker adresi yok, bu yüzden açılamıyor. Tracker'ınızdaki .torrent dosyasını yükleyin ya da tracker adresini içeren bir magnet bağlantısı yapıştırın.",
+    "load.magnet.privateBody": "Yalnızca kendi tracker'ı üzerinden paylaşılıyor ve bu bağlantıda tracker adresi yok, bu yüzden açılamıyor. Tracker'ınızdaki .torrent dosyasını yükleyin ya da tracker adresini içeren bir magnet bağlantısı kullanın.",
     "load.magnet.privateUpload": ".torrent dosyasını yükle",
     "job.enrichingContent": "Başlık ve afiş alınıyor",
     "job.redirecting": "Tamamlandı! Sayfa açılıyor",

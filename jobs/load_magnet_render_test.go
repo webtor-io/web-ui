@@ -50,16 +50,22 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 			t.Errorf("private: missing %q", w)
 		}
 	}
-	for _, w := range []string{"magnet-retry-long", "magnet-wait", "Searched for", "magnet-failed-shown", "Nobody is sharing", "Vault", "donate", `name="resource" value=`, "urn:btih", "accepted", "passkey"} {
+	// "use", not "paste": the card also answers Discover, where nothing was
+	// pasted.
+	for _, w := range []string{"magnet-retry-long", "magnet-wait", "Searched for", "magnet-failed-shown", "Nobody is sharing", "Vault", "donate", `name="resource" value=`, "urn:btih", "accepted", "passkey", "paste"} {
 		if strings.Contains(private, w) {
 			t.Errorf("private: must not carry %q:\n%s", w, private)
 		}
 	}
+	paste := map[string]string{"ru": "вставьте", "es": "pega ", "de": "füge", "fr": "collez", "pt": "cole ", "it": "incolla", "pl": "wklej", "tr": "yapıştır", "nl": "plak", "cs": "vlož", "zh": "粘贴"}
 	for _, lang := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"} {
 		for _, kind := range []string{"dead", "private"} {
 			out := render(lang, &MagnetErrorData{Kind: kind, WaitedSec: 60, Magnet: "m"})
 			if strings.Contains(out, "load.magnet.") {
 				t.Errorf("%s %s: unresolved key in %s", lang, kind, out)
+			}
+			if kind == "private" && strings.Contains(out, paste[lang]) {
+				t.Errorf("%s private: says %q, not use", lang, paste[lang])
 			}
 		}
 	}
