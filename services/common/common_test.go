@@ -297,6 +297,12 @@ func TestRefusedQuery(t *testing.T) {
 		{"a magnet's parameters alone",
 			"xt=urn:btih:5e4bd524&tr=http://tracker.invalid/a.php?uid=1&uk=" + key,
 			ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a key in a query with no path", "tracker.invalid?torrent_pass=" + key, ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a link encoded whole", "https%3A%2F%2Ftracker.invalid%2F" + key + "%2Fannounce", ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a link encoded twice", "https%253A%252F%252Ftracker.invalid%252F" + key, ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a magnet whose name ran into an encoded link",
+			"magnet:?xt=urn:btih:5e4bd524&dn=Sintel%20https%3A%2F%2Ftracker.invalid%2Fdl%2F" + key,
+			ErrMagnetInvalid, nil, []string{key, "query="}},
 		{"a magnet RedactURL does not see", "magnet://?xt=urn:btih:5e4bd524&as=https://tracker.invalid/1." + key, ErrMagnetNoHash, nil, []string{key, "tracker.invalid", "query="}},
 	} {
 		t.Run(c.name, func(t *testing.T) {

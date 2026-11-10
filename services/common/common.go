@@ -72,16 +72,17 @@ const maxRefusedQuery = 200
 // the load job report it, and the logs keep it: the query's length and, for
 // the refused-input analyses (titles, broken magnets), the query through
 // helpers.RedactURL -- but only a magnet, of which RedactURL keeps the hash
-// and name alone, or text without a "/". Anything else is or carries a link,
-// with any scheme (udp://, wss://) or none (host.tld/<key>/announce), and a
-// private tracker's link carries the user's key in its path or under a name
-// RedactURL does not know: it keeps its scheme://host, or nothing when it
-// has no host. A "/" left in a redacted magnet is in its name, which a link
-// pasted after it runs on into.
+// and name alone, or text without a "/" or a "?". Anything else is or carries
+// a link, with any scheme (udp://, wss://) or none (host.tld/<key>/announce,
+// host.tld?torrent_pass=<key>), encoded or not, and a private tracker's link
+// carries the user's key in its path or under a name RedactURL does not
+// know: it keeps its scheme://host, or nothing when it has no host. A "/"
+// left in a redacted magnet is in its name, which a link pasted after it
+// runs on into.
 func RefusedQuery(err error, query string) error {
 	t := strings.TrimSpace(query)
 	q := helpers.RedactURL(t)
-	if strings.Contains(q, "/") || (strings.Contains(t, "/") && !hasPrefixFold(t, "magnet:")) {
+	if hasSlash(q) || (!hasPrefixFold(t, "magnet:") && (hasSlash(t) || strings.Contains(t, "?"))) {
 		q = ""
 		if u, perr := parseWebURL(t); perr == nil && u.Host != "" {
 			q = u.Scheme + "://" + u.Host
@@ -94,6 +95,13 @@ func RefusedQuery(err error, query string) error {
 		q = strings.ToValidUTF8(q[:maxRefusedQuery], "")
 	}
 	return errors.Wrapf(err, "wrong resource provided query_len=%d query=%q", len(query), q)
+}
+
+// hasSlash reports a "/" as typed, or percent-encoded once or twice, the way
+// a link pasted as a query value arrives.
+func hasSlash(s string) bool {
+	l := strings.ToLower(s)
+	return strings.Contains(l, "/") || strings.Contains(l, "%2f") || strings.Contains(l, "%252f")
 }
 
 // ResolveQueryHash resolves a user query to a lowercase v1 infohash plus a
