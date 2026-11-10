@@ -11,7 +11,8 @@ How an `error` becomes the sentence a person reads, and which sentences exist.
   to `error.generic`. It opens with `errors.Is` cases for the query errors of
   `common.ResolveQueryHash` (below) — by identity, not text, because the form
   wraps them as `wrong resource provided query_len=<n> query=<what was
-  pasted>` (`common.RefusedQuery`: redacted and cut to 200 bytes, see
+  pasted>` (`common.RefusedQuery`: a magnet or text, redacted and cut to
+  200 bytes; a link's `scheme://host` or nothing, see
   `docs/private_torrent_logs.md`), and a pasted title containing
   "Unavailable" or "PermissionDenied" would otherwise match a backend class;
   text relayed from rest-api still can. The rest is a substring switch over `err.Error()`. Order

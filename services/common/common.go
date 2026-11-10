@@ -69,20 +69,26 @@ func (e *HashLengthError) Is(target error) bool { return target == ErrHashLength
 const maxRefusedQuery = 200
 
 // RefusedQuery is err, ResolveQueryHash's refusal of query, as the form and
-// the load job report it, and the logs keep it: the query's length and the
-// query itself, which is what the refused-input analyses read (titles,
-// broken magnets). The query goes through helpers.RedactURL, so a magnet
-// keeps its hash and name alone, and a link the query was (a web page, a
-// .torrent) keeps its scheme and host alone: a private tracker's download
-// link carries the user's key in its path, or under a name RedactURL does
-// not know.
+// the load job report it, and the logs keep it: the query's length and, for
+// the refused-input analyses (titles, broken magnets), the query through
+// helpers.RedactURL -- but only a magnet, of which RedactURL keeps the hash
+// and name alone, or text without a "/". Anything else is or carries a link,
+// with any scheme (udp://, wss://) or none (host.tld/<key>/announce), and a
+// private tracker's link carries the user's key in its path or under a name
+// RedactURL does not know: it keeps its scheme://host, or nothing when it
+// has no host. A "/" left in a redacted magnet is in its name, which a link
+// pasted after it runs on into.
 func RefusedQuery(err error, query string) error {
-	q := helpers.RedactURL(query)
-	if errors.Is(err, ErrQueryWebPage) || errors.Is(err, ErrQueryTorrentURL) {
+	t := strings.TrimSpace(query)
+	q := helpers.RedactURL(t)
+	if strings.Contains(q, "/") || (strings.Contains(t, "/") && !hasPrefixFold(t, "magnet:")) {
 		q = ""
-		if u, perr := parseWebURL(strings.TrimSpace(query)); perr == nil {
+		if u, perr := parseWebURL(t); perr == nil && u.Host != "" {
 			q = u.Scheme + "://" + u.Host
 		}
+	}
+	if q == "" {
+		return errors.Wrapf(err, "wrong resource provided query_len=%d", len(query))
 	}
 	if len(q) > maxRefusedQuery {
 		q = strings.ToValidUTF8(q[:maxRefusedQuery], "")
