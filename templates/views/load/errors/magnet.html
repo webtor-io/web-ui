@@ -2,9 +2,10 @@
 {{/* A magnet that did not become a torrent. Same card as action/errors/no_peers:
      what happened, how long we looked, what to do. Kind "dead" — no peer had
      the metadata within the wait; "invalid" — the link itself is broken, so
-     there is nothing to retry; "private" — it resolved to a private torrent,
-     which rest-api takes only as its .torrent file: no retry and nothing to
-     sell, the upload instead. Long — the ten-minute attempt is what failed. */}}
+     there is nothing to retry; "private" — a magnet without a tracker
+     resolved to a private torrent rest-api has not stored: no retry and
+     nothing to sell, the upload (or a magnet with the tracker) instead.
+     Long — the ten-minute attempt is what failed. */}}
 {{ $dead := eq .Data.Kind "dead" }}
 {{ $private := eq .Data.Kind "private" }}
 {{/* text-left: the home page's hero centres its text and this card lives

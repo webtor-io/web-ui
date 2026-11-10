@@ -20,8 +20,9 @@ const (
 	CodeNotFound         = "not_found"
 	CodeConflict         = "conflict"
 	CodeMethodNotAllowed = "method_not_allowed"
-	// CodePrivateMagnet: the magnet is of a private torrent, which is taken
-	// only as its .torrent file. Retrying the magnet gets the same answer.
+	// CodePrivateMagnet: a magnet without a tracker of a private torrent not
+	// stored yet. Send the .torrent file or a magnet that includes the
+	// tracker; retrying the same magnet gets the same answer.
 	CodePrivateMagnet = "private_magnet"
 	// CodeRateLimited comes with a Retry-After header; the wait is short
 	// (seconds), so the right client reaction is to back off, not to fail over.

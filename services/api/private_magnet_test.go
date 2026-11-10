@@ -13,7 +13,7 @@ import (
 // identity, from the status alone: other words under 422 are still it, and
 // the same words under another status are not.
 func TestStoreResourcePrivateMagnet(t *testing.T) {
-	const contract = `{"error": "private torrent: magnet links are not accepted, upload the .torrent file"}`
+	const contract = `{"error": "private torrent: this magnet has no tracker; upload the .torrent file or use a magnet that includes your tracker"}`
 	for _, c := range []struct {
 		name   string
 		status int

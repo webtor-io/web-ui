@@ -519,12 +519,13 @@ func (s *Api) doRequestRaw(ctx context.Context, c *Claims, url string, method st
 // one web.ClassifyError and the logs match.
 var ErrForbidden = errors.New("access is forbidden")
 
-// ErrPrivateMagnet is rest-api's 422 to POST /resource: the magnet resolved
-// to a private torrent that is not stored yet, and rest-api stored nothing.
-// It takes such a torrent only as its .torrent file; no peer and no wait will
-// change the answer. By status, like ErrForbidden: the body's wording is not
-// part of the decision.
-var ErrPrivateMagnet = errors.New("private torrent: magnet links are not accepted")
+// ErrPrivateMagnet is rest-api's 422 to POST /resource: a magnet without a
+// tracker (no tr=) resolved to a private torrent that is not stored yet, and
+// rest-api stored nothing. Such a torrent works only through its tracker, so
+// it takes the .torrent file or a magnet that carries the tracker; no peer
+// and no wait will change the answer to the same magnet. By status, like
+// ErrForbidden: the body's wording is not part of the decision.
+var ErrPrivateMagnet = errors.New("private torrent: the magnet has no tracker")
 
 func (s *Api) doRequest(ctx context.Context, c *Claims, url string, method string, data []byte, v any) error {
 	res, err := s.doRequestRaw(ctx, c, url, method, data)

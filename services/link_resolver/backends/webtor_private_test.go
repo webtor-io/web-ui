@@ -37,7 +37,7 @@ func TestEnsureResourcePrivateMagnetIsFinal(t *testing.T) {
 			arrived <- struct{}{}
 			<-release
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			_, _ = w.Write([]byte(`{"error": "private torrent: magnet links are not accepted, upload the .torrent file"}`))
+			_, _ = w.Write([]byte(`{"error": "private torrent: this magnet has no tracker; upload the .torrent file or use a magnet that includes your tracker"}`))
 		default:
 			t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusTeapot)

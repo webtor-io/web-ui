@@ -172,8 +172,13 @@ func TestClassifyError_PrivateMagnet(t *testing.T) {
 	if got := ClassifyError(errors.New(api.ErrPrivateMagnet.Error())); got == "error.private_magnet" {
 		t.Errorf("the words without the error must not be it, got %s", got)
 	}
-	if _, ok := englishMessages(t)["error.private_magnet"]; !ok {
-		t.Error("error.private_magnet is not in locales/en.json")
+	// The rule it explains: a private torrent's magnet works when it carries
+	// the tracker's address, so the line names both ways out.
+	msg, _ := englishMessages(t)["error.private_magnet"].(string)
+	for _, w := range []string{"no tracker address", ".torrent file", "magnet link that includes your tracker"} {
+		if !strings.Contains(msg, w) {
+			t.Errorf("error.private_magnet %q lacks %q", msg, w)
+		}
 	}
 }
 

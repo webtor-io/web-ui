@@ -98,7 +98,7 @@ func TestPostResourcePrivateMagnet(t *testing.T) {
 			t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusUnprocessableEntity)
-		_, _ = w.Write([]byte(`{"error": "private torrent: magnet links are not accepted, upload the .torrent file"}`))
+		_, _ = w.Write([]byte(`{"error": "private torrent: this magnet has no tracker; upload the .torrent file or use a magnet that includes your tracker"}`))
 	}))
 	defer upstream.Close()
 	u, _ := url.Parse(upstream.URL)
@@ -125,8 +125,10 @@ func TestPostResourcePrivateMagnet(t *testing.T) {
 	if res.Error.Code != libapi.CodePrivateMagnet {
 		t.Errorf("code %q, want %q", res.Error.Code, libapi.CodePrivateMagnet)
 	}
-	if !strings.Contains(res.Error.Message, ".torrent") {
-		t.Errorf("the message must say what to do instead: %q", res.Error.Message)
+	for _, w := range []string{"no tracker", ".torrent", "magnet that includes the tracker"} {
+		if !strings.Contains(res.Error.Message, w) {
+			t.Errorf("the message must say why and what to do instead (%q): %q", w, res.Error.Message)
+		}
 	}
 	// The upstream text (it carries rest-api's internal URL) stays in the logs.
 	if strings.Contains(w.Body.String(), u.Host) {

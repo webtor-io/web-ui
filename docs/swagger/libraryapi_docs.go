@@ -645,7 +645,7 @@ const docTemplatelibraryapi = `{
                         }
                     },
                     "422": {
-                        "description": "The magnet is of a private torrent (code ` + "`" + `private_magnet` + "`" + `): upload its .torrent file instead",
+                        "description": "A magnet without a tracker (no ` + "`" + `tr=` + "`" + `) of a private torrent not stored yet (code ` + "`" + `private_magnet` + "`" + `): upload its .torrent file or use a magnet that includes the tracker",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }

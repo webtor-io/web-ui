@@ -45,7 +45,7 @@ func TestStoreQueryRefusal(t *testing.T) {
 		// rest-api resolved the magnet to a private torrent and stored
 		// nothing: its own card (upload the .torrent), never the dead one
 		// with its ten-minute retry -- no peer will change the answer.
-		{name: "private torrent", get: http.StatusNotFound, post: http.StatusUnprocessableEntity, body: `{"error":"private torrent: magnet links are not accepted, upload the .torrent file"}`, kind: "private", key: "error.private_magnet"},
+		{name: "private torrent", get: http.StatusNotFound, post: http.StatusUnprocessableEntity, body: `{"error":"private torrent: this magnet has no tracker; upload the .torrent file or use a magnet that includes your tracker"}`, kind: "private", key: "error.private_magnet"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

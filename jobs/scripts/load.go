@@ -52,8 +52,8 @@ const (
 
 // MagnetError is a magnet that did not become a torrent. Kind is "dead" (no
 // peer had the metadata within Waited), "invalid" (the link itself is
-// broken) or "private" (it resolved to a private torrent, which rest-api
-// takes only as a .torrent file: api.ErrPrivateMagnet). The Jobs layer
+// broken) or "private" (a magnet without a tracker resolved to a private
+// torrent rest-api has not stored: api.ErrPrivateMagnet). The Jobs layer
 // renders it as a card; only "dead" has a retry.
 type MagnetError struct {
 	Kind   string
@@ -206,9 +206,9 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 		return nil, errors.Wrap(err, "failed to store resource by magnet")
 	}
 	if errors.Is(err, api.ErrPrivateMagnet) {
-		// The magnet did resolve, to a private torrent, and rest-api stored
-		// nothing: it takes such a torrent only as its .torrent file. Its own
-		// card -- upload the file -- not the dead one: no peer and no
+		// The magnet did resolve, to a private torrent, but carries no
+		// tracker, and rest-api stored nothing. Its own card -- the .torrent
+		// or a magnet with the tracker -- not the dead one: no peer and no
 		// ten-minute retry change that answer.
 		return nil, &MagnetError{Kind: "private", Waited: time.Since(started), Long: long, Cause: err}
 	}
@@ -226,7 +226,7 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 // debugMagnet plays the magnet failure for review (dev only): a short
 // countdown, then the card. "magnet_dead_long" says the ten-minute attempt
 // failed too; "magnet_invalid" is the broken link; "magnet_private" is the
-// private torrent rest-api would not take as a magnet (no countdown: the
+// private torrent rest-api would not take as a bare magnet (no countdown: the
 // card is what there is to look at).
 func (s *LoadScript) debugMagnet(ctx context.Context, j *job.Job, mode string) error {
 	switch mode {
