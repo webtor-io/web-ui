@@ -16,11 +16,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/disintegration/imaging"
+	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 )
 
@@ -56,6 +58,7 @@ type Service struct {
 	pg     *cs.PG
 	cl     *http.Client
 	thumb  *thumbnail.Service
+	api    *api.Api
 	bucket string
 }
 
@@ -63,7 +66,7 @@ type Service struct {
 // cache bucket used by the legacy /lib/:type/poster/:imdb_id endpoint
 // — sharing it costs nothing and lets either endpoint warm the cache
 // for the other when source-content matches.
-func New(s3Cl *cs.S3Client, pg *cs.PG, cl *http.Client, thumb *thumbnail.Service, cacheBucket string) *Service {
+func New(s3Cl *cs.S3Client, pg *cs.PG, cl *http.Client, thumb *thumbnail.Service, a *api.Api, cacheBucket string) *Service {
 	return &Service{
 		// 5-min TTL bounds memory growth under bursty library/continue-watching
 		// reloads (multiple tabs of the same user, returning visitor in the same
@@ -77,6 +80,7 @@ func New(s3Cl *cs.S3Client, pg *cs.PG, cl *http.Client, thumb *thumbnail.Service
 		pg:     pg,
 		cl:     cl,
 		thumb:  thumb,
+		api:    a,
 		bucket: cacheBucket,
 	}
 }
@@ -114,13 +118,26 @@ func (s *Service) Get(ctx context.Context, resourceID, file string, force, allow
 // post-processed. A separate look-up keeps the resolver function pure
 // and lets us flip is_adult via SQL without re-running classification.
 func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Result, error) {
-	db := s.pg.Get()
-	if db == nil {
-		return nil, errors.New("no db")
-	}
-	src, err := Resolve(ctx, db, s.thumb, s.cl, resourceID)
+	// The poster is public and edge-cached for a day: a private torrent has
+	// no source, neither its frames nor the enrichment artwork. A failed
+	// lookup is an error, never the default.
+	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve source")
+		return nil, errors.Wrap(err, "failed to look up resource")
+	}
+	var (
+		db  *pg.DB
+		src *Source
+	)
+	if r == nil || !r.Private {
+		db = s.pg.Get()
+		if db == nil {
+			return nil, errors.New("no db")
+		}
+		src, err = Resolve(ctx, db, s.thumb, s.cl, resourceID)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to resolve source")
+		}
 	}
 	if src == nil {
 		// Resize mode → 404. Caller-side CSS placeholder is a better UX

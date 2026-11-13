@@ -37,7 +37,7 @@ func TestPosterDecodePanicFailsTheKeyNotWedgesIt(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := New(nil, nil, srv.Client(), nil, "")
+	s := New(nil, nil, srv.Client(), nil, nil, "")
 	src := posterSource(SourceIMDbMovie, "tt0000001", srv.URL+"/poster.jpg", srv.Client())
 	mode, err := ParseFileMode("500.jpg")
 	if err != nil {

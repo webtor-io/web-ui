@@ -256,6 +256,32 @@ func TestNonPaywallOutcomesAreUnchanged(t *testing.T) {
 	})
 }
 
+// rest-api's refusal of a private torrent is a decision about this user, not
+// an outage: a 403 and a warning. A coded private_magnet stays the 404 above.
+func TestStremioResolvePrivateRefusalIs403(t *testing.T) {
+	for name, c := range map[string]struct {
+		err  *api.PrivateError
+		want int
+	}{
+		"private_torrent": {&api.PrivateError{Status: http.StatusForbidden, Code: "private_torrent", Reason: "no_record"}, http.StatusForbidden},
+		"private_magnet":  {&api.PrivateError{Status: http.StatusUnprocessableEntity, Code: "private_magnet"}, http.StatusNotFound},
+	} {
+		t.Run(name, func(t *testing.T) {
+			hook := test.NewGlobal()
+			defer hook.Reset()
+			w := resolveWith(t, resolveCase{res: &fakeResolver{err: errors.Wrap(c.err, "failed to look up resource")}, promo: trialPlan, clips: clipsIn(t, "en")})
+			if w.Code != c.want {
+				t.Errorf("status = %d (Location %q), want %d", w.Code, w.Header().Get("Location"), c.want)
+			}
+			for _, e := range hook.AllEntries() {
+				if e.Level <= logrus.ErrorLevel {
+					t.Errorf("logged %s %q, want a warning", e.Level, e.Message)
+				}
+			}
+		})
+	}
+}
+
 // A re-rendered clip must be a new URL, or the CDN keeps serving the old
 // one: the query carries a digest of the file.
 func TestClipURLChangesWithTheFile(t *testing.T) {

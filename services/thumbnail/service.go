@@ -176,7 +176,8 @@ func (s *Service) Enabled() bool { return s != nil }
 // seek offset lands at ~25 % rather than the blind 5-min default. The
 // caller doesn't need to feed a probe in.
 //
-// Returns ErrNoSource when the torrent has neither a usable image file
+// Returns ErrNoSource when the torrent is private (its thumbnail would be
+// served by hash to anyone), has neither a usable image file
 // nor a video item, or its video's frames are over maxFramePixels — caller
 // logs this at info and proceeds with the
 // favicon fallback. Other errors are propagated so they show up in the
@@ -184,6 +185,13 @@ func (s *Service) Enabled() bool { return s != nil }
 func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID string) (*models.Thumbnail, error) {
 	if s == nil {
 		return nil, nil
+	}
+	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to look up resource")
+	}
+	if r != nil && r.Private {
+		return nil, errors.Wrap(ErrNoSource, "private torrent")
 	}
 	db := s.pg.Get()
 	if db == nil {

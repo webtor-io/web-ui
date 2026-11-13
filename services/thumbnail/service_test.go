@@ -3,12 +3,19 @@ package thumbnail
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"flag"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"runtime"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/urfave/cli"
+	cs "github.com/webtor-io/common-services"
 
 	"github.com/webtor-io/web-ui/services/api"
 )
@@ -96,5 +103,47 @@ func TestFramePixels(t *testing.T) {
 	}
 	if framePixels(nil) != 0 {
 		t.Error("an unknown probe has frames")
+	}
+}
+
+// A private torrent gets no frame and no image of its own: the thumbnail is
+// served by hash to anyone. Privacy is asked as web-ui itself -- the user
+// who started the stream may hold the record or not. The listing is never
+// read and the database never reached: the service has none.
+func TestGenerateSkipsPrivate(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/resource/"+hash {
+			t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusTeapot)
+			return
+		}
+		p, err := jwt.Parse(r.Header.Get("X-Token"), func(*jwt.Token) (interface{}, error) { return []byte("test"), nil })
+		if err != nil || p.Claims.(jwt.MapClaims)["internal"] != true {
+			// What rest-api tells a user without a record.
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":"x","code":"private_torrent","reason":"no_record"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"` + hash + `","private":true}`))
+	}))
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range api.RegisterFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
+		"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{pg: &cs.PG{}, api: api.New(cli.NewContext(cli.NewApp(), fs, nil), srv.Client())}
+
+	th, err := s.Generate(context.Background(), &api.Claims{Uid: "76543210fedcba9876543210fedcba9876543210"}, hash)
+	if !errors.Is(err, ErrNoSource) {
+		t.Fatalf("err = %v, want ErrNoSource", err)
+	}
+	if th != nil {
+		t.Errorf("thumbnail = %+v, want none", th)
 	}
 }
