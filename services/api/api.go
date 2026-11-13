@@ -35,6 +35,7 @@ import (
 
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 const (
@@ -320,7 +321,7 @@ type Api struct {
 	torrentHTTPProxyHost        string
 	torrentHTTPProxyPort        int
 	secret                      string
-	rapidAPI                    bool // rest-api is reached through RapidAPI: no /internal/ there
+	rapidAPI                    bool // rest-api is reached through RapidAPI: no /internal/ there, no private torrents
 }
 
 type ListResourceContentOutputType string
@@ -395,7 +396,7 @@ func New(c *cli.Context, cl *http.Client) *Api {
 	rapidAPI := rapidApiHost != "" && rapidApiKey != ""
 	if rapidAPI {
 		log.Info("using RapidAPI")
-		log.Info("private trackers: export and account-deletion cleanup are off: rest-api is reached through RapidAPI")
+		log.Info("private torrents are off: rest-api is reached through RapidAPI, which carries one account for every user of this instance")
 		prepareRequest = func(r *http.Request, cl *Claims) (*http.Request, error) {
 			r.Header.Set("X-RapidAPI-Host", rapidApiHost)
 			r.Header.Set("X-RapidAPI-Key", rapidApiKey)
@@ -567,12 +568,38 @@ func (s *Api) LibraryTorrent(ctx context.Context, c *Claims, infohash string) (*
 	return &info, int64(len(t)), nil
 }
 
+// PrivateAvailable says this server takes private torrents. Through RapidAPI
+// it does not: web-ui sends no X-Token there and the gateway signs one uid
+// for the whole instance, so a private torrent's right would be shared by
+// every user of it (decision 42).
+func (s *Api) PrivateAvailable() bool {
+	return !s.rapidAPI
+}
+
+// errPrivateUnavailable refuses a private torrent where PrivateAvailable is
+// false, as rest-api refuses it where it has no private store.
+func errPrivateUnavailable() *PrivateError {
+	return &PrivateError{Status: http.StatusUnprocessableEntity, Code: CodePrivateUnavailable,
+		Message: "private torrents are not available on this server"}
+}
+
+// StoreResource stores a .torrent or a magnet. Where private torrents are not
+// available, a private .torrent is refused before rest-api sees it, and a
+// magnet whose resource comes back private is refused instead of returned:
+// every door that stores (site, JSON API, WebDAV/S3, Stremio) comes through
+// here.
 func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e *ra.ResourceResponse, err error) {
+	if !s.PrivateAvailable() && private_torrent.IsPrivate(resource) {
+		return nil, errPrivateUnavailable()
+	}
 	u := s.url + "/resource"
 	e = &ra.ResourceResponse{}
 	err = s.doRequest(ctx, c, u, "POST", resource, e)
 	if e.ID == "" {
 		e = nil
+	}
+	if err == nil && e != nil && e.Private && !s.PrivateAvailable() {
+		return nil, errPrivateUnavailable()
 	}
 	return
 }
