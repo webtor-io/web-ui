@@ -422,14 +422,12 @@ func New(c *cli.Context, cl *http.Client) *Api {
 	}
 }
 
-func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
-	u := s.url + "/resource/" + infohash
-	e = &ra.ResourceResponse{}
-	err = s.doRequest(ctx, c, u, "GET", nil, e)
-	if e.ID == "" {
-		e = nil
+func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (*ra.ResourceResponse, error) {
+	r, err := s.LookupResource(ctx, c, infohash)
+	if r == nil {
+		return nil, err
 	}
-	return
+	return &r.ResourceResponse, err
 }
 
 // Resource is rest-api's resource with the private flag, which the rest-api

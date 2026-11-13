@@ -343,8 +343,10 @@ func TestQueryHasTrackers(t *testing.T) {
 		{"magnet:?xt=urn:btih:" + h + "&tr=" + tr, true},
 		{"magnet:xt=urn:btih:" + h + "&tr=" + tr, true},
 		// The encoding ResolveQueryHash takes back: a magnet that was a query
-		// value. One encoded whole ("magnet%3A%3F…") it refuses, so no run.
+		// value. One encoded whole ("magnet%3A%3F…") it refuses, so Load
+		// refuses it before any run; if that ever changes, this row says so.
 		{"magnet:?" + url.QueryEscape("xt=urn:btih:"+h+"&tr=http://tracker.example/announce"), true},
+		{url.QueryEscape("magnet:?xt=urn:btih:" + h + "&tr=http://tracker.example/announce"), false},
 		{"watch magnet:?xt=urn:btih:" + h + "&tr=" + tr + " now", true},
 		{"magnet:?xt=urn:btih:" + h, false},
 		{h, false},

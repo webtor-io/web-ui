@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -114,8 +115,9 @@ func testLoadScript(t *testing.T, srv *httptest.Server, c *api.Claims) *LoadScri
 // The lookup that decides "new or known" is the shared run's, so it reads as
 // internal; only the store of a user's own magnet carries the user. A known
 // private torrent still gets the magnet with tr= stored: that is how the
-// user's own tracker reaches rest-api. A rest-api without the private field
-// (before phase 1) reads as public: no POST, as before.
+// user's own tracker reaches rest-api; not from an embed, which has no uid
+// for rest-api to judge. A rest-api without the private field (before phase
+// 1) reads as public: no POST, as before.
 func TestStoreQueryLooksUpAsInternal(t *testing.T) {
 	const hash = "0123456789abcdef0123456789abcdef01234567"
 	const uid = "89abcdef0123456789abcdef0123456789abcdef"
@@ -123,6 +125,7 @@ func TestStoreQueryLooksUpAsInternal(t *testing.T) {
 	bare := "magnet:?xt=urn:btih:" + hash
 	cases := []struct {
 		name, query string
+		source      string // LoadArgs.Source; an "embed" has no uid
 		get         string // the GET's body; empty is a 404
 		post        bool
 		private     bool
@@ -132,6 +135,7 @@ func TestStoreQueryLooksUpAsInternal(t *testing.T) {
 		{name: "known private, tr=", query: withTr, get: `{"id":"` + hash + `","private":true}`, post: true, private: true},
 		{name: "known private, bare", query: bare, get: `{"id":"` + hash + `","private":true}`, private: true},
 		{name: "rest-api before phase 1", query: withTr, get: `{"id":"` + hash + `"}`},
+		{name: "embed, known private, tr=", query: withTr, source: "embed", get: `{"id":"` + hash + `","private":true}`, private: true},
 	}
 	claimsOf := func(t *testing.T, r *http.Request) jwt.MapClaims {
 		p, err := jwt.Parse(r.Header.Get("X-Token"), func(*jwt.Token) (interface{}, error) { return []byte("test"), nil })
@@ -160,6 +164,10 @@ func TestStoreQueryLooksUpAsInternal(t *testing.T) {
 					if cl := claimsOf(t, r); cl["uid"] != uid || cl["internal"] != nil {
 						t.Errorf("POST claims %v, want uid and no internal", cl)
 					}
+					// The point of the POST: the user's tracker reaches rest-api.
+					if b, _ := io.ReadAll(r.Body); !strings.Contains(string(b), "tr=") || !strings.Contains(string(b), "tracker.example") {
+						t.Errorf("POST body %q, want the magnet with its tr=", b)
+					}
 					_, _ = w.Write([]byte(`{"id":"` + hash + `"}`))
 				default:
 					t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
@@ -167,7 +175,12 @@ func TestStoreQueryLooksUpAsInternal(t *testing.T) {
 				}
 			}))
 			defer srv.Close()
-			s := testLoadScript(t, srv, &api.Claims{Uid: uid})
+			claims := &api.Claims{Uid: uid}
+			if tc.source == "embed" {
+				claims = &api.Claims{}
+			}
+			s := testLoadScript(t, srv, claims)
+			s.args.Source = tc.source
 			j := job.New(context.Background(), "t", "test", nil, &job.NilStorage{}, false, nil)
 
 			res, err := s.storeQuery(context.Background(), j, tc.query)

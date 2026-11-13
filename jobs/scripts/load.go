@@ -35,8 +35,11 @@ type LoadArgs struct {
 	// "magnet_dead_long", "magnet_invalid", "magnet_private" play the failure
 	// without a network.
 	Debug string
-	// Source is the door a File came in by, "site" or "embed", for the
-	// private-torrent count (services/private_torrent).
+	// Source is the door the request came in by, "site" or "embed". For a
+	// File it labels the private-torrent count (services/private_torrent).
+	// For a Query from an embed, a known private hash is never stored again
+	// with the magnet's tr=: an embed has no uid, so rest-api could only
+	// refuse it with "sign in".
 	Source string
 }
 
@@ -173,8 +176,10 @@ func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (re
 // storeQuery returns the resource of the query's hash. The lookup that
 // decides "new or known" is the shared run's, so it reads as internal. A new
 // hash, or a known private one asked with the user's own tracker (tr=), is
-// stored as the user: that is how the tracker reaches rest-api. A known hash
-// returns the lookup's answer, private flag included, even after the store.
+// stored as the user: that is how the tracker reaches rest-api. Not from an
+// embed: it has no uid, and the lookup already says private, which the embed
+// renders itself. A known hash returns the lookup's answer, private flag
+// included, even after the store.
 func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (*api.Resource, error) {
 	j.InProgress(s.t("job.checkingMagnet"))
 	hash, magnet, err := common.ResolveQueryHash(query)
@@ -189,7 +194,7 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 		return nil, errors.Wrap(err, "failed to load resource by magnet")
 	}
 	j.Done()
-	if known != nil && !(known.Private && common.QueryHasTrackers(magnet)) {
+	if known != nil && !(known.Private && s.args.Source != "embed" && common.QueryHasTrackers(magnet)) {
 		return known, nil
 	}
 	j.Info(s.t("job.magnetizing.info"))
