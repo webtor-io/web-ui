@@ -10,10 +10,33 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/webtor-io/web-ui/jobs/scripts"
+	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/webtor-io/web-ui/services/job"
 )
+
+// perUserLoad says the load runs as the user's own: what rest-api answers an
+// upload or a magnet with tr= depends on who asks (a private torrent is
+// stored for that user, never for a guest). A bare magnet's answer does not.
+func perUserLoad(args *scripts.LoadArgs) bool {
+	return args.File != nil || common.QueryHasTrackers(args.Query)
+}
+
+// loadJobID is the load job's id: sha1(hash/lang) for the shared run,
+// sha1(hash/lang/uid) for the user's own. A guest's uid is empty, and
+// "hash/lang/" is still not the shared run's key.
+func loadJobID(c *web.Context, args *scripts.LoadArgs, hash string) string {
+	key := hash + "/" + c.Lang
+	if perUserLoad(args) {
+		uid := ""
+		if c.ApiClaims != nil {
+			uid = c.ApiClaims.Uid
+		}
+		key += "/" + uid
+	}
+	return fmt.Sprintf("%x", sha1.Sum([]byte(key)))
+}
 
 func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err error) {
 	ls, hash, err := scripts.Load(s.api, s.i18n, c, args)
@@ -21,15 +44,22 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	id := fmt.Sprintf("%x", sha1.Sum([]byte(hash+"/"+c.Lang)))
-	// A load job is keyed by hash+lang and its log is kept in Redis, so a
-	// second visit replays the first run — including a failure. The
-	// dead-magnet retry must run again, not replay the card it was clicked
-	// on; the dev playback likewise. So must an upload: a magnet card asks
-	// for the .torrent, which has the same infohash. Purge drops the stored
-	// log first.
+	id := loadJobID(c, args, hash)
+	perUser := perUserLoad(args)
+	// A load job's log is kept in Redis, so a second visit replays the first
+	// run — including a failure. The dead-magnet retry must run again, not
+	// replay the card it was clicked on; the dev playback likewise. An
+	// upload goes by its own per-user run and still runs again every time.
+	// Purge drops the stored log first.
 	purge := args.MagnetWait > 0 || args.Debug != "" || args.File != nil
 	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, id, job.NewScript(func(j *job.Job) (err error) {
+		if perUser {
+			// Not kept for replay: the same user's next magnet may carry a
+			// new passkey and must reach rest-api. Not purge on every magnet
+			// either: /magnet:?… loads on every GET, and a reload would send
+			// it to rest-api again.
+			j.DoNotCache()
+		}
 		err = ls.Run(ctx, j)
 		if me, ok := err.(*scripts.MagnetError); ok {
 			// A magnet that did not become a torrent gets a card, not a red
