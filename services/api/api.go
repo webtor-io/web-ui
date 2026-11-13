@@ -437,8 +437,21 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *r
 // unknown for the whole minute (an API client stores, then pledges).
 var errResourceNotFound = errors.New("resource not found")
 
+// cacheKey starts the key of a minute cache with the caller's class: rest-api
+// answers by the caller now, so one caller must never get another's answer.
+// Internal wins over uid; no claims at all (error pages) are anonymous.
+func cacheKey(c *Claims, infohash string) string {
+	switch {
+	case c != nil && c.Internal:
+		return "internal/" + infohash
+	case c != nil && c.Uid != "":
+		return "u/" + c.Uid + "/" + infohash
+	}
+	return "anon/" + infohash
+}
+
 func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
-	e, err = s.resourcesCache.Get(infohash, func() (*ra.ResourceResponse, error) {
+	e, err = s.resourcesCache.Get(cacheKey(c, infohash), func() (*ra.ResourceResponse, error) {
 		r, err := s.GetResource(ctx, c, infohash)
 		if err == nil && r == nil {
 			return nil, errResourceNotFound
@@ -461,7 +474,7 @@ func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (close
 }
 
 func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) ([]byte, error) {
-	return s.torrentCache.Get(infohash, func() ([]byte, error) {
+	return s.torrentCache.Get(cacheKey(c, infohash), func() ([]byte, error) {
 		resp, err := s.GetTorrent(ctx, c, infohash)
 		if err != nil {
 			return nil, err
@@ -496,7 +509,7 @@ func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash strin
 }
 
 func (s *Api) ListResourceContentCached(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (*ra.ListResponse, error) {
-	key := infohash + fmt.Sprintf("%+v", args)
+	key := cacheKey(c, infohash) + fmt.Sprintf("%+v", args)
 	return s.listResponseCache.Get(key, func() (*ra.ListResponse, error) {
 		return s.ListResourceContent(ctx, c, infohash, args)
 	})
