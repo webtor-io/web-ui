@@ -428,10 +428,18 @@ func New(c *cli.Context, cl *http.Client) *Api {
 	}
 }
 
+// GetResource is the resource as the caller may use it. Where private
+// torrents are not available, a private one is refused as rest-api refuses it
+// where its store keeps no private records: through RapidAPI rest-api answers
+// the instance's one account, so a record there would open the torrent to
+// every user of the instance (decision 42).
 func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (*ra.ResourceResponse, error) {
 	r, err := s.LookupResource(ctx, c, infohash)
 	if r == nil {
 		return nil, err
+	}
+	if r.Private && !s.PrivateAvailable() {
+		return nil, errPrivateUnavailable(http.StatusForbidden)
 	}
 	// Resource's own Private shadows the embedded one, which JSON leaves false.
 	r.ResourceResponse.Private = r.Private
@@ -449,13 +457,21 @@ type Resource struct {
 }
 
 // LookupResource is GetResource with the private flag: nil, nil on 404,
-// ErrForbidden on 403.
+// ErrForbidden on 403. A private resource comes back as it is, for web-ui's
+// own readers (posters, Vault) to treat as private. Where private torrents
+// are not available, rest-api's private_torrent refusal is private_unavailable:
+// it names the instance's one account, and neither signing in nor an upload
+// here would change it.
 func (s *Api) LookupResource(ctx context.Context, c *Claims, infohash string) (e *Resource, err error) {
 	u := s.url + "/resource/" + infohash
 	e = &Resource{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)
 	if e.ID == "" {
 		e = nil
+	}
+	var pe *PrivateError
+	if !s.PrivateAvailable() && errors.As(err, &pe) && pe.Code == CodePrivateTorrent {
+		return nil, errPrivateUnavailable(http.StatusForbidden)
 	}
 	return
 }
@@ -577,10 +593,23 @@ func (s *Api) PrivateAvailable() bool {
 }
 
 // errPrivateUnavailable refuses a private torrent where PrivateAvailable is
-// false, as rest-api refuses it where it has no private store.
-func errPrivateUnavailable() *PrivateError {
-	return &PrivateError{Status: http.StatusUnprocessableEntity, Code: CodePrivateUnavailable,
+// false, as rest-api refuses it where it has no private store: 422 on a store,
+// 403 on a read.
+func errPrivateUnavailable(status int) *PrivateError {
+	return &PrivateError{Status: status, Code: CodePrivateUnavailable,
 		Message: "private torrents are not available on this server"}
+}
+
+// readable refuses, where private torrents are not available, a list or an
+// export of a private torrent: rest-api would serve it to the instance's one
+// account. Every caller there is that account, so one cached lookup per hash
+// serves the whole instance.
+func (s *Api) readable(ctx context.Context, infohash string) error {
+	if s.PrivateAvailable() {
+		return nil
+	}
+	_, err := s.GetResourceCached(ctx, InternalClaims(), infohash)
+	return err
 }
 
 // StoreResource stores a .torrent or a magnet. Where private torrents are not
@@ -590,7 +619,7 @@ func errPrivateUnavailable() *PrivateError {
 // here.
 func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e *ra.ResourceResponse, err error) {
 	if !s.PrivateAvailable() && private_torrent.IsPrivate(resource) {
-		return nil, errPrivateUnavailable()
+		return nil, errPrivateUnavailable(http.StatusUnprocessableEntity)
 	}
 	u := s.url + "/resource"
 	e = &ra.ResourceResponse{}
@@ -599,12 +628,15 @@ func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e 
 		e = nil
 	}
 	if err == nil && e != nil && e.Private && !s.PrivateAvailable() {
-		return nil, errPrivateUnavailable()
+		return nil, errPrivateUnavailable(http.StatusUnprocessableEntity)
 	}
 	return
 }
 
 func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (e *ra.ListResponse, err error) {
+	if err = s.readable(ctx, infohash); err != nil {
+		return nil, err
+	}
 	u := s.url + "/resource/" + infohash + "/list?" + args.ToQuery().Encode()
 	e = &ra.ListResponse{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)
@@ -725,6 +757,9 @@ func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Cla
 }
 
 func (s *Api) exportResourceContent(ctx context.Context, c *Claims, infohash string, itemID string, q url.Values) (*ra.ExportResponse, error) {
+	if err := s.readable(ctx, infohash); err != nil {
+		return nil, err
+	}
 	u := s.url + "/resource/" + infohash + "/export/" + itemID
 	if len(q) > 0 {
 		u += "?" + q.Encode()

@@ -25,27 +25,41 @@ import (
 func newRestAPIHandler(t *testing.T, upstream *httptest.Server) *Handler {
 	t.Helper()
 	u, _ := url.Parse(upstream.URL)
+	return restAPIHandler(t, upstream.Client(), "--webtor-rest-api-host="+u.Hostname(), "--webtor-rest-api-port="+u.Port(),
+		"--webtor-secret=test", "--rapidapi-host=")
+}
+
+// restAPIHandler is a Handler whose rest-api client New builds from flags,
+// talking through cl.
+func restAPIHandler(t *testing.T, cl *http.Client, flags ...string) *Handler {
+	t.Helper()
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	for _, f := range restapi.RegisterFlags(nil) {
 		f.Apply(fs)
 	}
-	if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
-		"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+	if err := fs.Parse(flags); err != nil {
 		t.Fatal(err)
 	}
-	return &Handler{api: restapi.New(cli.NewContext(cli.NewApp(), fs, nil), upstream.Client())}
+	return &Handler{api: restapi.New(cli.NewContext(cli.NewApp(), fs, nil), cl)}
 }
 
-// A private .torrent stored through the JSON API is counted once, as the
-// API's (services/private_torrent); a magnet is not a torrent and is not.
-func TestPostResource_CountsAPrivateUpload(t *testing.T) {
+// privateTorrent is a private .torrent with a test key in its announce, and
+// its hash.
+func privateTorrent(t *testing.T) ([]byte, string) {
+	t.Helper()
 	info := metainfo.Info{Name: "probe", PieceLength: 16384, Length: 1, Pieces: make([]byte, 20), Private: &[]bool{true}[0]}
 	mi := metainfo.MetaInfo{InfoBytes: bencode.MustMarshal(info), Announce: "http://tracker.invalid/announce?passkey=0123456789abcdef0123456789abcdef"}
 	var torrent bytes.Buffer
 	if err := mi.Write(&torrent); err != nil {
 		t.Fatal(err)
 	}
-	hash := mi.HashInfoBytes().HexString()
+	return torrent.Bytes(), mi.HashInfoBytes().HexString()
+}
+
+// A private .torrent stored through the JSON API is counted once, as the
+// API's (services/private_torrent); a magnet is not a torrent and is not.
+func TestPostResource_CountsAPrivateUpload(t *testing.T) {
+	torrent, hash := privateTorrent(t)
 
 	restAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/resource" {
@@ -79,7 +93,7 @@ func TestPostResource_CountsAPrivateUpload(t *testing.T) {
 		}
 		return n
 	}
-	if n := count(torrent.Bytes()); n != 1 {
+	if n := count(torrent); n != 1 {
 		t.Errorf("a private torrent: %d lines, want 1", n)
 	}
 	if n := count([]byte("magnet:?xt=urn:btih:" + hash)); n != 0 {
