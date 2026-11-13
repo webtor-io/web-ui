@@ -164,10 +164,11 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return s.renderPrivate(j, hash)
 	}
 	err = ls.Run(ctx, j)
-	// Until rest-api names its reasons (part B), any 422 to the magnet is
-	// this card.
+	// A 422 without a code to the magnet, or a refusal rest-api names by a
+	// code (403/422): this card, not "sign in", which a third-party site
+	// cannot do. A check that did not answer (503, 429) stays the error.
 	var me *MagnetError
-	if errors.As(err, &me) && me.Kind == "private" {
+	if errors.As(err, &me) && me.Kind == "private" || api.IsPrivateRefusal(err) {
 		return s.renderPrivate(j, hash)
 	}
 	if err != nil {

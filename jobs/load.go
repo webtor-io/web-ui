@@ -157,7 +157,9 @@ func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadA
 // Not the dead card: no peer and no retry change it. Not kept for replay: a
 // magnet with tr= and an upload run as the user's own and are not kept
 // anyway, but a bare magnet's 429 or 503 runs the shared run, and the next
-// visitor of the hash must reach rest-api, not this card.
+// visitor of the hash must reach rest-api, not this card. Returned as Shown,
+// not nil: the run counts as the refusal it is, rejected for 403/422 and an
+// error for 503/429 (Р6), and the card is not followed by a red line.
 func (s *Jobs) renderPrivateError(c *web.Context, j *job.Job, pe *api.PrivateError) error {
 	j.DoNotCache()
 	r := web.NewPrivateRefusal(pe, c.User != nil && c.User.HasAuth())
@@ -170,5 +172,5 @@ func (s *Jobs) renderPrivateError(c *web.Context, j *job.Job, pe *api.PrivateErr
 	}
 	j.Fail()
 	j.Custom("load/errors/private", strings.TrimSpace(str))
-	return nil
+	return job.Shown(pe)
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/job"
+	"github.com/webtor-io/web-ui/services/metrics"
+	"github.com/webtor-io/web-ui/services/metrics/metricstest"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -35,13 +37,14 @@ func TestCodedMagnetRefusalIsNotTheDeadCard(t *testing.T) {
 		status   int
 		body     string
 		wantCard string
+		outcome  string // Р6: a refusal is rejected, a check that did not answer an error
 	}{
 		{"tracker refused the key", withTr, true, http.StatusUnprocessableEntity,
-			`{"error":"x","code":"private_tracker_refused","reason":"key"}`, "private card error.private_tracker_refused private_tracker_refused"},
+			`{"error":"x","code":"private_tracker_refused","reason":"key"}`, "private card error.private_tracker_refused private_tracker_refused #log-load", metrics.JobRejected},
 		{"verification unavailable", withTr, true, http.StatusServiceUnavailable,
-			`{"error":"x","code":"private_verify_unavailable"}`, "private card error.private_verify_unavailable private_verify_unavailable"},
+			`{"error":"x","code":"private_verify_unavailable"}`, "private card error.private_verify_unavailable private_verify_unavailable #log-load", metrics.JobError},
 		{"429 on a bare magnet, the shared run", bare, false, http.StatusTooManyRequests,
-			`{"error":"x"}`, "private card error.private_verify_unavailable rate_limited"},
+			`{"error":"x"}`, "private card error.private_verify_unavailable rate_limited #log-load", metrics.JobError},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			st := &memStorage{logs: map[string][]job.LogItem{}, closed: make(chan string, 8)}
@@ -63,6 +66,7 @@ func TestCodedMagnetRefusalIsNotTheDeadCard(t *testing.T) {
 			}), st)()
 			wc := &web.Context{Lang: "en", ApiClaims: &api.Claims{Uid: uidA}, User: &auth.User{ID: uuid.NewV4()}}
 			args := &scripts.LoadArgs{Query: c.query, Source: "site"}
+			counted := loadOutcome(t, c.outcome)
 			run, err := jobs.Load(wc, args)
 			if err != nil {
 				t.Fatal(err)
@@ -89,6 +93,7 @@ func TestCodedMagnetRefusalIsNotTheDeadCard(t *testing.T) {
 			if run.Cacheable() {
 				t.Error("the private card is kept for replay")
 			}
+			counted()
 		})
 	}
 }
@@ -110,6 +115,7 @@ func TestAnonUploadNeedsAccountCard(t *testing.T) {
 	}), st)()
 	anon := &web.Context{Lang: "en", ApiClaims: &api.Claims{}}
 	args := &scripts.LoadArgs{File: torrent, Source: "site"}
+	counted := loadOutcome(t, metrics.JobRejected)
 	if _, err := jobs.Load(anon, args); err != nil {
 		t.Fatal(err)
 	}
@@ -117,8 +123,26 @@ func TestAnonUploadNeedsAccountCard(t *testing.T) {
 	if want := loadJobID(anon, args, h); id != want {
 		t.Fatalf("closed %s, want %s", id, want)
 	}
-	const want = "private card error.private_needs_account private_needs_account"
+	const want = "private card error.private_needs_account private_needs_account #log-load"
 	if l := st.log(id); !hasItem(l, func(i job.LogItem) bool { return i.Level == job.Custom && i.Body == want }) {
 		t.Errorf("want %q, got %+v", want, l)
+	}
+	counted()
+}
+
+// loadOutcome checks, once the run has closed, that it was counted once
+// under outcome in webui_jobs_total: the card is the answer the user sees,
+// not a run that went well (Р6).
+func loadOutcome(t *testing.T, outcome string) func() {
+	t.Helper()
+	count := func() float64 {
+		return metricstest.Counter(t, "webui_jobs_total", map[string]string{"job": "load", "outcome": outcome})
+	}
+	before := count()
+	return func() {
+		t.Helper()
+		if got := count() - before; got != 1 {
+			t.Errorf("webui_jobs_total{outcome=%q} moved by %v, want 1", outcome, got)
+		}
 	}
 }

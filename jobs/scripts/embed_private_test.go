@@ -89,6 +89,17 @@ func TestEmbedRefusesPrivate(t *testing.T) {
 			calls:   []string{"GET /resource/" + hash, "POST /resource"},
 		},
 		{
+			// rest-api names the refusal: still the card, never "sign in".
+			name:     "magnet, coded refusal",
+			settings: models.EmbedSettings{Magnet: withTr},
+			api: map[string]reply{
+				"GET /resource/" + hash: {404, ""},
+				"POST /resource":        {422, `{"error":"x","code":"private_needs_account"}`},
+			},
+			private: true,
+			calls:   []string{"GET /resource/" + hash, "POST /resource"},
+		},
+		{
 			// Only the private kind: a dead magnet is the job's error, as before.
 			name:     "magnet, dead",
 			settings: models.EmbedSettings{Magnet: withTr},

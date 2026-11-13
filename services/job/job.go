@@ -211,6 +211,10 @@ func (s *Job) Run(ctx context.Context) error {
 
 	if s.runnable != nil {
 		err := s.execute(ctx)
+		if errors.As(err, new(shownError)) {
+			// The card is on the log already: no red line under it.
+			return err
+		}
 		if err != nil {
 			errr := s.Error(err)
 			if errr != nil {
@@ -246,6 +250,17 @@ func (s *Job) execute(ctx context.Context) (err error) {
 	outcome = outcomeOf(err)
 	return err
 }
+
+// Shown wraps an error the script has already shown to the viewer as a card
+// (Fail, then Custom) in place of the red line. The run is still the failure
+// err is: counted by it (a private refusal rejected, a check that did not
+// answer an error), dropped from storage and logged by retire. Run only
+// writes no second, red line under the card.
+func Shown(err error) error { return shownError{err} }
+
+type shownError struct{ error }
+
+func (e shownError) Unwrap() error { return e.error }
 
 func outcomeOf(err error) string {
 	switch {

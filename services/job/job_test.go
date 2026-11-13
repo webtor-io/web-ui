@@ -307,3 +307,38 @@ func TestPrivateRefusalIsRejected(t *testing.T) {
 		}
 	}
 }
+
+// A card the script rendered in place of the red line (Shown) is counted by
+// the error it carries (Р6), and Run returns that error for retire, but
+// writes no red line under the card.
+func TestRun_ShownErrorIsCountedWithoutARedLine(t *testing.T) {
+	const q = "metrics-shown-test"
+	count := func(outcome string) float64 {
+		return metricstest.Counter(t, "webui_jobs_total", map[string]string{"job": q, "outcome": outcome})
+	}
+	for _, c := range []struct {
+		err  error
+		want string
+	}{
+		{&api.PrivateError{Status: 422, Code: "private_needs_account"}, metrics.JobRejected},
+		{&api.PrivateError{Status: 503, Code: "store_outdated"}, metrics.JobError},
+	} {
+		before := count(c.want)
+		j := New(context.Background(), "id", q, NewScript(func(j *Job) error {
+			j.Fail()
+			j.Custom("card", "")
+			return Shown(c.err)
+		}), &NilStorage{}, true, nil)
+		if err := j.Run(context.Background()); !errors.Is(err, c.err) {
+			t.Errorf("Run = %v, want %v for retire", err, c.err)
+		}
+		if got := count(c.want) - before; got != 1 {
+			t.Errorf("%v: %s moved by %v, want 1", c.err, c.want, got)
+		}
+		for _, i := range itemsOf(j) {
+			if i.Level == Error && i.Message != "" {
+				t.Errorf("%v: a red line under the card: %+v", c.err, i)
+			}
+		}
+	}
+}
