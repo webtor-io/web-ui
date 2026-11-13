@@ -10,7 +10,12 @@ by the user without any manual review on our side.
 - **Disposition:** attachment, filename `webtor-data-export-YYYY-MM-DD.json`
 - **Cache-Control:** `no-store` (responses contain credentials)
 - **Handler:** `handlers/profile/handler.go` → `Handler.export`
-- **Builder:** `services/data_export/export.go` → `data_export.Build`
+- **Builder:** `services/data_export/export.go` → `data_export.Build`; the
+  handler adds `private_trackers`, which rest-api holds, after it
+- **Never partial:** when the private tracker records cannot be read, there is
+  no file: the handler redirects to `/profile` with `error.generic` ("try
+  again"). A store without private records (`private_unavailable`) and a
+  RapidAPI deployment (no request is sent) export `[]`
 
 ## Wire format
 
@@ -40,6 +45,7 @@ breaks consumers.
   "streaming_backends": [...],
   "user_subtitles": [...],
   "access_tokens": [...],
+  "private_trackers": [...],
   "vault": { ... } | omitted
 }
 ```
@@ -71,6 +77,7 @@ omitted entirely when the user has never used the feature.
 | `streaming_backends`  | `models.GetUserStreamingBackends`                                  |
 | `user_subtitles`      | `models.ListAllUserSubtitles`                                      |
 | `access_tokens`       | `models.ListUserAccessTokens`                                      |
+| `private_trackers`    | rest-api `GET /internal/private-trackers/{uid}` (`api.ListPrivateTrackers`, web-ui's internal claims; uid = `api.GenerateSessionIDFromUser`), called by `Handler.export` after `Build`: `{resource_id, hosts, source, created_at, updated_at}` |
 | `vault.balance`       | `vault.GetUserVP`                                                  |
 | `vault.pledges`       | `vault.GetUserPledges`                                             |
 | `vault.transactions`  | `vault.ListUserTxLogs`                                             |
@@ -93,6 +100,11 @@ belong in the file either. `torznab_indexer.api_key` is stored in its own
 column precisely so the feed URL can be shown without it, so the export
 carries `torznab_indexers[].has_api_key` (bool) instead of the key.
 
+`private_trackers` follows the same rule. torrent-store keeps a private
+torrent's tracker URLs, with the user's key (passkey) in them, encrypted, and
+nothing renders them back to the user, so the export carries each record's
+tracker `hosts` only, as rest-api answers them.
+
 `user_settings.lang` stays a nullable string in the export: `null`/absent
 means "never observed on an authenticated request", which is a different
 fact about the account than an explicit language choice.
@@ -101,6 +113,8 @@ fact about the account than an explicit language choice.
 
 - `torznab_indexer.api_key` — write-only credential, never rendered back to
   the user; exported as the `has_api_key` boolean instead.
+- Private tracker URLs and the keys (passkeys) in them — encrypted in
+  torrent-store and never rendered back; `private_trackers[].hosts` instead.
 - `ai_enrich.query` — global title-normalisation cache, not user-keyed.
 - AI recommendation quota counters — ephemeral Redis state that rolls over
   daily (`services/recommendations/quota.go`). Not "data we hold about the

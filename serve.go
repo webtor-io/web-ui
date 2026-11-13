@@ -542,7 +542,7 @@ func serve(c *cli.Context) error {
 	notifications.RegisterHandler(r, tm, ns, donate.Billing(c), offers)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get())
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get(), sapi)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)

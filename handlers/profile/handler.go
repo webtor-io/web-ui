@@ -16,12 +16,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/adminauth"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
@@ -143,6 +145,9 @@ type Handler struct {
 	payments     *pay.Client
 	releaseSubs  *rss.Service
 	notification *notification.Service
+	// restAPI holds the account's private tracker records, which the export
+	// reads through rest-api's internal endpoint.
+	restAPI *api.Api
 	// billing: who takes the money and where it is managed; zero when no
 	// provider is configured, and the tier card then says nothing about it.
 	billing       notification.Billing
@@ -178,7 +183,7 @@ type Handler struct {
 	emailLimiter *libapi.RateLimiter
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient, restAPI *api.Api) {
 	h := &Handler{
 		tb:               tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:               at,
@@ -190,6 +195,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		payments:         payments,
 		releaseSubs:      releaseSubs,
 		notification:     ns,
+		restAPI:          restAPI,
 		billing:          donate.Billing(c),
 		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
 		disableS3:        c.Bool(common.DisableS3Flag),
@@ -378,6 +384,20 @@ func (s *Handler) export(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/logout")
 		return
 	}
+	// Never a partial export: without the records there is no file at all,
+	// and the user is asked to try again.
+	records, err := s.restAPI.ListPrivateTrackers(c.Request.Context(), api.GenerateSessionIDFromUser(u))
+	if err != nil {
+		// The redirect logs only the key; the cause (an old rest-api's 404,
+		// a store outage) goes here. No uid in it: the client keeps it out.
+		log.WithError(err).Warn("data export: failed to read private tracker records")
+		web.RedirectWithErrorAndPath(c, "/profile", web.NewUserError("error.generic", err))
+		return
+	}
+	if records == nil {
+		records = []api.PrivateTrackerRecord{}
+	}
+	exp.PrivateTrackers = records
 	filename := fmt.Sprintf("webtor-data-export-%s.json", time.Now().UTC().Format("2006-01-02"))
 	c.Header("Content-Type", "application/json; charset=utf-8")
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))

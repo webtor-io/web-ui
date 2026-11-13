@@ -16,6 +16,7 @@ import (
 
 	"github.com/webtor-io/web-ui/models"
 	vaultmodels "github.com/webtor-io/web-ui/models/vault"
+	"github.com/webtor-io/web-ui/services/api"
 )
 
 // SchemaVersion identifies the wire format of an Export. Increment whenever
@@ -54,7 +55,12 @@ type Export struct {
 	// minutes (confirmed ones are deleted on the device's next poll), so the
 	// list is almost always empty — included because the table is user-keyed.
 	PendingDeviceAuth []DeviceAuthItem `json:"pending_device_auth"`
-	Vault             *VaultData       `json:"vault,omitempty"`
+	// PrivateTrackers are the account's private tracker records. rest-api
+	// holds them, not this database, so the export handler fills the field
+	// after Build. The tracker URLs and keys stay out, as the Torznab key
+	// does (TorznabIndexerItem.HasAPIKey).
+	PrivateTrackers []api.PrivateTrackerRecord `json:"private_trackers"` // always an array; hosts only, no URLs
+	Vault           *VaultData                 `json:"vault,omitempty"`
 }
 
 type UserData struct {
