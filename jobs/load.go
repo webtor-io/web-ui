@@ -3,6 +3,7 @@ package j
 import (
 	"context"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/webtor-io/web-ui/jobs/scripts"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/web"
 
@@ -68,6 +70,10 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 			// (measured 2026-09-04: 5 of 60 resolve on a warm client), but
 			// the user decides. "user error shown" keeps the err_key metric.
 			return s.renderMagnetError(c, j, args, me, hash)
+		}
+		var pe *api.PrivateError
+		if errors.As(err, &pe) {
+			return s.renderPrivateError(c, j, pe)
 		}
 		if err != nil {
 			return
@@ -143,5 +149,26 @@ func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadA
 	}
 	j.Fail()
 	j.Custom("load/errors/magnet", strings.TrimSpace(str))
+	return nil
+}
+
+// renderPrivateError shows rest-api's answer named by a code (Р13) as the
+// private card: why, and the way out, an account or the user's own .torrent.
+// Not the dead card: no peer and no retry change it. Not kept for replay: a
+// magnet with tr= and an upload run as the user's own and are not kept
+// anyway, but a bare magnet's 429 or 503 runs the shared run, and the next
+// visitor of the hash must reach rest-api, not this card.
+func (s *Jobs) renderPrivateError(c *web.Context, j *job.Job, pe *api.PrivateError) error {
+	j.DoNotCache()
+	r := web.NewPrivateRefusal(pe, c.User != nil && c.User.HasAuth())
+	r.Target = "#log-load"
+	log.WithError(pe).WithField("err_key", r.Key).Info("user error shown")
+	tpl := s.tb.Build("load/errors/private").WithLayoutBody(`{{ template "main" . }}`)
+	str, err := tpl.ToString(c.WithData(r))
+	if err != nil {
+		return err
+	}
+	j.Fail()
+	j.Custom("load/errors/private", strings.TrimSpace(str))
 	return nil
 }

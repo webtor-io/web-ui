@@ -227,6 +227,14 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 		// ten-minute retry change that answer.
 		return nil, &MagnetError{Kind: "private", Waited: time.Since(started), Long: long, Cause: err}
 	}
+	var pe *api.PrivateError
+	if errors.As(err, &pe) {
+		// Any other answer rest-api names by a code: the tracker refused the
+		// key, the check could not run, the account is missing. Not a dead
+		// magnet either -- the Jobs layer shows the private card, without the
+		// ten-minute retry of the same answer.
+		return nil, errors.Wrap(err, "failed to store resource by magnet")
+	}
 	if err != nil || res == nil {
 		kind := "dead"
 		if err != nil && strings.Contains(err.Error(), "failed to parse magnet") {

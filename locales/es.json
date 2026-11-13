@@ -673,6 +673,8 @@
     "action.noPeers.timeoutBody": "Esperamos todo el tiempo de calentamiento y el enjambre no entregó lo suficiente para empezar. Puede acelerarse en unos minutos, o este torrent simplemente tiene pocos seeders.",
     "action.noPeers.refusedTitle": "Este tracker privado no nos deja pasar",
     "action.noPeers.refusedBody": "Este torrent viene de un tracker privado, y el tracker rechazó nuestra solicitud o no respondió. Sin él no podemos llegar a ningún par, así que volver a intentarlo no servirá por ahora. Si eres miembro de ese tracker, abre el torrent en tu propio cliente de torrent.",
+    "action.noPeers.own.title": "El tracker no aceptó tu clave",
+    "action.noPeers.own.body": "Los motivos habituales: no reconoce la clave (si cambiaste tu passkey, usa un enlace o archivo .torrent nuevo), tu cuenta tiene restricciones en el tracker, el torrent no está en el tracker o el tracker no deja entrar al cliente de Webtor.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} recibidos de {{.Peers}} par en {{.Sec}} s",
         "other": "{{.Bytes}} recibidos de {{.Peers}} pares en {{.Sec}} s"

@@ -663,6 +663,8 @@
     "action.noPeers.timeoutBody": "已等待完整的预缓冲时间，BT 网络仍未提供足够的数据。几分钟后速度可能会改善，也可能只是此种子做种者不足。",
     "action.noPeers.refusedTitle": "此私有 Tracker 拒绝了我们的连接",
     "action.noPeers.refusedBody": "此种子来自私有 Tracker，该 Tracker 拒绝了我们的请求或没有响应。没有它我们无法连接到任何节点，因此暂时重试也没有用。如果你是该 Tracker 的成员，请用你自己的 BT 客户端打开此种子。",
+    "action.noPeers.own.title": "Tracker 未接受你的密钥",
+    "action.noPeers.own.body": "常见原因：密钥无法识别（如果你更换了 passkey，请使用新的链接或 .torrent 文件）、你的账号在 Tracker 上受到限制、该种子不在 Tracker 上，或 Tracker 不允许 Webtor 的客户端接入。",
     "action.noPeers.stats": {
         "other": "{{.Sec}} 秒内从 {{.Peers}} 个节点收到 {{.Bytes}}"
     },

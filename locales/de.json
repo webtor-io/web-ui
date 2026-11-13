@@ -673,6 +673,8 @@
     "action.noPeers.timeoutBody": "Wir haben die volle Aufwärmzeit gewartet, und der Schwarm hat nicht genug geliefert. In ein paar Minuten kann es anziehen – oder dieser Torrent hat einfach zu wenige Seeder.",
     "action.noPeers.refusedTitle": "Dieser private Tracker lässt uns nicht durch",
     "action.noPeers.refusedBody": "Dieser Torrent stammt von einem privaten Tracker, und der Tracker hat unsere Anfrage abgelehnt oder nicht beantwortet. Ohne ihn erreichen wir keine Peers, ein neuer Versuch hilft also vorerst nicht. Wenn du Mitglied dieses Trackers bist, öffne den Torrent in deinem eigenen Torrent-Client.",
+    "action.noPeers.own.title": "Der Tracker hat deinen Schlüssel nicht akzeptiert",
+    "action.noPeers.own.body": "Die üblichen Gründe: Der Schlüssel wird nicht erkannt (wenn du deinen Passkey geändert hast, nutze einen neuen Link oder eine neue .torrent-Datei), dein Konto ist auf dem Tracker eingeschränkt, der Torrent ist nicht auf dem Tracker, oder der Tracker lässt den Client von Webtor nicht zu.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} von {{.Peers}} Peer in {{.Sec}} s empfangen",
         "other": "{{.Bytes}} von {{.Peers}} Peers in {{.Sec}} s empfangen"

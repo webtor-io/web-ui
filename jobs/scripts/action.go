@@ -22,6 +22,7 @@ import (
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/metrics"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
@@ -1148,6 +1149,9 @@ type NoPeersData struct {
 	Bytes      string
 	BytesRaw   int64
 	ElapsedSec int
+	// Own: the tracker refused the user's own key (ownKeyRefused), and the
+	// card says so instead of "this tracker isn't letting us through".
+	Own bool
 	// Form-resubmit context for "try again", same shape as SlowDownloadData.
 	Action        string
 	Endpoint      string
@@ -1875,6 +1879,7 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		}
 		if isNoPeers {
 			data.Reason = npe.Reason
+			data.Own = ownKeyRefused(npe.Reason, s.c.ApiClaims)
 			data.Peers = npe.Peers
 			data.Seeders = npe.Seeders
 			data.Leechers = npe.Leechers
@@ -1898,6 +1903,15 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return nil
 	}
 	return err
+}
+
+// ownKeyRefused says the refusal answered the user's own key (Р14): the
+// tracker refused, access is enforced, so the seeder announced with the
+// record of the user asking, and the user has a uid. In observation the
+// seeder announces with the key of whoever added the torrent first, and the
+// card must not call that key the user's.
+func ownKeyRefused(reason string, cl *api.Claims) bool {
+	return reason == "refused" && private_torrent.Enforce() && cl != nil && cl.Uid != ""
 }
 
 // actionClock is the clock of the job keys' time bucket (Action, Embed); a

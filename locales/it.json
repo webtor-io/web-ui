@@ -673,6 +673,8 @@
     "action.noPeers.timeoutBody": "Abbiamo atteso l’intero tempo di riscaldamento e lo sciame non ha fornito abbastanza per iniziare. Potrebbe accelerare tra qualche minuto, oppure questo torrent ha semplicemente pochi seeder.",
     "action.noPeers.refusedTitle": "Questo tracker privato non ci lascia passare",
     "action.noPeers.refusedBody": "Questo torrent proviene da un tracker privato, e il tracker ha rifiutato la nostra richiesta o non ha risposto. Senza di esso non possiamo raggiungere nessun peer, quindi riprovare per ora non servirà. Se sei iscritto a quel tracker, apri il torrent nel tuo client torrent.",
+    "action.noPeers.own.title": "Il tracker non ha accettato la tua chiave",
+    "action.noPeers.own.body": "I motivi più comuni: la chiave non è riconosciuta (se hai cambiato la tua passkey, usa un link o un file .torrent nuovo), il tuo account è limitato sul tracker, il torrent non è sul tracker, oppure il tracker non accetta il client di Webtor.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} ricevuti da {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} ricevuti da {{.Peers}} peer in {{.Sec}} s"

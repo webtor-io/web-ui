@@ -7,8 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 // The no-peers modal has three variants keyed on Reason; each must resolve in
@@ -80,6 +82,12 @@ func TestNoPeersModalRenders(t *testing.T) {
 		{"refused", trial, func() NoPeersData { d := base; d.TierName = "silver"; d.Reason = "refused"; return d },
 			[]string{"private tracker"},
 			[]string{"Save it to Vault", "no-peers-retry", "another torrent"}},
+		// The user's own key was refused (Own, see ownKeyRefused): the
+		// tracker's answer to them, every usual reason in one card, none of
+		// the tracker's own words. Still no retry and no Vault.
+		{"refused, own key", trial, func() NoPeersData { d := base; d.Reason = "refused"; d.Own = true; d.ElapsedSec = 60; return d },
+			[]string{"accept your key", "changed your passkey", "your account is restricted", `reason: 'refused'`},
+			[]string{"letting us through", "refused our request", "donate-no-peers", "Vault", "no-peers-retry", "another torrent"}},
 	}
 	for _, c := range cases {
 		promo = c.offer
@@ -110,4 +118,30 @@ func renderModal(t *testing.T, tpl *template.Template, lang string, data any) st
 		t.Fatalf("execute lang=%s: %v", lang, err)
 	}
 	return buf.String()
+}
+
+// The own-key card (Р14) speaks of the user's key only when it was theirs:
+// after enforce, and for a user with a uid. In observation the seeder
+// announced with the key of whoever added the torrent first.
+func TestOwnKeyRefused(t *testing.T) {
+	t.Cleanup(func() { private_torrent.SetEnforce(false) })
+	user := &api.Claims{Uid: "76543210fedcba9876543210fedcba9876543210"}
+	for _, c := range []struct {
+		name    string
+		enforce bool
+		reason  string
+		cl      *api.Claims
+		want    bool
+	}{
+		{"refused, enforce, uid", true, "refused", user, true},
+		{"dead", true, "dead", user, false},
+		{"no uid", true, "refused", &api.Claims{}, false},
+		{"no claims", true, "refused", nil, false},
+		{"observation", false, "refused", user, false},
+	} {
+		private_torrent.SetEnforce(c.enforce)
+		if got := ownKeyRefused(c.reason, c.cl); got != c.want {
+			t.Errorf("%s: ownKeyRefused = %v, want %v", c.name, got, c.want)
+		}
+	}
 }

@@ -673,6 +673,8 @@
     "action.noPeers.timeoutBody": "We hebben de volledige opwarmtijd gewacht en de zwerm leverde niet genoeg om te beginnen. Het kan over een paar minuten aantrekken — of deze torrent heeft simpelweg te weinig seeders.",
     "action.noPeers.refusedTitle": "Deze privétracker laat ons niet door",
     "action.noPeers.refusedBody": "Deze torrent komt van een privétracker, en die heeft ons verzoek geweigerd of niet beantwoord. Zonder die tracker kunnen we geen peers bereiken, dus opnieuw proberen helpt voorlopig niet. Ben je lid van die tracker, open de torrent dan in je eigen torrentclient.",
+    "action.noPeers.own.title": "De tracker heeft je sleutel niet geaccepteerd",
+    "action.noPeers.own.body": "De gebruikelijke redenen: de sleutel wordt niet herkend (als je je passkey hebt gewijzigd, gebruik dan een nieuwe link of een nieuw .torrent-bestand), je account is op de tracker beperkt, de torrent staat niet op de tracker, of de tracker laat de client van Webtor niet toe.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} ontvangen van {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} ontvangen van {{.Peers}} peers in {{.Sec}} s"

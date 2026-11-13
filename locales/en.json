@@ -791,6 +791,9 @@
     "action.noPeers.timeoutBody": "We waited the full warm-up time and the swarm did not deliver enough to begin. It may pick up in a few minutes — or this torrent is simply short on seeders.",
     "action.noPeers.refusedTitle": "This private tracker isn't letting us through",
     "action.noPeers.refusedBody": "This torrent comes from a private tracker, and the tracker refused our request or didn't answer. Without it we can't reach any peers, so trying again won't help for now. If you're a member of that tracker, open the torrent in your own torrent client.",
+    "action.noPeers.own.title": "The tracker didn't accept your key",
+    "@action.noPeers.own.body": "Shown in the no-peers card when a private tracker refused the signed-in user's own key while Webtor streamed the torrent; action.noPeers.own.title is its heading. The same reasons as error.private_tracker_refused, whose first sentence is that heading. 'Passkey': the personal secret code a private tracker writes into each member's .torrent files and announce links; it tells the tracker which member is downloading. Keep the term your language's tracker users use (often the English word 'passkey').",
+    "action.noPeers.own.body": "The usual reasons: the key isn't recognized (if you changed your passkey, use a fresh link or .torrent file), your account is restricted on the tracker, the torrent isn't on the tracker, or the tracker doesn't let Webtor's client in.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} received from {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} received from {{.Peers}} peers in {{.Sec}} s"
