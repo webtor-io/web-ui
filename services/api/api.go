@@ -482,20 +482,42 @@ func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string)
 	return
 }
 
+// GetTorrent is the stored .torrent: nil, nil on 404; any other status but
+// 200 is an error, never a body read as a torrent.
 func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (closer io.ReadCloser, err error) {
 	u := s.url + "/resource/" + infohash + ".torrent"
 	res, err := s.doRequestRaw(ctx, c, u, "GET", nil)
 	if err != nil {
 		return nil, err
 	}
-	return res.Body, nil
+	if res.StatusCode == http.StatusOK {
+		return res.Body, nil
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(res.Body)
+	if res.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	return nil, errorFromResponse(res, body, u)
 }
 
+// errTorrentNotFound carries rest-api's 404 out of torrentCache, which keeps
+// only successes, as errResourceNotFound does for resourcesCache.
+var errTorrentNotFound = errors.New("torrent not found")
+
 func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) ([]byte, error) {
-	return s.torrentCache.Get(cacheKey(c, infohash), func() ([]byte, error) {
+	data, err := s.torrentCache.Get(cacheKey(c, infohash), func() ([]byte, error) {
 		resp, err := s.GetTorrent(ctx, c, infohash)
 		if err != nil {
 			return nil, err
+		}
+		if resp == nil {
+			return nil, errTorrentNotFound
 		}
 		defer func(Body io.ReadCloser) {
 			_ = Body.Close()
@@ -506,7 +528,10 @@ func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) 
 		}
 		return data, nil
 	})
-
+	if errors.Is(err, errTorrentNotFound) {
+		return nil, nil
+	}
+	return data, err
 }
 
 func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e *ra.ResourceResponse, err error) {
@@ -596,18 +621,8 @@ func (s *Api) doRequest(ctx context.Context, c *Claims, url string, method strin
 		return nil
 	} else if res.StatusCode == http.StatusNotFound {
 		return nil
-	} else if res.StatusCode == http.StatusForbidden {
-		return fmt.Errorf("%w url=%v", ErrForbidden, url)
-	} else if res.StatusCode == http.StatusUnprocessableEntity {
-		return fmt.Errorf("%w url=%v", ErrPrivateMagnet, url)
-	} else {
-		var e ra.ErrorResponse
-		err = json.Unmarshal(body, &e)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse status=%v body=%v url=%v", res.StatusCode, body, url)
-		}
-		return errors.New(e.Error)
 	}
+	return errorFromResponse(res, body, url)
 }
 
 type SpeedtestURL struct {

@@ -24,7 +24,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/openai/openai-go/v3 v3.68.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.2
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/satori/go.uuid v1.2.0
@@ -36,19 +36,19 @@ require (
 	github.com/swaggo/swag v1.16.6
 	github.com/urfave/cli v1.22.17
 	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
-	github.com/webtor-io/abuse-store v0.0.0-20250803081841-28e32eee4d01
+	github.com/webtor-io/abuse-store v0.0.0-20260807084622-80685fa640e9
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
 	github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
 	github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a
-	github.com/webtor-io/rest-api v1.0.1-0.20260926072012-e91a19d58e76
+	github.com/webtor-io/rest-api v1.0.1-0.20261113112901-269b6c15ddc5
 	github.com/yargevad/filepathx v1.0.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.45.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/text v0.42.0
 	golang.org/x/time v0.14.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
@@ -98,7 +98,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/mock v1.6.0 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -109,7 +108,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -127,8 +126,8 @@ require (
 	github.com/nyaruka/phonenumbers v1.6.6 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/common v0.67.2 // indirect
-	github.com/prometheus/procfs v0.19.2 // indirect
+	github.com/prometheus/common v0.70.1 // indirect
+	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -148,11 +147,11 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	github.com/webtor-io/magnet2torrent v0.0.0-20220312143110-bc1a7e4bcbba // indirect
-	github.com/webtor-io/torrent-store v1.0.1-0.20260614135143-50f5d91eee6b // indirect
+	github.com/webtor-io/magnet2torrent v1.0.1-0.20261113103955-8de21226ede1 // indirect
+	github.com/webtor-io/torrent-store v0.0.0-20261113110425-65a5e4f57aa3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
@@ -162,7 +161,7 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
