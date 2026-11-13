@@ -12,11 +12,8 @@ import (
 )
 
 func ServeError(w http.ResponseWriter, err error) {
-	code := http.StatusInternalServerError
-	var httpErr *HTTPError
-	if errors.As(err, &httpErr) {
-		code = httpErr.Code
-	}
+	// The status the S3 layer would pick too, carried statuses included.
+	code := HTTPErrorFromError(err).Code
 
 	var errElt *Error
 	if errors.As(err, &errElt) {

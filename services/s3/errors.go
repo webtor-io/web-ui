@@ -104,7 +104,7 @@ func errorFromVFS(err error, bucketOnly bool) *Error {
 		return newError(http.StatusNotFound, ErrCodeNoSuchKey, "The specified key does not exist", err)
 	case http.StatusForbidden:
 		return newError(http.StatusForbidden, ErrCodeAccessDenied, "Access Denied", err)
-	case http.StatusBadRequest:
+	case http.StatusBadRequest, http.StatusUnprocessableEntity: // S3 has no 422
 		return newError(http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid Request", err)
 	case http.StatusMethodNotAllowed:
 		return newError(http.StatusMethodNotAllowed, ErrCodeMethodNotAllowed, "The specified method is not allowed against this resource", err)

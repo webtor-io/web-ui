@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -532,6 +533,30 @@ func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) 
 		return nil, nil
 	}
 	return data, err
+}
+
+// LibraryTorrent is what a library row is made of. rest-api decides access first:
+// GetResourceCached with the caller's claims (403 private_torrent with its reason
+// when the user has no record). The metainfo is then read as web-ui itself: rest-api
+// gives a private torrent's .torrent to no user (decision 2). (nil, 0, nil): not stored.
+func (s *Api) LibraryTorrent(ctx context.Context, c *Claims, infohash string) (*metainfo.Info, int64, error) {
+	r, err := s.GetResourceCached(ctx, c, infohash)
+	if err != nil || r == nil {
+		return nil, 0, err
+	}
+	t, err := s.GetTorrentCached(ctx, InternalClaims(), infohash)
+	if err != nil || t == nil {
+		return nil, 0, err
+	}
+	mi, err := metainfo.Load(bytes.NewReader(t))
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "the stored torrent is malformed")
+	}
+	info, err := mi.UnmarshalInfo()
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "the stored torrent is malformed")
+	}
+	return &info, int64(len(t)), nil
 }
 
 func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e *ra.ResourceResponse, err error) {

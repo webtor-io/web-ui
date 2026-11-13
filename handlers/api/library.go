@@ -1,13 +1,10 @@
 package api
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net/http"
 	"strings"
 
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
@@ -204,27 +201,17 @@ func (s *Handler) addLibrary(c *gin.Context) {
 	// The torrent is fetched and parsed rather than trusted from the request:
 	// the library row carries name, size and file count, and those have to come
 	// from the metainfo the store actually holds. Same path the UI's add
-	// button takes.
-	t, aerr := s.api.GetTorrentCached(c.Request.Context(), restapi.GetClaimsFromContext(c), rID)
+	// button takes; rest-api decides first whether this caller may have it.
+	info, size, aerr := s.api.LibraryTorrent(c.Request.Context(), restapi.GetClaimsFromContext(c), rID)
 	if aerr != nil {
 		s.abort(c, upstreamError(aerr, "failed to fetch the torrent"))
 		return
 	}
-	if len(t) == 0 {
+	if info == nil {
 		s.abort(c, notFound("no such resource in the store — POST /resource first"))
 		return
 	}
-	mi, merr := metainfo.Load(io.NopCloser(bytes.NewReader(t)))
-	if merr != nil {
-		s.abort(c, libapi.NewError(http.StatusBadGateway, libapi.CodeUpstream, "the stored torrent is malformed", merr))
-		return
-	}
-	info, merr := mi.UnmarshalInfo()
-	if merr != nil {
-		s.abort(c, libapi.NewError(http.StatusBadGateway, libapi.CodeUpstream, "the stored torrent is malformed", merr))
-		return
-	}
-	if _, derr = models.AddTorrentToLibrary(c.Request.Context(), db, u.ID, rID, &info, "", int64(len(t))); derr != nil {
+	if _, derr = models.AddTorrentToLibrary(c.Request.Context(), db, u.ID, rID, info, "", size); derr != nil {
 		s.abort(c, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to add to the library", derr))
 		return
 	}

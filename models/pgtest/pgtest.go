@@ -6,7 +6,9 @@ package pgtest
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -15,6 +17,8 @@ import (
 
 	"github.com/go-pg/migrations/v8"
 	"github.com/go-pg/pg/v10"
+	"github.com/urfave/cli"
+	cs "github.com/webtor-io/common-services"
 )
 
 // Start brings up a disposable postgres:17-alpine container, runs this
@@ -122,6 +126,28 @@ func Start(t *testing.T) *pg.DB {
 	}
 
 	return db
+}
+
+// CS is a cs.PG on the disposable server db is connected to, for code that
+// takes the service's own handle.
+func CS(t *testing.T, db *pg.DB) *cs.PG {
+	t.Helper()
+	o := db.Options()
+	host, port, err := net.SplitHostPort(o.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs := flag.NewFlagSet("pgtest", flag.ContinueOnError)
+	for _, f := range cs.RegisterPGFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--postgres-host=" + host, "--postgres-port=" + port,
+		"--postgres-user=" + o.User, "--postgres-password=" + o.Password, "--postgres-database=" + o.Database}); err != nil {
+		t.Fatal(err)
+	}
+	p := cs.NewPG(cli.NewContext(cli.NewApp(), fs, nil))
+	t.Cleanup(p.Close)
+	return p
 }
 
 func lastLine(s string) string {

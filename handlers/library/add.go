@@ -1,11 +1,8 @@
 package library
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/models"
@@ -21,6 +18,11 @@ func (s *Handler) add(c *gin.Context) {
 		return
 	}
 	err, rID := s.addTorrentToLibrary(c, u)
+	var pe *api.PrivateError
+	if errors.As(err, &pe) {
+		web.RedirectWithError(c, err)
+		return
+	}
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to add torrent to library"))
 		return
@@ -33,27 +35,18 @@ func (s *Handler) addTorrentToLibrary(c *gin.Context, u *auth.User) (err error, 
 	clms := api.GetClaimsFromContext(c)
 	ctx := c.Request.Context()
 	rID, _ := c.GetPostForm("resource_id")
-	t, err := s.api.GetTorrentCached(ctx, clms, rID)
+	info, size, err := s.api.LibraryTorrent(ctx, clms, rID)
 	if err != nil {
 		return
 	}
-	body := io.NopCloser(bytes.NewReader(t))
-	defer func(body io.ReadCloser) {
-		_ = body.Close()
-	}(body)
-	mi, err := metainfo.Load(body)
-	if err != nil {
-		return
-	}
-	info, err := mi.UnmarshalInfo()
-	if err != nil {
-		return
+	if info == nil {
+		return errors.New("torrent not found"), id
 	}
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("no db"), id
 	}
-	_, err = models.AddTorrentToLibrary(ctx, db, u.ID, rID, &info, "", int64(len(t)))
+	_, err = models.AddTorrentToLibrary(ctx, db, u.ID, rID, info, "", size)
 	if err != nil {
 		return
 	}
