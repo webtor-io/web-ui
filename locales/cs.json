@@ -2365,5 +2365,8 @@
     "embed.off.link": "serveru Webtor",
     "embed.unauthorized.title": "Tento přehrávač není na tomto webu povolen",
     "embed.unauthorized.text": "Je to váš web? Přidejte jeho doménu ve {{.Link}}.",
-    "embed.unauthorized.link": "svém profilu na serveru Webtor"
+    "embed.unauthorized.link": "svém profilu na serveru Webtor",
+    "embed.private.title": "Tento torrent se tady nepřehraje",
+    "embed.private.text": "Je to soukromý torrent: přehraje se jen přihlášenému uživateli, který ho přidal se svým vlastním trackerem. {{.Link}}",
+    "embed.private.link": "Otevřít ho na serveru Webtor"
 }

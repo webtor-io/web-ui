@@ -1,6 +1,7 @@
-// Package private_torrent counts the private torrents (BEP 27, private=1 in
-// the info dict) that come into the store through web-ui. A measurement
-// only: it changes nothing about the upload. See docs/private_torrent_logs.md.
+// Package private_torrent tells a private torrent (BEP 27, private=1 in the
+// info dict) and counts the ones that come into the store through web-ui.
+// The count is a measurement only: it changes nothing about the upload. See
+// docs/private_torrent_logs.md.
 package private_torrent
 
 import (
@@ -24,12 +25,8 @@ import (
 // passkey is in the rest of its URL (?passkey=, ?pk=, a path segment), and
 // userinfo is dropped with it.
 func LogUpload(torrent []byte, u *auth.User, source string) {
-	mi, err := metainfo.Load(bytes.NewReader(torrent))
-	if err != nil {
-		return
-	}
-	info, err := mi.UnmarshalInfo()
-	if err != nil || info.Private == nil || !*info.Private {
+	mi := loadPrivate(torrent)
+	if mi == nil {
 		return
 	}
 	user := "anon"
@@ -45,6 +42,26 @@ func LogUpload(torrent []byte, u *auth.User, source string) {
 		"trackers": strings.Join(trackerHosts(mi.UpvertedAnnounceList().DistinctValues()), ","),
 		"source":   source,
 	}).Info("private torrent upload")
+}
+
+// IsPrivate reports whether torrent is a .torrent with private=1 in its info
+// dict. Anything that does not parse is not.
+func IsPrivate(torrent []byte) bool {
+	return loadPrivate(torrent) != nil
+}
+
+// loadPrivate is torrent's metainfo when it is a private .torrent, nil
+// otherwise.
+func loadPrivate(torrent []byte) *metainfo.MetaInfo {
+	mi, err := metainfo.Load(bytes.NewReader(torrent))
+	if err != nil {
+		return nil
+	}
+	info, err := mi.UnmarshalInfo()
+	if err != nil || info.Private == nil || !*info.Private {
+		return nil
+	}
+	return mi
 }
 
 // trackerHosts is each tracker's scheme://host[:port], lower-cased, once,

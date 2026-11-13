@@ -2477,5 +2477,9 @@
     "@embed.unauthorized.title": "Shown inside an iframe on another website whose domain is not on this Webtor server's allowed embed domains. embed.unauthorized.link is the link text inside embed.unauthorized.text (the profile page of this server) and must fit its grammar.",
     "embed.unauthorized.title": "This player is not allowed on this website",
     "embed.unauthorized.text": "Own this website? Add its domain in {{.Link}}.",
-    "embed.unauthorized.link": "your profile on the Webtor server"
+    "embed.unauthorized.link": "your profile on the Webtor server",
+    "@embed.private.title": "Shown inside an iframe on another website when its torrent is a private one (private=1): the embed never plays it, since a private torrent plays only for the signed-in user who added it with their own tracker. embed.private.link is the link text inside embed.private.text (this torrent's page on this Webtor server) and must fit its grammar.",
+    "embed.private.title": "This torrent does not play here",
+    "embed.private.text": "It is a private torrent: it plays only for a signed-in user who added it with their own tracker. {{.Link}}",
+    "embed.private.link": "Open it on the Webtor server"
 }

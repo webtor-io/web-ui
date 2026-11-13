@@ -2325,5 +2325,8 @@
     "embed.off.link": "servidor Webtor",
     "embed.unauthorized.title": "Este reproductor no está permitido en este sitio web",
     "embed.unauthorized.text": "¿Es tu sitio web? Añade su dominio en {{.Link}}.",
-    "embed.unauthorized.link": "tu perfil del servidor Webtor"
+    "embed.unauthorized.link": "tu perfil del servidor Webtor",
+    "embed.private.title": "Este torrent no se reproduce aquí",
+    "embed.private.text": "Es un torrent privado: solo se reproduce para un usuario con sesión iniciada que lo añadió con su propio tracker. {{.Link}}",
+    "embed.private.link": "Ábrelo en el servidor Webtor"
 }

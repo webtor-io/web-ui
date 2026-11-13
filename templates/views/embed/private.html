@@ -1,0 +1,9 @@
+<div class="flex flex-col items-center justify-center h-full text-center p-6 text-base-content/80">
+    <p class="text-lg font-semibold mb-2">
+        {{ t .Lang "embed.private.title" }}
+    </p>
+    <p class="text-sm">
+        {{/* This server's page of the torrent (.Data is its infohash): there it plays for a signed-in user who added it with their own tracker. */}}
+        {{ tpHTML .Lang "embed.private.text" "Link" (printf "<a href=\"%s/%s\" class=\"link link-primary\" target=\"_blank\" rel=\"noopener\">%s</a>" domain .Data (t .Lang "embed.private.link")) }}
+    </p>
+</div>

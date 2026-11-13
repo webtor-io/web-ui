@@ -18,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -152,13 +153,28 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 	if err != nil {
 		return
 	}
-	ls, _, err := Load(s.api, s.i18n, s.c, args)
+	ls, hash, err := Load(s.api, s.i18n, s.c, args)
 	if err != nil {
 		return err
 	}
+	// An embed never has uid, so rest-api could only refuse a private torrent
+	// with "sign in". It gets its own card instead, and a private .torrent
+	// does not reach rest-api from here at all; Load has counted it.
+	if args.File != nil && private_torrent.IsPrivate(args.File) {
+		return s.renderPrivate(j, hash)
+	}
 	err = ls.Run(ctx, j)
+	// Until rest-api names its reasons (part B), any 422 to the magnet is
+	// this card.
+	var me *MagnetError
+	if errors.As(err, &me) && me.Kind == "private" {
+		return s.renderPrivate(j, hash)
+	}
 	if err != nil {
 		return err
+	}
+	if j.Context.Value("respPrivate") == true {
+		return s.renderPrivate(j, hash)
 	}
 	id := j.Context.Value("respID").(string)
 	i, err := s.getBestItem(ctx, j, id, s.settings)
@@ -191,6 +207,18 @@ func (s *EmbedScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return err
 	}
 	return
+}
+
+// renderPrivate is the embed's answer to a private torrent: its card, with
+// a link to this server's page of hash.
+func (s *EmbedScript) renderPrivate(j *job.Job, hash string) error {
+	privateTemplate := "embed/private"
+	str, err := s.tb.Build(privateTemplate).ToString(s.c.WithData(hash))
+	if err != nil {
+		return err
+	}
+	j.RenderTemplate("rendering private", privateTemplate, strings.TrimSpace(str))
+	return nil
 }
 
 func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, settings *models.EmbedSettings) (i *ra.ListItem, err error) {

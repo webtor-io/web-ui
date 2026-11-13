@@ -2325,5 +2325,8 @@
     "embed.off.link": "Webtor-Server",
     "embed.unauthorized.title": "Dieser Player ist auf dieser Website nicht erlaubt",
     "embed.unauthorized.text": "Ist das deine Website? Füge ihre Domain in {{.Link}} hinzu.",
-    "embed.unauthorized.link": "deinem Profil auf dem Webtor-Server"
+    "embed.unauthorized.link": "deinem Profil auf dem Webtor-Server",
+    "embed.private.title": "Dieser Torrent wird hier nicht abgespielt",
+    "embed.private.text": "Es ist ein privater Torrent: Er wird nur für angemeldete Nutzer abgespielt, die ihn mit ihrem eigenen Tracker hinzugefügt haben. {{.Link}}",
+    "embed.private.link": "Auf dem Webtor-Server öffnen"
 }

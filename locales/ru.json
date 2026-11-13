@@ -2365,5 +2365,8 @@
     "embed.off.link": "серверу Webtor",
     "embed.unauthorized.title": "Этот плеер не разрешён на этом сайте",
     "embed.unauthorized.text": "Это ваш сайт? Добавьте его домен в {{.Link}}.",
-    "embed.unauthorized.link": "профиле на сервере Webtor"
+    "embed.unauthorized.link": "профиле на сервере Webtor",
+    "embed.private.title": "Этот торрент здесь не воспроизводится",
+    "embed.private.text": "Это приватный торрент: он воспроизводится только у вошедшего пользователя, который добавил его со своим трекером. {{.Link}}",
+    "embed.private.link": "Открыть его на сервере Webtor"
 }
