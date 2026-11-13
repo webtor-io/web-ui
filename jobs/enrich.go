@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Jobs) Enrich(c *web.Context, rID string) (j *job.Job, err error) {
-	es, hash := scripts.Enrich(s.enricher, c, rID)
+	es, hash := scripts.Enrich(s.enricher, rID)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	j = s.q.GetOrCreate("enrich").Enqueue(ctx, cancel, hash, job.NewScript(func(j *job.Job) (err error) {
 		return es.Run(ctx, j)

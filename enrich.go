@@ -363,7 +363,7 @@ func enrich(c *cli.Context) error {
 		for _, h := range hashes {
 			h := h // capture
 			g.Go(func() error {
-				if mdErr := en.EnsureResourceMetadata(gctx, h, &api.Claims{}); mdErr != nil {
+				if mdErr := en.EnsureResourceMetadata(gctx, h); mdErr != nil {
 					failed.Add(1)
 					log.WithError(mdErr).WithField("hash", h).
 						Warn("metadata-only backfill: classify failed")
@@ -411,7 +411,7 @@ func enrich(c *cli.Context) error {
 		return err
 	}
 	for _, resource := range resources {
-		err = en.Enrich(ctx, resource.ResourceID, &api.Claims{}, force, "")
+		err = en.Enrich(ctx, resource.ResourceID, force, "")
 		if err != nil {
 			return err
 		}
