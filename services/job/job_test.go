@@ -290,3 +290,20 @@ func TestRun_CountsARunTheStoreRefused(t *testing.T) {
 		t.Fatalf("an observer was counted as a run: %v", got)
 	}
 }
+
+// rest-api refusing a private torrent (403 or 422 with a code) is a decision
+// about this torrent, like the stoplist, not a failed run: counted as error it
+// would raise WebUIJobFailures on the night private access is switched on.
+// A check that did not answer (503) or hit its limit (429) is still a failure.
+func TestPrivateRefusalIsRejected(t *testing.T) {
+	for err, want := range map[error]string{
+		&api.PrivateError{Status: 403, Code: "private_torrent"}:                                             metrics.JobRejected,
+		pkgerrors.Wrap(&api.PrivateError{Status: 422, Code: "private_no_tracker"}, "failed to upload file"): metrics.JobRejected,
+		&api.PrivateError{Status: 503, Code: "private_verify_unavailable"}:                                  metrics.JobError,
+		&api.PrivateError{Status: 429, Code: "rate_limited"}:                                                metrics.JobError,
+	} {
+		if got := outcomeOf(err); got != want {
+			t.Errorf("outcomeOf(%v) = %s, want %s", err, got, want)
+		}
+	}
+}

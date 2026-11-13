@@ -66,9 +66,10 @@ value would be a series kept for the life of the process.
   `other`. Both are bounded inside `metrics.TrialShortlink`, which takes the
   raw query values — at most 3 × 3 × 11 = 99 series. A new surface is a new
   entry in `offer.TrialFroms`, never a value passed through.
-- `rejected` is a torrent-store stoplist block — working as intended, so an
+- `rejected` is a torrent-store stoplist block, or rest-api's refusal of a
+  private torrent (403 or 422 with a code) — working as intended, so an
   error-rate alert on `outcome="error"` does not fire on a burst of blocked
-  hashes.
+  hashes or refused private torrents.
 
 ### What is deliberately not measured
 

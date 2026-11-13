@@ -37,6 +37,14 @@ func ClassifyError(err error) string {
 		return ue.Key
 	}
 
+	// rest-api's coded refusal of a private torrent: by type, above the text
+	// below, where its English ("access is forbidden") and a gRPC-shaped
+	// wrapper ("PermissionDenied") would read as a rights-holder block.
+	var pe *api.PrivateError
+	if errors.As(err, &pe) {
+		return privateErrKey(pe)
+	}
+
 	// A session the transcoder refused because of the video route it took:
 	// by identity, and only where the route is the cause (routeRefusalKey).
 	// Everything else -- a transcoder that names no reason, a start without
@@ -205,6 +213,40 @@ func ClassifyError(err error) string {
 	}
 }
 
+// privateErrKey is the text of rest-api's refusal of a private torrent
+// (docs/user_errors.md, "Streaming-chain classes"). Every class of a tracker's
+// refusal reads one text, too many trackers reads "no usable tracker", and a
+// private .torrent file reads "not available" (S28): the code and reason
+// still reach the JSON API as they are.
+func privateErrKey(pe *api.PrivateError) string {
+	switch pe.Code {
+	case api.CodePrivateTorrent:
+		switch pe.Reason {
+		case api.ReasonSignIn:
+			return "error.private_sign_in"
+		case api.ReasonNoRecord:
+			return "error.private_no_record"
+		}
+		// token_in_query: web-ui never sends ?token= to rest-api.
+		return "error.generic"
+	case api.CodePrivateTorrentFile, api.CodePrivateUnavailable:
+		return "error.private.unavailable"
+	case api.CodePrivateNeedsAccount:
+		return "error.private_needs_account"
+	case api.CodePrivateNoTracker, api.CodePrivateTooManyTrackers:
+		return "error.private_no_tracker"
+	case api.CodePrivateMagnet:
+		return "error.private_magnet"
+	case api.CodePrivateTrackerRefused:
+		return "error.private_tracker_refused"
+	case api.CodePrivateVerifyUnavailable, api.CodeRateLimited:
+		return "error.private_verify_unavailable"
+	case api.CodeStoreOutdated:
+		return "error.service_unavailable"
+	}
+	return "error.generic"
+}
+
 // ErrArgs are the numbers a user-facing message quotes, for the one key that
 // has any: error.hash_length says how many characters were pasted (Count,
 // which also picks the plural form) and how many a full infohash has (Full).
@@ -229,14 +271,19 @@ func ErrArgsOf(err error) *ErrArgs {
 // retry-able rather than a hard error.
 func StatusForErrKey(key string) int {
 	switch key {
-	case "error.forbidden", "error.access_denied":
+	case "error.forbidden", "error.access_denied",
+		"error.private_sign_in", "error.private_no_record", "error.private.unavailable",
+		"error.vault_private_no_record":
 		return http.StatusForbidden
+	case "error.private_needs_account", "error.private_no_tracker", "error.private_magnet",
+		"error.private_tracker_refused":
+		return http.StatusUnprocessableEntity
 	case "error.not_found":
 		return http.StatusNotFound
 	case "error.unauthorized":
 		return http.StatusUnauthorized
 	case "error.service_unavailable", "error.upstream_unavailable",
-		"error.video_route.source_check_failed":
+		"error.video_route.source_check_failed", "error.private_verify_unavailable":
 		return http.StatusServiceUnavailable
 	case "error.magnet_invalid", "error.turnstile_failed",
 		"error.free_text", "error.webpage_url", "error.torrent_url", "error.v2_hash",

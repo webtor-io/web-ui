@@ -398,14 +398,16 @@ func (s *Job) formatError(err error) string {
 
 // isStoplistBlock reports whether err is a torrent-store stoplist rejection
 // (gRPC PermissionDenied with "found in stoplist" message, or rest-api's 403
-// for it, api.ErrForbidden, whose body the client drops). These are working-
-// as-intended CSAM blocks, not real errors — they bypass the "got job error"
-// log path to keep error counters meaningful.
+// for it, api.ErrForbidden, whose body the client drops), or rest-api's
+// refusal of a private torrent (api.IsPrivateRefusal: 403 or 422 with a
+// code). These are working-as-intended decisions, not real errors — they
+// bypass the "got job error" log path to keep error counters meaningful.
 func isStoplistBlock(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, api.ErrForbidden) || strings.Contains(err.Error(), "found in stoplist")
+	return errors.Is(err, api.ErrForbidden) || strings.Contains(err.Error(), "found in stoplist") ||
+		api.IsPrivateRefusal(err)
 }
 
 func (s *Job) Error(err error) error {
