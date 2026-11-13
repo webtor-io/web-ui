@@ -41,7 +41,7 @@ require (
 	github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
 	github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a
-	github.com/webtor-io/rest-api v1.0.1-0.20261113112901-269b6c15ddc5
+	github.com/webtor-io/rest-api v1.0.1-0.20261113162932-c681c05d6c8d
 	github.com/yargevad/filepathx v1.0.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.45.0
