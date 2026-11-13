@@ -2,6 +2,7 @@ package resource
 
 import (
 	"bytes"
+	"html"
 	"html/template"
 	"strings"
 	"testing"
@@ -200,5 +201,49 @@ func TestVaultFreezeLinesInEveryLocale(t *testing.T) {
 				t.Errorf("%s %s: the amount is not in %q", lang, name, line)
 			}
 		}
+	}
+}
+
+// A private torrent's Save to Vault: before enforce the pledge is closed --
+// it says so, offers no Store button and counts the refusal; once open, the
+// Store button comes with the warning and nothing is counted (S29). A pledge
+// refused for want of the user's own record counts that refusal after the
+// redirect. A public torrent gets none of it.
+func TestPledgeModalPrivate(t *testing.T) {
+	tpl := vaultModal(t)
+	warning := html.EscapeString("Saving downloads the whole torrent under your tracker account, and Webtor doesn't check your tracker's hit-and-run rules.")
+	closed := html.EscapeString("This isn't available for private torrents on this server.")
+	noRecord := html.EscapeString("To save this private torrent to Vault, first upload your own .torrent file of it from your tracker.")
+	const refused = `data-umami-impression="vault-private-refused-shown"`
+
+	open := addForm(f64(250))
+	open.Private = true
+	out := renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: open})
+	if !strings.Contains(out, warning) || !strings.Contains(out, storeForm) {
+		t.Errorf("open: want the warning and the Store button:\n%s", out)
+	}
+	if strings.Contains(out, closed) || strings.Contains(out, refused) || strings.Contains(out, "vault-private-warning-shown") {
+		t.Errorf("open: no refusal and no warning event (S29):\n%s", out)
+	}
+
+	shut := addForm(f64(250))
+	shut.Private, shut.PrivateClosed = true, true
+	out = renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: shut})
+	if !strings.Contains(out, closed) || !strings.Contains(out, refused+` data-umami-impression-code="private_unavailable">`) {
+		t.Errorf("closed: want error.private.unavailable and its refusal event:\n%s", out)
+	}
+	if strings.Contains(out, storeForm) || strings.Contains(out, warning) {
+		t.Errorf("closed: no Store button and no warning:\n%s", out)
+	}
+
+	out = renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{
+		Status: "error", ErrKey: "error.vault_private_no_record", Private: true, ResourceID: intentHash}})
+	if !strings.Contains(out, noRecord) || !strings.Contains(out, refused+` data-umami-impression-code="private_torrent" data-umami-impression-reason="no_record"`) {
+		t.Errorf("no record: want its text and its refusal event:\n%s", out)
+	}
+
+	out = renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: addForm(f64(250))})
+	if strings.Contains(out, warning) || strings.Contains(out, closed) || strings.Contains(out, refused) || !strings.Contains(out, storeForm) {
+		t.Errorf("public: want the Store button and nothing private:\n%s", out)
 	}
 }

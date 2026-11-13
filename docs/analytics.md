@@ -100,6 +100,17 @@ data and no tracker:
 `TestPrivateRefusalPartialRenders` pins both; `lib/privateRefusal.test.js`
 pins the full-load order.
 
+The Save to Vault modal counts its own refusals of a private pledge, the same
+way (`data-umami-impression`, `app/private_refusal.js`):
+
+- `vault-private-refused-shown` `{code, reason}`: `{code: private_unavailable}`
+  when the modal opens on a private torrent before private pledges are open on
+  the server (`PRIVATE_ACCESS_ENFORCE` off: the text says so, there is no Store
+  button); `{code: private_torrent, reason: no_record}` when a pledge came back
+  refused because the user never added the torrent with their own tracker. The
+  warning shown above the Store button once private pledges are open is not
+  counted. `TestPledgeModalPrivate` pins all three.
+
 ## On every event and identify call
 
 `eventDefaults()` is merged into the data of every `umami.track` and

@@ -64,6 +64,7 @@ func (s *Handler) getVault(c *gin.Context) {
 //	@Failure		403		{object}	libapi.ErrorResponse	"Not enough Vault Points"
 //	@Failure		404		{object}	libapi.ErrorResponse	"No such resource"
 //	@Failure		409		{object}	libapi.ErrorResponse	"A pledge for this resource already exists"
+//	@Failure		422		{object}	libapi.ErrorResponse	"A private torrent refused: code `private_torrent` with `reason` `no_record` (store its .torrent file with your own tracker first) or `private_unavailable` (private pledges are not open on this deployment)"
 //	@Failure		503		{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
 //	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/vault/pledges [post]
@@ -208,11 +209,8 @@ func (s *Handler) createPledge(ctx context.Context, resourceID string, u *auth.U
 		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to get claims", nil)
 	}
 	res, err := s.vault.GetOrCreateResource(ctx, cl, resourceID)
-	if errors.Is(err, vault.ErrResourceNotFound) {
-		return nil, notFound("no such resource")
-	}
 	if err != nil {
-		return nil, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to resolve the resource", err)
+		return nil, pledgeError(err)
 	}
 	existing, err := s.vault.GetPledge(ctx, u, res)
 	if err != nil {
@@ -239,6 +237,24 @@ func (s *Handler) createPledge(ctx context.Context, resourceID string, u *auth.U
 	}
 	out := libapi.NewPledge(p, res, frozen)
 	return &out, nil
+}
+
+// pledgeError answers a pledge GetOrCreateResource refused: a private torrent
+// without the user's own record is 422 private_torrent / no_record; any other
+// rest-api code passes as it came (422 private_unavailable before private
+// pledges are enforced).
+func pledgeError(err error) *libapi.Error {
+	var pe *api.PrivateError
+	switch {
+	case errors.Is(err, vault.ErrPrivateNoRecord):
+		return &libapi.Error{Status: http.StatusUnprocessableEntity, Code: api.CodePrivateTorrent, Reason: api.ReasonNoRecord,
+			Message: "private torrent: upload your own .torrent file of it before saving it to Vault", Err: err}
+	case errors.As(err, &pe):
+		return upstreamError(err, "")
+	case errors.Is(err, vault.ErrResourceNotFound):
+		return notFound("no such resource")
+	}
+	return libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to resolve the resource", err)
 }
 
 func (s *Handler) removePledge(ctx context.Context, resourceID string, u *auth.User) *libapi.Error {

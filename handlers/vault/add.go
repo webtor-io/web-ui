@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -43,7 +44,7 @@ func (h *Handler) createPledge(ctx context.Context, resourceID string, user *aut
 	// Get or create resource
 	resource, err := h.vault.GetOrCreateResource(ctx, apiClaims, resourceID)
 	if err != nil {
-		return err
+		return pledgeErr(err)
 	}
 
 	// Create pledge
@@ -53,4 +54,14 @@ func (h *Handler) createPledge(ctx context.Context, resourceID string, user *aut
 	}
 
 	return nil
+}
+
+// pledgeErr gives a pledge refused for want of the user's own record its
+// text. A *api.PrivateError reaches ClassifyError as it is: private pledges
+// not open yet read as error.private.unavailable.
+func pledgeErr(err error) error {
+	if errors.Is(err, vault.ErrPrivateNoRecord) {
+		return web.NewUserError("error.vault_private_no_record", err)
+	}
+	return err
 }

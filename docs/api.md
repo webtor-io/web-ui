@@ -149,14 +149,14 @@ it; a client that does not know a reason acts on the code alone.
 | `not_found` | 404 | No such resource, file or library entry |
 | `conflict` | 409 | Pledge already exists, or is still frozen |
 | `bad_request` | 400 | Malformed body or query |
-| `private_torrent` | 403 | A private torrent you may not use. `reason`: `sign_in` (only a signed-in user who added it with their own tracker can play it), `no_record` (you have not added it with your own tracker: store its `.torrent` or a magnet with your tracker), `token_in_query` |
+| `private_torrent` | 403 / 422 | A private torrent you may not use. `reason`: `sign_in` (only a signed-in user who added it with their own tracker can play it), `no_record` (you have not added it with your own tracker: store its `.torrent` or a magnet with your tracker), `token_in_query`. `POST /vault/pledges` answers it 422 with `no_record` |
 | `private_torrent_file` | 403 | A private torrent's `.torrent` is never served, not even to a user who may play it |
 | `private_needs_account` | 422 | Only an account can store a private torrent |
 | `private_no_tracker` | 422 | The private torrent names no usable tracker |
 | `private_too_many_trackers` | 422 | The private torrent names too many tracker URLs |
 | `private_magnet` | 422 | `POST /resource` with a magnet without a tracker (no `tr=`) of a private torrent that is not stored yet: send its `.torrent` file, or a magnet that includes the tracker. Nothing was stored; the same magnet gets the same answer. A magnet with `tr=` of a private torrent is stored as usual |
 | `private_tracker_refused` | 422 | Your tracker refused the key in your magnet. `reason` is the class of the refusal: `key`, `account`, `unregistered`, `client`, `other` |
-| `private_unavailable` | 422 / 403 | This deployment does not serve private torrents: 422 on store, 403 on access |
+| `private_unavailable` | 422 / 403 | This deployment does not serve private torrents: 422 on store, 403 on access. `POST /vault/pledges` answers it 422 while pledges on private torrents are not open on this deployment |
 | `private_verify_unavailable` | 503 | Your tracker could not be asked now; `Retry-After` says when to try again |
 | `store_outdated` | 503 | Private torrents cannot be checked right now; try again later |
 | `rate_limited` | 429 | Too many requests with this key, or rest-api's limit on tracker checks; `Retry-After` says how long to wait |

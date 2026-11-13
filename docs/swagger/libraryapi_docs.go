@@ -1150,6 +1150,12 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "422": {
+                        "description": "A private torrent refused: code ` + "`" + `private_torrent` + "`" + ` with ` + "`" + `reason` + "`" + ` ` + "`" + `no_record` + "`" + ` (store its .torrent file with your own tracker first) or ` + "`" + `private_unavailable` + "`" + ` (private pledges are not open on this deployment)",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
                         "schema": {

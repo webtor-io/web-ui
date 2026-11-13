@@ -391,7 +391,7 @@ func (s *Handler) get(c *gin.Context) {
 		} else {
 			d.VaultButton = vaultButton
 			if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
-				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
+				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, d.Resource.Private)
 				if err != nil {
 					_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
 					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
