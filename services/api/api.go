@@ -320,6 +320,7 @@ type Api struct {
 	torrentHTTPProxyHost        string
 	torrentHTTPProxyPort        int
 	secret                      string
+	rapidAPI                    bool // rest-api is reached through RapidAPI: no /internal/ there
 }
 
 type ListResourceContentOutputType string
@@ -391,8 +392,10 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		r.Header.Set("X-Api-Key", key)
 		return r, nil
 	}
-	if rapidApiHost != "" && rapidApiKey != "" {
+	rapidAPI := rapidApiHost != "" && rapidApiKey != ""
+	if rapidAPI {
 		log.Info("using RapidAPI")
+		log.Info("private trackers: export and account-deletion cleanup are off: rest-api is reached through RapidAPI")
 		prepareRequest = func(r *http.Request, cl *Claims) (*http.Request, error) {
 			r.Header.Set("X-RapidAPI-Host", rapidApiHost)
 			r.Header.Set("X-RapidAPI-Key", rapidApiKey)
@@ -420,6 +423,7 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		torrentHTTPProxyHost:        c.String(torrentHTTPProxyHostFlag),
 		torrentHTTPProxyPort:        c.Int(torrentHTTPProxyPortFlag),
 		secret:                      secret,
+		rapidAPI:                    rapidAPI,
 	}
 }
 
