@@ -288,7 +288,22 @@ type Claims struct {
 	// Rules ride inside the X-Token header to rest-api, which copies the
 	// header verbatim into the ?token= of every signed export URL. THP
 	// then reads them off the segment-request token. See docs/grace_token.md.
-	Rules []Rule `json:"rules,omitempty"`
+	Rules    []Rule `json:"rules,omitempty"`
+	Uid      string `json:"uid,omitempty"`      // sha1(user_id) of the signed-in user; set only by Api.RegisterHandler
+	Internal bool   `json:"internal,omitempty"` // web-ui's server-side reads without a user
+}
+
+// InternalClaims are the claims of web-ui's own server-side reads, made for
+// no user: no uid, domain or session. Internal is a claim of its own, not a
+// role -- role is the tier. It expires in an hour, so a token carrying it is
+// never valid for good.
+func InternalClaims() *Claims {
+	return &Claims{
+		Internal: true,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
 }
 
 type Api struct {
@@ -1394,6 +1409,12 @@ func (s *Api) RegisterHandler(r *gin.Engine) {
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
+		}
+		// Here and not in MakeClaimsFromContext: the embed goes through
+		// that too, with the embedding domain owner's claims, and must
+		// never carry the viewer's uid.
+		if u := auth.GetUserFromContext(c); u.HasAuth() {
+			GetClaimsFromContext(c).Uid = GenerateSessionIDFromUser(u)
 		}
 		c.Next()
 	})
