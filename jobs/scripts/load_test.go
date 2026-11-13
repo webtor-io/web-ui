@@ -15,6 +15,7 @@ import (
 
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/golang-jwt/jwt/v5"
 	log "github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
@@ -62,21 +63,7 @@ func TestStoreQueryRefusal(t *testing.T) {
 				}
 			}))
 			defer srv.Close()
-			u, _ := url.Parse(srv.URL)
-			fs := flag.NewFlagSet("test", flag.ContinueOnError)
-			for _, f := range api.RegisterFlags(nil) {
-				f.Apply(fs)
-			}
-			if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
-				"--webtor-secret=test", "--rapidapi-host="}); err != nil {
-				t.Fatal(err)
-			}
-			s := &LoadScript{
-				api:  api.New(cli.NewContext(cli.NewApp(), fs, nil), srv.Client()),
-				i18n: i18n.New(os.DirFS("../../locales")),
-				c:    &web.Context{Lang: "en", ApiClaims: &api.Claims{}},
-				args: &LoadArgs{},
-			}
+			s := testLoadScript(t, srv, &api.Claims{})
 			j := job.New(context.Background(), "t", "test", nil, &job.NilStorage{}, false, nil)
 
 			_, err := s.storeQuery(context.Background(), j, "magnet:?xt=urn:btih:"+hash)
@@ -98,6 +85,100 @@ func TestStoreQueryRefusal(t *testing.T) {
 			}
 			if got := web.ClassifyError(err); got != tc.key {
 				t.Fatalf("ClassifyError(%q)=%s, want %s", err, got, tc.key)
+			}
+		})
+	}
+}
+
+// testLoadScript is a LoadScript for a user with claims c, talking to srv as
+// its rest-api; tokens are signed with the secret "test".
+func testLoadScript(t *testing.T, srv *httptest.Server, c *api.Claims) *LoadScript {
+	t.Helper()
+	u, _ := url.Parse(srv.URL)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range api.RegisterFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
+		"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+		t.Fatal(err)
+	}
+	return &LoadScript{
+		api:  api.New(cli.NewContext(cli.NewApp(), fs, nil), srv.Client()),
+		i18n: i18n.New(os.DirFS("../../locales")),
+		c:    &web.Context{Lang: "en", ApiClaims: c},
+		args: &LoadArgs{},
+	}
+}
+
+// The lookup that decides "new or known" is the shared run's, so it reads as
+// internal; only the store of a user's own magnet carries the user. A known
+// private torrent still gets the magnet with tr= stored: that is how the
+// user's own tracker reaches rest-api. A rest-api without the private field
+// (before phase 1) reads as public: no POST, as before.
+func TestStoreQueryLooksUpAsInternal(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	const uid = "89abcdef0123456789abcdef0123456789abcdef"
+	withTr := "magnet:?xt=urn:btih:" + hash + "&tr=http%3A%2F%2Ftracker.example%2Fannounce"
+	bare := "magnet:?xt=urn:btih:" + hash
+	cases := []struct {
+		name, query string
+		get         string // the GET's body; empty is a 404
+		post        bool
+		private     bool
+	}{
+		{name: "unknown, tr=", query: withTr, post: true},
+		{name: "known public, tr=", query: withTr, get: `{"id":"` + hash + `","private":false}`},
+		{name: "known private, tr=", query: withTr, get: `{"id":"` + hash + `","private":true}`, post: true, private: true},
+		{name: "known private, bare", query: bare, get: `{"id":"` + hash + `","private":true}`, private: true},
+		{name: "rest-api before phase 1", query: withTr, get: `{"id":"` + hash + `"}`},
+	}
+	claimsOf := func(t *testing.T, r *http.Request) jwt.MapClaims {
+		p, err := jwt.Parse(r.Header.Get("X-Token"), func(*jwt.Token) (interface{}, error) { return []byte("test"), nil })
+		if err != nil || !p.Valid {
+			t.Errorf("X-Token did not validate: %v", err)
+			return jwt.MapClaims{}
+		}
+		return p.Claims.(jwt.MapClaims)
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			posted := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/resource/"+hash:
+					if cl := claimsOf(t, r); cl["internal"] != true || cl["uid"] != nil {
+						t.Errorf("GET claims %v, want internal and no uid", cl)
+					}
+					if tc.get == "" {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					_, _ = w.Write([]byte(tc.get))
+				case r.Method == http.MethodPost && r.URL.Path == "/resource":
+					posted = true
+					if cl := claimsOf(t, r); cl["uid"] != uid || cl["internal"] != nil {
+						t.Errorf("POST claims %v, want uid and no internal", cl)
+					}
+					_, _ = w.Write([]byte(`{"id":"` + hash + `"}`))
+				default:
+					t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
+					w.WriteHeader(http.StatusTeapot)
+				}
+			}))
+			defer srv.Close()
+			s := testLoadScript(t, srv, &api.Claims{Uid: uid})
+			j := job.New(context.Background(), "t", "test", nil, &job.NilStorage{}, false, nil)
+
+			res, err := s.storeQuery(context.Background(), j, tc.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if posted != tc.post {
+				t.Errorf("POST /resource: %v, want %v", posted, tc.post)
+			}
+			if res == nil || res.ID != hash || res.Private != tc.private {
+				t.Errorf("res %+v, want id %s private %v", res, hash, tc.private)
 			}
 		})
 	}

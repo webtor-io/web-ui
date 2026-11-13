@@ -153,6 +153,26 @@ func ResolveQueryHash(query string) (hash string, magnet string, err error) {
 	return "", "", ErrQueryFreeText
 }
 
+// QueryHasTrackers reports whether query, as ResolveQueryHash reads it, is a
+// magnet with at least one tracker: a tr= value that is not blank. A bare
+// hash, "&tr=" and "&tr=%20" carry none (the library keeps empty values).
+func QueryHasTrackers(query string) bool {
+	_, magnet, err := ResolveQueryHash(query)
+	if err != nil {
+		return false
+	}
+	m, err := metainfo.ParseMagnetV2Uri(magnet)
+	if err != nil {
+		return false
+	}
+	for _, tr := range m.Trackers {
+		if strings.TrimSpace(tr) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // resolveMagnetIn resolves magnet m, found in query. A magnet that does not
 // parse is not given up on while the person's intent is still readable:
 //

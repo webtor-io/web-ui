@@ -432,6 +432,26 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *r
 	return
 }
 
+// Resource is rest-api's resource with the private flag, which the rest-api
+// module web-ui builds against does not know yet. A rest-api without the
+// field reads as public: it has no private access rule either.
+type Resource struct {
+	ra.ResourceResponse
+	Private bool `json:"private"`
+}
+
+// LookupResource is GetResource with the private flag: nil, nil on 404,
+// ErrForbidden on 403.
+func (s *Api) LookupResource(ctx context.Context, c *Claims, infohash string) (e *Resource, err error) {
+	u := s.url + "/resource/" + infohash
+	e = &Resource{}
+	err = s.doRequest(ctx, c, u, "GET", nil, e)
+	if e.ID == "" {
+		e = nil
+	}
+	return
+}
+
 // errResourceNotFound carries rest-api's 404 out of resourcesCache, which
 // keeps only successes: a cached miss would keep a hash stored a moment later
 // unknown for the whole minute (an API client stores, then pledges).
