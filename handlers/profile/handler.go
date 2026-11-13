@@ -341,9 +341,40 @@ var deleteUser = func(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
 	return models.DeleteUser(ctx, db, userID)
 }
 
+// deletePrivateRecords deletes the private tracker records of the account
+// with site uid through rest-api's internal endpoint.
+var deletePrivateRecords = func(ctx context.Context, a *api.Api, uid string) error {
+	_, err := a.DeletePrivateTrackers(ctx, uid)
+	return err
+}
+
+// forgetVaultPledger takes the account off Vault's pledger list of every
+// private resource it pledged to; nothing to do without Vault.
+var forgetVaultPledger = func(ctx context.Context, v *vault.Vault, userID uuid.UUID) error {
+	if v == nil {
+		return nil
+	}
+	return v.ForgetUser(ctx, userID)
+}
+
 func (s *Handler) delete(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
+	ctx := c.Request.Context()
+	// The private tracker records and the uid on Vault's pledger lists go
+	// first, while the session and the account are still there to try again
+	// from: once the row is gone, nothing deletes them. Either failing stops
+	// the deletion. The log names the account by its hash, never by uid.
+	if err := deletePrivateRecords(ctx, s.restAPI, api.GenerateSessionIDFromUser(u)); err != nil {
+		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to delete private tracker records")
+		web.RedirectWithError(c, web.NewUserError("error.generic", err))
+		return
+	}
+	if err := forgetVaultPledger(ctx, s.vault, u.ID); err != nil {
+		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to take the account off vault pledger lists")
+		web.RedirectWithError(c, web.NewUserError("error.generic", err))
+		return
+	}
 	// End the session before the row goes: the /logout this redirects to
 	// still carried it, and the auth middleware resolved it by email into a
 	// fresh empty account -- deleting an account recreated it at once.
@@ -351,7 +382,7 @@ func (s *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	if err := deleteUser(c.Request.Context(), db, u.ID); err != nil {
+	if err := deleteUser(ctx, db, u.ID); err != nil {
 		web.RedirectWithError(c, err)
 		return
 	}
