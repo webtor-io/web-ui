@@ -1,0 +1,12 @@
+{{/* The resource page when rest-api refuses a private torrent (403 with a
+     code, handlers/resource/get.go privateRefusal). Its title is the
+     refusal's, not the torrent's: rest-api gave no name.
+     .Data = *web.PrivateRefusal. */}}
+{{ define "title" }}{{ t $.Lang "private.page.title" }}{{ end }}
+{{ define "main" }}
+<section class="min-h-[70vh] pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+    <div class="max-w-[680px] mx-auto">
+        {{ template "private/refusal" . }}
+    </div>
+</section>
+{{ end }}

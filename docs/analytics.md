@@ -75,6 +75,23 @@ sends kind and timing, `magnet-private-shown` and `magnet-private-upload` the
 name alone (`TestMagnetErrorCardRenders` pins both), and the page they fire on
 is cut as above.
 
+## Private torrent refusals
+
+rest-api's refusal of a private torrent is shown by one partial
+(`partials/private/refusal`): on the resource page (`views/resource/private`,
+a 403 from rest-api) and in the load job's card. Its events carry no user
+data and no tracker:
+
+- `private-refused-shown` `{code, reason}`: any refusal shown, with
+  rest-api's code and reason as they came (`private_torrent` / `sign_in`,
+  `private_tracker_refused` / `key`, …). One event for every case: there is
+  no separate event per way out (sign in, upload).
+- `private-reupload-upload`: a `.torrent` file picked in the refusal's upload
+  (a signed-in user without a record, or a tracker that refused or names
+  nothing usable). A click that ends in "cancel" is not counted.
+
+`TestPrivateRefusalPartialRenders` pins both.
+
 ## On every event and identify call
 
 `eventDefaults()` is merged into the data of every `umami.track` and

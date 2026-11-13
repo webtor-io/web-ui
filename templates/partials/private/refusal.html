@@ -1,0 +1,44 @@
+{{/* rest-api refused a private torrent (web.PrivateRefusal): why, and the way
+     out -- an account (SignIn) or the user's own .torrent (Upload). Shared by
+     the resource page (views/resource/private) and the load job's card
+     (views/load/errors/private). Called with the view context ($): .Data =
+     *web.PrivateRefusal. Never the torrent's name: rest-api did not give it.
+
+     The upload is the private branch of load/errors/magnet: a file input that
+     posts to / into .Data.Target ("main" on the page, the log host #log-load
+     in the card, which is replaced in place and so pushes no history entry).
+     The pick is counted, a click that ends in "cancel" is not. One Umami event
+     for every refusal shown, with rest-api's code and reason (S29). */}}
+{{ define "private/refusal" }}
+<div class="p-4 rounded-xl bg-base-300/20 border border-w-line/40 text-left">
+    <div class="flex items-start gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 mt-0.5 text-w-pinkL" aria-hidden="true">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <h3 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang "private.page.title" }}</h3>
+    </div>
+    <p class="text-sm text-w-sub mt-3 leading-relaxed">{{ t $.Lang .Data.Key }}</p>
+    {{- if .Data.VaultKept }}
+    <p class="text-sm text-w-sub mt-2 leading-relaxed">{{ t $.Lang "private.page.vaultKept" }}</p>
+    {{- end }}
+    {{- if .Data.SignIn }}
+    <div class="mt-4 flex justify-end">
+        <a href="{{ langPath $.Lang "/login" }}?return-url={{ langPath $.Lang $.Path }}" class="btn btn-sm btn-soft-cyan" data-async-target="main">{{ t $.Lang "private.page.signIn" }}</a>
+    </div>
+    {{- else if .Data.Upload }}
+    <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="{{ .Data.Target }}"{{ if ne .Data.Target "main" }} data-async-push-state="false"{{ end }} class="mt-4 flex justify-end">
+        <label class="btn btn-sm btn-soft-cyan focus-within:outline-2 focus-within:outline-offset-2">
+            {{- t $.Lang "private.page.upload" -}}
+            <input type="file" name="resource" accept=".torrent,application/x-bittorrent" class="sr-only" onchange="if (window.umami) window.umami.track('private-reupload-upload'); this.form.requestSubmit()" />
+        </label>
+    </form>
+    {{- end }}
+</div>
+<script>
+(function () {
+    if (!window.umami) return;
+    window.umami.track('private-refused-shown', {code: '{{ .Data.Code }}', reason: '{{ .Data.Reason }}'});
+})();
+</script>
+{{ end }}

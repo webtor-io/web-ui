@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"net"
@@ -16,11 +17,15 @@ import (
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
+	cs "github.com/webtor-io/common-services"
 
 	"github.com/webtor-io/web-ui/handlers/index"
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -66,15 +71,23 @@ func fakeRestAPI(t *testing.T) (*httptest.Server, func() []string) {
 }
 
 // newResourceRouter wires the resource and index handlers the way serve.go
-// does, against the fake rest-api and a stand-in index view that prints what
-// the real one branches on. The template manager resolves "templates/"
-// against the working directory, hence the chdir.
+// does, against the fake rest-api and stand-in views that print what the
+// real ones branch on. The template manager resolves "templates/" against the
+// working directory, hence the chdir.
 func newResourceRouter(t *testing.T, restAPI *httptest.Server) *gin.Engine {
+	return newResourceRouterAs(t, restAPI, nil, nil)
+}
+
+// newResourceRouterAs is newResourceRouter with a Vault (nil: none) and, when
+// user is set, that user signed in on every request.
+func newResourceRouterAs(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User) *gin.Engine {
 	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
-		"templates/layouts/main.html": `{{ template "main" . }}`,
-		"templates/views/index.html":  `{{ define "main" }}[home][err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
+		"templates/layouts/main.html":           `{{ template "main" . }}`,
+		"templates/views/index.html":            `{{ define "main" }}[home][err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
+		"templates/views/resource/get.html":     `{{ define "main" }}[resource][name={{ .Data.Resource.Name }}]{{ end }}`,
+		"templates/views/resource/private.html": `{{ define "main" }}[private][key={{ .Data.Key }}][signin={{ .Data.SignIn }}][upload={{ .Data.Upload }}][vault={{ .Data.VaultKept }}][target={{ .Data.Target }}]{{ end }}`,
 	}
 	for name, body := range files {
 		p := filepath.Join(dir, name)
@@ -122,10 +135,17 @@ func newResourceRouter(t *testing.T, restAPI *httptest.Server) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(web.NoindexDefault(false))
+	if user != nil {
+		r.Use(func(c *gin.Context) {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), auth.UserContext{}, user))
+		})
+	}
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
-	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, nil, nil, nil, nil)
+	// A database handle without a host (Get is nil): an anonymous visitor's
+	// page renders without a database, a signed-in one's does not.
+	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, &cs.PG{}, v, nil, nil)
 	index.RegisterHandler(r, tm, nil)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)

@@ -428,6 +428,8 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (*ra.
 	if r == nil {
 		return nil, err
 	}
+	// Resource's own Private shadows the embedded one, which JSON leaves false.
+	r.ResourceResponse.Private = r.Private
 	return &r.ResourceResponse, err
 }
 

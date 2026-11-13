@@ -94,13 +94,19 @@ func (s *Handler) downloadTorrent(c *gin.Context) {
 	defer cancel()
 
 	torrent, err := s.api.GetTorrentCached(ctx, claims, resourceID)
+	// A private torrent's .torrent is served to no one (private_torrent_file):
+	// 403. A banned one (403 without a code) and one rest-api does not have
+	// are a plain 404. None of these is a server fault (Р12).
+	var pe *api.PrivateError
+	if errors.As(err, &pe) {
+		c.String(http.StatusForbidden, "not available")
+		return
+	}
+	if errors.Is(err, api.ErrForbidden) || (err == nil && torrent == nil) {
+		c.String(http.StatusNotFound, "not available")
+		return
+	}
 	if err != nil {
-		// A banned torrent is refused upstream (PermissionDenied); that is
-		// a plain "not available", not a server fault.
-		if strings.Contains(err.Error(), "PermissionDenied") || strings.Contains(err.Error(), "restricted") {
-			c.String(http.StatusNotFound, "not available")
-			return
-		}
 		_ = c.Error(errors.Wrap(err, "failed to get torrent"))
 		c.String(http.StatusInternalServerError, "failed to get torrent")
 		return
