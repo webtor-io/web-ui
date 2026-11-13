@@ -11,6 +11,7 @@ import (
 
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/handlers/index"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
@@ -439,7 +440,7 @@ func (s *Handler) privateRefusal(ctx context.Context, c *gin.Context, args *GetA
 	log.WithError(pe).
 		WithField("err_key", r.Key).
 		WithField("surface", "page").
-		WithField("path", c.Request.URL.Path).
+		WithField("path", helpers.RedactURL(c.Request.URL.Path)).
 		Info("user error shown")
 	if web.WantsJSON(c) {
 		c.JSON(http.StatusForbidden, gin.H{"status": "error", "message": r.Key})

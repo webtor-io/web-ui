@@ -433,9 +433,11 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (*ra.
 	return &r.ResourceResponse, err
 }
 
-// Resource is rest-api's resource with the private flag, which the rest-api
-// module web-ui builds against does not know yet. A rest-api without the
-// field reads as public: it has no private access rule either.
+// Resource is rest-api's resource with the private flag. The rest-api module
+// now has the flag too (ra.ResourceResponse.Private, same json tag): this one
+// shadows it, so JSON fills this one and GetResource copies it down. A
+// rest-api without the field reads as public: it has no private access rule
+// either.
 type Resource struct {
 	ra.ResourceResponse
 	Private bool `json:"private"`

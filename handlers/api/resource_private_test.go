@@ -205,3 +205,39 @@ func TestUpstreamPrivateEnvelope(t *testing.T) {
 		})
 	}
 }
+
+// GET /resource/{id} answers rest-api's private flag as it came. The module's
+// own field is shadowed by services/api.Resource, and decoding left it false
+// for every private torrent until GetResource copied the flag down.
+func TestGetResourceKeepsPrivate(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	for _, want := range []bool{true, false} {
+		body := `{"id":"` + hash + `","name":"probe","private":false}`
+		if want {
+			body = `{"id":"` + hash + `","name":"probe","private":true}`
+		}
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}))
+		h := newRestAPIHandler(t, upstream)
+		gin.SetMode(gin.TestMode)
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), restapi.ClaimsContext{}, &restapi.Claims{}))
+			c.Next()
+		})
+		r.GET("/resource/:resource_id", h.getResource)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/resource/"+hash, nil))
+		upstream.Close()
+		var res struct {
+			Private *bool `json:"private"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil || w.Code != http.StatusOK {
+			t.Fatalf("status %d body %q: %v", w.Code, w.Body.String(), err)
+		}
+		if res.Private == nil || *res.Private != want {
+			t.Errorf("rest-api said private=%t, the API answered %s", want, w.Body.String())
+		}
+	}
+}

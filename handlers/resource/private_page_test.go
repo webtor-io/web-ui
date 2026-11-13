@@ -40,6 +40,9 @@ func privateRestAPI(t *testing.T) (*httptest.Server, func(status int, body strin
 		mu.Lock()
 		defer mu.Unlock()
 		rw.Header().Set("Content-Type", "application/json")
+		if status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable {
+			rw.Header().Set("Retry-After", "7")
+		}
 		rw.WriteHeader(status)
 		_, _ = rw.Write([]byte(body))
 	}))
@@ -193,6 +196,7 @@ func TestPrivateRefusalPage(t *testing.T) {
 // the refusal, the way out, one Umami event with the code and the reason.
 func TestPrivateRefusalPartialRenders(t *testing.T) {
 	funcs := intentFuncs(t)
+	funcs["asset"] = func(p string) template.HTML { return template.HTML(`<script src="/assets/` + p + `"></script>`) }
 	tpl, err := template.New("private.html").Funcs(funcs).ParseFiles(
 		"../../templates/views/resource/private.html",
 		"../../templates/partials/private/refusal.html",
@@ -247,10 +251,23 @@ func TestPrivateRefusalPartialRenders(t *testing.T) {
 		t.Errorf("signed in: a sign-in link rendered:\n%s", out)
 	}
 
+	// The event is declared on the card and sent by app/private_refusal.js
+	// once layout.js has set window.umami. An inline script runs while a full
+	// page is parsed, before umami exists, and loses it: none may come back.
 	for _, r := range []*w.PrivateRefusal{signIn, upload} {
 		out := render("en", r)
-		if want := "track('private-refused-shown', {code: '" + r.Code + "', reason: '" + r.Reason + "'})"; !strings.Contains(out, want) {
-			t.Errorf("missing %q in\n%s", want, out)
+		for _, want := range []string{
+			`data-umami-impression="private-refused-shown"`,
+			`data-umami-impression-code="` + r.Code + `"`,
+			`data-umami-impression-reason="` + r.Reason + `"`,
+			`<script src="/assets/private_refusal.js"></script>`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("missing %q in\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "<script>") {
+			t.Errorf("an inline script: on a full page load it runs before umami exists\n%s", out)
 		}
 		for _, gone := range []string{"private-signin-shown", "private-reupload-shown"} {
 			if strings.Contains(out, gone) {
@@ -264,7 +281,8 @@ func TestPrivateRefusalPartialRenders(t *testing.T) {
 }
 
 // GET /<hash>.torrent (Р12): a coded refusal is 403, a refusal without a code
-// (a ban) and a torrent rest-api does not have are 404; never a 500.
+// (a ban) and a torrent rest-api does not have are 404; never a 500. A coded
+// 429 or 503 is a failure: its status and Retry-After, not a final 403.
 func TestDownloadTorrentPrivate(t *testing.T) {
 	restAPI, answer := privateRestAPI(t)
 	r := newResourceRouter(t, restAPI)
@@ -275,16 +293,22 @@ func TestDownloadTorrentPrivate(t *testing.T) {
 	for _, c := range []struct {
 		name, body   string
 		status, want int
+		retry        string
 	}{
-		{"private", `{"error":"x","code":"private_torrent_file"}`, http.StatusForbidden, http.StatusForbidden},
-		{"a ban", `{"error":"forbidden: restricted by the rightholder"}`, http.StatusForbidden, http.StatusNotFound},
-		{"not stored", `{"error":"not found"}`, http.StatusNotFound, http.StatusNotFound},
+		{"private", `{"error":"x","code":"private_torrent_file"}`, http.StatusForbidden, http.StatusForbidden, ""},
+		{"a ban", `{"error":"forbidden: restricted by the rightholder"}`, http.StatusForbidden, http.StatusNotFound, ""},
+		{"not stored", `{"error":"not found"}`, http.StatusNotFound, http.StatusNotFound, ""},
+		{"an outdated store", `{"error":"x","code":"store_outdated"}`, http.StatusServiceUnavailable, http.StatusServiceUnavailable, "7"},
+		{"rate limited", `{"error":"x"}`, http.StatusTooManyRequests, http.StatusTooManyRequests, "7"},
 	} {
 		answer(c.status, c.body)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/"+privHash+".torrent?token="+url.QueryEscape(token), nil))
 		if rec.Code != c.want || rec.Body.String() != "not available" {
 			t.Errorf("%s: %d %q, want %d \"not available\"", c.name, rec.Code, rec.Body.String(), c.want)
+		}
+		if got := rec.Header().Get("Retry-After"); got != c.retry {
+			t.Errorf("%s: Retry-After %q, want %q", c.name, got, c.retry)
 		}
 	}
 }
