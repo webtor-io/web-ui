@@ -163,7 +163,10 @@ func (s *Handler) getLibraryItem(c *gin.Context) {
 //	@Failure		400		{object}	libapi.ErrorResponse
 //	@Failure		401		{object}	libapi.ErrorResponse
 //	@Failure		402		{object}	libapi.ErrorResponse
+//	@Failure		403		{object}	libapi.ErrorResponse	"A private torrent you may not use: code `private_torrent` (`reason`: `sign_in`, `no_record` or `token_in_query`), `private_torrent_file` (its .torrent is never served) or `private_unavailable`; or the plan does not allow it (`forbidden`)"
 //	@Failure		404		{object}	libapi.ErrorResponse	"The resource is not in the store"
+//	@Failure		422		{object}	libapi.ErrorResponse	"A private torrent refused on upload: code `private_needs_account`, `private_no_tracker`, `private_too_many_trackers`, `private_magnet` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), `private_tracker_refused` (`reason`: `key`, `account`, `unregistered`, `client` or `other`) or `private_unavailable`"
+//	@Failure		503		{object}	libapi.ErrorResponse	"A private torrent could not be checked now: code `private_verify_unavailable` (the `Retry-After` header says when to try again) or `store_outdated`"
 //	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library [post]
 func (s *Handler) addLibrary(c *gin.Context) {

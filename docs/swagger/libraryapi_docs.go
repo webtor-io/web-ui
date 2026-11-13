@@ -264,14 +264,32 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "A private torrent you may not use: code ` + "`" + `private_torrent` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `sign_in` + "`" + `, ` + "`" + `no_record` + "`" + ` or ` + "`" + `token_in_query` + "`" + `), ` + "`" + `private_torrent_file` + "`" + ` (its .torrent is never served) or ` + "`" + `private_unavailable` + "`" + `; or the plan does not allow it (` + "`" + `forbidden` + "`" + `)",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "The resource is not in the store",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "422": {
+                        "description": "A private torrent refused on upload: code ` + "`" + `private_needs_account` + "`" + `, ` + "`" + `private_no_tracker` + "`" + `, ` + "`" + `private_too_many_trackers` + "`" + `, ` + "`" + `private_magnet` + "`" + ` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), ` + "`" + `private_tracker_refused` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `key` + "`" + `, ` + "`" + `account` + "`" + `, ` + "`" + `unregistered` + "`" + `, ` + "`" + `client` + "`" + ` or ` + "`" + `other` + "`" + `) or ` + "`" + `private_unavailable` + "`" + `",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "A private torrent could not be checked now: code ` + "`" + `private_verify_unavailable` + "`" + ` (the ` + "`" + `Retry-After` + "`" + ` header says when to try again) or ` + "`" + `store_outdated` + "`" + `",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -632,6 +650,12 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "A private torrent you may not use: code ` + "`" + `private_torrent` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `sign_in` + "`" + `, ` + "`" + `no_record` + "`" + ` or ` + "`" + `token_in_query` + "`" + `), ` + "`" + `private_torrent_file` + "`" + ` (its .torrent is never served) or ` + "`" + `private_unavailable` + "`" + `; or the plan does not allow it (` + "`" + `forbidden` + "`" + `)",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "The torrent could not be fetched",
                         "schema": {
@@ -645,13 +669,19 @@ const docTemplatelibraryapi = `{
                         }
                     },
                     "422": {
-                        "description": "A magnet without a tracker (no ` + "`" + `tr=` + "`" + `) of a private torrent not stored yet (code ` + "`" + `private_magnet` + "`" + `): upload its .torrent file or use a magnet that includes the tracker",
+                        "description": "A private torrent refused on upload: code ` + "`" + `private_needs_account` + "`" + `, ` + "`" + `private_no_tracker` + "`" + `, ` + "`" + `private_too_many_trackers` + "`" + `, ` + "`" + `private_magnet` + "`" + ` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), ` + "`" + `private_tracker_refused` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `key` + "`" + `, ` + "`" + `account` + "`" + `, ` + "`" + `unregistered` + "`" + `, ` + "`" + `client` + "`" + ` or ` + "`" + `other` + "`" + `) or ` + "`" + `private_unavailable` + "`" + `",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "A private torrent could not be checked now: code ` + "`" + `private_verify_unavailable` + "`" + ` (the ` + "`" + `Retry-After` + "`" + ` header says when to try again) or ` + "`" + `store_outdated` + "`" + `",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -703,14 +733,32 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "A private torrent you may not use: code ` + "`" + `private_torrent` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `sign_in` + "`" + `, ` + "`" + `no_record` + "`" + ` or ` + "`" + `token_in_query` + "`" + `), ` + "`" + `private_torrent_file` + "`" + ` (its .torrent is never served) or ` + "`" + `private_unavailable` + "`" + `; or the plan does not allow it (` + "`" + `forbidden` + "`" + `)",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "422": {
+                        "description": "A private torrent refused on upload: code ` + "`" + `private_needs_account` + "`" + `, ` + "`" + `private_no_tracker` + "`" + `, ` + "`" + `private_too_many_trackers` + "`" + `, ` + "`" + `private_magnet` + "`" + ` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), ` + "`" + `private_tracker_refused` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `key` + "`" + `, ` + "`" + `account` + "`" + `, ` + "`" + `unregistered` + "`" + `, ` + "`" + `client` + "`" + ` or ` + "`" + `other` + "`" + `) or ` + "`" + `private_unavailable` + "`" + `",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "A private torrent could not be checked now: code ` + "`" + `private_verify_unavailable` + "`" + ` (the ` + "`" + `Retry-After` + "`" + ` header says when to try again) or ` + "`" + `store_outdated` + "`" + `",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -823,14 +871,32 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "A private torrent you may not use: code ` + "`" + `private_torrent` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `sign_in` + "`" + `, ` + "`" + `no_record` + "`" + ` or ` + "`" + `token_in_query` + "`" + `), ` + "`" + `private_torrent_file` + "`" + ` (its .torrent is never served) or ` + "`" + `private_unavailable` + "`" + `; or the plan does not allow it (` + "`" + `forbidden` + "`" + `)",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "422": {
+                        "description": "A private torrent refused on upload: code ` + "`" + `private_needs_account` + "`" + `, ` + "`" + `private_no_tracker` + "`" + `, ` + "`" + `private_too_many_trackers` + "`" + `, ` + "`" + `private_magnet` + "`" + ` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), ` + "`" + `private_tracker_refused` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `key` + "`" + `, ` + "`" + `account` + "`" + `, ` + "`" + `unregistered` + "`" + `, ` + "`" + `client` + "`" + ` or ` + "`" + `other` + "`" + `) or ` + "`" + `private_unavailable` + "`" + `",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "A private torrent could not be checked now: code ` + "`" + `private_verify_unavailable` + "`" + ` (the ` + "`" + `Retry-After` + "`" + ` header says when to try again) or ` + "`" + `store_outdated` + "`" + `",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -930,14 +996,32 @@ const docTemplatelibraryapi = `{
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "A private torrent you may not use: code ` + "`" + `private_torrent` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `sign_in` + "`" + `, ` + "`" + `no_record` + "`" + ` or ` + "`" + `token_in_query` + "`" + `), ` + "`" + `private_torrent_file` + "`" + ` (its .torrent is never served) or ` + "`" + `private_unavailable` + "`" + `; or the plan does not allow it (` + "`" + `forbidden` + "`" + `)",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
                     },
+                    "422": {
+                        "description": "A private torrent refused on upload: code ` + "`" + `private_needs_account` + "`" + `, ` + "`" + `private_no_tracker` + "`" + `, ` + "`" + `private_too_many_trackers` + "`" + `, ` + "`" + `private_magnet` + "`" + ` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), ` + "`" + `private_tracker_refused` + "`" + ` (` + "`" + `reason` + "`" + `: ` + "`" + `key` + "`" + `, ` + "`" + `account` + "`" + `, ` + "`" + `unregistered` + "`" + `, ` + "`" + `client` + "`" + ` or ` + "`" + `other` + "`" + `) or ` + "`" + `private_unavailable` + "`" + `",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
                     "429": {
                         "description": "Too many requests with this key — the ` + "`" + `Retry-After` + "`" + ` header says how long to wait",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "A private torrent could not be checked now: code ` + "`" + `private_verify_unavailable` + "`" + ` (the ` + "`" + `Retry-After` + "`" + ` header says when to try again) or ` + "`" + `store_outdated` + "`" + `",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -1290,6 +1374,11 @@ const docTemplatelibraryapi = `{
                 "message": {
                     "type": "string",
                     "example": "the specified path does not exist"
+                },
+                "reason": {
+                    "description": "Reason narrows a private torrent's refusal: rest-api's reason, passed on\nas it came (sign_in, no_record, the tracker's refusal class).",
+                    "type": "string",
+                    "example": "no_record"
                 }
             }
         },
@@ -1920,9 +2009,17 @@ const docTemplatelibraryapi = `{
                 "name": {
                     "type": "string"
                 },
+                "private": {
+                    "description": "Private is true for a BEP 27 private torrent. Always present: its\nabsence must never be read as false.",
+                    "type": "boolean"
+                },
                 "size": {
                     "description": "Size is the torrent's total size in bytes (sum of all files). Lets\nclients read the size without paginating /list — a real win on torrents\nwith tens of thousands of files.",
                     "type": "integer"
+                },
+                "verified": {
+                    "description": "Verified is \"accepted\" when a magnet's tracker accepted it and the\nrecord was created by this request; empty otherwise.",
+                    "type": "string"
                 }
             }
         }

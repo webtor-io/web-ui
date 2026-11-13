@@ -43,13 +43,17 @@ const (
 	CodeUpstreamTimeout = "upstream_timeout"
 )
 
-// Error is one API error. Status and cause are ours; Code and Message are the
-// wire contract.
+// Error is one API error. Status and cause are ours; Code, Message and Reason
+// are the wire contract.
 type Error struct {
 	Status  int    `json:"-"`
 	Code    string `json:"code" example:"not_found"`
 	Message string `json:"message" example:"the specified path does not exist"`
-	Err     error  `json:"-"`
+	// Reason narrows a private torrent's refusal: rest-api's reason, passed on
+	// as it came (sign_in, no_record, the tracker's refusal class).
+	Reason     string `json:"reason,omitempty" example:"no_record"`
+	RetryAfter string `json:"-"` // WriteError sets the Retry-After header when it is not empty
+	Err        error  `json:"-"`
 }
 
 func (e *Error) Error() string {
@@ -92,6 +96,9 @@ func WriteError(c *gin.Context, e *Error) {
 		entry.Debug("api path not found")
 	default:
 		entry.Warn("api request rejected")
+	}
+	if e.RetryAfter != "" {
+		c.Header("Retry-After", e.RetryAfter)
 	}
 	c.AbortWithStatusJSON(e.Status, &ErrorResponse{Error: *e})
 }

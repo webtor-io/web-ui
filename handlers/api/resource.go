@@ -40,9 +40,11 @@ const maxResourceBody = 8 << 20
 //	@Failure		400			{object}	libapi.ErrorResponse
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
+//	@Failure		403			{object}	libapi.ErrorResponse	"A private torrent you may not use: code `private_torrent` (`reason`: `sign_in`, `no_record` or `token_in_query`), `private_torrent_file` (its .torrent is never served) or `private_unavailable`; or the plan does not allow it (`forbidden`)"
 //	@Failure		404			{object}	libapi.ErrorResponse	"The torrent could not be fetched"
 //	@Failure		408			{object}	libapi.ErrorResponse	"A magnet took too long to resolve"
-//	@Failure		422			{object}	libapi.ErrorResponse	"A magnet without a tracker (no `tr=`) of a private torrent not stored yet (code `private_magnet`): upload its .torrent file or use a magnet that includes the tracker"
+//	@Failure		422			{object}	libapi.ErrorResponse	"A private torrent refused on upload: code `private_needs_account`, `private_no_tracker`, `private_too_many_trackers`, `private_magnet` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), `private_tracker_refused` (`reason`: `key`, `account`, `unregistered`, `client` or `other`) or `private_unavailable`"
+//	@Failure		503			{object}	libapi.ErrorResponse	"A private torrent could not be checked now: code `private_verify_unavailable` (the `Retry-After` header says when to try again) or `store_outdated`"
 //	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource [post]
 func (s *Handler) postResource(c *gin.Context) {
@@ -92,7 +94,10 @@ func (s *Handler) postResource(c *gin.Context) {
 //	@Success		200			{object}	services.ResourceResponse
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
+//	@Failure		403			{object}	libapi.ErrorResponse	"A private torrent you may not use: code `private_torrent` (`reason`: `sign_in`, `no_record` or `token_in_query`), `private_torrent_file` (its .torrent is never served) or `private_unavailable`; or the plan does not allow it (`forbidden`)"
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		422			{object}	libapi.ErrorResponse	"A private torrent refused on upload: code `private_needs_account`, `private_no_tracker`, `private_too_many_trackers`, `private_magnet` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), `private_tracker_refused` (`reason`: `key`, `account`, `unregistered`, `client` or `other`) or `private_unavailable`"
+//	@Failure		503			{object}	libapi.ErrorResponse	"A private torrent could not be checked now: code `private_verify_unavailable` (the `Retry-After` header says when to try again) or `store_outdated`"
 //	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource/{resource_id} [get]
 func (s *Handler) getResource(c *gin.Context) {
@@ -149,7 +154,10 @@ func (s *Handler) getResourceTorrent(c *gin.Context, id string) {
 //	@Failure		400			{object}	libapi.ErrorResponse
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
+//	@Failure		403			{object}	libapi.ErrorResponse	"A private torrent you may not use: code `private_torrent` (`reason`: `sign_in`, `no_record` or `token_in_query`), `private_torrent_file` (its .torrent is never served) or `private_unavailable`; or the plan does not allow it (`forbidden`)"
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		422			{object}	libapi.ErrorResponse	"A private torrent refused on upload: code `private_needs_account`, `private_no_tracker`, `private_too_many_trackers`, `private_magnet` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), `private_tracker_refused` (`reason`: `key`, `account`, `unregistered`, `client` or `other`) or `private_unavailable`"
+//	@Failure		503			{object}	libapi.ErrorResponse	"A private torrent could not be checked now: code `private_verify_unavailable` (the `Retry-After` header says when to try again) or `store_outdated`"
 //	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource/{resource_id}/list [get]
 func (s *Handler) listResource(c *gin.Context) {
@@ -236,7 +244,10 @@ func (s *Handler) listResource(c *gin.Context) {
 //	@Failure		400				{object}	libapi.ErrorResponse
 //	@Failure		401				{object}	libapi.ErrorResponse
 //	@Failure		402				{object}	libapi.ErrorResponse
+//	@Failure		403				{object}	libapi.ErrorResponse	"A private torrent you may not use: code `private_torrent` (`reason`: `sign_in`, `no_record` or `token_in_query`), `private_torrent_file` (its .torrent is never served) or `private_unavailable`; or the plan does not allow it (`forbidden`)"
 //	@Failure		404				{object}	libapi.ErrorResponse
+//	@Failure		422				{object}	libapi.ErrorResponse	"A private torrent refused on upload: code `private_needs_account`, `private_no_tracker`, `private_too_many_trackers`, `private_magnet` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), `private_tracker_refused` (`reason`: `key`, `account`, `unregistered`, `client` or `other`) or `private_unavailable`"
+//	@Failure		503				{object}	libapi.ErrorResponse	"A private torrent could not be checked now: code `private_verify_unavailable` (the `Retry-After` header says when to try again) or `store_outdated`"
 //	@Failure		429				{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/resource/{resource_id}/export/{content_id} [get]
 func (s *Handler) exportResource(c *gin.Context) {
@@ -328,7 +339,12 @@ func parseExportTypes(param string) (map[string]bool, *libapi.Error) {
 
 // upstreamError turns a rest-api client failure into an API error.
 //
-// The client we proxy through discards the upstream status and hands back a
+// A refusal rest-api names with a code (a private torrent, its rate limit)
+// arrives typed, as *restapi.PrivateError, and is passed on as rest-api sent
+// it: status, code, reason, message and Retry-After. Its message is rest-api's
+// own English text, which carries neither a URL nor a key.
+//
+// For everything else the client discards the upstream status and hands back a
 // plain error carrying rest-api's message, so the message is the only signal
 // left. Classifying it by substring is not elegant — but it is what rest-api's
 // own error middleware does to pick that status in the first place
@@ -337,6 +353,14 @@ func parseExportTypes(param string) (map[string]bool, *libapi.Error) {
 // for everything, would report "the torrent does not exist" as "webtor is
 // broken".
 func upstreamError(err error, message string) *libapi.Error {
+	var pe *restapi.PrivateError
+	if errors.As(err, &pe) {
+		msg := pe.Message
+		if msg == "" {
+			msg = "private torrent refused"
+		}
+		return &libapi.Error{Status: pe.Status, Code: pe.Code, Message: msg, Reason: pe.Reason, RetryAfter: pe.RetryAfter, Err: err}
+	}
 	e := strings.ToLower(err.Error())
 	switch {
 	case errors.Is(err, restapi.ErrPrivateMagnet):

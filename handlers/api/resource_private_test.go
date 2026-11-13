@@ -135,3 +135,73 @@ func TestPostResourcePrivateMagnet(t *testing.T) {
 		t.Errorf("upstream URL leaked into the response: %s", w.Body.String())
 	}
 }
+
+// rest-api's coded refusals reach a JSON API client as rest-api named them:
+// its status, code, reason and Retry-After, so a client can tell "sign in" from
+// "your tracker refused the key" from "try again in 5 s". A 403 without a code
+// stays the plan's forbidden.
+func TestUpstreamPrivateEnvelope(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	for _, c := range []struct {
+		path, method         string
+		status               int
+		body, retry          string
+		wantStatus           int
+		wantCode, wantReason string
+	}{
+		{"/resource/" + hash, "GET", 403, `{"error":"private torrent: only a signed-in user who added it with their own tracker can play it","code":"private_torrent","reason":"no_record"}`, "", 403, "private_torrent", "no_record"},
+		{"/resource", "POST", 422, `{"error":"x","code":"private_tracker_refused","reason":"account"}`, "", 422, "private_tracker_refused", "account"},
+		{"/resource", "POST", 503, `{"error":"x","code":"private_verify_unavailable"}`, "5", 503, "private_verify_unavailable", ""},
+		{"/resource", "POST", 429, `{"error":"x"}`, "60", 429, "rate_limited", ""},
+		{"/resource/" + hash, "GET", 403, `{"error":"restricted"}`, "", 403, "forbidden", ""},
+	} {
+		// representatives only (S32): the full code table is TestRestAPIPrivateCodes (Task 1)
+		t.Run(c.wantCode, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if c.retry != "" {
+					w.Header().Set("Retry-After", c.retry)
+				}
+				w.WriteHeader(c.status)
+				_, _ = w.Write([]byte(c.body))
+			}))
+			defer upstream.Close()
+			u, _ := url.Parse(upstream.URL)
+			h := newRestAPIHandler(t, upstream)
+
+			gin.SetMode(gin.TestMode)
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), restapi.ClaimsContext{}, &restapi.Claims{}))
+				c.Next()
+			})
+			r.POST("/resource", h.postResource)
+			r.GET("/resource/:resource_id", h.getResource)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(c.method, c.path, strings.NewReader("magnet:?xt=urn:btih:"+hash)))
+
+			if w.Code != c.wantStatus {
+				t.Errorf("status %d, want %d: %s", w.Code, c.wantStatus, w.Body.String())
+			}
+			// The wire shape, not the Go type: what a client decodes.
+			var res struct {
+				Error struct {
+					Code    string `json:"code"`
+					Message string `json:"message"`
+					Reason  string `json:"reason"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+				t.Fatalf("body is not an error document: %q", w.Body.String())
+			}
+			if res.Error.Code != c.wantCode || res.Error.Reason != c.wantReason {
+				t.Errorf("code %q reason %q, want %q %q", res.Error.Code, res.Error.Reason, c.wantCode, c.wantReason)
+			}
+			if got := w.Header().Get("Retry-After"); got != c.retry {
+				t.Errorf("Retry-After %q, want %q", got, c.retry)
+			}
+			if strings.Contains(w.Body.String(), u.Host) {
+				t.Errorf("upstream URL leaked into the response: %s", w.Body.String())
+			}
+		})
+	}
+}
