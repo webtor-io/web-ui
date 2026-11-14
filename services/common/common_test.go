@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -232,6 +233,97 @@ func TestResolveQueryHash_FormInputs(t *testing.T) {
 			}
 			if !strings.Contains(magnet, "urn:btih:"+tc.hash) {
 				t.Fatalf("magnet %q does not carry the hex hash", magnet)
+			}
+		})
+	}
+}
+
+// A magnet's tr= values are tracker URLs, and a private tracker's passkey is
+// in them. A magnet the parser refuses goes into an error that is logged
+// ("redirect with error", "user error shown"); url.Parse quotes the URI it
+// refused whole, so that error must say why without the URI. A line break
+// pasted into the middle of the link is the realistic way to get there.
+func TestResolveQueryHash_RefusalKeepsNoTracker(t *testing.T) {
+	const passkey = "0123456789abcdef0123456789abcdef"
+	q := "magnet:?xt=urn:btih:5e4bd524\n&tr=http%3A%2F%2Ftracker.invalid%2Fannounce%3Fpasskey%3D" + passkey
+	_, _, err := ResolveQueryHash(q)
+	if !errors.Is(err, ErrMagnetInvalid) {
+		t.Fatalf("err = %v, want ErrMagnetInvalid", err)
+	}
+	if msg := err.Error(); strings.Contains(msg, passkey) || strings.Contains(msg, "tracker.invalid") {
+		t.Errorf("the refusal quotes the magnet: %s", msg)
+	}
+	if msg := err.Error(); !strings.Contains(msg, "invalid control character") {
+		t.Errorf("the refusal lost its reason: %s", msg)
+	}
+}
+
+// A refused query is logged (redirect with error, the load job's error): its
+// length, and for the refused-input analyses (titles, broken magnets) the
+// query itself when it is a magnet (helpers.RedactURL keeps its hash and name
+// alone) or text without a "/". Anything else is or carries a link, whose key
+// can be in its path or under a name RedactURL does not know: scheme://host
+// at most. Cut to 200 bytes; the type stays for web.ClassifyError.
+func TestRefusedQuery(t *testing.T) {
+	const key = "0123456789abcdef0123456789abcdef"
+	// 801 bytes: the 200-byte cut falls inside a 2-byte rune, which goes.
+	title := "x" + strings.Repeat("Сила", 100)
+	for _, c := range []struct {
+		name, query string
+		is          error
+		has, miss   []string
+	}{
+		{"a broken magnet",
+			" magnet:?xt=urn:btih:5e4bd524&dn=Sintel&tr=http%3A%2F%2Ftracker.invalid%2F" + key + "%2Fannounce&as=https://tracker.invalid/1." + key + "\n",
+			ErrMagnetInvalid, []string{`query="magnet:?xt=urn:btih:5e4bd524&dn=Sintel&tr=<redacted>&as=<redacted>"`}, []string{key, "tracker.invalid"}},
+		{"free text", "Big Buck Bunny 2008", ErrQueryFreeText, []string{`query="Big Buck Bunny 2008"`}, nil},
+		{"a web page", " https://tracker.invalid/download.php?id=1&torrent_pass=" + key + "\n", ErrQueryWebPage, []string{`query="https://tracker.invalid"`}, []string{key, "download.php"}},
+		{"a .torrent link", "www.tracker.invalid/rss/" + key + "/x.torrent", ErrQueryTorrentURL, []string{`query="http://www.tracker.invalid"`}, []string{key}},
+		{"a link that does not parse", "https://tracker.invalid/dl/" + key + "/%zz", ErrQueryWebPage, nil, []string{key, "query="}},
+		{"a long title", title, ErrQueryFreeText, []string{`query="` + title[:199] + `"`}, []string{title[:201]}},
+		{"a udp tracker", "udp://tracker.invalid:6969/announce/" + key, ErrQueryFreeText, []string{`query="udp://tracker.invalid:6969"`}, []string{key}},
+		{"a wss tracker", "wss://tracker.invalid/" + key, ErrQueryFreeText, []string{`query="wss://tracker.invalid"`}, []string{key}},
+		{"a key in a path without a scheme", "tracker.invalid/" + key + "/announce", ErrQueryFreeText, nil, []string{key, "tracker.invalid", "query="}},
+		{"a key in a query without a scheme", "tracker.invalid/announce.php?torrent_pass=" + key, ErrQueryFreeText, nil, []string{key, "tracker.invalid", "query="}},
+		{"a link inside text", "Sintel https://tracker.invalid/dl/" + key, ErrQueryFreeText, nil, []string{key, "Sintel", "query="}},
+		{"a link inside text without a scheme", "Sintel tracker.invalid/dl/" + key, ErrQueryFreeText, nil, []string{key, "Sintel", "query="}},
+		// The magnet runs on to the end (a pasted space does not end it), so
+		// the link is part of dn=, which RedactURL keeps.
+		{"a magnet whose name ran into a link",
+			"magnet:?xt=urn:btih:5e4bd524&dn=Sintel https://tracker.invalid/dl/" + key,
+			ErrMagnetInvalid, nil, []string{key, "tracker.invalid", "query="}},
+		// Not a magnet, so no allowlist: RedactURL's tr= rule takes every
+		// "/" out, and the key the tracker URL spilled stays.
+		{"a magnet's parameters alone",
+			"xt=urn:btih:5e4bd524&tr=http://tracker.invalid/a.php?uid=1&uk=" + key,
+			ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a key in a query with no path", "tracker.invalid?torrent_pass=" + key, ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a link encoded whole", "https%3A%2F%2Ftracker.invalid%2F" + key + "%2Fannounce", ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a link encoded twice", "https%253A%252F%252Ftracker.invalid%252F" + key, ErrQueryFreeText, nil, []string{key, "query="}},
+		{"a magnet whose name ran into an encoded link",
+			"magnet:?xt=urn:btih:5e4bd524&dn=Sintel%20https%3A%2F%2Ftracker.invalid%2Fdl%2F" + key,
+			ErrMagnetInvalid, nil, []string{key, "query="}},
+		{"a magnet RedactURL does not see", "magnet://?xt=urn:btih:5e4bd524&as=https://tracker.invalid/1." + key, ErrMagnetNoHash, nil, []string{key, "tracker.invalid", "query="}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, _, err := ResolveQueryHash(c.query)
+			if !errors.Is(err, c.is) {
+				t.Fatalf("ResolveQueryHash(%q) = %v, want %v", c.query, err, c.is)
+			}
+			err = RefusedQuery(err, c.query)
+			if !errors.Is(err, c.is) {
+				t.Errorf("the wrapper lost the type: %v", err)
+			}
+			msg := err.Error()
+			for _, w := range append(c.has, "wrong resource provided query_len="+strconv.Itoa(len(c.query))) {
+				if !strings.Contains(msg, w) {
+					t.Errorf("%s\nlacks %s", msg, w)
+				}
+			}
+			for _, w := range c.miss {
+				if strings.Contains(msg, w) {
+					t.Errorf("%s\nkeeps %s", msg, w)
+				}
 			}
 		})
 	}

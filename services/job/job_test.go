@@ -196,9 +196,9 @@ func TestRun_ReportsOutcomeOnce(t *testing.T) {
 	}
 }
 
-// A rendered item is the download script with the stream URL in it, the
-// site's api-key and the viewer's token included. The log keeps it without
-// them; the item itself (storage, browser) is untouched.
+// A rendered item is the player with the stream URL in it, the site's
+// api-key and the viewer's token included. The log keeps it without them;
+// the item itself (storage, browser) is untouched.
 func TestLogToLogger_RedactsCredentials(t *testing.T) {
 	var buf bytes.Buffer
 	out, lvl := log.StandardLogger().Out, log.GetLevel()
@@ -208,13 +208,42 @@ func TestLogToLogger_RedactsCredentials(t *testing.T) {
 
 	u := "https://h.example/89f8ee4c/a.mp4?api-key=SECRET-KEY&token=SECRET-TOKEN"
 	j := &Job{ID: "id", Queue: "download"}
-	l := LogItem{Level: Custom, Body: `<script>var url = "` + u + `";</script>`, Location: u, Message: "failed: " + u}
+	l := LogItem{Level: RenderTemplate, Body: `<script>var url = "` + u + `";</script>`, Location: u, Message: "failed: " + u}
 	j.logToLogger(l)
-	if got := buf.String(); strings.Contains(got, "SECRET") || !strings.Contains(got, "a.mp4?api-key=<redacted>") {
+	if got := buf.String(); strings.Contains(got, "SECRET") || !strings.Contains(got, `var url = \"https://h.example/89f8ee4c/a.mp4?api-key=<redacted>`) {
 		t.Errorf("log line: %s", got)
 	}
 	if !strings.Contains(l.Body, "SECRET-KEY") {
 		t.Error("the item itself must keep the URL whole")
+	}
+}
+
+// A card (Custom) is rendered from what the job was asked, which can be the
+// visitor's own input -- the dead-magnet card's retry form held the magnet,
+// trackers and a private tracker's passkey included -- and a pattern cannot
+// tell every shape it takes (a value escaped for a script is not one for an
+// attribute). The log keeps the card's name, not its body; the item itself
+// is untouched.
+func TestLogToLogger_KeepsNoCardBody(t *testing.T) {
+	var buf bytes.Buffer
+	out, lvl := log.StandardLogger().Out, log.GetLevel()
+	log.SetOutput(&buf)
+	log.SetLevel(log.InfoLevel)
+	defer func() { log.SetOutput(out); log.SetLevel(lvl) }()
+
+	const input = "visitor-input-0123456789abcdef"
+	j := &Job{ID: "id", Queue: "load"}
+	l := LogItem{Level: Custom, Template: "load/errors/magnet", Body: `<script>var q = "` + input + `";</script><input value="` + input + `" />`}
+	j.logToLogger(l)
+	got := buf.String()
+	if strings.Contains(got, input) {
+		t.Errorf("the log keeps the card's body: %s", got)
+	}
+	if !strings.Contains(got, "Template=load/errors/magnet") {
+		t.Errorf("the log lost the card's name: %s", got)
+	}
+	if !strings.Contains(l.Body, input) {
+		t.Error("the item itself must keep its body")
 	}
 }
 

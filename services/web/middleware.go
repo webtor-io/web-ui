@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/services/template"
 )
 
@@ -106,12 +107,16 @@ func ErrorHandler(tb template.Builder[*Context]) gin.HandlerFunc {
 			c.Status(StatusClientClosedRequest)
 		}
 
+		// A magnet reaches here as a path too (the magnet: handler puts it
+		// there whole, trackers and their passkeys included).
+		path := helpers.RedactURL(c.Request.URL.Path)
+
 		// (1) always log the real error(s)
 		for _, ginErr := range c.Errors {
 			l := log.WithError(ginErr.Err).
 				WithField("status", c.Writer.Status()).
 				WithField("method", c.Request.Method).
-				WithField("path", c.Request.URL.Path)
+				WithField("path", path)
 			if clientGone(client, ginErr.Err) {
 				l.Info("client closed request")
 				continue
@@ -127,7 +132,7 @@ func ErrorHandler(tb template.Builder[*Context]) gin.HandlerFunc {
 
 		errKey := ClassifyError(last)
 		status := StatusForErrKey(errKey)
-		log.WithError(last).WithField("err_key", errKey).WithField("surface", "page").WithField("path", c.Request.URL.Path).Info("user error shown")
+		log.WithError(last).WithField("err_key", errKey).WithField("surface", "page").WithField("path", path).Info("user error shown")
 		if wantsJSON(c) {
 			c.JSON(status, gin.H{"error": errKey})
 			return

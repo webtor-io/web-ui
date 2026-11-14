@@ -163,6 +163,15 @@ class Renderer {
         this.results.appendChild(div);
         this.endStage();
         loadAsyncView(div, data.body);
+        // The dead-magnet card's retry resubmits what this browser submitted.
+        // The card itself knows the infohash only: it is stored with the job
+        // and replayed to whoever loads the same torrent, and a magnet's tr=
+        // can carry a private tracker's passkey. The host was rendered for
+        // this browser alone (partials/load/progress.html).
+        const query = this.el.getAttribute('data-load-query');
+        if (query) {
+            for (const inp of div.querySelectorAll('input[data-load-query]')) inp.value = query;
+        }
         // A card is a verdict too (no peers, too slow): its heading, said
         // once. Only a heading -- the download card has none and starts with
         // a <script> holding the link, api-key and token, which textContent

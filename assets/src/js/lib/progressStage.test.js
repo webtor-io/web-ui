@@ -178,3 +178,25 @@ test('a card without a heading is not read out -- the download card starts with 
     sdk.push({ level: 'custom', tag: 'l', body: '<script>var url = "https://x/f?api-key=k&token=t";</script><div>start download</div>' });
     assert.equal(q('[data-job-announce]').textContent, 'The file is ready to download', 'the verdict stands; no script, no key');
 });
+
+test('the dead-magnet card\'s retry resubmits the query this browser sent, which the card never holds', () => {
+    // The card is stored with the job and replayed to whoever loads the same
+    // torrent; it knows the infohash only (jobs/load.go, a magnet's tr= can
+    // carry a private tracker's passkey). The host, rendered for this
+    // browser alone, has the query (partials/load/progress.html).
+    const hash = '08ada5a7a6183aae1e09d831df6748d566095a10';
+    const query = `magnet:?xt=urn:btih:${hash}&tr=udp%3A%2F%2Ftracker.invalid%3A6969`;
+    const card = `<div><h3>Nobody is sharing this torrent right now</h3></div><form><input type="hidden" name="resource" value="magnet:?xt=urn:btih:${hash}" data-load-query /><input type="hidden" name="magnet-wait" value="long" /></form>`;
+    const { el, sdk, q } = stageHost();
+    el.setAttribute('data-load-query', query);
+    sdk.inProgress('peers', 'Getting the torrent from peers');
+    sdk.push({ level: 'custom', tag: 'peers', body: card });
+    assert.equal(q('input[name=resource]').value, query);
+    assert.equal(q('input[name=magnet-wait]').value, 'long', 'nothing else is touched');
+    // A host that has no query (Discover's modal submits the bare infohash
+    // and draws its own host): the card's infohash is the retry.
+    const h = stageHost();
+    h.sdk.inProgress('peers', 'Getting the torrent from peers');
+    h.sdk.push({ level: 'custom', tag: 'peers', body: card });
+    assert.equal(h.q('input[name=resource]').value, `magnet:?xt=urn:btih:${hash}`);
+});

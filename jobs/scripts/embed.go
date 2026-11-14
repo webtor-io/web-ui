@@ -101,7 +101,7 @@ var embedTorrentClient = &http.Client{
 }
 
 func (s *EmbedScript) makeLoadArgs(settings *models.EmbedSettings) (*LoadArgs, error) {
-	la := &LoadArgs{}
+	la := &LoadArgs{Source: "embed"}
 	if settings.TorrentURL != "" {
 		u, err := url.Parse(settings.TorrentURL)
 		if err != nil {

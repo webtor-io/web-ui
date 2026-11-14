@@ -35,7 +35,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 			// waits ten minutes — the ordinary minute is rarely the reason
 			// (measured 2026-09-04: 5 of 60 resolve on a warm client), but
 			// the user decides. "user error shown" keeps the err_key metric.
-			return s.renderMagnetError(c, j, args, me)
+			return s.renderMagnetError(c, j, args, me, hash)
 		}
 		if err != nil {
 			return
@@ -58,26 +58,37 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 
 // MagnetErrorData feeds templates/views/load/errors/magnet.html.
 type MagnetErrorData struct {
-	Kind        string // dead | invalid
-	WaitedSec   int
-	Long        bool // the ten-minute attempt is what failed
-	Query       string
+	Kind      string // dead | invalid
+	WaitedSec int
+	Long      bool // the ten-minute attempt is what failed
+	// Magnet is what the retry submits when the browser cannot give it the
+	// query it submitted: the infohash alone, never the query. The card is
+	// kept in the job store and replayed to whoever loads the same torrent
+	// in the same language, through a log endpoint that needs no account,
+	// and a magnet's tr= can carry a private tracker's passkey. The retry
+	// takes the query from the log host, which was rendered for this
+	// browser only (partials/load/progress.html, progressLog.js).
+	Magnet      string
 	HintVideoID string
 }
 
-func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadArgs, me *scripts.MagnetError) error {
+func newMagnetErrorData(args *scripts.LoadArgs, me *scripts.MagnetError, hash string) *MagnetErrorData {
+	return &MagnetErrorData{
+		Kind:        me.Kind,
+		WaitedSec:   int(me.Waited.Round(time.Second).Seconds()),
+		Long:        me.Long,
+		Magnet:      "magnet:?xt=urn:btih:" + hash,
+		HintVideoID: args.HintVideoID,
+	}
+}
+
+func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadArgs, me *scripts.MagnetError, hash string) error {
 	key := "error.magnet_no_metadata"
 	if me.Kind == "invalid" {
 		key = "error.magnet_invalid"
 	}
 	log.WithError(me).WithField("err_key", key).WithField("long", me.Long).WithField("waited_s", int(me.Waited.Seconds())).Info("user error shown")
-	data := &MagnetErrorData{
-		Kind:        me.Kind,
-		WaitedSec:   int(me.Waited.Round(time.Second).Seconds()),
-		Long:        me.Long,
-		Query:       args.Query,
-		HintVideoID: args.HintVideoID,
-	}
+	data := newMagnetErrorData(args, me, hash)
 	tpl := s.tb.Build("load/errors/magnet").WithLayoutBody(`{{ template "main" . }}`)
 	str, terr := tpl.ToString(c.WithData(data))
 	if terr != nil {

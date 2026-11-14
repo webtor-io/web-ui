@@ -41,7 +41,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, pg *cs.PG, ats *at.AccessTok
 	// over WebDAV are the same objects, by construction.
 	h := &Handler{
 		at: ats,
-		sh: s3.New(libfs.New(pg, sapi, jobs), s3.SigningSecret(c), s3.MountPath),
+		sh: s3.New(libfs.New(pg, sapi, jobs, "s3"), s3.SigningSecret(c), s3.MountPath),
 	}
 
 	cr := r.Group(CredentialsPath)

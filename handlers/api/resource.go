@@ -9,7 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	ra "github.com/webtor-io/rest-api/services"
 	restapi "github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/libapi"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 // maxResourceBody bounds a POST /resource body. A .torrent is metadata, not
@@ -56,6 +58,7 @@ func (s *Handler) postResource(c *gin.Context) {
 		s.abort(c, libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "the body is too large for a torrent", nil))
 		return
 	}
+	private_torrent.LogUpload(body, auth.GetUserFromContext(c), "api")
 	res, aerr := s.api.StoreResource(c.Request.Context(), restapi.GetClaimsFromContext(c), body)
 	if aerr != nil {
 		s.abort(c, upstreamError(aerr, "failed to store the resource"))

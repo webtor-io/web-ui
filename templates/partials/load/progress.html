@@ -18,8 +18,16 @@
      added here and not in jobs/load.go on purpose — a load job is keyed by
      infohash + language and its log is replayed to everyone who loads the
      same torrent, so a slug baked into the stored redirect would follow the
-     first visitor's page to all the others. See docs/tool_pages.md. */}}
-<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px] text-left" data-async-progress-log="{{ makeJobLogURL .Lang .Data.Job }}" data-async-target="main">
+     first visitor's page to all the others. See docs/tool_pages.md.
+
+     data-load-query is the query this browser submitted, for the
+     dead-magnet card's retry (progressLog.js fills the card's
+     data-load-query input from it). The card itself is stored with the job
+     and replayed to everyone, and a magnet's tr= can carry a private
+     tracker's passkey, so it knows the infohash only. An attribute, not a
+     hidden input: those become query params of the redirect. */}}
+<div class="hidden progress-alert progress-alert-block mb-10 closeable relative z-10 w-full max-w-[680px] text-left" data-async-progress-log="{{ makeJobLogURL .Lang .Data.Job }}" data-async-target="main"
+    {{- with .Data }}{{ if has . "Args" }}{{ with .Args.Query }} data-load-query="{{ . }}"{{ end }}{{ end }}{{ end }}>
     {{- with .Data }}{{ if has . "Tool" }}{{ with .Tool }}
     <input type="hidden" name="tool" value="{{ .Url }}" />
     {{- end }}{{ end }}{{ end }}

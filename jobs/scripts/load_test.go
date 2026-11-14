@@ -1,14 +1,21 @@
 package scripts
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/anacrolix/torrent/bencode"
+	"github.com/anacrolix/torrent/metainfo"
+	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
 
 	"github.com/webtor-io/web-ui/services/api"
@@ -83,5 +90,56 @@ func TestStoreQueryRefusal(t *testing.T) {
 				t.Fatalf("ClassifyError(%q)=%s, want %s", err, got, tc.key)
 			}
 		})
+	}
+}
+
+// The embed hands Load a magnet from the embedding page's settings; one Load
+// refuses becomes the job's error, which is logged ("got job error"). It
+// says how long the query was and what it was, without the trackers and
+// sources in it: a private tracker's key rides in their URLs.
+func TestLoad_RefusedQueryKeepsNoTracker(t *testing.T) {
+	const passkey = "0123456789abcdef0123456789abcdef"
+	q := "magnet:?xt=urn:btih:5e4bd524&tr=http%3A%2F%2Ftracker.invalid%2Fannounce%3Fpasskey%3D" + passkey + "&as=https%3A%2F%2Ftracker.invalid%2F1." + passkey
+	_, _, err := Load(nil, nil, &web.Context{Lang: "en"}, &LoadArgs{Query: q})
+	if err == nil {
+		t.Fatal("the broken magnet was accepted")
+	}
+	if msg := err.Error(); strings.Contains(msg, passkey) || strings.Contains(msg, "tracker.invalid") {
+		t.Errorf("the error quotes the trackers: %s", msg)
+	}
+	if msg := err.Error(); !strings.Contains(msg, "query_len="+strconv.Itoa(len(q))+` query="magnet:?xt=urn:btih:5e4bd524&tr=<redacted>&as=<redacted>"`) {
+		t.Errorf("want query_len=%d and the redacted query in %s", len(q), msg)
+	}
+	if got := web.ClassifyError(err); got != "error.magnet_invalid" {
+		t.Errorf("ClassifyError = %s, want error.magnet_invalid", got)
+	}
+	_, _, err = Load(nil, nil, &web.Context{Lang: "en"}, &LoadArgs{Query: "Big Buck Bunny 2008"})
+	if err == nil || !strings.Contains(err.Error(), `query="Big Buck Bunny 2008"`) {
+		t.Errorf("a refused title must be readable: %v", err)
+	}
+}
+
+// A private .torrent submitted on the site (or fetched for an embed) is
+// counted once, by the door it came through (services/private_torrent).
+func TestLoad_CountsAPrivateUpload(t *testing.T) {
+	hook := test.NewGlobal()
+	defer hook.Reset()
+	info := metainfo.Info{Name: "probe", PieceLength: 16384, Length: 1, Pieces: make([]byte, 20), Private: &[]bool{true}[0]}
+	mi := metainfo.MetaInfo{InfoBytes: bencode.MustMarshal(info), Announce: "http://tracker.invalid/announce?passkey=0123456789abcdef0123456789abcdef"}
+	var b bytes.Buffer
+	if err := mi.Write(&b); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Load(nil, nil, &web.Context{Lang: "en"}, &LoadArgs{File: b.Bytes(), Source: "embed"}); err != nil {
+		t.Fatal(err)
+	}
+	var lines []*log.Entry
+	for _, e := range hook.AllEntries() {
+		if e.Data["event"] == "private_torrent_upload" {
+			lines = append(lines, e)
+		}
+	}
+	if len(lines) != 1 || lines[0].Data["source"] != "embed" || lines[0].Data["trackers"] != "http://tracker.invalid" {
+		t.Fatalf("lines %v, want one from the embed", hook.AllEntries())
 	}
 }

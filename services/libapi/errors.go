@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/webtor-io/web-ui/helpers"
 )
 
 // Error codes clients branch on. They are stable strings, not HTTP statuses:
@@ -74,7 +76,11 @@ func NewError(status int, code string, message string, cause error) *Error {
 // logging misses at warn level would drown the errors that matter, the same
 // reasoning as in services/s3.
 func WriteError(c *gin.Context, e *Error) {
-	entry := log.WithError(e).WithField("path", c.Request.URL.Path).WithField("method", c.Request.Method)
+	// The cause can quote what the client sent: rest-api answers a magnet
+	// it cannot parse with url.Parse's error, the whole URI in it, and a
+	// private tracker's passkey is part of a tracker URL. So can the path:
+	// a resource id may be a magnet, which URL.Path holds decoded.
+	entry := log.WithField(log.ErrorKey, helpers.RedactURL(e.Error())).WithField("path", helpers.RedactURL(c.Request.URL.Path)).WithField("method", c.Request.Method)
 	switch {
 	case e.Status >= http.StatusInternalServerError:
 		entry.Error("api request failed")

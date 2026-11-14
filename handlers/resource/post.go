@@ -39,8 +39,10 @@ func (s *Handler) bindArgs(c *gin.Context) (*PostArgs, error) {
 		query = strings.TrimPrefix(c.Request.URL.Path, "/") + c.Request.URL.RawQuery
 	}
 	if query != "" {
+		// The error is logged (RedirectWithError): RefusedQuery keeps a
+		// private tracker's key out of it.
 		if _, _, err := sv.ResolveQueryHash(query); err != nil {
-			return &PostArgs{Query: query}, errors.Wrapf(err, "wrong resource provided query=%v", query)
+			return &PostArgs{Query: query}, sv.RefusedQuery(err, query)
 		}
 	}
 
@@ -120,6 +122,7 @@ func (s *Handler) post(c *gin.Context) {
 		HintVideoID: args.HintVideoID,
 		MagnetWait:  args.MagnetWait,
 		Debug:       args.Debug,
+		Source:      "site",
 	})
 	if err != nil {
 		web.RedirectWithError(c, errors.Wrap(err, "failed to load resource"))

@@ -61,6 +61,15 @@ by ip + user agent + month, so:
   pageviews and `play-embed` never join `session_data`, and a browser that
   both watches an embed and visits the site is two visitors.
 
+## Magnet pages
+
+A magnet page is sent as its bare path — `/magnet:` (also `/ru/magnet:`, and
+the browser's `magnet:` handler, which encodes the whole magnet into the
+path), `/ext/magnet` — as the page and as the next page's referrer: its
+address is the magnet, and a private tracker's passkey is part of a tracker
+URL. Every other page keeps its query. Before 2026-11 these rows carried the
+whole magnet. See `docs/private_torrent_logs.md`.
+
 ## On every event and identify call
 
 `eventDefaults()` is merged into the data of every `umami.track` and

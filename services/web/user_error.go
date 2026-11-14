@@ -53,8 +53,9 @@ func ClassifyError(err error) string {
 	switch {
 	// --- what was pasted into the form. First, and by identity rather than
 	// by text: the query is part of the message ("wrong resource provided
-	// query=..."), so a title like "Unavailable" or a magnet named
-	// "...Access.Denied..." must not read as a backend outage or a ban ---
+	// query_len=... query=...", common.RefusedQuery), so a title like
+	// "Unavailable" or a magnet named "...Access.Denied..." must not read as
+	// a backend outage or a ban ---
 
 	case errors.Is(err, common.ErrMagnetInvalid),
 		errors.Is(err, common.ErrMagnetNoHash):
