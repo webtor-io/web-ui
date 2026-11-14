@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/pkg/errors"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/i18n"
 )
@@ -149,6 +150,35 @@ func TestClassifyError_BrokenMagnetBeatsItsWrapper(t *testing.T) {
 	}
 	if got := ClassifyError(errors.New("wrong resource provided resource_id=favicon.png")); got != "error.invalid_resource" {
 		t.Errorf("a bad resource id: got %s, want error.invalid_resource", got)
+	}
+}
+
+// rest-api's 422 for a magnet of a private torrent (api.ErrPrivateMagnet) has
+// its own words wherever it surfaces without the load card -- an embed renders
+// the plain message. By identity: it rides inside the dead card's error
+// ("failed to magnetize: ...", jobs/scripts MagnetError), whose text would
+// otherwise read "nobody is sharing it", and the words alone are not it.
+func TestClassifyError_PrivateMagnet(t *testing.T) {
+	refusal := fmt.Errorf("%w url=%v", api.ErrPrivateMagnet, "http://rest-api.invalid/resource")
+	for _, err := range []error{
+		refusal,
+		errors.Wrap(refusal, "failed to store resource by magnet"),
+		fmt.Errorf("failed to magnetize: %w", refusal),
+	} {
+		if got := ClassifyError(err); got != "error.private_magnet" {
+			t.Errorf("%q: got %s, want error.private_magnet", err, got)
+		}
+	}
+	if got := ClassifyError(errors.New(api.ErrPrivateMagnet.Error())); got == "error.private_magnet" {
+		t.Errorf("the words without the error must not be it, got %s", got)
+	}
+	// The rule it explains: a private torrent's magnet works when it carries
+	// the tracker's address, so the line names both ways out.
+	msg, _ := englishMessages(t)["error.private_magnet"].(string)
+	for _, w := range []string{"no tracker address", ".torrent file", "magnet link that includes your tracker"} {
+		if !strings.Contains(msg, w) {
+			t.Errorf("error.private_magnet %q lacks %q", msg, w)
+		}
 	}
 }
 

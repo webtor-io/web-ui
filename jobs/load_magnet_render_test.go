@@ -33,10 +33,40 @@ func TestMagnetErrorCardRenders(t *testing.T) {
 	if !strings.Contains(invalid, "magnet link is broken") || strings.Contains(invalid, "magnet-retry-long") || strings.Contains(invalid, "Searched for") {
 		t.Errorf("invalid: must explain the link and offer no retry:\n%s", invalid)
 	}
+	// A private torrent: a magnet without a tracker address resolved to one
+	// rest-api has not stored, and it stored nothing. Its own words -- the
+	// link has no tracker address -- and both ways out: the .torrent, uploaded
+	// into the same log host the retry targets, or a magnet that carries the
+	// tracker. None of the dead card: no "searched for", no ten-minute retry,
+	// nothing to sell, and its own Umami event so the dead/invalid series
+	// stays what it was.
+	private := render("en", &MagnetErrorData{Kind: "private", WaitedSec: 12, Magnet: "magnet:?xt=urn:btih:00", HintVideoID: "tt0000000"})
+	for _, w := range []string{"private torrent", "no tracker address", "magnet link that includes your tracker", ".torrent file", `type="file"`, `name="resource"`, `accept=".torrent,application/x-bittorrent"`,
+		`data-async-target="#log-load"`, `enctype="multipart/form-data"`, `name="hint_video_id" value="tt0000000"`, "this.form.requestSubmit()",
+		// Umami gets the event names alone: no data argument that could
+		// carry the link (the page URL itself is cut in lib/umami.js).
+		"umami.track('magnet-private-upload')", "umami.track('magnet-private-shown')"} {
+		if !strings.Contains(private, w) {
+			t.Errorf("private: missing %q", w)
+		}
+	}
+	// "use", not "paste": the card also answers Discover, where nothing was
+	// pasted.
+	for _, w := range []string{"magnet-retry-long", "magnet-wait", "Searched for", "magnet-failed-shown", "Nobody is sharing", "Vault", "donate", `name="resource" value=`, "urn:btih", "accepted", "passkey", "paste"} {
+		if strings.Contains(private, w) {
+			t.Errorf("private: must not carry %q:\n%s", w, private)
+		}
+	}
+	paste := map[string]string{"ru": "вставьте", "es": "pega ", "de": "füge", "fr": "collez", "pt": "cole ", "it": "incolla", "pl": "wklej", "tr": "yapıştır", "nl": "plak", "cs": "vlož", "zh": "粘贴"}
 	for _, lang := range []string{"ru", "es", "de", "fr", "pt", "it", "pl", "tr", "nl", "cs", "zh"} {
-		out := render(lang, &MagnetErrorData{Kind: "dead", WaitedSec: 60, Magnet: "m"})
-		if strings.Contains(out, "load.magnet.") {
-			t.Errorf("%s: unresolved key in %s", lang, out)
+		for _, kind := range []string{"dead", "private"} {
+			out := render(lang, &MagnetErrorData{Kind: kind, WaitedSec: 60, Magnet: "m"})
+			if strings.Contains(out, "load.magnet.") {
+				t.Errorf("%s %s: unresolved key in %s", lang, kind, out)
+			}
+			if kind == "private" && strings.Contains(out, paste[lang]) {
+				t.Errorf("%s private: says %q, not use", lang, paste[lang])
+			}
 		}
 	}
 }
@@ -229,4 +259,18 @@ func progressPartial(t *testing.T) *template.Template {
 		t.Fatalf("parse: %v", err)
 	}
 	return tpl
+}
+
+// Each face of the card is counted under its own err_key in "user error
+// shown": a private torrent must not swell the dead-magnet count.
+func TestMagnetErrKey(t *testing.T) {
+	for kind, want := range map[string]string{
+		"dead":    "error.magnet_no_metadata",
+		"invalid": "error.magnet_invalid",
+		"private": "error.private_magnet",
+	} {
+		if got := magnetErrKey(&scripts.MagnetError{Kind: kind}); got != want {
+			t.Errorf("%s: %s, want %s", kind, got, want)
+		}
+	}
 }

@@ -3,6 +3,7 @@ package scripts
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"net/http"
 	"net/http/httptest"
@@ -34,13 +35,17 @@ func TestStoreQueryRefusal(t *testing.T) {
 		name      string
 		get, post int    // rest-api's answers; a zero post is never asked
 		body      string // the POST's error body
-		key       string // the plain error's ClassifyError
+		key       string // ClassifyError of the plain error, or of the card's (an embed has no card)
 		kind      string // the card's MagnetError.Kind
 	}{
 		{name: "lookup refused", get: http.StatusForbidden, key: "error.forbidden"},
 		{name: "store refused", get: http.StatusNotFound, post: http.StatusForbidden, body: `{"error":"forbidden"}`, key: "error.forbidden"},
 		{name: "nobody shares it", get: http.StatusNotFound, post: http.StatusInternalServerError, body: `{"error":"magnet timeout"}`, kind: "dead"},
 		{name: "broken link", get: http.StatusNotFound, post: http.StatusBadRequest, body: `{"error":"failed to parse magnet: placeholder"}`, kind: "invalid"},
+		// rest-api resolved the magnet to a private torrent and stored
+		// nothing: its own card (upload the .torrent), never the dead one
+		// with its ten-minute retry -- no peer will change the answer.
+		{name: "private torrent", get: http.StatusNotFound, post: http.StatusUnprocessableEntity, body: `{"error":"private torrent: this magnet has no tracker; upload the .torrent file or use a magnet that includes your tracker"}`, kind: "private", key: "error.private_magnet"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,6 +85,11 @@ func TestStoreQueryRefusal(t *testing.T) {
 			if tc.kind != "" {
 				if !card || me.Kind != tc.kind {
 					t.Fatalf("err=%v, want the %s card", err, tc.kind)
+				}
+				if tc.key != "" {
+					if got := web.ClassifyError(err); got != tc.key {
+						t.Fatalf("ClassifyError(%q)=%s, want %s", err, got, tc.key)
+					}
 				}
 				return
 			}
@@ -141,5 +151,22 @@ func TestLoad_CountsAPrivateUpload(t *testing.T) {
 	}
 	if len(lines) != 1 || lines[0].Data["source"] != "embed" || lines[0].Data["trackers"] != "http://tracker.invalid" {
 		t.Fatalf("lines %v, want one from the embed", hook.AllEntries())
+	}
+}
+
+// The dev playback of the private card (debug=magnet_private) is the real
+// card's error: Kind private with the refusal inside, so the card, its
+// err_key and an embed's plain message are the ones a real refusal gets.
+func TestDebugMagnetPrivate(t *testing.T) {
+	s := &LoadScript{
+		i18n: i18n.New(os.DirFS("../../locales")),
+		c:    &web.Context{Lang: "en", ApiClaims: &api.Claims{}},
+		args: &LoadArgs{},
+	}
+	j := job.New(context.Background(), "t", "test", nil, &job.NilStorage{}, false, nil)
+	err := s.debugMagnet(context.Background(), j, "magnet_private")
+	me, card := err.(*MagnetError)
+	if !card || me.Kind != "private" || !errors.Is(err, api.ErrPrivateMagnet) {
+		t.Fatalf("err=%v, want the private card with api.ErrPrivateMagnet inside", err)
 	}
 }

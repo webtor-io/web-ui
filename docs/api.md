@@ -147,6 +147,7 @@ the several reasons applies.
 | `not_found` | 404 | No such resource, file or library entry |
 | `conflict` | 409 | Pledge already exists, or is still frozen |
 | `bad_request` | 400 | Malformed body or query |
+| `private_magnet` | 422 | `POST /resource` with a magnet without a tracker (no `tr=`) of a private torrent that is not stored yet: send its `.torrent` file, or a magnet that includes the tracker. Nothing was stored; the same magnet gets the same answer. A magnet with `tr=` of a private torrent is stored as usual |
 | `rate_limited` | 429 | Too many requests with this key; `Retry-After` says how long to wait |
 | `upstream_error` | 502 | The services behind this one failed |
 | `upstream_timeout` | 408 / 504 | A magnet could not be resolved in time, or an upstream call ran out of time |
@@ -157,7 +158,10 @@ the several reasons applies.
 worth retrying and `internal_error` is not.
 
 The rest-api client flattens upstream statuses into plain errors, so a message
-substring is the only signal left about what actually happened. `upstreamError`
+substring is the only signal left about what actually happened — with two
+exceptions it keeps by identity: 403 (`api.ErrForbidden`) and rest-api's 422
+for a private torrent's magnet without a tracker (`api.ErrPrivateMagnet`, passed on as
+`private_magnet`). `upstreamError`
 matches **the same substrings rest-api's own error middleware matches** to pick
 its status (`not found`, `forbidden`, `failed to parse`, `timeout`,
 `deadline exceeded`), which reproduces upstream's decision instead of inventing

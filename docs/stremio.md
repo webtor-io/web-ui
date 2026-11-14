@@ -13,7 +13,7 @@ All under `/stremio` (`handlers/stremio/handler.go`):
 | `GET /manifest.json` | Addon manifest (`resources: stream, catalog, meta`; `types: movie, series`) — see [Manifest text](#manifest-text) |
 | `GET /catalog/:type/*id` | The user's library as a Stremio catalog |
 | `GET /meta/:type/*id` | Series/movie meta. For series, `videos[]` is built from the library torrent's episodes (`Library.makeVideos`). The manifest declares no `idPrefixes`, so Stremio asks us about other addons' IDs too (`tmdb:series:76747`, `mx:…`): an ID we do not hold answers `null`, never an error — `parseLibraryID` takes season/episode only from a numeric tail, the rest is the series ID |
-| `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it. A free account on a stream only Webtor could serve gets the [paywall clip](#the-paywall-clip) instead |
+| `GET\|HEAD /resolve/*data` | Playback redirect. The JWT in the path carries `{hash, idx, exp}` (72h TTL — Stremio persists stream URLs across sessions and probes them on next-day resume/binge; 12h made those probes 401); resolves to a backend URL via `LinkResolver` and `302`s to it. A free account on a stream only Webtor could serve gets the [paywall clip](#the-paywall-clip) instead. A private torrent Webtor has not stored is a `404` with the warning `private torrent without a tracker, nothing to resolve`: the stream's magnet is the bare infohash, and rest-api refuses a private torrent's magnet without a tracker (`api.ErrPrivateMagnet`, its 422) |
 | `GET /stream/:type/*id` | Streams for a movie/episode (the pipeline below) |
 
 `GET /configure` (Stremio's standard config entry): anonymous → login with
@@ -291,8 +291,8 @@ otherwise:
 `HEAD` gets the same redirect as `GET`: it is Stremio's probe before
 auto-playing the next episode (see the binge contract above), and a probe that
 reached the clip plays the clip rather than bouncing to source selection.
-Paid accounts, debrid hits, a result with no URL (`404`) and resolver errors
-(`500`) are untouched.
+Paid accounts, debrid hits, a result with no URL (`404`), a private torrent
+(`404`, see the route table) and resolver errors (`500`) are untouched.
 
 `?v=` is the first 8 hex of the file's SHA-256, read at startup: a re-rendered
 clip is a new URL for every cache on the way, CDN included. Without it a

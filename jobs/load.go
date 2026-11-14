@@ -25,8 +25,10 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 	// A load job is keyed by hash+lang and its log is kept in Redis, so a
 	// second visit replays the first run — including a failure. The
 	// dead-magnet retry must run again, not replay the card it was clicked
-	// on; the dev playback likewise. Purge drops the stored log first.
-	purge := args.MagnetWait > 0 || args.Debug != ""
+	// on; the dev playback likewise. So must an upload: a magnet card asks
+	// for the .torrent, which has the same infohash. Purge drops the stored
+	// log first.
+	purge := args.MagnetWait > 0 || args.Debug != "" || args.File != nil
 	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, id, job.NewScript(func(j *job.Job) (err error) {
 		err = ls.Run(ctx, j)
 		if me, ok := err.(*scripts.MagnetError); ok {
@@ -58,7 +60,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 
 // MagnetErrorData feeds templates/views/load/errors/magnet.html.
 type MagnetErrorData struct {
-	Kind      string // dead | invalid
+	Kind      string // dead | invalid | private
 	WaitedSec int
 	Long      bool // the ten-minute attempt is what failed
 	// Magnet is what the retry submits when the browser cannot give it the
@@ -82,10 +84,25 @@ func newMagnetErrorData(args *scripts.LoadArgs, me *scripts.MagnetError, hash st
 	}
 }
 
+// magnetErrKey is the err_key a magnet card is counted under in "user error
+// shown": the key the same failure reads as a plain line.
+func magnetErrKey(me *scripts.MagnetError) string {
+	switch me.Kind {
+	case "invalid":
+		return "error.magnet_invalid"
+	case "private":
+		return "error.private_magnet"
+	}
+	return "error.magnet_no_metadata"
+}
+
 func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadArgs, me *scripts.MagnetError, hash string) error {
-	key := "error.magnet_no_metadata"
-	if me.Kind == "invalid" {
-		key = "error.magnet_invalid"
+	key := magnetErrKey(me)
+	if me.Kind == "private" {
+		// The refusal answers the link that was submitted (no tracker in
+		// it), not the torrent. The stored card goes when this run retires,
+		// so a later magnet with the tracker runs instead of replaying it.
+		j.DoNotCache()
 	}
 	log.WithError(me).WithField("err_key", key).WithField("long", me.Long).WithField("waited_s", int(me.Waited.Seconds())).Info("user error shown")
 	data := newMagnetErrorData(args, me, hash)

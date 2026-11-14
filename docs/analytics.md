@@ -70,6 +70,11 @@ address is the magnet, and a private tracker's passkey is part of a tracker
 URL. Every other page keeps its query. Before 2026-11 these rows carried the
 whole magnet. See `docs/private_torrent_logs.md`.
 
+The magnet card's own events carry no link either: `magnet-failed-shown`
+sends kind and timing, `magnet-private-shown` and `magnet-private-upload` the
+name alone (`TestMagnetErrorCardRenders` pins both), and the page they fire on
+is cut as above.
+
 ## On every event and identify call
 
 `eventDefaults()` is merged into the data of every `umami.track` and

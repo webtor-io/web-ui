@@ -298,6 +298,17 @@ func (s *Handler) resolve(c *gin.Context) {
 		s.paywall(c, user, hash, fileIdx)
 		return
 	}
+	if errors.Is(err, api.ErrPrivateMagnet) {
+		// A stream carries the bare infohash, and rest-api refuses a bare
+		// magnet of a private torrent it has not stored. Nothing to play
+		// and nothing broken: a 404, not an outage's 500.
+		log.WithError(err).
+			WithField("hash", hash).
+			WithField("file_idx", fileIdx).
+			Warn("private torrent without a tracker, nothing to resolve")
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.WithError(err).
 			WithField("hash", hash).

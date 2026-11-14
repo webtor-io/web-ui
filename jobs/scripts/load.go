@@ -32,7 +32,8 @@ type LoadArgs struct {
 	// ordinary MagnetWaitDefault. The dead-magnet card offers MagnetWaitLong.
 	MagnetWait time.Duration
 	// Debug is a dev-only switch (see CLAUDE.md, Debugging): "magnet_dead",
-	// "magnet_dead_long", "magnet_invalid" play the failure without a network.
+	// "magnet_dead_long", "magnet_invalid", "magnet_private" play the failure
+	// without a network.
 	Debug string
 	// Source is the door a File came in by, "site" or "embed", for the
 	// private-torrent count (services/private_torrent).
@@ -50,8 +51,10 @@ const (
 )
 
 // MagnetError is a magnet that did not become a torrent. Kind is "dead" (no
-// peer had the metadata within Waited) or "invalid" (the link itself is
-// broken). The Jobs layer renders it as a card with a retry.
+// peer had the metadata within Waited), "invalid" (the link itself is
+// broken) or "private" (a magnet without a tracker resolved to a private
+// torrent rest-api has not stored: api.ErrPrivateMagnet). The Jobs layer
+// renders it as a card; only "dead" has a retry.
 type MagnetError struct {
 	Kind   string
 	Waited time.Duration
@@ -202,6 +205,13 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 		// but error.forbidden -- what the same hash reads once it is stored.
 		return nil, errors.Wrap(err, "failed to store resource by magnet")
 	}
+	if errors.Is(err, api.ErrPrivateMagnet) {
+		// The magnet did resolve, to a private torrent, but carries no
+		// tracker, and rest-api stored nothing. Its own card -- the .torrent
+		// or a magnet with the tracker -- not the dead one: no peer and no
+		// ten-minute retry change that answer.
+		return nil, &MagnetError{Kind: "private", Waited: time.Since(started), Long: long, Cause: err}
+	}
 	if err != nil || res == nil {
 		kind := "dead"
 		if err != nil && strings.Contains(err.Error(), "failed to parse magnet") {
@@ -215,12 +225,17 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 
 // debugMagnet plays the magnet failure for review (dev only): a short
 // countdown, then the card. "magnet_dead_long" says the ten-minute attempt
-// failed too; "magnet_invalid" is the broken link.
+// failed too; "magnet_invalid" is the broken link; "magnet_private" is the
+// private torrent rest-api would not take as a bare magnet (no countdown: the
+// card is what there is to look at).
 func (s *LoadScript) debugMagnet(ctx context.Context, j *job.Job, mode string) error {
 	switch mode {
-	case "magnet_dead", "magnet_dead_long", "magnet_invalid":
+	case "magnet_dead", "magnet_dead_long", "magnet_invalid", "magnet_private":
 	default:
 		return errors.Errorf("unknown debug mode %q", mode)
+	}
+	if mode == "magnet_private" {
+		return &MagnetError{Kind: "private", Cause: fmt.Errorf("%w url=debug", api.ErrPrivateMagnet)}
 	}
 	if mode != "magnet_invalid" {
 		wait := 8 * time.Second

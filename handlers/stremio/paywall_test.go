@@ -2,6 +2,7 @@ package stremio
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
@@ -221,6 +224,28 @@ func TestNonPaywallOutcomesAreUnchanged(t *testing.T) {
 		w := resolveWith(t, resolveCase{res: &fakeResolver{err: errors.New("rest-api down")}, promo: trialPlan, clips: clips})
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("status = %d, want 500", w.Code)
+		}
+	})
+	// A stream's magnet is the bare infohash, and rest-api refuses a bare
+	// magnet of a private torrent it has not stored (api.ErrPrivateMagnet):
+	// nothing to play, the client's condition and not our fault -- 404 and a
+	// warning, not the 500 and "failed to resolve link" error of an outage.
+	t.Run("a private torrent", func(t *testing.T) {
+		hook := test.NewGlobal()
+		defer hook.Reset()
+		refusal := errors.Wrap(errors.Wrap(fmt.Errorf("%w url=%v", api.ErrPrivateMagnet, "http://rest-api.invalid/resource"),
+			"failed to ensure resource"), "failed to generate webtor link")
+		w := resolveWith(t, resolveCase{res: &fakeResolver{err: refusal}, promo: trialPlan, clips: clips})
+		if w.Code != http.StatusNotFound {
+			t.Errorf("status = %d (Location %q), want 404", w.Code, w.Header().Get("Location"))
+		}
+		for _, e := range hook.AllEntries() {
+			if e.Level <= logrus.ErrorLevel || e.Message == "failed to resolve link" {
+				t.Errorf("logged %s %q, want a warning", e.Level, e.Message)
+			}
+		}
+		if e := hook.LastEntry(); e == nil || e.Level != logrus.WarnLevel {
+			t.Errorf("last entry %v, want a warning", e)
 		}
 	})
 	t.Run("a wrapped paywall is still the paywall", func(t *testing.T) {
