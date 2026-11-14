@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
+	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
@@ -166,5 +168,114 @@ func TestStoreTorrentCountsAPrivateUpload(t *testing.T) {
 		if len(lines) != 1 || lines[0]["source"] != source || lines[0]["user"] != auth.LogHash(id) || lines[0]["trackers"] != "udp://tracker.invalid:6969" {
 			t.Errorf("%s: lines %v, want one", source, lines)
 		}
+	}
+}
+
+// libfsAPI is an Api whose rest-api is h.
+func libfsAPI(t *testing.T, h http.HandlerFunc) *api.Api {
+	t.Helper()
+	restAPI := httptest.NewServer(h)
+	t.Cleanup(restAPI.Close)
+	u, _ := url.Parse(restAPI.URL)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range api.RegisterFlags(nil) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
+		"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+		t.Fatal(err)
+	}
+	return api.New(cli.NewContext(cli.NewApp(), fs, nil), restAPI.Client())
+}
+
+// privateTorrent is an upload of a private torrent and its infohash.
+func privateTorrent(t *testing.T) ([]byte, string) {
+	t.Helper()
+	info := metainfo.Info{Name: "probe", PieceLength: 16384, Length: 1, Pieces: make([]byte, 20), Private: &[]bool{true}[0]}
+	mi := metainfo.MetaInfo{InfoBytes: bencode.MustMarshal(info), Announce: "http://tracker.invalid/announce"}
+	var torrent bytes.Buffer
+	if err := mi.Write(&torrent); err != nil {
+		t.Fatal(err)
+	}
+	return torrent.Bytes(), mi.HashInfoBytes().HexString()
+}
+
+// rest-api serves a private torrent's .torrent to no user: a WebDAV GET of it
+// answers rest-api's 403, not a 500 that reads as webtor being broken.
+func TestWebDAVGetPrivateTorrentIs403(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	dir := &TorrentLibraryDirectory{api: libfsAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/resource/"+hash+".torrent" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":"x","code":"private_torrent_file"}`))
+	})}
+	l := &models.Library{
+		Name:      "probe",
+		CreatedAt: time.Unix(1700000000, 0),
+		Torrent:   &models.TorrentResource{ResourceID: hash, TorrentSizeBytes: 100},
+	}
+	h := &webdav.Handler{FileSystem: libraryEntryFS{TorrentLibraryDirectory: dir, l: l}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wc := &web.Context{ApiClaims: &api.Claims{}}
+		h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), web.Context{}, wc)))
+	}))
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/probe.torrent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("GET status = %d, want 403", resp.StatusCode)
+	}
+}
+
+// A private torrent's .torrent is served to no user, so its size is not read
+// back after an upload: the request would only be refused (and the row would
+// fall back to the upload's size anyway, with a warning).
+func TestCreatePrivateSkipsSizeRead(t *testing.T) {
+	torrent, hash := privateTorrent(t)
+	var asked atomic.Bool
+	dir := &TorrentLibraryDirectory{pg: &cs.PG{}, api: libfsAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/resource":
+			_, _ = w.Write([]byte(`{"id":"` + hash + `","private":true}`))
+		case r.URL.Path == "/resource/"+hash+".torrent":
+			asked.Store(true)
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":"x","code":"private_torrent_file"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	})}
+	ctx := context.WithValue(context.Background(), web.Context{}, &web.Context{ApiClaims: &api.Claims{}, User: &auth.User{ID: uuid.NewV4()}})
+
+	// No database here: Create gets as far as the row, which is past the size.
+	_, _, err := dir.Create(ctx, "/probe.torrent", io.NopCloser(bytes.NewReader(torrent)), nil)
+	if err == nil || err.Error() != "db is nil" {
+		t.Fatalf("err = %v, want the row's missing database", err)
+	}
+	if asked.Load() {
+		t.Error("the .torrent of a private torrent was asked for")
+	}
+}
+
+// rest-api's refusal of an upload reaches WebDAV and S3 with its own status,
+// 422, not as a 500.
+func TestCreatePrivateRefusedIs422(t *testing.T) {
+	torrent, _ := privateTorrent(t)
+	dir := &TorrentLibraryDirectory{pg: &cs.PG{}, api: libfsAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"error":"x","code":"private_no_tracker"}`))
+	})}
+	ctx := context.WithValue(context.Background(), web.Context{}, &web.Context{ApiClaims: &api.Claims{}, User: &auth.User{ID: uuid.NewV4()}})
+
+	_, _, err := dir.Create(ctx, "/probe.torrent", io.NopCloser(bytes.NewReader(torrent)), nil)
+	if got := vfs.StatusCode(err); got != http.StatusUnprocessableEntity {
+		t.Errorf("status %d, want 422: %v", got, err)
 	}
 }

@@ -25,27 +25,41 @@ import (
 func newRestAPIHandler(t *testing.T, upstream *httptest.Server) *Handler {
 	t.Helper()
 	u, _ := url.Parse(upstream.URL)
+	return restAPIHandler(t, upstream.Client(), "--webtor-rest-api-host="+u.Hostname(), "--webtor-rest-api-port="+u.Port(),
+		"--webtor-secret=test", "--rapidapi-host=")
+}
+
+// restAPIHandler is a Handler whose rest-api client New builds from flags,
+// talking through cl.
+func restAPIHandler(t *testing.T, cl *http.Client, flags ...string) *Handler {
+	t.Helper()
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	for _, f := range restapi.RegisterFlags(nil) {
 		f.Apply(fs)
 	}
-	if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
-		"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+	if err := fs.Parse(flags); err != nil {
 		t.Fatal(err)
 	}
-	return &Handler{api: restapi.New(cli.NewContext(cli.NewApp(), fs, nil), upstream.Client())}
+	return &Handler{api: restapi.New(cli.NewContext(cli.NewApp(), fs, nil), cl)}
 }
 
-// A private .torrent stored through the JSON API is counted once, as the
-// API's (services/private_torrent); a magnet is not a torrent and is not.
-func TestPostResource_CountsAPrivateUpload(t *testing.T) {
+// privateTorrent is a private .torrent with a test key in its announce, and
+// its hash.
+func privateTorrent(t *testing.T) ([]byte, string) {
+	t.Helper()
 	info := metainfo.Info{Name: "probe", PieceLength: 16384, Length: 1, Pieces: make([]byte, 20), Private: &[]bool{true}[0]}
 	mi := metainfo.MetaInfo{InfoBytes: bencode.MustMarshal(info), Announce: "http://tracker.invalid/announce?passkey=0123456789abcdef0123456789abcdef"}
 	var torrent bytes.Buffer
 	if err := mi.Write(&torrent); err != nil {
 		t.Fatal(err)
 	}
-	hash := mi.HashInfoBytes().HexString()
+	return torrent.Bytes(), mi.HashInfoBytes().HexString()
+}
+
+// A private .torrent stored through the JSON API is counted once, as the
+// API's (services/private_torrent); a magnet is not a torrent and is not.
+func TestPostResource_CountsAPrivateUpload(t *testing.T) {
+	torrent, hash := privateTorrent(t)
 
 	restAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/resource" {
@@ -79,7 +93,7 @@ func TestPostResource_CountsAPrivateUpload(t *testing.T) {
 		}
 		return n
 	}
-	if n := count(torrent.Bytes()); n != 1 {
+	if n := count(torrent); n != 1 {
 		t.Errorf("a private torrent: %d lines, want 1", n)
 	}
 	if n := count([]byte("magnet:?xt=urn:btih:" + hash)); n != 0 {
@@ -133,5 +147,111 @@ func TestPostResourcePrivateMagnet(t *testing.T) {
 	// The upstream text (it carries rest-api's internal URL) stays in the logs.
 	if strings.Contains(w.Body.String(), u.Host) {
 		t.Errorf("upstream URL leaked into the response: %s", w.Body.String())
+	}
+}
+
+// rest-api's coded refusals reach a JSON API client as rest-api named them:
+// its status, code, reason and Retry-After, so a client can tell "sign in" from
+// "your tracker refused the key" from "try again in 5 s". A 403 without a code
+// stays the plan's forbidden.
+func TestUpstreamPrivateEnvelope(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	for _, c := range []struct {
+		path, method         string
+		status               int
+		body, retry          string
+		wantStatus           int
+		wantCode, wantReason string
+	}{
+		{"/resource/" + hash, "GET", 403, `{"error":"private torrent: only a signed-in user who added it with their own tracker can play it","code":"private_torrent","reason":"no_record"}`, "", 403, "private_torrent", "no_record"},
+		{"/resource", "POST", 422, `{"error":"x","code":"private_tracker_refused","reason":"account"}`, "", 422, "private_tracker_refused", "account"},
+		{"/resource", "POST", 503, `{"error":"x","code":"private_verify_unavailable"}`, "5", 503, "private_verify_unavailable", ""},
+		{"/resource", "POST", 429, `{"error":"x"}`, "60", 429, "rate_limited", ""},
+		{"/resource/" + hash, "GET", 403, `{"error":"restricted"}`, "", 403, "forbidden", ""},
+	} {
+		// representatives only (S32): the full code table is TestRestAPIPrivateCodes (Task 1)
+		t.Run(c.wantCode, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if c.retry != "" {
+					w.Header().Set("Retry-After", c.retry)
+				}
+				w.WriteHeader(c.status)
+				_, _ = w.Write([]byte(c.body))
+			}))
+			defer upstream.Close()
+			u, _ := url.Parse(upstream.URL)
+			h := newRestAPIHandler(t, upstream)
+
+			gin.SetMode(gin.TestMode)
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), restapi.ClaimsContext{}, &restapi.Claims{}))
+				c.Next()
+			})
+			r.POST("/resource", h.postResource)
+			r.GET("/resource/:resource_id", h.getResource)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(c.method, c.path, strings.NewReader("magnet:?xt=urn:btih:"+hash)))
+
+			if w.Code != c.wantStatus {
+				t.Errorf("status %d, want %d: %s", w.Code, c.wantStatus, w.Body.String())
+			}
+			// The wire shape, not the Go type: what a client decodes.
+			var res struct {
+				Error struct {
+					Code    string `json:"code"`
+					Message string `json:"message"`
+					Reason  string `json:"reason"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+				t.Fatalf("body is not an error document: %q", w.Body.String())
+			}
+			if res.Error.Code != c.wantCode || res.Error.Reason != c.wantReason {
+				t.Errorf("code %q reason %q, want %q %q", res.Error.Code, res.Error.Reason, c.wantCode, c.wantReason)
+			}
+			if got := w.Header().Get("Retry-After"); got != c.retry {
+				t.Errorf("Retry-After %q, want %q", got, c.retry)
+			}
+			if strings.Contains(w.Body.String(), u.Host) {
+				t.Errorf("upstream URL leaked into the response: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+// GET /resource/{id} answers rest-api's private flag as it came. The module's
+// own field is shadowed by services/api.Resource, and decoding left it false
+// for every private torrent until GetResource copied the flag down.
+func TestGetResourceKeepsPrivate(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	for _, want := range []bool{true, false} {
+		body := `{"id":"` + hash + `","name":"probe","private":false}`
+		if want {
+			body = `{"id":"` + hash + `","name":"probe","private":true}`
+		}
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}))
+		h := newRestAPIHandler(t, upstream)
+		gin.SetMode(gin.TestMode)
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), restapi.ClaimsContext{}, &restapi.Claims{}))
+			c.Next()
+		})
+		r.GET("/resource/:resource_id", h.getResource)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/resource/"+hash, nil))
+		upstream.Close()
+		var res struct {
+			Private *bool `json:"private"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil || w.Code != http.StatusOK {
+			t.Fatalf("status %d body %q: %v", w.Code, w.Body.String(), err)
+		}
+		if res.Private == nil || *res.Private != want {
+			t.Errorf("rest-api said private=%t, the API answered %s", want, w.Body.String())
+		}
 	}
 }

@@ -309,6 +309,16 @@ func (s *Handler) resolve(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
+	if api.IsPrivateRefusal(err) {
+		// rest-api refused this user a private torrent: its decision, not
+		// an outage.
+		log.WithError(err).
+			WithField("hash", hash).
+			WithField("file_idx", fileIdx).
+			Warn("private torrent refused by rest-api")
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
 	if err != nil {
 		log.WithError(err).
 			WithField("hash", hash).

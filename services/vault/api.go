@@ -180,15 +180,38 @@ func (s *Api) GetResourceCached(ctx context.Context, resourceID string) (*Resour
 	})
 }
 
-// PutResource queues a resource for storage in the Vault
-func (s *Api) PutResource(ctx context.Context, resourceID string) (*Resource, error) {
+// uidsRequest is the pledgers' uids Vault signs with, in the order it tries
+// them.
+type uidsRequest struct {
+	UIDs []string `json:"uids"`
+}
+
+// PutResource queues a resource for storage in the Vault. uids are the
+// pledgers of a private resource; nil sends no body, as for a public one.
+func (s *Api) PutResource(ctx context.Context, resourceID string, uids []string) (*Resource, error) {
 	u := fmt.Sprintf("%s/resource/%s", s.url, resourceID)
+	var body []byte
+	if uids != nil {
+		body, _ = json.Marshal(uidsRequest{uids})
+	}
 	resource := &Resource{}
-	_, err := s.doRequest(ctx, u, "PUT", nil, resource)
+	_, err := s.doRequest(ctx, u, "PUT", body, resource)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to put resource")
 	}
 	return resource, nil
+}
+
+// PutResourceUIDs replaces the pledgers' uids of a resource without changing
+// its status; an empty list clears them. A resource Vault does not have (404)
+// is not an error: there is nothing to sign for.
+func (s *Api) PutResourceUIDs(ctx context.Context, resourceID string, uids []string) error {
+	u := fmt.Sprintf("%s/resource/%s/uids", s.url, resourceID)
+	body, _ := json.Marshal(uidsRequest{uids})
+	if _, err := s.doRequest(ctx, u, "PUT", body, nil); err != nil {
+		return errors.Wrap(err, "failed to put resource uids")
+	}
+	return nil
 }
 
 // DeleteResource queues a resource for deletion from the Vault

@@ -115,7 +115,7 @@
     </div>
 
     <div class="text-center mt-12 flex flex-col items-center gap-3">
-        <a href="{{ langPath $.Lang "/profile/export" }}" class="btn btn-ghost border border-w-line text-w-sub hover:text-w-text text-sm" data-umami-event="profile-export" download>
+        <a href="{{ langPath $.Lang "/profile/export" }}" class="btn btn-ghost border border-w-line text-w-sub hover:text-w-text text-sm" data-umami-event="profile-export">
             {{ t $.Lang "profile.exportData" }}
         </a>
         <a href="{{ langPath $.Lang "/logout" }}" class="btn btn-ghost text-w-muted hover:text-error text-sm" data-async-target="main" data-umami-event="logout">{{ t $.Lang "profile.logout" }}</a>

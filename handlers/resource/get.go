@@ -11,6 +11,7 @@ import (
 
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/handlers/index"
+	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
 	sv "github.com/webtor-io/web-ui/services/common"
@@ -352,6 +353,11 @@ func (s *Handler) get(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 	d, err := s.prepareGetData(ctx, args)
+	var pe *api.PrivateError
+	if errors.As(err, &pe) && pe.Status == http.StatusForbidden {
+		s.privateRefusal(ctx, c, args, pe)
+		return
+	}
 	if err != nil {
 		_ = c.Error(err)
 		web.RedirectWithErrorAndPath(c, "/", err)
@@ -360,6 +366,9 @@ func (s *Handler) get(c *gin.Context) {
 	if d == nil {
 		s.notFound(c, errors.New("resource not found"))
 		return
+	}
+	if d.Resource.Private {
+		noStoreNoIndex(c)
 	}
 
 	s.addTitleText(ctx, d, args.User, i18n.GetLang(c))
@@ -382,7 +391,7 @@ func (s *Handler) get(c *gin.Context) {
 		} else {
 			d.VaultButton = vaultButton
 			if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
-				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args)
+				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, d.Resource.Private)
 				if err != nil {
 					_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
 					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
@@ -411,6 +420,49 @@ func (s *Handler) get(c *gin.Context) {
 	}
 
 	getTpl.HTML(http.StatusOK, web.NewContext(c).WithData(d))
+}
+
+// noStoreNoIndex keeps a private torrent's page out of every cache and index
+// (Р11): the refusal and the page of whoever may play it alike. The second
+// has the torrent's name, and anti-goal 6 forbids serving one person's page
+// to another from a cache.
+func noStoreNoIndex(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Robots-Tag", "noindex")
+}
+
+// privateRefusal answers rest-api's 403 for a private torrent: why, and the
+// way out, without the torrent's name (rest-api gave none). A 503 or a 429
+// says nothing about this user's right and keeps the redirect above.
+func (s *Handler) privateRefusal(ctx context.Context, c *gin.Context, args *GetArgs, pe *api.PrivateError) {
+	noStoreNoIndex(c)
+	r := web.NewPrivateRefusal(pe, args.User.HasAuth())
+	log.WithError(pe).
+		WithField("err_key", r.Key).
+		WithField("surface", "page").
+		WithField("path", helpers.RedactURL(c.Request.URL.Path)).
+		Info("user error shown")
+	if web.WantsJSON(c) {
+		c.JSON(http.StatusForbidden, gin.H{"status": "error", "message": r.Key})
+		return
+	}
+	r.Target = "main"
+	r.VaultKept = args.User.HasAuth() && pe.Reason == api.ReasonNoRecord && s.vaulted(ctx, c, args.ID)
+	s.tb.Build("resource/private").HTML(http.StatusForbidden, web.NewContext(c).WithData(r))
+}
+
+// vaulted says Vault keeps a copy of the torrent. Unknown (no Vault, or its
+// database did not answer) reads as no: the line is a promise.
+func (s *Handler) vaulted(ctx context.Context, c *gin.Context, id string) bool {
+	if s.vault == nil {
+		return false
+	}
+	res, err := s.vault.GetResource(ctx, id)
+	if err != nil {
+		_ = c.Error(errors.Wrap(err, "failed to get vault resource"))
+		return false
+	}
+	return res != nil && res.Vaulted
 }
 
 // notFound answers a resource URL that names nothing: the ID is not one at

@@ -75,6 +75,42 @@ sends kind and timing, `magnet-private-shown` and `magnet-private-upload` the
 name alone (`TestMagnetErrorCardRenders` pins both), and the page they fire on
 is cut as above.
 
+## Private torrent refusals
+
+rest-api's refusal of a private torrent is shown by one partial
+(`partials/private/refusal`): on the resource page (`views/resource/private`,
+a 403 from rest-api) and in the load job's card. Its events carry no user
+data and no tracker:
+
+- `private-refused-shown` `{code, reason}`: any refusal shown, with
+  rest-api's code and reason as they came (`private_torrent` / `sign_in`,
+  `private_tracker_refused` / `key`, …). One event for every case: there is
+  no separate event per way out (sign in, upload). Declared on the card
+  (`data-umami-impression`) and sent by `app/private_refusal.js` through
+  `av`, which runs after `layout.js` has set `window.umami`: on a full page
+  load (a shared link, a reload) as well as after an async swap. An inline
+  script would run while the page is parsed, before umami exists, and lose
+  it. Like every impression (`lib/impression.js`) it is sent once per page
+  load per `{code, reason}`: a re-render is not a second refusal, another
+  refusal is.
+- `private-reupload-upload`: a `.torrent` file picked in the refusal's upload
+  (a signed-in user without a record, or a tracker that refused or names
+  nothing usable). A click that ends in "cancel" is not counted.
+
+`TestPrivateRefusalPartialRenders` pins both; `lib/privateRefusal.test.js`
+pins the full-load order.
+
+The Save to Vault modal counts its own refusals of a private pledge, the same
+way (`data-umami-impression`, `app/private_refusal.js`):
+
+- `vault-private-refused-shown` `{code, reason}`: `{code: private_unavailable}`
+  when the modal opens on a private torrent before private pledges are open on
+  the server (`PRIVATE_ACCESS_ENFORCE` off: the text says so, there is no Store
+  button); `{code: private_torrent, reason: no_record}` when a pledge came back
+  refused because the user never added the torrent with their own tracker. The
+  warning shown above the Store button once private pledges are open is not
+  counted. `TestPledgeModalPrivate` pins all three.
+
 ## On every event and identify call
 
 `eventDefaults()` is merged into the data of every `umami.track` and

@@ -327,6 +327,40 @@ func TestTorrentMagnetSplitCarriesTheTool(t *testing.T) {
 	}
 }
 
+// A private torrent's .torrent is served to no one (private_torrent_file), so
+// its page links to none; whoever may play it reads instead what playing does
+// on their tracker account. No link to the profile: there is nothing about
+// private trackers there (S26). A public torrent's page is as it was.
+func TestPrivateResourceHasNoTorrentLink(t *testing.T) {
+	tpl := resourceTemplates(t)
+	tr := intentFuncs(t)["t"].(func(string, string) string)
+	notice := template.HTMLEscapeString(tr("en", "private.notice.title"))
+	page := func(private bool) string {
+		gd := intentPage("", true)
+		gd.Resource.Private = private
+		return execute(t, tpl, "main", pageContext("en", gd))
+	}
+
+	priv := page(true)
+	if strings.Contains(priv, "download-torrent") {
+		t.Error("a private torrent's page links to its .torrent")
+	}
+	if !strings.Contains(priv, notice) || !strings.Contains(priv, template.HTMLEscapeString(tr("en", "private.notice.body"))) {
+		t.Errorf("no notice on a private torrent's page:\n%s", priv)
+	}
+	if strings.Contains(priv, "/profile#") {
+		t.Error("the notice links to a profile section that does not exist")
+	}
+
+	pub := page(false)
+	if !strings.Contains(pub, `data-umami-event="download-torrent"`) {
+		t.Error("a public torrent's page lost its .torrent link")
+	}
+	if strings.Contains(pub, notice) {
+		t.Error("the private notice on a public torrent's page")
+	}
+}
+
 // The markup assets/src/js/lib/toolIntent.test.js runs against. Committed,
 // because `npm test` must not need a Go toolchain; generated, because the
 // script presses the page's own download buttons (form.download-dir in #list,

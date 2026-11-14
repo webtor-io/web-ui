@@ -130,9 +130,10 @@ func testJobsWith(t *testing.T, h http.Handler, st job.Storage) func() *Jobs {
 	}
 	dir := t.TempDir()
 	for name, body := range map[string]string{
-		"templates/layouts/main.html":             `{{ template "main" . }}`,
-		"templates/views/load/errors/magnet.html": `{{ define "main" }}{{ .Data.Kind }} card{{ end }}`,
-		"templates/partials/.keep":                ``,
+		"templates/layouts/main.html":              `{{ template "main" . }}`,
+		"templates/views/load/errors/magnet.html":  `{{ define "main" }}{{ .Data.Kind }} card{{ end }}`,
+		"templates/views/load/errors/private.html": `{{ define "main" }}private card {{ .Data.Key }} {{ .Data.Code }} {{ .Data.Target }}{{ end }}`,
+		"templates/partials/.keep":                 ``,
 	} {
 		p := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

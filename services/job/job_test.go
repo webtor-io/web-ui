@@ -290,3 +290,55 @@ func TestRun_CountsARunTheStoreRefused(t *testing.T) {
 		t.Fatalf("an observer was counted as a run: %v", got)
 	}
 }
+
+// rest-api refusing a private torrent (403 or 422 with a code) is a decision
+// about this torrent, like the stoplist, not a failed run: counted as error it
+// would raise WebUIJobFailures on the night private access is switched on.
+// A check that did not answer (503) or hit its limit (429) is still a failure.
+func TestPrivateRefusalIsRejected(t *testing.T) {
+	for err, want := range map[error]string{
+		&api.PrivateError{Status: 403, Code: "private_torrent"}:                                             metrics.JobRejected,
+		pkgerrors.Wrap(&api.PrivateError{Status: 422, Code: "private_no_tracker"}, "failed to upload file"): metrics.JobRejected,
+		&api.PrivateError{Status: 503, Code: "private_verify_unavailable"}:                                  metrics.JobError,
+		&api.PrivateError{Status: 429, Code: "rate_limited"}:                                                metrics.JobError,
+	} {
+		if got := outcomeOf(err); got != want {
+			t.Errorf("outcomeOf(%v) = %s, want %s", err, got, want)
+		}
+	}
+}
+
+// A card the script rendered in place of the red line (Shown) is counted by
+// the error it carries (Р6), and Run returns that error for retire, but
+// writes no red line under the card.
+func TestRun_ShownErrorIsCountedWithoutARedLine(t *testing.T) {
+	const q = "metrics-shown-test"
+	count := func(outcome string) float64 {
+		return metricstest.Counter(t, "webui_jobs_total", map[string]string{"job": q, "outcome": outcome})
+	}
+	for _, c := range []struct {
+		err  error
+		want string
+	}{
+		{&api.PrivateError{Status: 422, Code: "private_needs_account"}, metrics.JobRejected},
+		{&api.PrivateError{Status: 503, Code: "store_outdated"}, metrics.JobError},
+	} {
+		before := count(c.want)
+		j := New(context.Background(), "id", q, NewScript(func(j *Job) error {
+			j.Fail()
+			j.Custom("card", "")
+			return Shown(c.err)
+		}), &NilStorage{}, true, nil)
+		if err := j.Run(context.Background()); !errors.Is(err, c.err) {
+			t.Errorf("Run = %v, want %v for retire", err, c.err)
+		}
+		if got := count(c.want) - before; got != 1 {
+			t.Errorf("%v: %s moved by %v, want 1", c.err, c.want, got)
+		}
+		for _, i := range itemsOf(j) {
+			if i.Level == Error && i.Message != "" {
+				t.Errorf("%v: a red line under the card: %+v", c.err, i)
+			}
+		}
+	}
+}

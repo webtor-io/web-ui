@@ -129,6 +129,8 @@ func HTTPErrorf(code int, format string, a ...interface{}) *HTTPError {
 }
 
 // HTTPErrorFromError coerces any error into a *HTTPError, defaulting to 500.
+// An error that carries its own status (rest-api's refusal of a private
+// torrent) keeps it.
 func HTTPErrorFromError(err error) *HTTPError {
 	if err == nil {
 		return nil
@@ -136,6 +138,10 @@ func HTTPErrorFromError(err error) *HTTPError {
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {
 		return httpErr
+	}
+	var hs interface{ HTTPStatus() int }
+	if errors.As(err, &hs) {
+		return &HTTPError{Code: hs.HTTPStatus(), Err: err}
 	}
 	return &HTTPError{Code: http.StatusInternalServerError, Err: err}
 }

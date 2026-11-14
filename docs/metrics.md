@@ -26,6 +26,7 @@ The collectors live in `services/metrics`, on the default registry, namespace
 | `webui_download_ready_total` | counter | `kind`, `cached` | Download jobs that ended in the card with the link (`jobs/scripts/action.go` download): `kind` ∈ `file` / `dir` (TAR/ZIP), `cached` from the export's cache flag (for `dir`, the whole directory). Replays of a stored result are not counted; all four series exist at 0 from the start. The denominator of Umami `download-start` — docs/job_wait_ux.md, "What the wait leaves behind" |
 | `webui_transcoder_capability` | gauge | `answer` | One-hot: what content-transcoder last said about HEVC passthrough (`GET /capabilities`), `answer` ∈ `on` / `off` / `unknown` (nothing heard since this pod started) — docs/discover.md, "Transcoder capability" |
 | `webui_transcoder_capability_checks_total` | counter | `result` | The background questions behind it, every 30 s: `result` ∈ `on` / `off` / `failed` (no answer; the last answer stays) |
+| `webui_private_enforce` | gauge | — | The private access switch `PRIVATE_ACCESS_ENFORCE` (`--private-access-enforce`, `services/private_torrent`): 1 when on (Vault pledges on private torrents are open), 0 when off, the default. Set once at start; the startup log says the same. The switch goes in phase 4 |
 | `webui_passthrough_fallback_total` | counter | `reason`, `class` | Stream starts that restart a file whose HEVC passthrough failed in the browser (`decode-fallback`, site and embed): `reason` ∈ `codecs_rejected` / `decode_error` / `media_error` / `src_unsupported` / `no_frames` / `user` / `other`, `class` ∈ `hevc8` / `hevc10` / `hevc8-2160` / `hevc10-2160` / `unknown` — docs/player.md, "Passthrough: errors and fallback". Also a restart after the multichannel audio a declaration made failed, on any route: `class` ∈ `dolby` / `aac51` (docs/player.md, "Multichannel audio and the fallback") — the HEVC fallbacks are the other classes. `codecs_rejected` > 0 is a build fault of ours |
 
 ### Label rules
@@ -66,9 +67,10 @@ value would be a series kept for the life of the process.
   `other`. Both are bounded inside `metrics.TrialShortlink`, which takes the
   raw query values — at most 3 × 3 × 11 = 99 series. A new surface is a new
   entry in `offer.TrialFroms`, never a value passed through.
-- `rejected` is a torrent-store stoplist block — working as intended, so an
+- `rejected` is a torrent-store stoplist block, or rest-api's refusal of a
+  private torrent (403 or 422 with a code) — working as intended, so an
   error-rate alert on `outcome="error"` does not fire on a burst of blocked
-  hashes.
+  hashes or refused private torrents.
 
 ### What is deliberately not measured
 

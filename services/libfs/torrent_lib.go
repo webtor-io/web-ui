@@ -79,12 +79,13 @@ func (s *TorrentLibraryDirectory) Create(ctx context.Context, name string, body 
 	if err != nil {
 		return nil, false, err
 	}
-	// Record the size of what GET serves, not of the upload: rest-api strips
-	// a private torrent's trackers. Same source the UI's add button measures.
-	// Still a snapshot — the store can merge more trackers later, and GET
-	// takes its length from the bytes, so the upload's size is a fine fallback.
+	// Record the size of what GET serves, not of the upload: the store keeps
+	// its own record (merged announce lists). Still a snapshot — the store can
+	// merge more later, and GET takes its length from the bytes, so the
+	// upload's size is a fine fallback. A private torrent's .torrent is served
+	// to no user: asking would only be refused, so its row takes the upload's.
 	size := int64(len(t))
-	if wcc, err := getWebContext(ctx); err == nil {
+	if wcc, err := getWebContext(ctx); err == nil && !resp.Private {
 		if served, err := s.api.GetTorrentCached(ctx, wcc.ApiClaims, resp.ID); err == nil {
 			size = int64(len(served))
 		} else {

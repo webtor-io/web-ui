@@ -245,6 +245,7 @@ func TestMetricNames(t *testing.T) {
 		"webui_trial_shortlink_total":              dto.MetricType_COUNTER,
 		"webui_status_view_total":                  dto.MetricType_COUNTER,
 		"webui_download_ready_total":               dto.MetricType_COUNTER,
+		"webui_private_enforce":                    dto.MetricType_GAUGE,
 	}
 	for _, f := range families {
 		typ, ok := want[f.GetName()]

@@ -105,6 +105,12 @@ func (s *LinkResolver) ResolveLink(ctx context.Context, userID uuid.UUID, apiCla
 		"file_idx":         fileIdx,
 		"requires_payment": requiresPayment,
 	}).Debug("resolving link")
+	// rest-api decides first whether this user may play the torrent: a
+	// private one must not reach a debrid backend by its hash (nor a banned
+	// one). Its refusal or failure is the answer.
+	if _, err := s.api.GetResourceCached(ctx, apiClaims, hash); err != nil {
+		return nil, errors.Wrap(err, "failed to look up resource")
+	}
 	enabledBackends, err := s.GetUserEnabledBackends(ctx, userID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load user enabled backends")

@@ -1,13 +1,10 @@
 package api
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net/http"
 	"strings"
 
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
@@ -163,7 +160,10 @@ func (s *Handler) getLibraryItem(c *gin.Context) {
 //	@Failure		400		{object}	libapi.ErrorResponse
 //	@Failure		401		{object}	libapi.ErrorResponse
 //	@Failure		402		{object}	libapi.ErrorResponse
+//	@Failure		403		{object}	libapi.ErrorResponse	"A private torrent you may not use: code `private_torrent` (`reason`: `sign_in`, `no_record` or `token_in_query`), `private_torrent_file` (its .torrent is never served) or `private_unavailable`; or the plan does not allow it (`forbidden`)"
 //	@Failure		404		{object}	libapi.ErrorResponse	"The resource is not in the store"
+//	@Failure		422		{object}	libapi.ErrorResponse	"A private torrent refused on upload: code `private_needs_account`, `private_no_tracker`, `private_too_many_trackers`, `private_magnet` (a magnet without a tracker: upload its .torrent file or use a magnet that includes the tracker), `private_tracker_refused` (`reason`: `key`, `account`, `unregistered`, `client` or `other`) or `private_unavailable`"
+//	@Failure		503		{object}	libapi.ErrorResponse	"A private torrent could not be checked now: code `private_verify_unavailable` (the `Retry-After` header says when to try again) or `store_outdated`"
 //	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library [post]
 func (s *Handler) addLibrary(c *gin.Context) {
@@ -201,27 +201,17 @@ func (s *Handler) addLibrary(c *gin.Context) {
 	// The torrent is fetched and parsed rather than trusted from the request:
 	// the library row carries name, size and file count, and those have to come
 	// from the metainfo the store actually holds. Same path the UI's add
-	// button takes.
-	t, aerr := s.api.GetTorrentCached(c.Request.Context(), restapi.GetClaimsFromContext(c), rID)
+	// button takes; rest-api decides first whether this caller may have it.
+	info, size, aerr := s.api.LibraryTorrent(c.Request.Context(), restapi.GetClaimsFromContext(c), rID)
 	if aerr != nil {
 		s.abort(c, upstreamError(aerr, "failed to fetch the torrent"))
 		return
 	}
-	if len(t) == 0 {
+	if info == nil {
 		s.abort(c, notFound("no such resource in the store — POST /resource first"))
 		return
 	}
-	mi, merr := metainfo.Load(io.NopCloser(bytes.NewReader(t)))
-	if merr != nil {
-		s.abort(c, libapi.NewError(http.StatusBadGateway, libapi.CodeUpstream, "the stored torrent is malformed", merr))
-		return
-	}
-	info, merr := mi.UnmarshalInfo()
-	if merr != nil {
-		s.abort(c, libapi.NewError(http.StatusBadGateway, libapi.CodeUpstream, "the stored torrent is malformed", merr))
-		return
-	}
-	if _, derr = models.AddTorrentToLibrary(c.Request.Context(), db, u.ID, rID, &info, "", int64(len(t))); derr != nil {
+	if _, derr = models.AddTorrentToLibrary(c.Request.Context(), db, u.ID, rID, info, "", size); derr != nil {
 		s.abort(c, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to add to the library", derr))
 		return
 	}

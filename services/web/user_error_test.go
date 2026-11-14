@@ -290,3 +290,55 @@ func TestClassifyError_DependencyOutageIs503(t *testing.T) {
 		}
 	}
 }
+
+// rest-api's coded refusals of a private torrent, read by type: each code
+// (and, for private_torrent, its reason) has its own words and status. The
+// merged rows (S28): every class of a tracker's refusal reads one text, too
+// many trackers reads "no usable tracker", a private .torrent file reads
+// "not available".
+func TestClassifyPrivateError(t *testing.T) {
+	for _, tc := range []struct {
+		code, reason, key string
+		status            int
+	}{
+		{"private_torrent", "sign_in", "error.private_sign_in", 403},
+		{"private_torrent", "no_record", "error.private_no_record", 403},
+		{"private_torrent", "token_in_query", "error.generic", 500},
+		{"private_torrent", "", "error.generic", 500},
+		{"private_torrent_file", "", "error.private.unavailable", 403},
+		{"private_needs_account", "", "error.private_needs_account", 422},
+		{"private_no_tracker", "", "error.private_no_tracker", 422},
+		{"private_too_many_trackers", "", "error.private_no_tracker", 422},
+		{"private_magnet", "", "error.private_magnet", 422},
+		{"private_tracker_refused", "key", "error.private_tracker_refused", 422},
+		{"private_tracker_refused", "client", "error.private_tracker_refused", 422},
+		{"private_tracker_refused", "", "error.private_tracker_refused", 422},
+		{"private_verify_unavailable", "", "error.private_verify_unavailable", 503},
+		{"rate_limited", "", "error.private_verify_unavailable", 503},
+		{"private_unavailable", "", "error.private.unavailable", 403},
+		{"store_outdated", "", "error.service_unavailable", 503},
+		{"a_code_this_build_does_not_know", "", "error.generic", 500},
+	} {
+		err := errors.Wrap(&api.PrivateError{Status: 422, Code: tc.code, Reason: tc.reason}, "failed to upload file")
+		if got := ClassifyError(err); got != tc.key {
+			t.Errorf("%s/%s: got %s, want %s", tc.code, tc.reason, got, tc.key)
+		}
+		if got := StatusForErrKey(tc.key); got != tc.status {
+			t.Errorf("%s: status %d, want %d", tc.key, got, tc.status)
+		}
+	}
+	if got := StatusForErrKey("error.vault_private_no_record"); got != 403 {
+		t.Errorf("error.vault_private_no_record: status %d, want 403", got)
+	}
+}
+
+// rest-api's English text of a private refusal names "access is forbidden",
+// and the error rides through gRPC-shaped wrappers ("PermissionDenied"): read
+// by text, it would say the rights holder blocked the torrent.
+func TestClassifyPrivateBeforeForbidden(t *testing.T) {
+	err := errors.Wrap(&api.PrivateError{Status: 403, Code: "private_torrent", Reason: "no_record",
+		Message: "access is forbidden, restricted by the rightholder"}, "PermissionDenied")
+	if got := ClassifyError(err); got != "error.private_no_record" {
+		t.Fatalf("got %q: a private refusal reads as a rights-holder block", got)
+	}
+}

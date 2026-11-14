@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -34,6 +35,7 @@ import (
 
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 const (
@@ -319,6 +321,7 @@ type Api struct {
 	torrentHTTPProxyHost        string
 	torrentHTTPProxyPort        int
 	secret                      string
+	rapidAPI                    bool // rest-api is reached through RapidAPI: no /internal/ there, no private torrents
 }
 
 type ListResourceContentOutputType string
@@ -390,8 +393,10 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		r.Header.Set("X-Api-Key", key)
 		return r, nil
 	}
-	if rapidApiHost != "" && rapidApiKey != "" {
+	rapidAPI := rapidApiHost != "" && rapidApiKey != ""
+	if rapidAPI {
 		log.Info("using RapidAPI")
+		log.Info("private torrents are off: rest-api is reached through RapidAPI, which carries one account for every user of this instance")
 		prepareRequest = func(r *http.Request, cl *Claims) (*http.Request, error) {
 			r.Header.Set("X-RapidAPI-Host", rapidApiHost)
 			r.Header.Set("X-RapidAPI-Key", rapidApiKey)
@@ -419,33 +424,54 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		torrentHTTPProxyHost:        c.String(torrentHTTPProxyHostFlag),
 		torrentHTTPProxyPort:        c.Int(torrentHTTPProxyPortFlag),
 		secret:                      secret,
+		rapidAPI:                    rapidAPI,
 	}
 }
 
+// GetResource is the resource as the caller may use it. Where private
+// torrents are not available, a private one is refused as rest-api refuses it
+// where its store keeps no private records: through RapidAPI rest-api answers
+// the instance's one account, so a record there would open the torrent to
+// every user of the instance (decision 42).
 func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (*ra.ResourceResponse, error) {
 	r, err := s.LookupResource(ctx, c, infohash)
 	if r == nil {
 		return nil, err
 	}
+	if r.Private && !s.PrivateAvailable() {
+		return nil, errPrivateUnavailable(http.StatusForbidden)
+	}
+	// Resource's own Private shadows the embedded one, which JSON leaves false.
+	r.ResourceResponse.Private = r.Private
 	return &r.ResourceResponse, err
 }
 
-// Resource is rest-api's resource with the private flag, which the rest-api
-// module web-ui builds against does not know yet. A rest-api without the
-// field reads as public: it has no private access rule either.
+// Resource is rest-api's resource with the private flag. The rest-api module
+// now has the flag too (ra.ResourceResponse.Private, same json tag): this one
+// shadows it, so JSON fills this one and GetResource copies it down. A
+// rest-api without the field reads as public: it has no private access rule
+// either.
 type Resource struct {
 	ra.ResourceResponse
 	Private bool `json:"private"`
 }
 
 // LookupResource is GetResource with the private flag: nil, nil on 404,
-// ErrForbidden on 403.
+// ErrForbidden on 403. A private resource comes back as it is, for web-ui's
+// own readers (posters, Vault) to treat as private. Where private torrents
+// are not available, rest-api's private_torrent refusal is private_unavailable:
+// it names the instance's one account, and neither signing in nor an upload
+// here would change it.
 func (s *Api) LookupResource(ctx context.Context, c *Claims, infohash string) (e *Resource, err error) {
 	u := s.url + "/resource/" + infohash
 	e = &Resource{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)
 	if e.ID == "" {
 		e = nil
+	}
+	var pe *PrivateError
+	if !s.PrivateAvailable() && errors.As(err, &pe) && pe.Code == CodePrivateTorrent {
+		return nil, errPrivateUnavailable(http.StatusForbidden)
 	}
 	return
 }
@@ -482,20 +508,42 @@ func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string)
 	return
 }
 
+// GetTorrent is the stored .torrent: nil, nil on 404; any other status but
+// 200 is an error, never a body read as a torrent.
 func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (closer io.ReadCloser, err error) {
 	u := s.url + "/resource/" + infohash + ".torrent"
 	res, err := s.doRequestRaw(ctx, c, u, "GET", nil)
 	if err != nil {
 		return nil, err
 	}
-	return res.Body, nil
+	if res.StatusCode == http.StatusOK {
+		return res.Body, nil
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(res.Body)
+	if res.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	return nil, errorFromResponse(res, body, u)
 }
 
+// errTorrentNotFound carries rest-api's 404 out of torrentCache, which keeps
+// only successes, as errResourceNotFound does for resourcesCache.
+var errTorrentNotFound = errors.New("torrent not found")
+
 func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) ([]byte, error) {
-	return s.torrentCache.Get(cacheKey(c, infohash), func() ([]byte, error) {
+	data, err := s.torrentCache.Get(cacheKey(c, infohash), func() ([]byte, error) {
 		resp, err := s.GetTorrent(ctx, c, infohash)
 		if err != nil {
 			return nil, err
+		}
+		if resp == nil {
+			return nil, errTorrentNotFound
 		}
 		defer func(Body io.ReadCloser) {
 			_ = Body.Close()
@@ -506,20 +554,89 @@ func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) 
 		}
 		return data, nil
 	})
-
+	if errors.Is(err, errTorrentNotFound) {
+		return nil, nil
+	}
+	return data, err
 }
 
+// LibraryTorrent is what a library row is made of. rest-api decides access first:
+// GetResourceCached with the caller's claims (403 private_torrent with its reason
+// when the user has no record). The metainfo is then read as web-ui itself: rest-api
+// gives a private torrent's .torrent to no user (decision 2). (nil, 0, nil): not stored.
+func (s *Api) LibraryTorrent(ctx context.Context, c *Claims, infohash string) (*metainfo.Info, int64, error) {
+	r, err := s.GetResourceCached(ctx, c, infohash)
+	if err != nil || r == nil {
+		return nil, 0, err
+	}
+	t, err := s.GetTorrentCached(ctx, InternalClaims(), infohash)
+	if err != nil || t == nil {
+		return nil, 0, err
+	}
+	mi, err := metainfo.Load(bytes.NewReader(t))
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "the stored torrent is malformed")
+	}
+	info, err := mi.UnmarshalInfo()
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "the stored torrent is malformed")
+	}
+	return &info, int64(len(t)), nil
+}
+
+// PrivateAvailable says this server takes private torrents. Through RapidAPI
+// it does not: web-ui sends no X-Token there and the gateway signs one uid
+// for the whole instance, so a private torrent's right would be shared by
+// every user of it (decision 42).
+func (s *Api) PrivateAvailable() bool {
+	return !s.rapidAPI
+}
+
+// errPrivateUnavailable refuses a private torrent where PrivateAvailable is
+// false, as rest-api refuses it where it has no private store: 422 on a store,
+// 403 on a read.
+func errPrivateUnavailable(status int) *PrivateError {
+	return &PrivateError{Status: status, Code: CodePrivateUnavailable,
+		Message: "private torrents are not available on this server"}
+}
+
+// readable refuses, where private torrents are not available, a list or an
+// export of a private torrent: rest-api would serve it to the instance's one
+// account. Every caller there is that account, so one cached lookup per hash
+// serves the whole instance.
+func (s *Api) readable(ctx context.Context, infohash string) error {
+	if s.PrivateAvailable() {
+		return nil
+	}
+	_, err := s.GetResourceCached(ctx, InternalClaims(), infohash)
+	return err
+}
+
+// StoreResource stores a .torrent or a magnet. Where private torrents are not
+// available, a private .torrent is refused before rest-api sees it, and a
+// magnet whose resource comes back private is refused instead of returned:
+// every door that stores (site, JSON API, WebDAV/S3, Stremio) comes through
+// here.
 func (s *Api) StoreResource(ctx context.Context, c *Claims, resource []byte) (e *ra.ResourceResponse, err error) {
+	if !s.PrivateAvailable() && private_torrent.IsPrivate(resource) {
+		return nil, errPrivateUnavailable(http.StatusUnprocessableEntity)
+	}
 	u := s.url + "/resource"
 	e = &ra.ResourceResponse{}
 	err = s.doRequest(ctx, c, u, "POST", resource, e)
 	if e.ID == "" {
 		e = nil
 	}
+	if err == nil && e != nil && e.Private && !s.PrivateAvailable() {
+		return nil, errPrivateUnavailable(http.StatusUnprocessableEntity)
+	}
 	return
 }
 
 func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (e *ra.ListResponse, err error) {
+	if err = s.readable(ctx, infohash); err != nil {
+		return nil, err
+	}
 	u := s.url + "/resource/" + infohash + "/list?" + args.ToQuery().Encode()
 	e = &ra.ListResponse{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)
@@ -596,18 +713,8 @@ func (s *Api) doRequest(ctx context.Context, c *Claims, url string, method strin
 		return nil
 	} else if res.StatusCode == http.StatusNotFound {
 		return nil
-	} else if res.StatusCode == http.StatusForbidden {
-		return fmt.Errorf("%w url=%v", ErrForbidden, url)
-	} else if res.StatusCode == http.StatusUnprocessableEntity {
-		return fmt.Errorf("%w url=%v", ErrPrivateMagnet, url)
-	} else {
-		var e ra.ErrorResponse
-		err = json.Unmarshal(body, &e)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse status=%v body=%v url=%v", res.StatusCode, body, url)
-		}
-		return errors.New(e.Error)
 	}
+	return errorFromResponse(res, body, url)
 }
 
 type SpeedtestURL struct {
@@ -650,6 +757,9 @@ func (s *Api) ExportResourceContentWithArchiveFormat(ctx context.Context, c *Cla
 }
 
 func (s *Api) exportResourceContent(ctx context.Context, c *Claims, infohash string, itemID string, q url.Values) (*ra.ExportResponse, error) {
+	if err := s.readable(ctx, infohash); err != nil {
+		return nil, err
+	}
 	u := s.url + "/resource/" + infohash + "/export/" + itemID
 	if len(q) > 0 {
 		u += "?" + q.Encode()

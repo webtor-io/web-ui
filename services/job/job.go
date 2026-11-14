@@ -211,6 +211,10 @@ func (s *Job) Run(ctx context.Context) error {
 
 	if s.runnable != nil {
 		err := s.execute(ctx)
+		if errors.As(err, new(shownError)) {
+			// The card is on the log already: no red line under it.
+			return err
+		}
 		if err != nil {
 			errr := s.Error(err)
 			if errr != nil {
@@ -246,6 +250,17 @@ func (s *Job) execute(ctx context.Context) (err error) {
 	outcome = outcomeOf(err)
 	return err
 }
+
+// Shown wraps an error the script has already shown to the viewer as a card
+// (Fail, then Custom) in place of the red line. The run is still the failure
+// err is: counted by it (a private refusal rejected, a check that did not
+// answer an error), dropped from storage and logged by retire. Run only
+// writes no second, red line under the card.
+func Shown(err error) error { return shownError{err} }
+
+type shownError struct{ error }
+
+func (e shownError) Unwrap() error { return e.error }
 
 func outcomeOf(err error) string {
 	switch {
@@ -398,14 +413,16 @@ func (s *Job) formatError(err error) string {
 
 // isStoplistBlock reports whether err is a torrent-store stoplist rejection
 // (gRPC PermissionDenied with "found in stoplist" message, or rest-api's 403
-// for it, api.ErrForbidden, whose body the client drops). These are working-
-// as-intended CSAM blocks, not real errors — they bypass the "got job error"
-// log path to keep error counters meaningful.
+// for it, api.ErrForbidden, whose body the client drops), or rest-api's
+// refusal of a private torrent (api.IsPrivateRefusal: 403 or 422 with a
+// code). These are working-as-intended decisions, not real errors — they
+// bypass the "got job error" log path to keep error counters meaningful.
 func isStoplistBlock(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, api.ErrForbidden) || strings.Contains(err.Error(), "found in stoplist")
+	return errors.Is(err, api.ErrForbidden) || strings.Contains(err.Error(), "found in stoplist") ||
+		api.IsPrivateRefusal(err)
 }
 
 func (s *Job) Error(err error) error {

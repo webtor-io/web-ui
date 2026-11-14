@@ -16,12 +16,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
 	"github.com/webtor-io/web-ui/handlers/donate"
 	"github.com/webtor-io/web-ui/models"
 	at "github.com/webtor-io/web-ui/services/access_token"
 	"github.com/webtor-io/web-ui/services/adminauth"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/common"
@@ -143,6 +145,9 @@ type Handler struct {
 	payments     *pay.Client
 	releaseSubs  *rss.Service
 	notification *notification.Service
+	// restAPI holds the account's private tracker records, which the export
+	// reads through rest-api's internal endpoint.
+	restAPI *api.Api
 	// billing: who takes the money and where it is managed; zero when no
 	// provider is configured, and the tier card then says nothing about it.
 	billing       notification.Billing
@@ -178,7 +183,7 @@ type Handler struct {
 	emailLimiter *libapi.RateLimiter
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient, restAPI *api.Api) {
 	h := &Handler{
 		tb:               tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:               at,
@@ -190,6 +195,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		payments:         payments,
 		releaseSubs:      releaseSubs,
 		notification:     ns,
+		restAPI:          restAPI,
 		billing:          donate.Billing(c),
 		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
 		disableS3:        c.Bool(common.DisableS3Flag),
@@ -335,9 +341,40 @@ var deleteUser = func(ctx context.Context, db *pg.DB, userID uuid.UUID) error {
 	return models.DeleteUser(ctx, db, userID)
 }
 
+// deletePrivateRecords deletes the private tracker records of the account
+// with site uid through rest-api's internal endpoint.
+var deletePrivateRecords = func(ctx context.Context, a *api.Api, uid string) error {
+	_, err := a.DeletePrivateTrackers(ctx, uid)
+	return err
+}
+
+// forgetVaultPledger takes the account off Vault's pledger list of every
+// private resource it pledged to; nothing to do without Vault.
+var forgetVaultPledger = func(ctx context.Context, v *vault.Vault, userID uuid.UUID) error {
+	if v == nil {
+		return nil
+	}
+	return v.ForgetUser(ctx, userID)
+}
+
 func (s *Handler) delete(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
+	ctx := c.Request.Context()
+	// The private tracker records and the uid on Vault's pledger lists go
+	// first, while the session and the account are still there to try again
+	// from: once the row is gone, nothing deletes them. Either failing stops
+	// the deletion. The log names the account by its hash, never by uid.
+	if err := deletePrivateRecords(ctx, s.restAPI, api.GenerateSessionIDFromUser(u)); err != nil {
+		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to delete private tracker records")
+		web.RedirectWithError(c, web.NewUserError("error.generic", err))
+		return
+	}
+	if err := forgetVaultPledger(ctx, s.vault, u.ID); err != nil {
+		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to take the account off vault pledger lists")
+		web.RedirectWithError(c, web.NewUserError("error.generic", err))
+		return
+	}
 	// End the session before the row goes: the /logout this redirects to
 	// still carried it, and the auth middleware resolved it by email into a
 	// fresh empty account -- deleting an account recreated it at once.
@@ -345,7 +382,7 @@ func (s *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
-	if err := deleteUser(c.Request.Context(), db, u.ID); err != nil {
+	if err := deleteUser(ctx, db, u.ID); err != nil {
 		web.RedirectWithError(c, err)
 		return
 	}
@@ -378,6 +415,20 @@ func (s *Handler) export(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/logout")
 		return
 	}
+	// Never a partial export: without the records there is no file at all,
+	// and the user is asked to try again.
+	records, err := s.restAPI.ListPrivateTrackers(c.Request.Context(), api.GenerateSessionIDFromUser(u))
+	if err != nil {
+		// The redirect logs only the key; the cause (an old rest-api's 404,
+		// a store outage) goes here. No uid in it: the client keeps it out.
+		log.WithError(err).Warn("data export: failed to read private tracker records")
+		web.RedirectWithErrorAndPath(c, "/profile", web.NewUserError("error.generic", err))
+		return
+	}
+	if records == nil {
+		records = []api.PrivateTrackerRecord{}
+	}
+	exp.PrivateTrackers = records
 	filename := fmt.Sprintf("webtor-data-export-%s.json", time.Now().UTC().Format("2006-01-02"))
 	c.Header("Content-Type", "application/json; charset=utf-8")
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))

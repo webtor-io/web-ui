@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	cs "github.com/webtor-io/common-services"
@@ -14,6 +15,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 const (
@@ -123,6 +125,7 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 
 	// Execute in transaction with SELECT FOR UPDATE
 	var result *vaultModels.UserVP
+	var changed []string // resources whose funding the new total changed
 	err = db.RunInTransaction(ctx, func(tx *pg.Tx) error {
 		// Lock the row for update
 		existingVP := &vaultModels.UserVP{}
@@ -215,7 +218,7 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 		}
 
 		// Recalculate pledge funding based on new total
-		err = s.recalculatePledgeFunding(ctx, tx, user, claimsPoints)
+		changed, err = s.recalculatePledgeFunding(ctx, tx, user, claimsPoints)
 		if err != nil {
 			return errors.Wrap(err, "failed to recalculate pledge funding")
 		}
@@ -236,6 +239,7 @@ func (s *Vault) UpdateUserVP(ctx context.Context, user *auth.User) (*vaultModels
 	if err != nil {
 		return nil, err
 	}
+	s.syncPrivateUIDs(ctx, changed...)
 
 	return result, nil
 }
@@ -508,12 +512,34 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 		}
 		return nil, err
 	}
+	s.syncPrivateUIDs(ctx, resource.ResourceID)
 
 	return result, nil
 }
 
-// GetOrCreateResource retrieves an existing resource or creates a new one if it doesn't exist
+// ErrPrivateNoRecord refuses a pledge rest-api answered with private_torrent:
+// a private torrent the pledger has no tracker record for.
+var ErrPrivateNoRecord = errors.New("private torrent: no tracker record for this user")
+
+// GetOrCreateResource retrieves an existing resource or creates a new one if
+// it doesn't exist. Every pledge asks rest-api first, with the pledger's
+// claims, before the early return below: every private resource pledged so
+// far already has its row. A private torrent without the pledger's record, a
+// private one before enforce, and rest-api's failure all refuse the pledge.
 func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, resourceID string) (*vaultModels.Resource, error) {
+	r, err := s.api.GetResource(ctx, claims, resourceID)
+	var pe *api.PrivateError
+	if errors.As(err, &pe) && pe.Code == api.CodePrivateTorrent {
+		return nil, errors.Wrap(ErrPrivateNoRecord, "pledge refused")
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check the resource")
+	}
+	if r != nil && r.Private && !private_torrent.Enforce() {
+		return nil, &api.PrivateError{Status: http.StatusUnprocessableEntity, Code: api.CodePrivateUnavailable,
+			Message: "private torrents are not available for Vault on this server yet"}
+	}
+
 	db := s.pg.Get()
 	if db == nil {
 		return nil, errors.New("database connection is not available")
@@ -712,6 +738,7 @@ func (s *Vault) RemovePledge(ctx context.Context, pledge *vaultModels.Pledge) er
 	if err != nil {
 		return err
 	}
+	s.syncPrivateUIDs(ctx, pledge.ResourceID)
 
 	return nil
 }
@@ -767,7 +794,18 @@ func (s *Vault) putResourceToVaultAPI(ctx context.Context, tx *pg.Tx, resource *
 
 	// If resource doesn't exist in Vault, add it via PUT
 	if vaultResource == nil {
-		_, err = s.vaultApi.PutResource(ctx, resource.ResourceID)
+		var uids []string
+		r, err := s.api.LookupResource(ctx, api.InternalClaims(), resource.ResourceID)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to look up resource")
+		}
+		if r != nil && r.Private {
+			// The tx sees the new pledge: the worker's first run has a uid.
+			if uids, err = s.pledgerUIDs(ctx, tx, resource.ResourceID, uuid.Nil); err != nil {
+				return false, err
+			}
+		}
+		_, err = s.vaultApi.PutResource(ctx, resource.ResourceID, uids)
 		if err != nil {
 			return false, errors.Wrap(err, "failed to put resource to vault api")
 		}
@@ -807,13 +845,15 @@ func (s *Vault) fundPledge(ctx context.Context, tx *pg.Tx, pledge *vaultModels.P
 	return nil
 }
 
-// recalculatePledgeFunding recalculates which pledges should be funded based on user's total points
-func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *auth.User, total *float64) error {
+// recalculatePledgeFunding recalculates which pledges should be funded based
+// on user's total points and returns the resources whose funding it changed.
+func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *auth.User, total *float64) ([]string, error) {
 	// Get all user pledges ordered by creation time (ascending)
 	pledges, err := vaultModels.GetUserPledgesOrderedByCreation(ctx, tx, user.ID)
 	if err != nil {
-		return errors.Wrap(err, "failed to get user pledges")
+		return nil, errors.Wrap(err, "failed to get user pledges")
 	}
+	var changed []string
 
 	// Track accumulated amount
 	accumulatedAmount := float64(0)
@@ -833,7 +873,7 @@ func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *a
 				// Resource doesn't exist, skip this pledge
 				continue
 			}
-			return errors.Wrap(err, "failed to lock resource")
+			return nil, errors.Wrap(err, "failed to lock resource")
 		}
 
 		// Check if this pledge should be funded
@@ -843,8 +883,9 @@ func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *a
 				// Fund the pledge
 				err = s.fundPledge(ctx, tx, pledge, resource)
 				if err != nil {
-					return errors.Wrap(err, "failed to fund pledge")
+					return nil, errors.Wrap(err, "failed to fund pledge")
 				}
+				changed = append(changed, pledge.ResourceID)
 			}
 			// Add to accumulated amount (whether it was already funded or just funded)
 			accumulatedAmount += pledge.Amount
@@ -854,13 +895,85 @@ func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *a
 				// Defund the pledge
 				err = s.defundPledge(ctx, tx, pledge, resource)
 				if err != nil {
-					return errors.Wrap(err, "failed to defund pledge")
+					return nil, errors.Wrap(err, "failed to defund pledge")
 				}
+				changed = append(changed, pledge.ResourceID)
 			}
 			// Don't add to accumulated amount
 		}
 	}
 
+	return changed, nil
+}
+
+// pledgerUIDs are the uids of a resource's funded pledgers, earliest pledge
+// first, without except's (uuid.Nil: nobody's). Never nil: an empty list
+// clears Vault's.
+func (s *Vault) pledgerUIDs(ctx context.Context, db pg.DBI, resourceID string, except uuid.UUID) ([]string, error) {
+	ids, err := vaultModels.GetFundedPledgerIDs(ctx, db, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	uids := []string{}
+	for _, id := range ids {
+		if id != except {
+			uids = append(uids, api.GenerateSessionIDFromUser(&auth.User{ID: id}))
+		}
+	}
+	return uids, nil
+}
+
+// putPrivateUIDs sends Vault the pledger uids of a private resource, without
+// except's; a public resource gets nothing.
+func (s *Vault) putPrivateUIDs(ctx context.Context, resourceID string, except uuid.UUID) error {
+	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
+	if err != nil {
+		return errors.Wrap(err, "failed to look up resource")
+	}
+	if r == nil || !r.Private {
+		return nil
+	}
+	uids, err := s.pledgerUIDs(ctx, s.pg.Get(), resourceID, except)
+	if err != nil {
+		return err
+	}
+	return s.vaultApi.PutResourceUIDs(ctx, resourceID, uids)
+}
+
+// syncPrivateUIDs sends Vault the pledgers of these private resources once a
+// pledge change has committed. A failure is only logged: the next change
+// sends the list again, and Vault's worker moves on to the next uid itself.
+func (s *Vault) syncPrivateUIDs(ctx context.Context, resourceIDs ...string) {
+	if s.vaultApi == nil {
+		return
+	}
+	for _, id := range resourceIDs {
+		if err := s.putPrivateUIDs(ctx, id, uuid.Nil); err != nil {
+			log.WithError(err).WithField("resource_id", id).Warn("failed to send pledger uids to vault")
+		}
+	}
+}
+
+// ForgetUser takes an account being deleted off the pledger list of every
+// private resource it pledged to; its pledges still exist and go with the
+// account. The first error stops it: the deletion is aborted and retried.
+func (s *Vault) ForgetUser(ctx context.Context, userID uuid.UUID) error {
+	if s.vaultApi == nil {
+		return nil
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("database connection is not available")
+	}
+	pledges, err := vaultModels.GetUserPledgesOrderedByCreation(ctx, db, userID)
+	if err != nil {
+		return err
+	}
+	for _, p := range pledges {
+		if err := s.putPrivateUIDs(ctx, p.ResourceID, userID); err != nil {
+			return errors.Wrapf(err, "failed to remove the pledger of %v from vault", p.ResourceID)
+		}
+	}
 	return nil
 }
 

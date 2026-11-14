@@ -3,6 +3,8 @@ package link_resolver
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -20,7 +22,11 @@ import (
 // so a paywall that came back as a bare nil would silently be a 404 again.
 func TestResolveLinkNamesThePaywall(t *testing.T) {
 	uid := uuid.NewV4()
+	// rest-api does not know the hash yet: nothing to refuse.
+	srv := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(srv.Close)
 	s := &LinkResolver{
+		api:                  restAPI(t, srv),
 		enabledBackendsCache: lazymap.New[[]*models.StreamingBackend](&lazymap.Config{Expire: time.Minute}),
 	}
 	// No enabled backends for this account, without a database.

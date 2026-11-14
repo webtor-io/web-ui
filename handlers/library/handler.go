@@ -63,7 +63,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		s3Cl:                s3Cl,
 		enricher:            en,
 		thumbnail:           thumb,
-		posterResolver:      poster_resolver.New(s3Cl, pg, cl, thumb, bucket),
+		posterResolver:      poster_resolver.New(s3Cl, pg, cl, thumb, api, bucket),
 		posterCacheS3Bucket: bucket,
 		tmdbImageBaseURL:    tmdb.ImageBaseURL(c),
 	}

@@ -68,6 +68,22 @@ func GetUserPledgesOrderedByCreation(ctx context.Context, db pg.DBI, userID uuid
 	return pledges, nil
 }
 
+// GetFundedPledgerIDs returns the users of a resource's funded pledges,
+// earliest pledge first.
+func GetFundedPledgerIDs(ctx context.Context, db pg.DBI, resourceID string) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := db.Model((*Pledge)(nil)).
+		Context(ctx).
+		Column("user_id").
+		Where("resource_id = ? AND funded = true", resourceID).
+		Order("created_at ASC").
+		Select(&ids)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get funded pledgers")
+	}
+	return ids, nil
+}
+
 // GetResourcePledges returns all pledges for a specific resource
 func GetResourcePledges(ctx context.Context, db *pg.DB, resourceID string) ([]Pledge, error) {
 	var pledges []Pledge

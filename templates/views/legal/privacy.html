@@ -11,7 +11,7 @@
 
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Privacy Policy</h1>
 
-    <p class="text-sm text-w-muted mb-8">Last updated: October 20, 2026</p>
+    <p class="text-sm text-w-muted mb-8">Last updated: November 13, 2026</p>
 
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">Webtor ("we," "our," or "us") values your privacy. This Privacy Policy explains how we handle your personal information when you use our service.</p>
 
@@ -40,6 +40,7 @@
       <li><span class="font-semibold">Library, watch history &amp; ratings</span> — to power the "continue watching" feature, to display your watched/rated state across the interface, and to ground AI recommendations in your actual taste. Legal basis: contract performance (Art.&nbsp;6(1)(b)).</li>
       <li><span class="font-semibold">AI queries</span> — to generate film suggestions via our AI provider (see &sect;3) and to manage your daily request quota. Legal basis: contract performance for the feature you invoked (Art.&nbsp;6(1)(b)).</li>
       <li><span class="font-semibold">Integrations data</span> — to operate the Stremio addon, WebDAV and S3 servers, embed playback, and external streaming backends you configured. Legal basis: contract performance (Art.&nbsp;6(1)(b)).</li>
+      <li><span class="font-semibold">Private tracker records</span> — when you add a torrent from a private tracker, we keep a record of its tracker addresses so that Webtor can announce to the tracker with your personal key (passkey) when you play or download that torrent. The addresses, and the key in them, are stored encrypted; only the tracker host names are kept in the clear. Legal basis: contract performance (Art.&nbsp;6(1)(b)).</li>
       <li><span class="font-semibold">Analytics page views</span> — see &sect;6.</li>
     </ul>
 
@@ -79,6 +80,7 @@
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">You can delete your account and all associated data (including watch history and AI usage data) at any time from your <a href="/profile" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2" data-async-target="main">profile page</a>.</p>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">You can also download a machine-readable copy of everything we hold on your account &mdash; profile, library, watch history, ratings, watchlists, settings, integrations (Stremio addon URLs, Torznab indexer URLs, embed domains) and (where applicable) vault transactions &mdash; via the <span class="font-semibold">Download my data</span> button on the <a href="/profile" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2" data-async-target="main">profile page</a>. The export is delivered as a single JSON file (GDPR Article 20).</p>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Connected <span class="font-semibold">Torznab indexers</span> (Jackett, Prowlarr and similar) are part of that export &mdash; their feed URL, name, ordering and enabled state. The <span class="font-semibold">indexer API key itself is not included</span>; the export only records whether a key is stored for that indexer, because unlike your other credentials the key is never displayed back to you in the interface and putting it in a downloadable file would widen its exposure.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Your <span class="font-semibold">private tracker records</span> are in the export as well &mdash; the torrent each one belongs to, its tracker host names, how it was added, and when. The tracker addresses and your key are <span class="font-semibold">not included</span>. The records are deleted together with your account; there is no separate way to delete them. If you use Webtor through RapidAPI, your records are deleted on request (see &sect;8). Links already issued for a private torrent keep playing what was prepared for them &mdash; converted video and Vault copies &mdash; until they expire, at most 24&nbsp;hours later, even after your account is deleted.</p>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">6. Analytics</h2>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We use <a href="https://umami.is" target="_blank" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2">Umami</a>, a privacy-focused, <span class="font-semibold">self-hosted</span> analytics tool, to understand how visitors use Webtor (page views, conversion funnels, feature adoption). Umami runs on our own infrastructure; no analytics data leaves it.</p>

@@ -135,9 +135,11 @@ entries (`TestAuthorizeRejectsWriteWithoutScope`).
 
 ## Errors
 
-Every failure answers `{"error": {"code": …, "message": …}}`. **Clients branch on
-`code`, not on the status**: a status says "you may not", a code says which of
-the several reasons applies.
+Every failure answers `{"error": {"code": …, "message": …, "reason": …}}`.
+**Clients branch on `code`, not on the status**: a status says "you may not", a
+code says which of the several reasons applies. `reason` is present only where
+a code has more than one cause (the private torrent codes below) and narrows
+it; a client that does not know a reason acts on the code alone.
 
 | Code | Status | Meaning |
 |------|--------|---------|
@@ -147,8 +149,17 @@ the several reasons applies.
 | `not_found` | 404 | No such resource, file or library entry |
 | `conflict` | 409 | Pledge already exists, or is still frozen |
 | `bad_request` | 400 | Malformed body or query |
+| `private_torrent` | 403 / 422 | A private torrent you may not use. `reason`: `sign_in` (only a signed-in user who added it with their own tracker can play it), `no_record` (you have not added it with your own tracker: store its `.torrent` or a magnet with your tracker), `token_in_query`. `POST /vault/pledges` answers it 422 with `no_record` |
+| `private_torrent_file` | 403 | A private torrent's `.torrent` is never served, not even to a user who may play it |
+| `private_needs_account` | 422 | Only an account can store a private torrent |
+| `private_no_tracker` | 422 | The private torrent names no usable tracker |
+| `private_too_many_trackers` | 422 | The private torrent names too many tracker URLs |
 | `private_magnet` | 422 | `POST /resource` with a magnet without a tracker (no `tr=`) of a private torrent that is not stored yet: send its `.torrent` file, or a magnet that includes the tracker. Nothing was stored; the same magnet gets the same answer. A magnet with `tr=` of a private torrent is stored as usual |
-| `rate_limited` | 429 | Too many requests with this key; `Retry-After` says how long to wait |
+| `private_tracker_refused` | 422 | Your tracker refused the key in your magnet. `reason` is the class of the refusal: `key`, `account`, `unregistered`, `client`, `other` |
+| `private_unavailable` | 422 / 403 | This deployment does not serve private torrents: 422 on store, 403 on access. `POST /vault/pledges` answers it 422 while pledges on private torrents are not open on this deployment |
+| `private_verify_unavailable` | 503 | Your tracker could not be asked now; `Retry-After` says when to try again |
+| `store_outdated` | 503 | Private torrents cannot be checked right now; try again later |
+| `rate_limited` | 429 | Too many requests with this key, or rest-api's limit on tracker checks; `Retry-After` says how long to wait |
 | `upstream_error` | 502 | The services behind this one failed |
 | `upstream_timeout` | 408 / 504 | A magnet could not be resolved in time, or an upstream call ran out of time |
 | `unavailable` | 503 | Vault or the DB is not available on this deployment |
@@ -157,10 +168,18 @@ the several reasons applies.
 `upstream_*` is deliberately separate from `internal_error`: those are usually
 worth retrying and `internal_error` is not.
 
-The rest-api client flattens upstream statuses into plain errors, so a message
+An answer in which rest-api names a code, and any 429, reaches us typed
+(`api.PrivateError`) and is passed on as rest-api sent it: its status, `code`,
+`reason`, `message` and `Retry-After` (`TestUpstreamPrivateEnvelope`). That
+message is rest-api's text for the client and names no URL or key; an empty one
+becomes `private torrent refused`. The private codes in the table above are
+rest-api's, word for word.
+
+Everything else the rest-api client flattens into plain errors, so a message
 substring is the only signal left about what actually happened — with two
-exceptions it keeps by identity: 403 (`api.ErrForbidden`) and rest-api's 422
-for a private torrent's magnet without a tracker (`api.ErrPrivateMagnet`, passed on as
+exceptions it keeps by identity: 403 without a code (`api.ErrForbidden`, passed
+on as `forbidden`) and rest-api's 422 without a code for a private torrent's
+magnet without a tracker (`api.ErrPrivateMagnet`, passed on as
 `private_magnet`). `upstreamError`
 matches **the same substrings rest-api's own error middleware matches** to pick
 its status (`not found`, `forbidden`, `failed to parse`, `timeout`,

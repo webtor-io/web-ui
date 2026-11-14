@@ -1,0 +1,9 @@
+{{ define "main" }}
+{{/* rest-api refused a private torrent in the load job (jobs/load.go,
+     renderPrivateError): the card the resource page shows too, inset like the
+     other load cards. .Data = *web.PrivateRefusal, its upload aimed at the log
+     host (#log-load). No retry: the same request gets the same answer. */}}
+<div class="mx-5 mt-1">
+    {{ template "private/refusal" . }}
+</div>
+{{ end }}

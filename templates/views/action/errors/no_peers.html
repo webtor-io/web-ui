@@ -5,10 +5,14 @@
      torrent; a slow swarm says the pace is the swarm's, not the plan's; a
      hard timeout says nothing is known yet; a private tracker that turned us
      away may have seeders, but Vault could not reach them either and a retry
-     meets the same answer, so that one offers neither. */}}
+     meets the same answer, so that one offers neither. Own: the refusal
+     answered the user's own key (ownKeyRefused), so the card says so, with
+     every usual reason and none of the tracker's own words (they may repeat
+     the key). */}}
 {{ $slow := eq .Data.Reason "slow" }}
 {{ $timeout := eq .Data.Reason "timeout" }}
 {{ $refused := eq .Data.Reason "refused" }}
+{{ $own := and $refused .Data.Own }}
 {{/* A dead swarm is not a speed problem, so a faster plan is not the pitch —
      Vault is: it keeps the torrent and fetches it when a seeder returns. Sold
      only when the promo plan includes Vault; no catalog, no pitch. */}}
@@ -26,6 +30,7 @@
             <h3 class="font-semibold text-base text-base-content leading-snug">
                 {{- if $slow }}{{ t $.Lang "action.noPeers.slowTitle" }}
                 {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutTitle" }}
+                {{- else if $own }}{{ t $.Lang "action.noPeers.own.title" }}
                 {{- else if $refused }}{{ t $.Lang "action.noPeers.refusedTitle" }}
                 {{- else }}{{ t $.Lang "action.noPeers.title" }}{{ end -}}
             </h3>
@@ -49,6 +54,7 @@
     <p class="text-sm text-w-sub mt-3 leading-relaxed">
         {{- if $slow }}{{ t $.Lang "action.noPeers.slowBody" }}
         {{- else if $timeout }}{{ t $.Lang "action.noPeers.timeoutBody" }}
+        {{- else if $own }}{{ t $.Lang "action.noPeers.own.body" }}
         {{- else if $refused }}{{ t $.Lang "action.noPeers.refusedBody" }}
         {{- else if $pitch }}{{ t $.Lang "action.noPeers.vaultPitch" }}
         {{- else }}{{ t $.Lang "action.noPeers.vaultUse" }}{{ end -}}
