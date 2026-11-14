@@ -2325,5 +2325,8 @@
     "embed.off.link": "Webtor sunucuları",
     "embed.unauthorized.title": "Bu oynatıcıya bu sitede izin verilmiyor",
     "embed.unauthorized.text": "Bu site sizin mi? Alan adını {{.Link}} ekleyin.",
-    "embed.unauthorized.link": "Webtor sunucusundaki profilinize"
+    "embed.unauthorized.link": "Webtor sunucusundaki profilinize",
+    "embed.private.title": "Bu torrent burada oynatılmaz",
+    "embed.private.text": "Bu özel bir torrent: yalnızca onu kendi tracker'ıyla ekleyen ve oturum açmış bir kullanıcı için oynatılır. {{.Link}}",
+    "embed.private.link": "Webtor sunucusunda açın"
 }

@@ -58,6 +58,7 @@ Grace JWT claims:
   "kind": "grace",
   "sessionID": "<the primary token's sessionID>",
   "domain": "<the primary token's domain>",
+  "uid": "<the primary token's uid; absent when the primary has none>",
   "exp": <the primary token's exp>
 }
 ```
@@ -108,6 +109,14 @@ With them, on a thp that has the 2026-09-25/26 changes (torrent-http-proxy
   With `exp` the grace token meets thp's `/session-stats` token rules (hash,
   exp, sessionID), which the primary carrying it already does: nothing new can
   read those stats (`api.TestNewGraceClaims_ExpiresWithThePrimary`).
+
+The grace token also carries the primary's `uid` (private torrents). The
+primary has it, sha1 of the user's id, only for a signed-in viewer:
+`Api.RegisterHandler` sets it, never for an anonymous viewer or the embed, and
+then neither token has the claim. thp's private-torrent gate requires it on
+`~vod` segments, grace ones included: without it a private torrent's viewer
+would get a 403 mid-playback inside the window
+(`api.TestNewGraceClaims_CarriesThePrimarySessionAndDomain`).
 
 What else reads a grace token's `sessionID` in thp (audited 2026-09-26 against
 torrent-http-proxy at 277778d plus its uncommitted limiter/stats change):

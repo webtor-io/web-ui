@@ -124,6 +124,7 @@ func TestClaimsWithHash_BindsToInfohash(t *testing.T) {
 func TestNewGraceClaims_CarriesThePrimarySessionAndDomain(t *testing.T) {
 	a := newTestApi(t)
 	primary := &Claims{SessionID: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b", Domain: "embed.example", Rate: "5M", Role: "free",
+		Uid:              "0123456789abcdef0123456789abcdef01234567",
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour))}}
 	parse := func(tok string) jwt.MapClaims {
 		t.Helper()
@@ -142,7 +143,8 @@ func TestNewGraceClaims_CarriesThePrimarySessionAndDomain(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, g := parse(ptok), parse(gtok)
-	for _, k := range []string{"sessionID", "domain"} {
+	// uid too: thp's gate needs it on ~vod segments inside the window.
+	for _, k := range []string{"sessionID", "domain", "uid"} {
 		if g[k] == nil || g[k] != p[k] {
 			t.Errorf("grace %s = %v, primary %v", k, g[k], p[k])
 		}
@@ -163,6 +165,14 @@ func TestNewGraceClaims_CarriesThePrimarySessionAndDomain(t *testing.T) {
 	}
 	if gc := NewGraceClaims(nil, "h", "50M"); gc.SessionID != "" || gc.Domain != "" || gc.Hash != "h" || gc.ExpiresAt != nil {
 		t.Errorf("no primary: %+v", gc)
+	}
+	// An anonymous primary's grace token has no uid at all.
+	atok, err := a.SignClaims(NewGraceClaims(&Claims{SessionID: "s"}, "h", "50M"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := parse(atok)["uid"]; ok {
+		t.Error("anonymous grace token carries uid")
 	}
 }
 

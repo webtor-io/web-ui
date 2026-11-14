@@ -35,8 +35,11 @@ type LoadArgs struct {
 	// "magnet_dead_long", "magnet_invalid", "magnet_private" play the failure
 	// without a network.
 	Debug string
-	// Source is the door a File came in by, "site" or "embed", for the
-	// private-torrent count (services/private_torrent).
+	// Source is the door the request came in by, "site" or "embed". For a
+	// File it labels the private-torrent count (services/private_torrent).
+	// For a Query from an embed, a known private hash is never stored again
+	// with the magnet's tr=: an embed has no uid, so rest-api could only
+	// refuse it with "sign in".
 	Source string
 }
 
@@ -135,10 +138,15 @@ func NewLoadScript(api *api.Api, i18nSvc *i18n.Service, c *web.Context, args *Lo
 	}
 }
 
+// Run puts the resource id into the job's context as "respID", and as
+// "respPrivate" whether the lookup found the hash private (false for a file).
 func (s *LoadScript) Run(ctx context.Context, j *job.Job) (err error) {
-	var res *ra.ResourceResponse
+	var res *api.Resource
 	if s.args.File != nil {
-		res, err = s.storeFile(ctx, j, s.args.File)
+		var r *ra.ResourceResponse
+		if r, err = s.storeFile(ctx, j, s.args.File); r != nil {
+			res = &api.Resource{ResourceResponse: *r}
+		}
 	} else if s.args.Query != "" {
 		res, err = s.storeQuery(ctx, j, s.args.Query)
 	}
@@ -149,6 +157,7 @@ func (s *LoadScript) Run(ctx context.Context, j *job.Job) (err error) {
 		return errors.New("resource not found")
 	}
 	j.Context = context.WithValue(j.Context, "respID", res.ID)
+	j.Context = context.WithValue(j.Context, "respPrivate", res.Private)
 	return
 }
 
@@ -164,7 +173,14 @@ func (s *LoadScript) storeFile(ctx context.Context, j *job.Job, file []byte) (re
 	return
 }
 
-func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (res *ra.ResourceResponse, err error) {
+// storeQuery returns the resource of the query's hash. The lookup that
+// decides "new or known" is the shared run's, so it reads as internal. A new
+// hash, or a known private one asked with the user's own tracker (tr=), is
+// stored as the user: that is how the tracker reaches rest-api. Not from an
+// embed: it has no uid, and the lookup already says private, which the embed
+// renders itself. A known hash returns the lookup's answer, private flag
+// included, even after the store.
+func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (*api.Resource, error) {
 	j.InProgress(s.t("job.checkingMagnet"))
 	hash, magnet, err := common.ResolveQueryHash(query)
 	if err != nil {
@@ -173,15 +189,14 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 	query = magnet
 	apiCtx, apiCancel := context.WithTimeout(ctx, 60*time.Second)
 	defer apiCancel()
-	res, err = s.api.GetResource(apiCtx, s.c.ApiClaims, hash)
+	known, err := s.api.LookupResource(apiCtx, api.InternalClaims(), hash)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load resource by magnet")
 	}
-	if res != nil {
-		j.Done()
-		return
-	}
 	j.Done()
+	if known != nil && !(known.Private && s.args.Source != "embed" && common.QueryHasTrackers(magnet)) {
+		return known, nil
+	}
 	j.Info(s.t("job.magnetizing.info"))
 	j.InProgress(s.t("job.magnetizing"))
 	wait := s.args.MagnetWait
@@ -197,7 +212,7 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 	defer magnetizeCancel()
 	stop := countdown(magnetizeCtx, j, s.tp, time.Now().Add(wait))
 	started := time.Now()
-	res, err = s.api.StoreResource(magnetizeCtx, s.c.ApiClaims, []byte(query))
+	res, err := s.api.StoreResource(magnetizeCtx, s.c.ApiClaims, []byte(query))
 	stop()
 	if errors.Is(err, api.ErrForbidden) {
 		// torrent-store refused the hash (stoplisted, banned): no peer will
@@ -220,7 +235,10 @@ func (s *LoadScript) storeQuery(ctx context.Context, j *job.Job, query string) (
 		return nil, &MagnetError{Kind: kind, Waited: time.Since(started), Long: long, Cause: err}
 	}
 	j.Done()
-	return
+	if known != nil {
+		return known, nil
+	}
+	return &api.Resource{ResourceResponse: *res}, nil
 }
 
 // debugMagnet plays the magnet failure for review (dev only): a short

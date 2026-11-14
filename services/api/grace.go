@@ -40,6 +40,9 @@ type GraceClaims struct {
 	Kind      string `json:"kind"`
 	SessionID string `json:"sessionID"`
 	Domain    string `json:"domain"`
+	// Uid is the primary's, named as Claims names it: thp's gate needs it
+	// on ~vod segments inside the window too.
+	Uid string `json:"uid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -51,7 +54,7 @@ type GraceClaims struct {
 func NewGraceClaims(primary *Claims, hash, rate string) GraceClaims {
 	g := GraceClaims{Rate: rate, Role: "grace", Hash: hash, Kind: "grace"}
 	if primary != nil {
-		g.SessionID, g.Domain = primary.SessionID, primary.Domain
+		g.SessionID, g.Domain, g.Uid = primary.SessionID, primary.Domain, primary.Uid
 		g.ExpiresAt = primary.ExpiresAt
 	}
 	return g

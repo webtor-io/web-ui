@@ -353,7 +353,7 @@ func serve(c *cli.Context) error {
 	// Setting Api
 	sapi := api.New(c, cl)
 
-	// Setting ApiClaimsHandler
+	// Setting ApiClaimsHandler -- after ats and uc: uid is the user they put in, an API key's too.
 	sapi.RegisterHandler(r)
 
 	// Setting Migration from v1 to v2

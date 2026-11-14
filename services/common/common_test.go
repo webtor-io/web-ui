@@ -2,6 +2,7 @@ package common
 
 import (
 	"errors"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -326,5 +327,35 @@ func TestRefusedQuery(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A magnet "with tr=" carries at least one tracker that is not blank, in any
+// shape ResolveQueryHash takes a magnet: percent-encoded, without the "?" the
+// /magnet route loses, inside text. An empty or blank tr= is no tracker.
+func TestQueryHasTrackers(t *testing.T) {
+	const h = "0123456789abcdef0123456789abcdef01234567"
+	tr := "http%3A%2F%2Ftracker.example%2Fannounce%3Fpasskey%3D00000000000000000000000000000000"
+	for _, tc := range []struct {
+		query string
+		want  bool
+	}{
+		{"magnet:?xt=urn:btih:" + h + "&tr=" + tr, true},
+		{"magnet:xt=urn:btih:" + h + "&tr=" + tr, true},
+		// The encoding ResolveQueryHash takes back: a magnet that was a query
+		// value. One encoded whole ("magnet%3A%3F…") it refuses, so Load
+		// refuses it before any run; if that ever changes, this row says so.
+		{"magnet:?" + url.QueryEscape("xt=urn:btih:"+h+"&tr=http://tracker.example/announce"), true},
+		{url.QueryEscape("magnet:?xt=urn:btih:" + h + "&tr=http://tracker.example/announce"), false},
+		{"watch magnet:?xt=urn:btih:" + h + "&tr=" + tr + " now", true},
+		{"magnet:?xt=urn:btih:" + h, false},
+		{h, false},
+		{"magnet:?xt=urn:btih:" + h + "&tr=", false},
+		{"magnet:?xt=urn:btih:" + h + "&tr=%20", false},
+		{"Big Buck Bunny 2008", false},
+	} {
+		if got := QueryHasTrackers(tc.query); got != tc.want {
+			t.Errorf("QueryHasTrackers(%q)=%v, want %v", tc.query, got, tc.want)
+		}
 	}
 }

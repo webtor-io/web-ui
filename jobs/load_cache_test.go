@@ -30,14 +30,14 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-// The load job's id is sha1(infohash/lang), and its log is kept in the job
-// store and replayed to the next request with that id that runs nowhere else
-// (another replica, or this one once the run has retired). A magnet that
-// ends in a card shares that id with the .torrent the card asks for. The
-// upload must run, not replay the card. The private card is not kept at
-// all: it answers the link that was submitted (no tracker in it), not the
-// torrent. The dead card is kept on purpose, for the next visitor of the
-// same dead magnet.
+// A load job's log is kept in the job store and replayed to the next request
+// with its id that runs nowhere else (another replica, or this one once the
+// run has retired). A bare magnet that ends in a card runs as the shared
+// sha1(infohash/lang); the .torrent the card asks for runs as the user's own
+// sha1(infohash/lang/uid). The upload must run and reach the resource, not
+// replay the card. The private card is not kept at all: it answers the link
+// that was submitted (no tracker in it), not the torrent. The dead card is
+// kept on purpose, for the next visitor of the same dead magnet.
 func TestUploadAfterMagnetCardRunsAFreshLoad(t *testing.T) {
 	torrent, hash := privateTorrent(t)
 	for _, c := range []struct {
@@ -66,13 +66,15 @@ func TestUploadAfterMagnetCardRunsAFreshLoad(t *testing.T) {
 				t.Errorf("the %s card: Cacheable() = %v, want %v", c.kind, card.Cacheable(), c.cacheable)
 			}
 
-			if _, err := replicaB.Load(wc, &scripts.LoadArgs{File: torrent, Source: "site"}); err != nil {
+			upload := &scripts.LoadArgs{File: torrent, Source: "site"}
+			if _, err := replicaB.Load(wc, upload); err != nil {
 				t.Fatal(err)
 			}
-			if got := st.waitClosed(t, "the upload (it replayed the stored card instead)"); got != id {
-				t.Fatalf("the upload ran as %s, the card as %s: not the same job", got, id)
+			uploadID := loadJobID(wc, upload, hash)
+			if got := st.waitClosed(t, "the upload (it replayed the stored card instead)"); got != uploadID {
+				t.Fatalf("the upload's run closed as %s, want %s", got, uploadID)
 			}
-			l := st.log(id)
+			l := st.log(uploadID)
 			if hasItem(l, func(l job.LogItem) bool { return l.Level == job.Custom }) ||
 				!hasItem(l, func(l job.LogItem) bool { return l.Level == job.Redirect && l.Location == "/"+hash }) {
 				t.Errorf("want a fresh load that redirects to the resource, got %+v", l)
@@ -86,7 +88,7 @@ func TestUploadAfterMagnetCardRunsAFreshLoad(t *testing.T) {
 // stores a .torrent. The card is a stub that names its kind.
 func testJobs(t *testing.T, hash string, status int, st job.Storage) func() *Jobs {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return testJobsWith(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/resource/"+hash:
 			w.WriteHeader(http.StatusNotFound)
@@ -102,7 +104,14 @@ func testJobs(t *testing.T, hash string, status int, st job.Storage) func() *Job
 			t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusTeapot)
 		}
-	}))
+	}), st)
+}
+
+// testJobsWith makes load-job runners (replicas) that share st, against the
+// fake rest-api h.
+func testJobsWith(t *testing.T, h http.Handler, st job.Storage) func() *Jobs {
+	t.Helper()
+	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	u, _ := url.Parse(srv.URL)
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)

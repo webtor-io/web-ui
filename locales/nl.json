@@ -2325,5 +2325,8 @@
     "embed.off.link": "Webtor-server",
     "embed.unauthorized.title": "Deze speler is niet toegestaan op deze website",
     "embed.unauthorized.text": "Is dit jouw website? Voeg het domein toe in {{.Link}}.",
-    "embed.unauthorized.link": "je profiel op de Webtor-server"
+    "embed.unauthorized.link": "je profiel op de Webtor-server",
+    "embed.private.title": "Deze torrent speelt hier niet af",
+    "embed.private.text": "Het is een privétorrent: hij speelt alleen af voor een ingelogde gebruiker die hem met een eigen tracker heeft toegevoegd. {{.Link}}",
+    "embed.private.link": "Open hem op de Webtor-server"
 }

@@ -2305,5 +2305,8 @@
     "embed.off.link": "Webtor 服务器",
     "embed.unauthorized.title": "此网站未获准嵌入播放器",
     "embed.unauthorized.text": "如果你是网站所有者，请在 {{.Link}} 中添加此网站域名。",
-    "embed.unauthorized.link": "Webtor 服务器的个人设置"
+    "embed.unauthorized.link": "Webtor 服务器的个人设置",
+    "embed.private.title": "此种子无法在这里播放",
+    "embed.private.text": "这是私有种子：只有用自己的 Tracker 添加了它并已登录的用户才能播放。{{.Link}}",
+    "embed.private.link": "在 Webtor 服务器上打开"
 }

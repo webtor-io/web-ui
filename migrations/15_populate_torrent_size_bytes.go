@@ -18,9 +18,10 @@ func PopulateTorrentSizeBytes(col *migrations.Collection, a *api.Api) {
 		if err != nil {
 			return err
 		}
-		claims := &api.Claims{}
 		for _, r := range resources {
-			t, err := a.GetTorrentCached(ctx, claims, r.ResourceID)
+			// Internal: rest-api serves a private torrent's .torrent to no
+			// one else. Fresh claims per resource, as they expire in an hour.
+			t, err := a.GetTorrentCached(ctx, api.InternalClaims(), r.ResourceID)
 			if err != nil {
 				return err
 			}

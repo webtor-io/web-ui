@@ -2333,5 +2333,8 @@
     "embed.off.link": "serveur Webtor",
     "embed.unauthorized.title": "Ce lecteur n'est pas autorisé sur ce site",
     "embed.unauthorized.text": "C'est votre site ? Ajoutez son domaine dans {{.Link}}.",
-    "embed.unauthorized.link": "votre profil sur le serveur Webtor"
+    "embed.unauthorized.link": "votre profil sur le serveur Webtor",
+    "embed.private.title": "Ce torrent ne se lit pas ici",
+    "embed.private.text": "C'est un torrent privé : il ne se lit que pour un utilisateur connecté qui l'a ajouté avec son propre tracker. {{.Link}}",
+    "embed.private.link": "L'ouvrir sur le serveur Webtor"
 }

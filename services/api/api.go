@@ -288,7 +288,22 @@ type Claims struct {
 	// Rules ride inside the X-Token header to rest-api, which copies the
 	// header verbatim into the ?token= of every signed export URL. THP
 	// then reads them off the segment-request token. See docs/grace_token.md.
-	Rules []Rule `json:"rules,omitempty"`
+	Rules    []Rule `json:"rules,omitempty"`
+	Uid      string `json:"uid,omitempty"`      // sha1(user_id) of the signed-in user; set only by Api.RegisterHandler
+	Internal bool   `json:"internal,omitempty"` // web-ui's server-side reads without a user
+}
+
+// InternalClaims are the claims of web-ui's own server-side reads, made for
+// no user: no uid, domain or session. Internal is a claim of its own, not a
+// role -- role is the tier. It expires in an hour, so a token carrying it is
+// never valid for good.
+func InternalClaims() *Claims {
+	return &Claims{
+		Internal: true,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
 }
 
 type Api struct {
@@ -407,9 +422,27 @@ func New(c *cli.Context, cl *http.Client) *Api {
 	}
 }
 
-func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
+func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (*ra.ResourceResponse, error) {
+	r, err := s.LookupResource(ctx, c, infohash)
+	if r == nil {
+		return nil, err
+	}
+	return &r.ResourceResponse, err
+}
+
+// Resource is rest-api's resource with the private flag, which the rest-api
+// module web-ui builds against does not know yet. A rest-api without the
+// field reads as public: it has no private access rule either.
+type Resource struct {
+	ra.ResourceResponse
+	Private bool `json:"private"`
+}
+
+// LookupResource is GetResource with the private flag: nil, nil on 404,
+// ErrForbidden on 403.
+func (s *Api) LookupResource(ctx context.Context, c *Claims, infohash string) (e *Resource, err error) {
 	u := s.url + "/resource/" + infohash
-	e = &ra.ResourceResponse{}
+	e = &Resource{}
 	err = s.doRequest(ctx, c, u, "GET", nil, e)
 	if e.ID == "" {
 		e = nil
@@ -422,8 +455,21 @@ func (s *Api) GetResource(ctx context.Context, c *Claims, infohash string) (e *r
 // unknown for the whole minute (an API client stores, then pledges).
 var errResourceNotFound = errors.New("resource not found")
 
+// cacheKey starts the key of a minute cache with the caller's class: rest-api
+// answers by the caller now, so one caller must never get another's answer.
+// Internal wins over uid; no claims at all (error pages) are anonymous.
+func cacheKey(c *Claims, infohash string) string {
+	switch {
+	case c != nil && c.Internal:
+		return "internal/" + infohash
+	case c != nil && c.Uid != "":
+		return "u/" + c.Uid + "/" + infohash
+	}
+	return "anon/" + infohash
+}
+
 func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
-	e, err = s.resourcesCache.Get(infohash, func() (*ra.ResourceResponse, error) {
+	e, err = s.resourcesCache.Get(cacheKey(c, infohash), func() (*ra.ResourceResponse, error) {
 		r, err := s.GetResource(ctx, c, infohash)
 		if err == nil && r == nil {
 			return nil, errResourceNotFound
@@ -446,7 +492,7 @@ func (s *Api) GetTorrent(ctx context.Context, c *Claims, infohash string) (close
 }
 
 func (s *Api) GetTorrentCached(ctx context.Context, c *Claims, infohash string) ([]byte, error) {
-	return s.torrentCache.Get(infohash, func() ([]byte, error) {
+	return s.torrentCache.Get(cacheKey(c, infohash), func() ([]byte, error) {
 		resp, err := s.GetTorrent(ctx, c, infohash)
 		if err != nil {
 			return nil, err
@@ -481,7 +527,7 @@ func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash strin
 }
 
 func (s *Api) ListResourceContentCached(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (*ra.ListResponse, error) {
-	key := infohash + fmt.Sprintf("%+v", args)
+	key := cacheKey(c, infohash) + fmt.Sprintf("%+v", args)
 	return s.listResponseCache.Get(key, func() (*ra.ListResponse, error) {
 		return s.ListResourceContent(ctx, c, infohash, args)
 	})
@@ -1394,6 +1440,12 @@ func (s *Api) RegisterHandler(r *gin.Engine) {
 		if err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
+		}
+		// Here and not in MakeClaimsFromContext: the embed goes through
+		// that too, with the embedding domain owner's claims, and must
+		// never carry the viewer's uid.
+		if u := auth.GetUserFromContext(c); u.HasAuth() {
+			GetClaimsFromContext(c).Uid = GenerateSessionIDFromUser(u)
 		}
 		c.Next()
 	})

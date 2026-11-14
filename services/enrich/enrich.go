@@ -913,9 +913,9 @@ func ptnAsJSON(ti *ptn.TorrentInfo) map[string]interface{} {
 	return out
 }
 
-func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, claims *api.Claims, force bool, hintVideoID string) (*models.MediaInfoMediaType, error) {
+func (s *Enricher) enrichMediaInfo(ctx context.Context, db *pg.DB, hash string, force bool, hintVideoID string) (*models.MediaInfoMediaType, error) {
 
-	items, err := s.retrieveTorrentItems(ctx, hash, claims)
+	items, err := s.retrieveTorrentItems(ctx, hash)
 
 	if err != nil {
 		return nil, err
@@ -1252,12 +1252,12 @@ func (s *Enricher) LookupByTitleYear(ctx context.Context, title string, year *in
 // budget those resources already exhausted.
 //
 // Safe to call repeatedly: the upsert is idempotent on resource_id.
-func (s *Enricher) EnsureResourceMetadata(ctx context.Context, hash string, claims *api.Claims) error {
+func (s *Enricher) EnsureResourceMetadata(ctx context.Context, hash string) error {
 	db := s.pg.Get()
 	if db == nil {
 		return errors.New("db is nil")
 	}
-	items, err := s.retrieveTorrentItems(ctx, hash, claims)
+	items, err := s.retrieveTorrentItems(ctx, hash)
 	if err != nil {
 		// Permanent-rejection errors → purge. The torrent will never
 		// be retrievable again, and leaving the row behind makes every
@@ -1337,7 +1337,7 @@ func scanSidecarFlags(items []ra.ListItem) (adult, sport bool) {
 	return
 }
 
-func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, force bool, hintVideoID string) error {
+func (s *Enricher) Enrich(ctx context.Context, hash string, force bool, hintVideoID string) error {
 	log.Infof("enriching media info for hash %s", hash)
 	if hintVideoID != "" {
 		log.Infof("enrichment hint video id: %s", hintVideoID)
@@ -1357,14 +1357,14 @@ func (s *Enricher) Enrich(ctx context.Context, hash string, claims *api.Claims, 
 		// is skipped and file_idx/file_size stay NULL. Fill them directly from
 		// rest-api's ListItem.Index/Size — no expensive re-enrich, gated so it
 		// no-ops once the resource is populated.
-		if ferr := s.backfillFileIndex(ctx, db, hash, claims); ferr != nil {
+		if ferr := s.backfillFileIndex(ctx, db, hash); ferr != nil {
 			log.WithError(ferr).WithField("hash", hash).Warn("failed to backfill file_idx")
 		}
 		return nil
 	}
 	log.Infof("start processing media info %+v", mi)
 
-	mt, err := s.enrichMediaInfo(ctx, db, hash, claims, force, hintVideoID)
+	mt, err := s.enrichMediaInfo(ctx, db, hash, force, hintVideoID)
 	if err != nil {
 		if strings.Contains(err.Error(), "PermissionDenied") {
 			mi.Status = int16(models.MediaInfoStatusForbidden)
@@ -1778,12 +1778,12 @@ func (s *Enricher) tryUpgrade(ctx context.Context, md *models.VideoMetadata, t m
 // movie/episode rows from rest-api's authoritative ListItem.Index/Size,
 // without re-running the full enrich. Gated by HasNullFileIdx so it issues no
 // rest-api call once the resource is populated.
-func (s *Enricher) backfillFileIndex(ctx context.Context, db *pg.DB, hash string, claims *api.Claims) error {
+func (s *Enricher) backfillFileIndex(ctx context.Context, db *pg.DB, hash string) error {
 	need, err := models.HasNullFileIdx(ctx, db, hash)
 	if err != nil || !need {
 		return err
 	}
-	items, err := s.retrieveTorrentItems(ctx, hash, claims)
+	items, err := s.retrieveTorrentItems(ctx, hash)
 	if err != nil {
 		return err
 	}
@@ -1800,9 +1800,12 @@ func (s *Enricher) backfillFileIndex(ctx context.Context, db *pg.DB, hash string
 	return models.FillFileIndex(ctx, db, hash, entries)
 }
 
-func (s *Enricher) retrieveTorrentItems(ctx context.Context, hash string, claims *api.Claims) ([]ra.ListItem, error) {
+// retrieveTorrentItems reads the listing as internal, whoever started the
+// enrichment: the media-info row it feeds is shared by every caller.
+func (s *Enricher) retrieveTorrentItems(ctx context.Context, hash string) ([]ra.ListItem, error) {
 	limit := uint(100)
 	offset := uint(0)
+	claims := api.InternalClaims()
 	var items []ra.ListItem
 	for {
 		resp, err := s.api.ListResourceContentCached(ctx, claims, hash, &api.ListResourceContentArgs{
