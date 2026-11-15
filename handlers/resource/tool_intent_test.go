@@ -439,7 +439,7 @@ func TestPrivateNoticeSeedDoor(t *testing.T) {
 	has(t, page(tpl, "ru", "free", true), "после просмотра — в платных тарифах.", "Bronze — 3 дня · Silver — 7 дней · Gold — 14 дней", ">Смотреть тарифы</a>")
 
 	for _, lang := range allLangs {
-		for _, tier := range []string{"free", "silver"} {
+		for _, tier := range []string{"free", "bronze", "silver", "gold", "sparkling"} {
 			out := page(tpl, lang, tier, true)
 			if strings.Contains(out, "private.seedDoor") || strings.Contains(out, "<no value>") {
 				t.Errorf("%s/%s: an untranslated key or a missing value reached the page", lang, tier)

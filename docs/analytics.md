@@ -153,7 +153,10 @@ GROUP BY 1, 2 ORDER BY 1, 2;
 To remove: the `resource/seed_door` template and its call in
 `resource/private_notice`, the `private.seedDoor.*` keys in all locales,
 `TestPrivateNoticeSeedDoor`, the `useUmami` stub in its test helpers if
-nothing else needs it, and this section.
+nothing else needs it, the door's mention in the comment of
+`assets/src/js/app/private_refusal.js` and in the comment of its case in
+`assets/src/js/lib/umami.test.js` (the case itself is generic and can stay),
+and this section.
 
 ## On every event and identify call
 
