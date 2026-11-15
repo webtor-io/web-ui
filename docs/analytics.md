@@ -111,6 +111,53 @@ way (`data-umami-impression`, `app/private_refusal.js`):
   warning shown above the Store button once private pledges are open is not
   counted. `TestPledgeModalPrivate` pins all three.
 
+## Seeding after watching (fake door)
+
+**Temporary: a fake door until 2026-11-30.** Owner's decision of 2026-11-15:
+count demand for "keep seeding with my key after watching" (so a private
+tracker does not count a hit-and-run) before building it. Nothing of it
+exists. The door sits under the private torrent notice
+(`resource/seed_door` in `views/resource/get.html`), so only someone who may
+play the private torrent sees it, and only where Umami is configured
+(`USE_UMAMI`): counting is all it is for. The button is the `<summary>` of a
+`<details>` that opens on "Thanks! This feature is still in development" with
+no request to the server; it cannot be closed again. Paid tiers read their
+days (Bronze 3, Silver 7, Gold 14; any other paid tier, such as sparkling, is
+shown as Gold), free gets "on paid plans" and a link to `/donate`.
+
+- `seed-door-shown` `{tier}`: the door rendered. Declared on it
+  (`data-umami-impression`) and sent by `app/private_refusal.js`, like the
+  refusals above; once per page load per tier, so an async move to another
+  private torrent in the same page load is not a second show.
+- `seed-door-click` `{tier}`: the button pressed, i.e. the door opened. The
+  summary hides once open, so there is no closing click to tell apart.
+- `seed-door-tiers-click` `{tier}`: "See plans" in the free tier's thanks.
+
+`tier` is the claims tier name, the same value `eventDefaults()` puts on every
+event (sparkling stays `sparkling` even though the door shows it Gold). A
+click can follow a show that was deduplicated, so compare distinct sessions,
+not events. Filter `event_data` by the same `created_at` window, or the query
+times out (no index on `website_event_id`):
+
+```sql
+WITH ev AS MATERIALIZED (
+  SELECT event_id, event_name, session_id FROM website_event
+  WHERE website_id = '<website>' AND created_at >= '<deploy>' AND created_at < now()
+    AND event_name IN ('seed-door-shown', 'seed-door-click', 'seed-door-tiers-click'))
+SELECT d.string_value AS tier, ev.event_name, count(DISTINCT ev.session_id)
+FROM ev JOIN event_data d ON d.website_event_id = ev.event_id AND d.data_key = 'tier'
+  AND d.created_at >= '<deploy>'
+GROUP BY 1, 2 ORDER BY 1, 2;
+```
+
+To remove: the `resource/seed_door` template and its call in
+`resource/private_notice`, the `private.seedDoor.*` keys in all locales,
+`TestPrivateNoticeSeedDoor`, the `useUmami` stub in its test helpers if
+nothing else needs it, the door's mention in the comment of
+`assets/src/js/app/private_refusal.js` and in the comment of its case in
+`assets/src/js/lib/umami.test.js` (the case itself is generic and can stay),
+and this section.
+
 ## On every event and identify call
 
 `eventDefaults()` is merged into the data of every `umami.track` and
