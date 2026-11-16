@@ -244,3 +244,28 @@ sticky status away on every click, then scrolled to the top of the page.
   (`services/web/has_guard_test.go`). A page without `#content` falls back to `main`.
 - Still targeting `main` on purpose: directory links when no file is picked, and the
   watched toggles (they keep the header button in sync).
+
+## The wget and curl commands
+
+The download card copies `wget -c -O "<file>" -t 20 --retry-on-http-error=429 "<url>"`
+and `curl -f -o "<file>" -C - --retry 20 "<url>"` (`action/download_file.html`, guarded
+by `TestDownloadCommandsSurviveLimiter`). The link goes to torrent-http-proxy, whose
+session limiter answers 429 with `Retry-After: 5`, and whose claims check answers 403.
+
+- `curl -f`: without it curl writes the error body into the file and exits 0 (on a fresh
+  403 it leaves an empty or error-text file), and a later `-C -` resumes after that body.
+  With a partial file, a 429 without `-f` ends in exit 33 "Cannot resume" and is never
+  retried; with `-f` it is a transient error that `--retry` repeats after `Retry-After`.
+  A 416 to the resume of an already complete file still exits 0.
+- `wget --retry-on-http-error=429`: without it wget does not retry a 429 at all (exit 8).
+  wget older than 1.19.1 does not know the option, and BusyBox wget (Alpine, routers)
+  stops on it with "unrecognized option" while it accepted the old command. At ingress
+  on 2026-11-16 that was 3 of 25 wget clients over 6 h (one `Wget/1.12`, two BusyBox,
+  whose User-Agent is a bare `Wget`); deleting the option from the copied line is the
+  way out for them.
+- Measured 2026-11-16 with curl 8.7.1 and wget 1.25.0 against a local server: both finish
+  a byte-identical file after 429s on a fresh and on a resumed download, both stop on a
+  403 without writing its body (curl exit 22, wget exit 8; wget leaves the empty file
+  `-O` creates), and both exit 0 on a complete file. A connection dropped mid-file still
+  ends curl with exit 18, which `--retry` does not cover; running the command again
+  resumes.
