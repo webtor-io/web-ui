@@ -165,6 +165,24 @@ func TestDownloadNudgeRenders(t *testing.T) {
 	}
 }
 
+// The copied commands: curl -f retries the limiter's 429 and never saves an
+// error body into the file; wget keeps no flag older or BusyBox wget rejects
+// (docs/job_wait_ux.md, "The wget and curl commands").
+func TestDownloadCommands(t *testing.T) {
+	type ctx struct {
+		Lang string
+		Data *FileDownload
+	}
+	tpl, err := template.New("download_file.html").Funcs(offerFuncs(t, nil, false)).
+		ParseFiles("../../templates/views/action/download_file.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	assertRender(t, "commands", renderModal(t, tpl, "en", &ctx{Lang: "en", Data: &FileDownload{URL: "u"}}),
+		[]string{"`wget -c -O \"${file}\" -t 20 \"${url}\"`",
+			"`curl -f -o \"${file}\" -C - --retry 20 \"${url}\"`"}, nil)
+}
+
 // The modal's title says which of the two it is: the plan's cap on a file
 // already on our side (checkCachedRateLimit) is "not enough speed for smooth
 // playback" -- not "download speed is too low", which is the swarm's
