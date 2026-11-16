@@ -2,7 +2,7 @@
     <script>
         var url = {{ .Data.URL }};
         var file = new URL(url).pathname.split('/').pop();
-        var wgetCmd = `wget -c -O "${file}" -t 20 --retry-on-http-error=429 "${url}"`;
+        var wgetCmd = `wget -c -O "${file}" -t 20 "${url}"`;
         var curlCmd = `curl -f -o "${file}" -C - --retry 20 "${url}"`;
     </script>
     {{- /* The nudge sells the promo plan (services/offer) to a free viewer.
