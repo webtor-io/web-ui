@@ -29,6 +29,7 @@ type Export struct {
 	GeneratedAt      time.Time           `json:"generated_at"`
 	User             UserData            `json:"user"`
 	Library          []LibraryItem       `json:"library"`
+	UploadReserves   []UploadReserveItem `json:"upload_reserves"`
 	WatchHistory     []WatchHistoryItem  `json:"watch_history"`
 	MovieStatuses    []MovieStatusItem   `json:"movie_statuses"`
 	SeriesStatuses   []SeriesStatusItem  `json:"series_statuses"`
@@ -79,6 +80,15 @@ type LibraryItem struct {
 	SizeBytes   int64     `json:"size_bytes,omitempty"`
 	FileCount   int       `json:"file_count,omitempty"`
 	AddedAt     time.Time `json:"added_at"`
+}
+
+// UploadReserveItem is the space one of the account's uploads holds against
+// its upload quota.
+type UploadReserveItem struct {
+	ResourceID    string     `json:"resource_id"`
+	ReservedBytes int64      `json:"reserved_bytes"`
+	WriteUntil    *time.Time `json:"write_until,omitempty"`
+	GoneAt        *time.Time `json:"gone_at,omitempty"`
 }
 
 type WatchHistoryItem struct {
@@ -313,6 +323,9 @@ func Build(ctx context.Context, db *pg.DB, u *models.User) (*Export, error) {
 	if err := exp.fillLibrary(ctx, db, u.UserID); err != nil {
 		return nil, err
 	}
+	if err := exp.fillUploadReserves(ctx, db, u.UserID); err != nil {
+		return nil, err
+	}
 	if err := exp.fillWatchHistory(ctx, db, u.UserID); err != nil {
 		return nil, err
 	}
@@ -361,6 +374,23 @@ func (e *Export) fillLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID) erro
 			item.FileCount = l.Torrent.FileCount
 		}
 		e.Library = append(e.Library, item)
+	}
+	return nil
+}
+
+func (e *Export) fillUploadReserves(ctx context.Context, db *pg.DB, uID uuid.UUID) error {
+	rows, err := models.ListAllUploadReserves(ctx, db, uID)
+	if err != nil {
+		return err
+	}
+	e.UploadReserves = make([]UploadReserveItem, 0, len(rows))
+	for _, r := range rows {
+		e.UploadReserves = append(e.UploadReserves, UploadReserveItem{
+			ResourceID:    r.ResourceID,
+			ReservedBytes: r.ReservedBytes,
+			WriteUntil:    r.WriteUntil,
+			GoneAt:        r.GoneAt,
+		})
 	}
 	return nil
 }
