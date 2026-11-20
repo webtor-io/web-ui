@@ -28,7 +28,7 @@
 
 | Kind | Что это | Обязательные поля |
 |---|---|---|
-| `AboutSteps` | три пронумерованные карточки, несёт якорь `#how` | `CTA` (`discover`/`stremio`) |
+| `AboutSteps` | три пронумерованные карточки, несёт якорь `#how` | `CTA` (`discover`/`stremio`); без него CTA нет — так у `/private-cloud-media-server`, где CTA — дропзона в hero |
 | `AboutProse` | заголовок + 1–3 абзаца | `Paras` (`p1`,`p2`,`p3` или `text`) |
 | `AboutChecklist` | заголовок, подзаголовок, сетка пунктов с галочками | `Items` |
 | `AboutCompare` | две подписанные колонки буллетов | `Cols` (ровно две) |
@@ -238,6 +238,24 @@ CTA — `stremio` (вторая страница после `/webtor-stremio-add
 «stremio without debrid» и не отобрала ли страница «torbox vs real debrid»
 у блога.
 
+## /private-cloud-media-server: страница загрузок (Tool.Uploads)
+
+Страница о загрузке своих файлов существует только там, где загрузки
+включены (`uploads.Enabled`: задан `UPLOAD_URL`, настроен секрет API, не
+RapidAPI). Признак — `Uploads: true` у записи. Где загрузки выключены,
+`serve()` на старте, до регистрации обработчиков, зовёт
+`common.DropUploadPages()`: запись уходит из `Tools`, и страницы нет сразу
+везде — ни маршрута (URL отвечает 404 главной с `error.invalid_resource`),
+ни строки в sitemap, ни ссылки в футере, ни карточки в «связанных», ни
+`ToolByURL`. Тесты видят полный список.
+
+CTA у шагов нет: CTA — дропзона в hero. Чисел в копирайте нет: лимит
+зависит от тарифа, его говорят бейдж под дропзоной (`home.sizeLimitUploads`
+с `uploadCap`, `home.sizeLimitUploadsUpsell` без платного тарифа) и строка
+«занято». `pub/llms.txt` этой страницы пока не называет — тест
+`TestLLMsTxtKeepsToTheFacts` её пропускает; строка появится вместе с
+юридическими текстами загрузок, и пропуск уберётся тем же коммитом.
+
 ## Как добавить страницу
 
 1. Запись в `Tools` с `Sections`.
@@ -246,7 +264,11 @@ CTA — `stremio` (вторая страница после `/webtor-stremio-add
    `about.faq.qN.question/.answer`, если задан `FAQ: N`.
 3. `go test ./handlers/common/ ./services/template/` — тесты скажут, чего не
    хватает, поимённо и по каждому языку.
-4. `-update` снапшотов не требуется: новая страница добавляет свой файл сама.
+4. Снапшоты новой страницы: `go test ./services/template/ -run
+   'TestAboutSnapshots|TestFAQSectionSnapshots' -update` — без них оба теста
+   падают с `no snapshot … (run with -update)`. После — `git status`: новыми
+   должны быть только `testdata/about/<url>.html` и `testdata/faq/<url>.html`;
+   прочитать оба.
 
 ## Что защищает изменения
 
@@ -265,6 +287,8 @@ CTA — `stremio` (вторая страница после `/webtor-stremio-add
 | `services/template.TestFAQAsksEachQuestionOnce` | на какой-то странице два вопроса FAQ дают один и тот же текст в `en.json` (общий how-to пункт не снят с гайда, который на него отвечает), или список вопросов в схеме разошёлся с разметкой |
 | `services/template.TestToolFAQItemsFollowTheTool` | вопросы страницы не совпадают с `Tool.FaqPairs` в схеме или в списке, стоят не после общих, либо страница с `FAQ: 0` (главная в том числе) рендерит лишние |
 | `handlers/common.TestEveryToolHasItsCopyInEveryLocale` | ключ `title`/`benefit`/`description` или пары FAQ нет в какой-то локали — `FaqSchema` молча выкинет такой вопрос из схемы |
+| `handlers/common.TestDropUploadPages` | `DropUploadPages` не убирает страницу загрузок или задевает остальные (их число и порядок) |
+| `services/template.TestIndexBadgeSaysTheUploadCap` | бейдж под дропзоной называет лимит своих файлов там, где загрузки выключены или claims нет, либо платный и бесплатный тексты перепутаны |
 
 Снапшоты, которыми обложен рефакторинг 2026-08-15, сняты **до** него: все 18
 страниц после перехода на секции рендерятся байт-в-байт (с точностью до

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"maps"
 	"os"
 	"reflect"
 	"strings"
@@ -28,6 +29,12 @@ type indexData struct {
 // renderIndexMain executes views/index.html's "main" with the translation
 // funcs echoing their key, and the sub-templates it pulls in stubbed out.
 func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{}) string {
+	t.Helper()
+	return renderIndexMainWith(t, tool, nil, extra...)
+}
+
+// renderIndexMainWith is renderIndexMain with funcs put over its stubs.
+func renderIndexMainWith(t *testing.T, tool *hc.Tool, over template.FuncMap, extra ...map[string]interface{}) string {
 	t.Helper()
 	echo := func(lang, key string, args ...interface{}) string { return key }
 	funcs := template.FuncMap{
@@ -57,7 +64,9 @@ func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{
 		"hasAuth":        func(any) bool { return false },
 		"tp":             func(lang, key string, args ...interface{}) string { return key },
 		"bitsForHumans":  func(int64) string { return "" },
+		"uploadCap":      func(any) string { return "" },
 	}
+	maps.Copy(funcs, over)
 	b, err := os.ReadFile("../../templates/views/index.html")
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +163,43 @@ func TestIndexErrorQuotesItsNumbers(t *testing.T) {
 	page = renderIndexMain(t, nil, map[string]interface{}{"ErrKey": "error.free_text"})
 	if !strings.Contains(page, `<pre class="error">error.free_text</pre>`) {
 		t.Errorf("a plain message changed:\n%s", errorBlock(page))
+	}
+}
+
+// The size badge under the drop zone: torrents have no size limit, own files
+// have the account's upload cap. It names the cap only where uploads are on
+// and there is a cap to name; a viewer without a paid plan reads the upsell.
+func TestIndexBadgeSaysTheUploadCap(t *testing.T) {
+	const open = `<span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3">`
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+		cap     string
+		paid    bool
+		want    string
+	}{
+		{"paid", true, "50\u00a0GB", true, "home.sizeLimitUploads"},
+		{"free", true, "10\u00a0GB", false, "home.sizeLimitUploadsUpsell"},
+		{"no claims", true, "", true, "home.noSizeLimit"},
+		{"uploads off", false, "50\u00a0GB", true, "home.noSizeLimit"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			page := renderIndexMainWith(t, nil, template.FuncMap{
+				"uploadsEnabled": func() bool { return tc.enabled },
+				"uploadCap":      func(any) string { return tc.cap },
+				"isPaid":         func(any) bool { return tc.paid },
+				// Signed in: the guest's sign-in card is TestDropzoneUploads' subject.
+				"hasAuth": func(any) bool { return true },
+			})
+			i := strings.Index(page, open)
+			if i < 0 {
+				t.Fatal("no size badge under the drop zone")
+			}
+			i += len(open)
+			if got := page[i : i+strings.Index(page[i:], "</span>")]; got != tc.want {
+				t.Errorf("badge says %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

@@ -1,5 +1,7 @@
 package common
 
+import "slices"
+
 // Tool represents a tool page with its URL and i18n translation keys
 // for the title, benefit, and description. These keys are resolved in
 // templates via {{ t $.Lang .Title }}.
@@ -20,6 +22,9 @@ type Tool struct {
 	// FaqPairs). They render after the shared questions, in the collapse
 	// list and in the FAQPage JSON-LD alike; answers go through tHTML.
 	FAQ int
+	// Uploads marks a page about uploading one's own files: routed and
+	// listed only where uploads are on (DropUploadPages).
+	Uploads bool
 }
 
 // Tools contains the list of all available tool pages.
@@ -291,6 +296,23 @@ var Tools = []Tool{
 		{Kind: AboutChecklist, Key: "benefits", Badge: "benefits", Accent: "pink", Alt: true, Items: 4},
 		{Kind: AboutProse, Key: "safety", Badge: "safety", Accent: "purple", Paras: []string{"text"}},
 	}},
+	// Uploading one's own files. No CTA under the steps: the drop zone in the
+	// hero is the call to action. No numbers in the copy: the cap depends on
+	// the plan (and is the same for everyone without a claims provider), so
+	// the size badge and the "used" line under the drop zone state it.
+	{Url: "private-cloud-media-server", Title: "tool.privateCloudMediaServer.title", Benefit: "tool.privateCloudMediaServer.benefit",
+		Description: "tool.privateCloudMediaServer.description", Uploads: true, Sections: []AboutSection{
+			{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink"},
+			{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1"}},
+		}},
+}
+
+// DropUploadPages removes the pages about uploading one's own files from
+// Tools, so they are neither routed nor listed (sitemap, footer, related
+// cards, ToolByURL). Called once at startup where uploads are off, before
+// any handler reads Tools.
+func DropUploadPages() {
+	Tools = slices.DeleteFunc(Tools, func(t Tool) bool { return t.Uploads })
 }
 
 // ToolByURL returns the tool page registered at url ("magnet-to-torrent", no

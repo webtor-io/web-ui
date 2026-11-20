@@ -301,6 +301,17 @@ func (s *Helper) IsPaid(c *claims.Data) bool {
 	return c.Context.Tier.Id != 0
 }
 
+// UploadCap is the account's upload quota for people ("50 GB"), or "" with
+// no claims to read the tier from.
+// Template usage: {{ with uploadCap $.Claims }}
+func (s *Helper) UploadCap(c *claims.Data) string {
+	limit, err := uploads.Limit(c)
+	if err != nil {
+		return ""
+	}
+	return helpers.Bytes(uint64(limit))
+}
+
 func (s *Helper) TierName(c *claims.Data) string {
 	if c == nil {
 		return "free"

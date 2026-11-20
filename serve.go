@@ -11,6 +11,7 @@ import (
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	japi "github.com/webtor-io/web-ui/handlers/api"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
+	hc "github.com/webtor-io/web-ui/handlers/common"
 	wdev "github.com/webtor-io/web-ui/handlers/device"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
@@ -157,6 +158,9 @@ func configureServe(c *cli.Command) {
 
 func serve(c *cli.Context) error {
 	private_torrent.Configure(c)
+	if !uploads.Enabled(c) {
+		hc.DropUploadPages()
+	}
 
 	// Setting HTTP Client
 	cl := http.DefaultClient
