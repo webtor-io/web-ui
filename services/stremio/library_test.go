@@ -2,7 +2,19 @@ package stremio
 
 import (
 	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"sync"
 	"testing"
+
+	"github.com/urfave/cli"
+	ra "github.com/webtor-io/rest-api/services"
+
+	"github.com/webtor-io/web-ui/services/api"
 )
 
 func TestHumanizeBytes(t *testing.T) {
@@ -195,4 +207,104 @@ func TestParseLibraryID(t *testing.T) {
 			t.Errorf("%s %q: got %+v, want %+v", c.ct, c.id, *got, c.want)
 		}
 	}
+}
+
+// An upload's files change order without changing size or count (its live
+// copy lists the directory walk, the Vault copy sorts by path), so a stored
+// index may name another file: an upload's file is found by its path in the
+// current listing, and a path that is not there gives no stream.
+func TestLibrary_resolveFileItem_UploadGoesByPath(t *testing.T) {
+	const id = "9c5db5752b7c0123456789abcdef0123456789ab"
+	zero := 0
+	two := []ra.ListItem{
+		{Type: ra.ListTypeFile, MediaFormat: ra.Video, Name: "a.mkv", PathStr: "/Name/a.mkv", Index: 0},
+		{Type: ra.ListTypeFile, MediaFormat: ra.Video, Name: "b.mkv", PathStr: "/Name/b.mkv", Index: 1},
+	}
+	listing := func(t *testing.T, page func(n int) (int, []byte)) (*api.Api, func() int) {
+		t.Helper()
+		var mu sync.Mutex
+		requests := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/resource/"+id+"/list" {
+				t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
+				w.WriteHeader(http.StatusTeapot)
+				return
+			}
+			mu.Lock()
+			requests++
+			n := requests
+			mu.Unlock()
+			status, body := page(n)
+			w.WriteHeader(status)
+			_, _ = w.Write(body)
+		}))
+		t.Cleanup(srv.Close)
+		u, _ := url.Parse(srv.URL)
+		fs := flag.NewFlagSet("test", flag.ContinueOnError)
+		for _, f := range api.RegisterFlags(nil) {
+			f.Apply(fs)
+		}
+		if err := fs.Parse([]string{"--webtor-rest-api-host=" + u.Hostname(), "--webtor-rest-api-port=" + u.Port(),
+			"--webtor-secret=test", "--rapidapi-host="}); err != nil {
+			t.Fatal(err)
+		}
+		return api.New(cli.NewContext(cli.NewApp(), fs, nil), srv.Client()), func() int {
+			mu.Lock()
+			defer mu.Unlock()
+			return requests
+		}
+	}
+	marshal := func(items []ra.ListItem, count int) []byte {
+		b, err := json.Marshal(ra.ListResponse{Items: items, Count: count})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	ctx := context.Background()
+
+	t.Run("the stored index is not used", func(t *testing.T) {
+		a, requests := listing(t, func(int) (int, []byte) { return http.StatusOK, marshal(two, 2) })
+		l := NewLibrary("https://example.com", nil, nil, a, api.InternalClaims())
+		idx, name, err := l.resolveFileItem(ctx, id, "/Name/b.mkv", &zero)
+		if err != nil || idx != 1 || name != "b.mkv" {
+			t.Errorf("got %d, %q, %v; want 1, b.mkv, nil", idx, name, err)
+		}
+		if n := requests(); n != 1 {
+			t.Errorf("%d list requests, want 1", n)
+		}
+	})
+
+	t.Run("a path that is gone gives no stream", func(t *testing.T) {
+		a, _ := listing(t, func(int) (int, []byte) { return http.StatusOK, marshal(two, 2) })
+		l := NewLibrary("https://example.com", nil, nil, a, api.InternalClaims())
+		_, name, err := l.resolveFileItem(ctx, id, "/Name/gone.mkv", &zero)
+		if err != nil || name != "" {
+			t.Errorf("got %q, %v; want no name, no error", name, err)
+		}
+	})
+
+	t.Run("the listing shrinks while it is walked", func(t *testing.T) {
+		page := make([]ra.ListItem, 100)
+		for i := range page {
+			page[i] = ra.ListItem{Type: ra.ListTypeFile, Name: fmt.Sprintf("f%d.mkv", i), PathStr: fmt.Sprintf("/Name/f%d.mkv", i), Index: i}
+		}
+		a, requests := listing(t, func(n int) (int, []byte) {
+			switch {
+			case n == 1:
+				return http.StatusOK, marshal(page, 250)
+			case n <= 3:
+				return http.StatusOK, marshal(nil, 50)
+			}
+			return http.StatusInternalServerError, nil
+		})
+		l := NewLibrary("https://example.com", nil, nil, a, api.InternalClaims())
+		_, name, err := l.resolveFileItem(ctx, id, "/Name/gone.mkv", &zero)
+		if err != nil || name != "" {
+			t.Errorf("got %q, %v; want no name, no error", name, err)
+		}
+		if n := requests(); n != 2 {
+			t.Errorf("%d list requests, want 2", n)
+		}
+	})
 }

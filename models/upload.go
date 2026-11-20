@@ -36,3 +36,42 @@ func UploadFrozen(ctx context.Context, db pg.DBI, id string) (bool, error) {
 	}
 	return frozen, nil
 }
+
+// AddUploadToLibrary keeps the owner's library row of an upload, records
+// its size and file count and clears its gone mark: rest-api has just
+// answered for it. torrent_resource.updated_at moves only when the size or
+// the count changes. An empty name (no file finished yet) keeps the name
+// already there.
+func AddUploadToLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, id, name string, size int64, filesCount int) error {
+	return db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO torrent_resource (resource_id, name, size_bytes, file_count) VALUES (?, ?, ?, ?)
+ON CONFLICT (resource_id) DO UPDATE SET name = COALESCE(NULLIF(EXCLUDED.name, ''), torrent_resource.name),
+  size_bytes = EXCLUDED.size_bytes,
+  file_count = EXCLUDED.file_count,
+  updated_at = CASE WHEN torrent_resource.size_bytes IS DISTINCT FROM EXCLUDED.size_bytes
+                      OR torrent_resource.file_count IS DISTINCT FROM EXCLUDED.file_count
+                    THEN now() ELSE torrent_resource.updated_at END`, id, name, size, filesCount); err != nil {
+			return errors.Wrap(err, "failed to upsert upload resource")
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO library (user_id, resource_id, name, created_at) VALUES (?, ?, ?, now()) ON CONFLICT DO NOTHING`,
+			uID, id, name); err != nil {
+			return errors.Wrap(err, "failed to insert upload library entry")
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE upload_reserve SET gone_at = NULL WHERE user_id = ? AND resource_id = ?`, uID, id); err != nil {
+			return errors.Wrap(err, "failed to clear the upload's gone mark")
+		}
+		return nil
+	})
+}
+
+// DropStaleMediaInfo deletes the upload's media_info row when it is older than the last change of the
+// upload's size or file count (torrent_resource.updated_at, AddUploadToLibrary); movie, series, episode
+// and resource_metadata go with it by cascade. kept reports whether a row is there afterwards.
+func DropStaleMediaInfo(ctx context.Context, db *pg.DB, id string) (kept bool, err error) {
+	if _, err := db.ExecContext(ctx, `DELETE FROM media_info m USING torrent_resource tr
+WHERE m.resource_id = ? AND tr.resource_id = m.resource_id AND m.updated_at < tr.updated_at`, id); err != nil {
+		return false, errors.Wrap(err, "failed to drop stale media info")
+	}
+	kept, err = MediaInfoExists(ctx, db, id)
+	return kept, errors.Wrap(err, "failed to check media info")
+}

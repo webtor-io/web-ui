@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -18,9 +19,11 @@ import (
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/statusview"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
@@ -215,6 +218,11 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 
 	db := s.pg.Get()
 	if db != nil {
+		// Only the owner gets this far on an upload: rest-api refused
+		// anyone else above.
+		if uploads.Owned(args.ID) && args.User.HasAuth() {
+			s.keepUpload(ctx, db, args, res)
+		}
 		if args.User.HasAuth() {
 			d.Resource.InLibrary, err = models.IsInLibrary(ctx, db, args.User.ID, d.Resource.ID)
 			if err != nil {
@@ -297,6 +305,52 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 		return nil, errors.New("failed to connect to database")
 	}
 	return d, nil
+}
+
+var uploadEnrichWait = 3 * time.Second     // how long the owner's page waits for a fresh enrichment
+var uploadEnrichTimeout = 30 * time.Minute // the enrichment's own deadline, as jobs.Enrich has
+
+// keepUpload keeps the library row of the owner's upload and enriches the upload again when its files
+// changed since the last enrichment. Neither failure breaks the page.
+func (s *Handler) keepUpload(ctx context.Context, db *pg.DB, args *GetArgs, res *ra.ResourceResponse) {
+	if err := models.AddUploadToLibrary(ctx, db, args.User.ID, args.ID, res.Name, res.Size, res.FilesCount); err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to keep the upload's library row")
+		return
+	}
+	if s.enricher == nil || !s.enricher.HasMappers() {
+		return
+	}
+	kept, err := models.DropStaleMediaInfo(ctx, db, args.ID)
+	if err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to drop the upload's stale enrichment")
+		return
+	}
+	if kept {
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		// A panic here would pass gin's recovery and take the process down;
+		// the files' names are the user's.
+		defer func() {
+			if r := recover(); r != nil {
+				log.WithField("stack", string(debug.Stack())).Errorf("upload enrichment panic: %v", r)
+			}
+			close(done)
+		}()
+		// Not the request's context: a run cut at the page's deadline would
+		// leave the row Processing, and no later call takes such a row.
+		ectx, cancel := context.WithTimeout(context.Background(), uploadEnrichTimeout)
+		defer cancel()
+		if err := s.enricher.Enrich(ectx, args.ID, false, ""); err != nil {
+			log.WithError(err).WithField("resource_id", args.ID).Warn("failed to enrich the upload")
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(uploadEnrichWait):
+	case <-ctx.Done():
+	}
 }
 
 // creditsTarget names the title whose directors and cast the page shows:

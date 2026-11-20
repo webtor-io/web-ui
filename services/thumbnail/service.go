@@ -340,7 +340,7 @@ func (s *Service) listAllItems(ctx context.Context, claims *api.Claims, resource
 			return nil, err
 		}
 		items = append(items, resp.Items...)
-		if (resp.Count - int(offset)) == len(resp.Items) {
+		if api.LastListPage(resp, offset) {
 			break
 		}
 		offset += limit

@@ -173,6 +173,13 @@ count resolved the *wrong* file whenever the torrent's natural `r.Files` order
 didn't match the folders-first/name sort (e.g. a season pack with scrambled
 file order).
 
+An upload (`uploads.HomeHosted`) always takes the list-walk, stored index or
+not: its files change order with no change of size or count (the live copy
+lists the directory walk, the Vault copy sorts by path), so a stored index may
+name another file. A path no longer in the listing gives no stream. The price
+is `/list` requests on every `/stream` of an upload; a torrent keeps the fast
+path.
+
 **Self-heal.** Adding a resource to a library calls `jobs.Enrich`, but enrich
 short-circuits for already-enriched resources (`TryInsertOrLockMediaInfo`
 returns nil), so a pre-migration-60 resource would keep `file_idx = NULL` and

@@ -1818,7 +1818,7 @@ func (s *Enricher) retrieveTorrentItems(ctx context.Context, hash string) ([]ra.
 		for _, item := range resp.Items {
 			items = append(items, item)
 		}
-		if (resp.Count - int(offset)) == len(resp.Items) {
+		if api.LastListPage(resp, offset) {
 			break
 		}
 		offset += limit
