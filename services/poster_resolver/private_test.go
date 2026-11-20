@@ -247,6 +247,8 @@ func TestAdmit(t *testing.T) {
 		{"holder", &api.Claims{Uid: uidA}, nil, ""},
 		{"stranger", &api.Claims{Uid: uidB}, nil, "not found"},
 		{"anonymous", &api.Claims{}, nil, "not found"},
+		// A route the api middleware did not run on hands Get no claims at all.
+		{"no claims", nil, nil, "not found"},
 		{"unknown", &api.Claims{Uid: uidA}, notFoundReply, "not found"},
 		{"forbidden", &api.Claims{Uid: uidA}, &reply{http.StatusForbidden, `{"error":"access is forbidden"}`}, "not found"},
 		{"500", &api.Claims{Uid: uidA}, downReply, "rest-api down"},
