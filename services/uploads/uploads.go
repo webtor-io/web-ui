@@ -5,6 +5,7 @@ package uploads
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net/http"
 	"strings"
 	"time"
 
@@ -97,7 +98,7 @@ func New(c *cli.Context, pg *cs.PG, a *api.Api) *Service {
 		return nil
 	}
 	log.Info("uploads: on")
-	return &Service{pg: pg, api: a, url: c.String(URLFlag), key: api.Key(c)}
+	return &Service{pg: pg, api: a, url: c.String(URLFlag), key: api.Key(c), cl: http.DefaultClient}
 }
 
 // Grant is a write token and what the browser needs with it.

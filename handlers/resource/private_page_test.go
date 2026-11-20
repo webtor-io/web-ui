@@ -153,7 +153,7 @@ func TestPrivateRefusalPage(t *testing.T) {
 		// here because this router has no database for a signed-in page.
 		answer(http.StatusOK, `{"id":"`+privHash+`","name":"probe","private":true}`)
 		rec := getPage(anon, "")
-		if rec.Code != http.StatusOK || rec.Body.String() != "[resource][name=probe][movie=]" {
+		if rec.Code != http.StatusOK || rec.Body.String() != "[resource][name=probe][movie=][upload=][uname=][unknown=][unpaid=][incomplete=]" {
 			t.Fatalf("status %d body %q, want the resource page", rec.Code, rec.Body.String())
 		}
 		if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {

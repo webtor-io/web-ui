@@ -139,7 +139,7 @@ func newEnv(t *testing.T) *env {
 		}
 		c.Request = c.Request.WithContext(ctx)
 	})
-	RegisterHandler(e.r, up, a, p)
+	RegisterHandler(e.r, up, a, nil, p, nil)
 	return e
 }
 

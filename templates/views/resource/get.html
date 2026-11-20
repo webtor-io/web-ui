@@ -131,6 +131,31 @@
                         </a>
                     </div>
 {{ end }}
+{{/* The owner's actions on their own upload: add files while it is not in
+     Vault, and delete it. Called with the view context. Nothing while uploads
+     are off: their routes are not mounted then. */}}
+{{ define "resource/upload_actions" }}
+{{- if uploadsEnabled }}{{ with .Data.Upload }}
+                    {{- if .CanWrite }}
+                    <button type="button" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap shrink-0" data-upload-add data-upload-id="{{ $.Data.Resource.ID }}" data-upload-name="{{ .Name }}" data-upload-dir="{{ $.Data.Args.PWD }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Data.Vault }} data-upload-vault{{ end }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        {{ t $.Lang "upload.addFiles" }}
+                    </button><input type="file" multiple hidden>
+                    {{- end }}
+                    {{- if .IsOwner }}
+                    <form method="post" enctype="multipart/form-data" action="{{ langPath $.Lang "/upload/delete" }}" data-async-target="main" class="shrink-0">
+                        <input type="hidden" name="resource_id" value="{{ $.Data.Resource.ID }}" />
+                        {{/* On the submit button, not the form: async.js sends the
+                             form on submit without asking whether it was cancelled. */}}
+                        <button type="submit" class="btn btn-ghost btn-sm text-w-muted hover:text-error whitespace-nowrap" onclick="return confirm('{{ t $.Lang "upload.deleteConfirm" }}')">
+                            {{ t $.Lang "upload.delete" }}
+                        </button>
+                    </form>
+                    {{- end }}
+{{- end }}{{ end }}
+{{- end }}
 {{/* What playing a private torrent does on the viewer's tracker account
      (design §8, private.notice.*), on the page of whoever may play it -- an
      upload ends on this page too, so it is also the notice "on upload". A
@@ -394,6 +419,7 @@
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
+                    {{- template "resource/upload_actions" $ }}
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
@@ -463,6 +489,7 @@
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
+                    {{- template "resource/upload_actions" $ }}
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>

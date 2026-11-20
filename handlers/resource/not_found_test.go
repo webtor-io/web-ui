@@ -97,9 +97,12 @@ func newResourceRouterEn(t *testing.T, restAPI *httptest.Server, v *vault.Vault,
 	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
-		"templates/layouts/main.html":           `{{ template "main" . }}`,
-		"templates/views/index.html":            `{{ define "main" }}[home][err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
-		"templates/views/resource/get.html":     `{{ define "main" }}[resource][name={{ .Data.Resource.Name }}][movie={{ with .Data.Movie }}{{ .Title }}{{ end }}]{{ end }}`,
+		"templates/layouts/main.html": `{{ template "main" . }}`,
+		"templates/views/index.html":  `{{ define "main" }}[home][err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
+		"templates/views/resource/get.html": `{{ define "main" }}[resource][name={{ .Data.Resource.Name }}][movie={{ with .Data.Movie }}{{ .Title }}{{ end }}]` +
+			`[upload={{ with .Data.Upload }}{{ .IsOwner }}/{{ .CanWrite }}/{{ .Saved }}{{ end }}][uname={{ with .Data.Upload }}{{ .Name }}{{ end }}]` +
+			`[unknown={{ with .Data.Upload }}{{ .VaultUnknown }}{{ end }}][unpaid={{ with .Data.Upload }}{{ .UnpaidPledge }}{{ end }}]` +
+			`[incomplete={{ with .Data.Upload }}{{ .Incomplete }}{{ end }}]{{ end }}`,
 		"templates/views/resource/private.html": `{{ define "main" }}[private][key={{ .Data.Key }}][signin={{ .Data.SignIn }}][upload={{ .Data.Upload }}][vault={{ .Data.VaultKept }}][target={{ .Data.Target }}]{{ end }}`,
 	}
 	for name, body := range files {

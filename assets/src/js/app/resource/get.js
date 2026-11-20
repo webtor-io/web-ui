@@ -5,6 +5,7 @@ import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initLandscapeFocus } from '../../lib/landscapeFocus';
 import { initToolIntent } from '../../lib/toolIntent';
 import { initStreamToggle } from '../../lib/streamToggle';
+import { bindUploadFileDelete } from '../../lib/uploadFile';
 import '../../lib/share/share';
 import { takesPart, whenDeclared, setPendingFallback } from '../../lib/player/decode-declaration';
 import { hasJob } from '../../lib/actionBusy';
@@ -56,6 +57,9 @@ av( async function() {
     // Watch / Listen pressed while its player plays pauses it (once per
     // page: lib/streamToggle.js guards a second wiring).
     initStreamToggle(document);
+    // The × of a file or a folder of the owner's upload (partials/list.html),
+    // before the #action early return.
+    bindUploadFileDelete(document);
     // Before the early return below: the status mirror is for every visit to
     // this page, not only the ones that arrive with #action=stream.
     const stopSticky = initStickyStatus(document);

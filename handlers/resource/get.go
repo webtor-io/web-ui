@@ -138,6 +138,69 @@ type GetData struct {
 	// adultUnknown is set when the resource_metadata read failed. Unlike a
 	// resource that was never classified, its adult flag is then unknown.
 	adultUnknown bool
+	// Upload is the owner's view of their upload; nil on any other page.
+	Upload *UploadView
+}
+
+// UploadView is what the owner's page of an upload adds to a torrent's.
+type UploadView struct {
+	// IsOwner: rest-api showed the upload, and it shows one only to its owner.
+	IsOwner bool
+	// CanWrite: no vault.resource row, so files can be added and deleted.
+	CanWrite bool
+	// Name is the upload's root folder, for files added to it; empty while the
+	// upload has no name yet.
+	Name string
+	// Saved: the owner's pledge is there and funded, a copy is kept.
+	Saved bool
+	// Incomplete: writable, and no file is done yet or a declared part is not.
+	Incomplete bool
+	// VaultUnknown: Vault is configured and could not be read, so CanWrite and
+	// Saved are false for want of an answer, not because the answer is no.
+	VaultUnknown bool
+	// UnpaidPledge: the owner's own pledge of the upload is there and not
+	// funded. Read only when the upload is neither writable nor saved.
+	UnpaidPledge bool
+}
+
+// uploadView is the owner's view of the upload on d: rest-api showed it, so
+// the viewer owns it. A Vault read that failed is an error on c and leaves
+// the view unknown, not "not in Vault".
+func (s *Handler) uploadView(ctx context.Context, c *gin.Context, d *GetData) *UploadView {
+	u := &UploadView{IsOwner: true, CanWrite: true, Name: d.Resource.Name}
+	if u.Name == "" {
+		if db := s.pg.Get(); db != nil {
+			if r, err := models.GetResourceByID(ctx, db, d.Args.ID); err == nil && r != nil {
+				u.Name = r.Name
+			}
+		}
+	}
+	if s.vault != nil {
+		r, err := s.vault.GetResource(ctx, d.Args.ID)
+		if err != nil {
+			_ = c.Error(errors.Wrap(err, "failed to get vault resource"))
+			u.CanWrite, u.VaultUnknown = false, true
+		} else {
+			u.CanWrite = r == nil
+		}
+	}
+	res := d.Resource
+	u.Incomplete = u.CanWrite && (res.FilesCount == 0 || (res.Reserved != nil && *res.Reserved > res.Size))
+	return u
+}
+
+// ownUnpaidPledge says the viewer has a pledge of the resource and it is not
+// funded.
+func (s *Handler) ownUnpaidPledge(ctx context.Context, args *GetArgs) (bool, error) {
+	resource, err := s.vault.GetResource(ctx, args.ID)
+	if err != nil || resource == nil {
+		return false, err
+	}
+	pledge, err := s.vault.GetPledge(ctx, args.User, resource)
+	if err != nil {
+		return false, err
+	}
+	return pledge != nil && !pledge.Funded, nil
 }
 
 type RateForm struct {
@@ -434,6 +497,10 @@ func (s *Handler) get(c *gin.Context) {
 	d.TorrentStatus = s.prepareInitialStatus(ctx, args.ID)
 	d.StatusView = s.initialView(c, d.TorrentStatus)
 
+	if uploads.Owned(args.ID) {
+		d.Upload = s.uploadView(ctx, c, d)
+	}
+
 	// Prepare vault button state. The vault button is a non-critical UI
 	// element (and is also re-fetched async), so if its state can't be
 	// resolved — e.g. a transient vault failure or a canceled request — log
@@ -442,8 +509,25 @@ func (s *Handler) get(c *gin.Context) {
 		vaultButton, err := s.prepareVaultButton(ctx, args)
 		if err != nil {
 			_ = c.Error(errors.Wrap(err, "failed to prepare vault button"))
+			if d.Upload != nil {
+				d.Upload.VaultUnknown = true
+			}
 		} else {
 			d.VaultButton = vaultButton
+			if d.Upload != nil {
+				d.Upload.Saved = vaultButton.Funded
+				// The button reads no pledge of an unfunded row: the
+				// owner's own one is read here.
+				if !d.Upload.CanWrite && !d.Upload.Saved {
+					unpaid, err := s.ownUnpaidPledge(ctx, args)
+					if err != nil {
+						_ = c.Error(errors.Wrap(err, "failed to read the viewer's pledge"))
+						d.Upload.VaultUnknown = true
+					} else {
+						d.Upload.UnpaidPledge = unpaid
+					}
+				}
+			}
 			if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
 				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, d.Resource.Private)
 				if err != nil {

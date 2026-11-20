@@ -25,6 +25,7 @@
         {{ $Item := .Item}}
         {{ $WatchedPaths := .WatchedPaths}}
         {{ $PathActions := .PathActions}}
+        {{- $Upload := .Upload }}
 
         {{ $DirSize := bitsForHumans .List.Size }}
 
@@ -131,6 +132,13 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                 </svg>
                             </a>
+                            {{- if and uploadsEnabled $Upload $Upload.CanWrite (gt (len (makeBreadcrumbs .PathStr)) 1) }}
+                            <div class="flex items-center gap-2 shrink-0 pl-2">
+                                <button type="button" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-error" title="{{ t $.Lang "upload.deleteFolder" }}" aria-label="{{ t $.Lang "upload.deleteFolder" }}" data-upload-delete="{{ .PathStr }}/" data-upload-id="{{ $Resource.ID }}" data-upload-token="{{ langPath $.Lang "/upload/token" }}" data-error="{{ t $.Lang "error.generic" }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}" data-confirm="{{ tp $.Lang "upload.deleteFolderConfirm" "Name" .Name }}">
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 18 18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                            {{- end }}
                         </div>
                     {{ else if and (not $Args.File) (eq .Type "directory") }}
                         <div class="flex items-center px-4 hover:bg-base-300/30 transition-colors group">
@@ -145,6 +153,13 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                 </svg>
                             </a>
+                            {{- if and uploadsEnabled $Upload $Upload.CanWrite (gt (len (makeBreadcrumbs .PathStr)) 1) }}
+                            <div class="flex items-center gap-2 shrink-0 pl-2">
+                                <button type="button" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-error" title="{{ t $.Lang "upload.deleteFolder" }}" aria-label="{{ t $.Lang "upload.deleteFolder" }}" data-upload-delete="{{ .PathStr }}/" data-upload-id="{{ $Resource.ID }}" data-upload-token="{{ langPath $.Lang "/upload/token" }}" data-error="{{ t $.Lang "error.generic" }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}" data-confirm="{{ tp $.Lang "upload.deleteFolderConfirm" "Name" .Name }}">
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 18 18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                            {{- end }}
                         </div>
                     {{ else if and ($Item) (eq .PathStr $Item.PathStr) }}
                         {{/* Currently-selected file row. Mark/unmark here targets "main"
@@ -180,6 +195,11 @@
                                     <svg class="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                 {{ end }}
                                 <span class="text-xs text-w-muted">{{ bitsForHumans .Size }}</span>
+                                {{- if and uploadsEnabled $Upload $Upload.CanWrite }}
+                                <button type="button" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-error" title="{{ t $.Lang "upload.deleteFile" }}" aria-label="{{ t $.Lang "upload.deleteFile" }}" data-upload-delete="{{ .PathStr }}" data-upload-id="{{ $Resource.ID }}" data-upload-token="{{ langPath $.Lang "/upload/token" }}" data-error="{{ t $.Lang "error.generic" }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}">
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 18 18 6M6 6l12 12"/></svg>
+                                </button>
+                                {{- end }}
                             </div>
                         </div>
                     {{ else }}
@@ -213,6 +233,11 @@
                                     <svg class="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                 {{ end }}
                                 <span class="text-xs text-w-muted/60">{{ bitsForHumans .Size }}</span>
+                                {{- if and uploadsEnabled $Upload $Upload.CanWrite }}
+                                <button type="button" class="btn btn-ghost btn-xs btn-circle text-w-muted/60 hover:text-error" title="{{ t $.Lang "upload.deleteFile" }}" aria-label="{{ t $.Lang "upload.deleteFile" }}" data-upload-delete="{{ .PathStr }}" data-upload-id="{{ $Resource.ID }}" data-upload-token="{{ langPath $.Lang "/upload/token" }}" data-error="{{ t $.Lang "error.generic" }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}">
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 18 18 6M6 6l12 12"/></svg>
+                                </button>
+                                {{- end }}
                             </div>
                         </div>
                     {{ end }}

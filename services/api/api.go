@@ -796,7 +796,10 @@ func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, int, error
 	return s.DownloadWithRange(ctx, u, 0, -1)
 }
 
-func (s *Api) proxyURL(u string) (string, error) {
+// ProxyURL is where web-ui's server side sends u, a torrent-http-proxy URL:
+// with the internal proxy configured, its host and port over http, path and
+// query kept; otherwise u as it is.
+func (s *Api) ProxyURL(u string) (string, error) {
 	if s.useInternalTorrentHTTPProxy {
 		ur, err := url.Parse(u)
 		if err != nil {
@@ -822,7 +825,7 @@ func (s *Api) do(req *http.Request) (*http.Response, error) {
 }
 
 func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.Request, error) {
-	resolved, err := s.proxyURL(u)
+	resolved, err := s.ProxyURL(u)
 	if err != nil {
 		return nil, err
 	}
@@ -904,7 +907,7 @@ func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string, decod
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to construct session URL")
 	}
-	resolved, err := s.proxyURL(sessionURL)
+	resolved, err := s.ProxyURL(sessionURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve proxy URL")
 	}
@@ -944,7 +947,7 @@ func (s *Api) DeleteTranscoderSession(ctx context.Context, baseURL string, sessi
 	if err != nil {
 		return errors.Wrap(err, "failed to construct delete URL")
 	}
-	resolved, err := s.proxyURL(deleteURL)
+	resolved, err := s.ProxyURL(deleteURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve proxy URL")
 	}

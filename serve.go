@@ -522,7 +522,7 @@ func serve(c *cli.Context) error {
 
 	// Setting UploadHandler -- after uc and sapi: a token is cut from the viewer's claims.
 	if up != nil {
-		wup.RegisterHandler(r, up, sapi, pg)
+		wup.RegisterHandler(r, up, sapi, v, pg, thumbnailSvc)
 	}
 
 	// Setting IndexHandler

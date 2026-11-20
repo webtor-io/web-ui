@@ -85,6 +85,27 @@ WHERE user_id = ? AND resource_id = ? AND write_until IS NOT DISTINCT FROM ?`, r
 	return errors.Wrap(err, "failed to mark upload gone")
 }
 
+// MarkUploadDeleted marks the account's upload id gone once its owner deleted
+// it. tombstoned: the seeder wrote the upload's tombstone, the upload can
+// never grow back, and the row weighs nothing from now on; otherwise it
+// weighs until its token ends.
+func MarkUploadDeleted(ctx context.Context, db pg.DBI, userID uuid.UUID, id string, tombstoned bool) error {
+	_, err := db.ExecContext(ctx, `UPDATE upload_reserve SET gone_at = now(),
+  write_until = CASE WHEN ? THEN NULL ELSE write_until END
+WHERE user_id = ? AND resource_id = ?`, tombstoned, userID, id)
+	return errors.Wrap(err, "failed to mark upload deleted")
+}
+
+// HasUploadReserve says the account was ever given a write token for id.
+func HasUploadReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id string) (bool, error) {
+	var ok bool
+	_, err := db.QueryOneContext(ctx, pg.Scan(&ok), `SELECT EXISTS (SELECT 1 FROM upload_reserve WHERE user_id = ? AND resource_id = ?)`, userID, id)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to read upload reserve")
+	}
+	return ok, nil
+}
+
 // UpsertUploadReserve records a token for id with limit lim until exp. A live
 // reserve is never lowered and a token end never moved back.
 func UpsertUploadReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id string, lim int64, exp time.Time) error {

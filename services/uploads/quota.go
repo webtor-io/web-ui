@@ -2,6 +2,7 @@ package uploads
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -41,13 +42,14 @@ func Limit(c *claims.Data) (int64, error) {
 // Usage is what a page shows: Used of Cap.
 type Usage struct{ Used, Cap int64 }
 
-// Service counts and reserves the accounts' upload quota and signs their
-// write tokens.
+// Service counts and reserves the accounts' upload quota, signs their
+// write tokens and makes web-ui's own calls to the seeder.
 type Service struct {
 	pg  *cs.PG
 	api *api.Api
 	url string // UPLOAD_URL
 	key string // WEBTOR_API_KEY
+	cl  *http.Client
 }
 
 // afterQuotaLock runs between taking the account's lock and counting: tests

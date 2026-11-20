@@ -18,14 +18,10 @@ import (
 	"github.com/webtor-io/web-ui/services/web"
 )
 
-const (
-	awsPosterCacheBucket = "aws-poster-cache-bucket"
-)
-
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
 		cli.StringFlag{
-			Name:   awsPosterCacheBucket,
+			Name:   thumbnail.PosterCacheBucketFlag,
 			Usage:  "aws poster cache bucket",
 			EnvVar: "AWS_POSTER_CACHE_BUCKET",
 		},
@@ -48,7 +44,7 @@ type Handler struct {
 }
 
 func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, pg *cs.PG, jobs *j.Jobs, cl *http.Client, s3Cl *cs.S3Client, en *enrich.Enricher, thumb *thumbnail.Service) {
-	bucket := c.String(awsPosterCacheBucket)
+	bucket := c.String(thumbnail.PosterCacheBucketFlag)
 	h := &Handler{
 		tb: tm.MustRegisterViews("library/*").
 			WithHelper(helpers.NewStarsHelper()).
