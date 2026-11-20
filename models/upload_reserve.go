@@ -22,6 +22,83 @@ type UploadReserve struct {
 	GoneAt        *time.Time `pg:"gone_at"`
 }
 
+// uploadReserveCounted is the account's rows its quota may count: all but
+// the excepted ID and the uploads pledged in Vault, which VP pay for.
+const uploadReserveCounted = `r.user_id = ? AND r.resource_id <> ?
+  AND NOT EXISTS (SELECT 1 FROM vault.pledge p WHERE p.resource_id = r.resource_id AND p.user_id = r.user_id)`
+
+// UploadUsed is the account's quota use without exceptID. A row weighs its
+// reserved_bytes while its token is alive (write_until plus five minutes)
+// or while it is not marked gone; a gone row past its token weighs nothing.
+func UploadUsed(ctx context.Context, db pg.DBI, userID uuid.UUID, exceptID string) (int64, error) {
+	var used int64
+	_, err := db.QueryOneContext(ctx, pg.Scan(&used), `SELECT coalesce(sum(r.reserved_bytes), 0) FROM upload_reserve r
+WHERE `+uploadReserveCounted+`
+  AND (r.write_until + interval '5 minutes' > now() OR r.gone_at IS NULL)`, userID, exceptID)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to sum upload reserves")
+	}
+	return used, nil
+}
+
+// UploadLiveReserve is the reserve of id while its token is alive, 0 after
+// that or without a row.
+func UploadLiveReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id string) (int64, error) {
+	var reserved int64
+	_, err := db.QueryContext(ctx, pg.Scan(&reserved), `SELECT reserved_bytes FROM upload_reserve
+WHERE user_id = ? AND resource_id = ? AND write_until + interval '5 minutes' > now()`, userID, id)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to read upload reserve")
+	}
+	return reserved, nil
+}
+
+// UploadCheckCandidates are the counted rows worth asking rest-api about:
+// not marked gone, and past their token or without one. Random order, so
+// that rows a deadline cuts off are not the same ones every time.
+func UploadCheckCandidates(ctx context.Context, db pg.DBI, userID uuid.UUID, exceptID string) ([]UploadReserve, error) {
+	var rows []UploadReserve
+	_, err := db.QueryContext(ctx, &rows, `SELECT r.* FROM upload_reserve r
+WHERE `+uploadReserveCounted+`
+  AND r.gone_at IS NULL
+  AND (r.write_until IS NULL OR r.write_until + interval '5 minutes' <= now())
+ORDER BY random()`, userID, exceptID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list upload reserves to check")
+	}
+	return rows, nil
+}
+
+// SetUploadReserved writes what the seeder holds for r, unless a token was
+// issued for it since r was read.
+func SetUploadReserved(ctx context.Context, db pg.DBI, r *UploadReserve, reserved int64) error {
+	_, err := db.ExecContext(ctx, `UPDATE upload_reserve SET reserved_bytes = ?
+WHERE user_id = ? AND resource_id = ? AND write_until IS NOT DISTINCT FROM ?`, reserved, r.UserID, r.ResourceID, r.WriteUntil)
+	return errors.Wrap(err, "failed to update upload reserve")
+}
+
+// MarkUploadGone marks r gone, unless a token was issued for it since r was
+// read.
+func MarkUploadGone(ctx context.Context, db pg.DBI, r *UploadReserve) error {
+	_, err := db.ExecContext(ctx, `UPDATE upload_reserve SET gone_at = now()
+WHERE user_id = ? AND resource_id = ? AND write_until IS NOT DISTINCT FROM ?`, r.UserID, r.ResourceID, r.WriteUntil)
+	return errors.Wrap(err, "failed to mark upload gone")
+}
+
+// UpsertUploadReserve records a token for id with limit lim until exp. A live
+// reserve is never lowered and a token end never moved back.
+func UpsertUploadReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id string, lim int64, exp time.Time) error {
+	_, err := db.ExecContext(ctx, `INSERT INTO upload_reserve (user_id, resource_id, reserved_bytes, write_until, gone_at)
+VALUES (?, ?, ?, ?, NULL)
+ON CONFLICT (user_id, resource_id) DO UPDATE SET
+  reserved_bytes = GREATEST(EXCLUDED.reserved_bytes,
+                            CASE WHEN upload_reserve.write_until + interval '5 minutes' > now()
+                                 THEN upload_reserve.reserved_bytes ELSE 0 END),
+  write_until    = GREATEST(upload_reserve.write_until, EXCLUDED.write_until),
+  gone_at        = NULL`, userID, id, lim, exp)
+	return errors.Wrap(err, "failed to write upload reserve")
+}
+
 // ListAllUploadReserves returns every reserve row of the account, for the
 // data export.
 func ListAllUploadReserves(ctx context.Context, db *pg.DB, userID uuid.UUID) ([]*UploadReserve, error) {

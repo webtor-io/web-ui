@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
@@ -98,4 +99,57 @@ func TestListAllUploadReservesReturnsOnlyTheAccountsRows(t *testing.T) {
 	if list[0].UserID != u || list[0].ResourceID != testUploadID || list[0].ReservedBytes != 3<<30 {
 		t.Errorf("row = %+v, want the account's own 3 GiB row", *list[0])
 	}
+}
+
+// The second transaction reads the clock right after taking the lock. With
+// the lock held by the first, that read is no earlier than the first one's
+// last read before its commit. clock_timestamp(), not now(): now() is when
+// the transaction began, and the second begins before the first commits.
+func TestAdvisoryXactLockSerializes(t *testing.T) {
+	db := pgtest.Start(t)
+	ctx := context.Background()
+	run := func(t *testing.T, key2 string) (t1, t2 time.Time) {
+		t.Helper()
+		locked := make(chan struct{})
+		first := make(chan error, 1)
+		go func() {
+			first <- db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+				if err := AdvisoryXactLock(ctx, tx, "k"); err != nil {
+					return err
+				}
+				close(locked)
+				time.Sleep(200 * time.Millisecond)
+				_, err := tx.QueryOneContext(ctx, pg.Scan(&t1), `SELECT clock_timestamp()`)
+				return err
+			})
+		}()
+		select {
+		case <-locked:
+		case err := <-first:
+			t.Fatalf("first transaction: %v", err)
+		}
+		if err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+			if err := AdvisoryXactLock(ctx, tx, key2); err != nil {
+				return err
+			}
+			_, err := tx.QueryOneContext(ctx, pg.Scan(&t2), `SELECT clock_timestamp()`)
+			return err
+		}); err != nil {
+			t.Fatalf("second transaction: %v", err)
+		}
+		if err := <-first; err != nil {
+			t.Fatalf("first transaction: %v", err)
+		}
+		return t1, t2
+	}
+	t.Run("same key waits", func(t *testing.T) {
+		if t1, t2 := run(t, "k"); t2.Before(t1) {
+			t.Errorf("the second took the lock at %v, before the first released it at %v", t2, t1)
+		}
+	})
+	t.Run("another key does not wait", func(t *testing.T) {
+		if t1, t2 := run(t, "k2"); !t2.Before(t1) {
+			t.Errorf("the second took its lock at %v, after the first released another at %v", t2, t1)
+		}
+	})
 }

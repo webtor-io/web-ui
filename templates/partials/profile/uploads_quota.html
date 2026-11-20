@@ -1,0 +1,1 @@
+{{ define "profile/uploads_quota" }}{{ with .Data }}<p class="text-sm text-w-sub">{{ tp $.Ctx.Lang "profile.uploadsQuota" "Used" (bitsForHumans .Used) "Cap" (bitsForHumans .Cap) }}</p><p class="text-xs text-w-muted">{{ t $.Ctx.Lang "upload.quota.hint" }}</p>{{ end }}{{ end }}

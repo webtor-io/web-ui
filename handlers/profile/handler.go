@@ -36,6 +36,7 @@ import (
 	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	"github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	"github.com/webtor-io/web-ui/services/vault"
@@ -87,6 +88,7 @@ type Data struct {
 	Is4KAvailable         bool
 	MinBitrateFor4KMbps   int64
 	VaultStats            *vault.UserStats
+	UploadQuota           *uploads.Usage
 	UserSettings          *models.UserSettings
 	ErrKey                string
 	DisableWebDAV         bool
@@ -148,6 +150,8 @@ type Handler struct {
 	// restAPI holds the account's private tracker records, which the export
 	// reads through rest-api's internal endpoint.
 	restAPI *api.Api
+	// uploads is nil where uploads are off.
+	uploads *uploads.Service
 	// billing: who takes the money and where it is managed; zero when no
 	// provider is configured, and the tier card then says nothing about it.
 	billing       notification.Billing
@@ -183,7 +187,7 @@ type Handler struct {
 	emailLimiter *libapi.RateLimiter
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient, restAPI *api.Api) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient, restAPI *api.Api, up *uploads.Service) {
 	h := &Handler{
 		tb:               tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:               at,
@@ -196,6 +200,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		releaseSubs:      releaseSubs,
 		notification:     ns,
 		restAPI:          restAPI,
+		uploads:          up,
 		billing:          donate.Billing(c),
 		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
 		disableS3:        c.Bool(common.DisableS3Flag),
@@ -559,6 +564,18 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
+	// The upload quota line reads only the reserves, without asking rest-api;
+	// a failure hides the line, not the page.
+	var uploadQuota *uploads.Usage
+	if s.uploads != nil {
+		used, limit, qerr := s.uploads.Quota(c.Request.Context(), u, claims.GetFromContext(c), nil, "", false)
+		if qerr != nil {
+			log.WithError(qerr).WithField("user_hash", auth.LogHash(u.ID)).Warn("failed to get upload quota")
+		} else {
+			uploadQuota = &uploads.Usage{Used: used, Cap: limit}
+		}
+	}
+
 	// Per-user preferences (adult-content visibility, etc). Missing row
 	// falls through to Default() — the toggle renders unchecked.
 	userSettings, err := s.userSettings.Get(c.Request.Context(), u.ID)
@@ -622,6 +639,7 @@ func (s *Handler) get(c *gin.Context) {
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
 		VaultStats:            vaultStats,
+		UploadQuota:           uploadQuota,
 		UserSettings:          userSettings,
 		ErrKey:                c.Query("err"),
 		HasPayments:           hasPayments,

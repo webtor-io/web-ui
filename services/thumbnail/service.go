@@ -20,7 +20,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"hash/fnv"
 	"image"
 	_ "image/gif"  // register decoder
 	_ "image/jpeg" // register decoder
@@ -659,7 +658,7 @@ func (s *Service) store(ctx context.Context, db *pg.DB, resourceID, path string,
 	}
 
 	err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
-		if err := advisoryLock(ctx, tx, hash); err != nil {
+		if err := models.AdvisoryXactLock(ctx, tx, hash); err != nil {
 			return err
 		}
 		if err := s.putObject(ctx, hash, format, data); err != nil {
@@ -687,19 +686,6 @@ func (s *Service) putObject(ctx context.Context, hash, format string, data []byt
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to put thumbnail object")
-	}
-	return nil
-}
-
-// advisoryLock — FNV-fold the hex hash into a bigint and take a
-// per-transaction lock. Mirrors the user_subtitle pattern; collisions
-// are harmless (they only serialise unrelated content).
-func advisoryLock(ctx context.Context, tx *pg.Tx, hash string) error {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(hash))
-	_, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?)", int64(h.Sum64()))
-	if err != nil {
-		return errors.Wrap(err, "failed to take advisory lock")
 	}
 	return nil
 }

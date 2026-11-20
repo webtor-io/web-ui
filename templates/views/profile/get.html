@@ -22,6 +22,7 @@
         {{ template "profile/vault" (withContext $ .Data.VaultStats) }}
     </div>
     {{ end }}
+    {{ template "profile/uploads_quota" (withContext $ .Data.UploadQuota) }}
 
     {{/* Stremio sits above preferences: connecting the addon is the strongest
          retention action we have (see docs/onboarding_empty_states.md), and it
