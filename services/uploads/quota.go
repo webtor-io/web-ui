@@ -41,10 +41,13 @@ func Limit(c *claims.Data) (int64, error) {
 // Usage is what a page shows: Used of Cap.
 type Usage struct{ Used, Cap int64 }
 
-// Service counts and reserves the accounts' upload quota.
+// Service counts and reserves the accounts' upload quota and signs their
+// write tokens.
 type Service struct {
 	pg  *cs.PG
 	api *api.Api
+	url string // UPLOAD_URL
+	key string // WEBTOR_API_KEY
 }
 
 // afterQuotaLock runs between taking the account's lock and counting: tests
@@ -141,12 +144,20 @@ func QuotaLock(ctx context.Context, tx *pg.Tx, userID uuid.UUID) error {
 // own is what id already holds: reported, the seeder's bytes, or its live
 // reserve when that is larger, so a renewal or a second tab never shrinks
 // it. On top of own come want more bytes, as far as the cap minus the other
-// uploads allows; want 0 renews at own. lim <= 0 records nothing.
+// uploads allows; want 0 renews at own. lim <= 0 records nothing. An upload
+// saved to Vault gets ErrFrozen.
 func Reserve(ctx context.Context, tx *pg.Tx, userID uuid.UUID, id string, cap, reported, want int64, exp time.Time) (lim, used int64, err error) {
 	if err = QuotaLock(ctx, tx, userID); err != nil {
 		return 0, 0, err
 	}
 	afterQuotaLock()
+	frozen, err := models.UploadFrozen(ctx, tx, id)
+	if err != nil {
+		return 0, 0, err
+	}
+	if frozen {
+		return 0, 0, ErrFrozen
+	}
 	if used, err = models.UploadUsed(ctx, tx, userID, id); err != nil {
 		return 0, 0, err
 	}

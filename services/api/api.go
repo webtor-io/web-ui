@@ -293,6 +293,11 @@ type Claims struct {
 	Rules    []Rule `json:"rules,omitempty"`
 	Uid      string `json:"uid,omitempty"`      // sha1(user_id) of the signed-in user; set only by Api.RegisterHandler
 	Internal bool   `json:"internal,omitempty"` // web-ui's server-side reads without a user
+	// Up and Lim make a write token of an upload, bound by Hash: "new" on
+	// the answer that creates the upload, "add" otherwise; Lim is how many
+	// bytes the upload may hold.
+	Up  string `json:"up,omitempty"`
+	Lim int64  `json:"lim,omitempty"`
 }
 
 // InternalClaims are the claims of web-ui's own server-side reads, made for
@@ -364,6 +369,21 @@ func (s *ListResourceContentArgs) ToQuery() url.Values {
 	return q
 }
 
+// RapidAPIConfigured says rest-api is reached through RapidAPI.
+func RapidAPIConfigured(c *cli.Context) bool {
+	return c.String(rapidApiHostFlag) != "" && c.String(rapidApiKeyFlag) != ""
+}
+
+// SecretConfigured says web-ui has the secret it signs tokens with.
+func SecretConfigured(c *cli.Context) bool {
+	return c.String(apiSecretFlag) != ""
+}
+
+// Key is the site's api key.
+func Key(c *cli.Context) string {
+	return c.String(apiKeyFlag)
+}
+
 func New(c *cli.Context, cl *http.Client) *Api {
 	host := c.String(apiHostFlag)
 	port := c.Int(apiPortFlag)
@@ -393,7 +413,7 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		r.Header.Set("X-Api-Key", key)
 		return r, nil
 	}
-	rapidAPI := rapidApiHost != "" && rapidApiKey != ""
+	rapidAPI := RapidAPIConfigured(c)
 	if rapidAPI {
 		log.Info("using RapidAPI")
 		log.Info("private torrents are off: rest-api is reached through RapidAPI, which carries one account for every user of this instance")

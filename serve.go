@@ -45,6 +45,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/tests"
 	"github.com/webtor-io/web-ui/handlers/torznab_indexer"
 	"github.com/webtor-io/web-ui/handlers/trial"
+	wup "github.com/webtor-io/web-ui/handlers/upload"
 	ush "github.com/webtor-io/web-ui/handlers/user_subtitle"
 	uvsh "github.com/webtor-io/web-ui/handlers/user_video_status"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
@@ -75,6 +76,7 @@ import (
 	"github.com/webtor-io/web-ui/services/transcodercaps"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
+	"github.com/webtor-io/web-ui/services/uploads"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	usv "github.com/webtor-io/web-ui/services/user_subtitle"
@@ -150,6 +152,7 @@ func configureServe(c *cli.Command) {
 	c.Flags = memwatch.RegisterFlags(c.Flags)
 	c.Flags = streamprefs.RegisterFlags(c.Flags)
 	c.Flags = transcodercaps.RegisterFlags(c.Flags)
+	c.Flags = uploads.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
@@ -360,6 +363,9 @@ func serve(c *cli.Context) error {
 	// Setting ApiClaimsHandler -- after ats and uc: uid is the user they put in, an API key's too.
 	sapi.RegisterHandler(r)
 
+	// Setting Uploads: nil when they are off
+	up := uploads.New(c, pg, sapi)
+
 	// Setting Migration from v1 to v2
 	wm.RegisterHandler(r)
 
@@ -514,6 +520,11 @@ func serve(c *cli.Context) error {
 	// Setting ResourceHandler
 	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en, offers)
 
+	// Setting UploadHandler -- after uc and sapi: a token is cut from the viewer's claims.
+	if up != nil {
+		wup.RegisterHandler(r, up, sapi, pg)
+	}
+
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm, pg)
 
@@ -542,7 +553,7 @@ func serve(c *cli.Context) error {
 	notifications.RegisterHandler(r, tm, ns, donate.Billing(c), offers)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get(), sapi, nil)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get(), sapi, up)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)
