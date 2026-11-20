@@ -535,7 +535,7 @@ func serve(c *cli.Context) error {
 	}
 
 	// Setting IndexHandler
-	wi.RegisterHandler(r, tm, pg)
+	wi.RegisterHandler(r, tm, pg, up)
 
 	// Setting UserVideoStatus service
 	uvs := uvss.New(pg.Get())

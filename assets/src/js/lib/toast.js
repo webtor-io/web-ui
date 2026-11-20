@@ -5,7 +5,7 @@ function getContainer() {
     return document.getElementById(CONTAINER_ID);
 }
 
-function show(msg, type) {
+function show(msg, type, duration = TOAST_DURATION) {
     const container = getContainer();
     if (!container) return;
 
@@ -27,13 +27,13 @@ function show(msg, type) {
         alert.addEventListener('transitionend', () => alert.remove(), { once: true });
         // Fallback removal in case transitionend doesn't fire
         setTimeout(() => alert.remove(), 300);
-    }, TOAST_DURATION);
+    }, duration);
 }
 
 const toast = {
-    success(msg) { show(msg, 'success'); },
-    error(msg) { show(msg, 'error'); },
-    info(msg) { show(msg, 'info'); },
+    success(msg, duration) { show(msg, 'success', duration); },
+    error(msg, duration) { show(msg, 'error', duration); },
+    info(msg, duration) { show(msg, 'info', duration); },
 };
 
 window.toast = toast;

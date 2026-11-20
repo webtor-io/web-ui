@@ -232,6 +232,13 @@ func (s *Helper) UploadOwned(id string) bool {
 	return uploads.Owned(id)
 }
 
+// UploadSignIn is the card a guest gets for dropping their own files: an
+// upload needs an account.
+// Template usage: {{ template "private/refusal" ($.WithData uploadSignIn) }}
+func (s *Helper) UploadSignIn() *PrivateRefusal {
+	return &PrivateRefusal{Title: "private.page.uploadTitle", Key: "upload.signIn", Code: "upload", Reason: "sign_in", SignIn: true}
+}
+
 // UploadHomeHosted: does id's content live on its home node, not in a
 // swarm: an upload ID of any kind.
 // Template usage: {{ if uploadHomeHosted .ID }}

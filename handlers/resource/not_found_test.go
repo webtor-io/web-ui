@@ -170,7 +170,7 @@ func newResourceRouterPics(t *testing.T, restAPI *httptest.Server, v *vault.Vaul
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
 	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, pg, v, en, nil, pics)
-	index.RegisterHandler(r, tm, nil)
+	index.RegisterHandler(r, tm, nil, nil)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)
 	}

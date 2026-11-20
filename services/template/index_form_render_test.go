@@ -51,6 +51,12 @@ func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{
 		"withContext": func(ctx, data interface{}) interface{} {
 			return map[string]interface{}{"Ctx": ctx, "Data": data}
 		},
+		// Uploads are off here: their markup is TestDropzoneUploads' subject.
+		"uploadsEnabled": func() bool { return false },
+		"uploadSignIn":   func() any { return nil },
+		"hasAuth":        func(any) bool { return false },
+		"tp":             func(lang, key string, args ...interface{}) string { return key },
+		"bitsForHumans":  func(int64) string { return "" },
 	}
 	b, err := os.ReadFile("../../templates/views/index.html")
 	if err != nil {
@@ -63,7 +69,7 @@ func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{
 	if _, err := tpl.ParseFiles("../../templates/partials/about/heading.html"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"hero_backdrop", "hero_wave", "load/progress", "promo", "onboarding_checklist", "continue_watching", "discover", "about"} {
+	for _, name := range []string{"hero_backdrop", "hero_wave", "load/progress", "promo", "onboarding_checklist", "continue_watching", "discover", "about", "private/refusal"} {
 		if _, err := tpl.Parse(`{{ define "` + name + `" }}{{ end }}`); err != nil {
 			t.Fatal(err)
 		}

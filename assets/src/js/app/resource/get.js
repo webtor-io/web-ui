@@ -50,6 +50,11 @@ function initPlotClamp() {
     renderCollapsed();
 }
 av( async function() {
+    // "Add files" of the owner's unsaved upload: the uploader's entry, a drop
+    // anywhere on the page and the hold on "Save to Vault" while an upload
+    // runs. A page without the button loads none of it.
+    const add = this.querySelector('[data-upload-add]');
+    if (add) import('../../lib/drop').then((m) => m.initAddFiles(add));
     initPlotClamp();
     // The line under the .torrent button for a visitor from a tool page
     // (partials/resource/tool_intent) — before the #action early return.

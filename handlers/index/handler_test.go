@@ -1,6 +1,8 @@
 package index
 
 import (
+	"context"
+	"flag"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,10 +12,21 @@ import (
 
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
+	uuid "github.com/satori/go.uuid"
+	"github.com/urfave/cli"
+	proto "github.com/webtor-io/claims-provider/proto"
+	cs "github.com/webtor-io/common-services"
 
 	"github.com/webtor-io/web-ui/handlers/common"
+	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/models/pgtest"
+	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -23,10 +36,17 @@ import (
 // resolves "templates/" against the working directory, hence the chdir.
 func newHomeRouter(t *testing.T) *gin.Engine {
 	t.Helper()
+	return homeRouter(t, `{{ define "main" }}[err={{ .ErrKey }}][args={{ with .ErrArgs }}{{ .Count }}/{{ .Full }}{{ end }}][instruction={{ .Data.Instruction }}]{{ end }}`, nil, nil)
+}
+
+// homeRouter serves the index routes with view as the index template; mw
+// runs before them.
+func homeRouter(t *testing.T, view string, pg *cs.PG, up *uploads.Service, mw ...gin.HandlerFunc) *gin.Engine {
+	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
 		"templates/layouts/main.html": `{{ template "main" . }}`,
-		"templates/views/index.html":  `{{ define "main" }}[err={{ .ErrKey }}][args={{ with .ErrArgs }}{{ .Count }}/{{ .Full }}{{ end }}][instruction={{ .Data.Instruction }}]{{ end }}`,
+		"templates/views/index.html":  view,
 	}
 	for name, body := range files {
 		p := filepath.Join(dir, name)
@@ -45,10 +65,11 @@ func newHomeRouter(t *testing.T) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(metrics.Middleware(), web.NoindexDefault(false))
+	r.Use(mw...)
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
-	RegisterHandler(r, tm, nil)
+	RegisterHandler(r, tm, pg, up)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)
 	}
@@ -127,5 +148,56 @@ func TestHomeReportsServerTiming(t *testing.T) {
 		if !strings.Contains(st, part) {
 			t.Errorf("Server-Timing %q lacks %q", st, part)
 		}
+	}
+}
+
+// The home page says how much of the upload quota the signed-in user holds,
+// from the reserves alone; a guest, and an instance without uploads, get no
+// line.
+func TestHomeQuotaLine(t *testing.T) {
+	const u0 = "9c5db5752b7c0123456789abcdef0123456789ab"
+	db := pgtest.Start(t)
+	var userID uuid.UUID
+	if _, err := db.QueryOne(pg.Scan(&userID), `INSERT INTO "user" (email) VALUES (?) RETURNING user_id`, uuid.NewV4().String()+"@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id, reserved_bytes, write_until) VALUES (?, ?, 3221225472, now() + interval '10 minutes')`, userID, u0); err != nil {
+		t.Fatal(err)
+	}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range uploads.RegisterFlags(api.RegisterFlags(nil)) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--upload-url=https://upload.invalid", "--webtor-secret=test", "--rapidapi-host=", "--rapidapi-key="}); err != nil {
+		t.Fatal(err)
+	}
+	c := cli.NewContext(cli.NewApp(), fs, nil)
+	p := pgtest.CS(t, db)
+	up := uploads.New(c, p, api.New(c, http.DefaultClient))
+	if up == nil {
+		t.Fatal("uploads are off")
+	}
+	free := &claims.Data{Context: &proto.Context{Tier: &proto.Tier{Id: 0}}}
+	signIn := func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), auth.UserContext{}, &models.User{UserID: userID})
+		c.Request = c.Request.WithContext(context.WithValue(ctx, claims.Context{}, free))
+	}
+	const view = `{{ define "main" }}[quota={{ with .Data.UploadQuota }}{{ .Used }}/{{ .Cap }}{{ end }}]{{ end }}`
+
+	for _, tc := range []struct {
+		name string
+		r    func(t *testing.T) *gin.Engine
+		want string
+	}{
+		{"signed in", func(t *testing.T) *gin.Engine { return homeRouter(t, view, p, up, signIn) }, "[quota=3221225472/10737418240]"},
+		{"guest", func(t *testing.T) *gin.Engine { return homeRouter(t, view, p, up) }, "[quota=]"},
+		{"uploads off", func(t *testing.T) *gin.Engine { return homeRouter(t, view, p, nil, signIn) }, "[quota=]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := get(tc.r(t), "/")
+			if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), tc.want) {
+				t.Errorf("status %d, body %q; want %q", w.Code, w.Body.String(), tc.want)
+			}
+		})
 	}
 }
