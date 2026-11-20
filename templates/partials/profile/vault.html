@@ -18,6 +18,17 @@
                                 {{ end }}
                             </td>
                         </tr>
+                        {{/* Where the funded points go, once some go to the account's own files. */}}
+                        {{ if gt .Data.FundedOwnFiles 0.0 }}
+                        <tr>
+                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.ownFiles" }}</td>
+                            <td class="text-center">{{ printf "%.2f" .Data.FundedOwnFiles }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.torrents" }}</td>
+                            <td class="text-center">{{ printf "%.2f" .Data.FundedTorrents }}</td>
+                        </tr>
+                        {{ end }}
                         <tr>
                             <td class="text-left font-semibold">{{ t .Ctx.Lang "profile.vault.vaultedTorrents" }}</td>
                             <td class="text-center {{ if gt .Data.VaultedCount 0 }}text-w-purpleL font-semibold{{ end }}">{{ .Data.VaultedCount }}</td>

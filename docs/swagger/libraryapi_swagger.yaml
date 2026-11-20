@@ -529,6 +529,12 @@ definitions:
           Private is true for a BEP 27 private torrent. Always present: its
           absence must never be read as false.
         type: boolean
+      reserved:
+        description: |-
+          Reserved is set for an upload only: the bytes it holds on its seeder
+          (finished files plus the declared size of unfinished ones), or the sum
+          of its files for a copy kept in Vault. A torrent has no such key.
+        type: integer
       size:
         description: |-
           Size is the torrent's total size in bytes (sum of all files). Lets
@@ -1415,6 +1421,10 @@ paths:
 
         The required amount is derived from the torrent size, so a pledge fails with `403` when the account
         does not have that many points available.
+
+        Pledging an upload closes it for writing for good; its pledge cannot be removed through the API —
+        delete the upload on the site to get the points back. Files that are not fully uploaded yet are
+        dropped.
       parameters:
       - description: Resource to pledge to
         in: body
@@ -1450,7 +1460,8 @@ paths:
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "409":
-          description: A pledge for this resource already exists
+          description: A pledge for this resource already exists, or the upload has
+            no finished files yet
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "422":
@@ -1477,7 +1488,8 @@ paths:
     delete:
       description: |-
         Removes the pledge for a resource and returns its points to the balance. A pledge that is still
-        frozen cannot be removed and answers `409`.
+        frozen cannot be removed and answers `409`. An upload's pledge cannot be removed: delete the upload
+        instead; it answers `409`.
       parameters:
       - description: Resource (infohash) the pledge is held against
         in: path
@@ -1502,7 +1514,7 @@ paths:
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "409":
-          description: Pledge is frozen
+          description: Pledge is frozen, or the resource is an upload
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "429":

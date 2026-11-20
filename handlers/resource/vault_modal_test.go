@@ -247,3 +247,106 @@ func TestPledgeModalPrivate(t *testing.T) {
 		t.Errorf("public: want the Store button and nothing private:\n%s", out)
 	}
 }
+
+const pledgeUpload = "9c5db5752b7c0123456789abcdef0123456789ab"
+
+// uploadNotice is vault.uploadNotice in English, as the page escapes it.
+var uploadNotice = html.EscapeString("Once saved, an upload can't be changed: you can't add or delete files. To get the VP back, delete the upload.")
+
+func uploadAddForm(available *float64) *VaultPledgeAddForm {
+	f := addForm(available)
+	f.ResourceID = pledgeUpload
+	return f
+}
+
+type modalCase struct {
+	name    string
+	d       *GetData
+	has     []string
+	hasNot  []string
+	ordered [2]string // the first comes before the second, when set
+}
+
+func checkModal(t *testing.T, tpl *template.Template, cases []modalCase) {
+	t.Helper()
+	for _, c := range cases {
+		out := renderModal(t, tpl, "en", c.d)
+		for _, s := range c.has {
+			if !strings.Contains(out, s) {
+				t.Errorf("%s: no %q:\n%s", c.name, s, out)
+			}
+		}
+		for _, s := range c.hasNot {
+			if strings.Contains(out, s) {
+				t.Errorf("%s: %q is there:\n%s", c.name, s, out)
+			}
+		}
+		if c.ordered[0] != "" {
+			if a, b := strings.Index(out, c.ordered[0]), strings.Index(out, c.ordered[1]); a < 0 || b < 0 || a > b {
+				t.Errorf("%s: %q is not before %q", c.name, c.ordered[0], c.ordered[1])
+			}
+		}
+	}
+}
+
+// An upload's pledge cannot be removed: the modal says so where the freeze
+// would be said, offers no Remove, before or after the click, and the remove
+// dialog shows the same words instead of its form. A torrent's modal is as
+// before.
+func TestUploadPledgeModalHasNoRemove(t *testing.T) {
+	const frozenAgain = "frozen for another"
+	unlimited, noFreeze := uploadAddForm(nil), uploadAddForm(f64(250))
+	noFreeze.FreezePeriod = 0
+	checkModal(t, vaultModal(t), []modalCase{
+		{"enough points", &GetData{VaultPledgeAddForm: uploadAddForm(f64(250))},
+			[]string{uploadNotice, storeForm}, []string{"Saving freezes", "the pledge is frozen for"}, [2]string{uploadNotice, storeForm}},
+		{"unlimited points", &GetData{VaultPledgeAddForm: unlimited}, []string{uploadNotice, storeForm}, []string{"the pledge is frozen for"}, [2]string{}},
+		{"no freeze", &GetData{VaultPledgeAddForm: noFreeze}, []string{uploadNotice, storeForm}, nil, [2]string{}},
+		{"not enough points", &GetData{VaultPledgeAddForm: uploadAddForm(f64(50))}, nil, []string{uploadNotice, storeForm}, [2]string{}},
+		{"saved", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Funded: true, ResourceID: pledgeUpload, FreezePeriod: freezePeriod}},
+			[]string{uploadNotice}, []string{removeAsk}, [2]string{}},
+		{"saved, frozen", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Funded: true, ResourceID: pledgeUpload, FreezePeriod: freezePeriod, FrozenFor: frozenLeft}},
+			[]string{uploadNotice}, []string{removeAsk, frozenAgain}, [2]string{}},
+		{"remove dialog", &GetData{VaultPledgeRemoveForm: &VaultPledgeRemoveForm{ResourceID: pledgeUpload, FreezePeriod: freezePeriod}},
+			[]string{uploadNotice}, []string{removeForm}, [2]string{}},
+		{"remove dialog, frozen", &GetData{VaultPledgeRemoveForm: &VaultPledgeRemoveForm{ResourceID: pledgeUpload, FreezePeriod: freezePeriod, FrozenFor: frozenLeft}},
+			[]string{uploadNotice}, []string{removeForm, frozenAgain}, [2]string{}},
+		{"removal refused", &GetData{VaultPledgeRemoveForm: &VaultPledgeRemoveForm{ResourceID: pledgeUpload, Status: "error", ErrKey: "vault.uploadNotice"}},
+			[]string{uploadNotice}, []string{removeForm}, [2]string{}},
+		{"a torrent, saved", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Funded: true, ResourceID: intentHash, FreezePeriod: freezePeriod}},
+			[]string{removeAsk}, []string{uploadNotice}, [2]string{}},
+	})
+}
+
+// An upload with no finished file has nothing to save: the modal says so
+// instead of the Store button. One with an unfinished part is saved with a
+// warning above the button that the part will be lost -- only where the
+// button is. A torrent never gets either.
+func TestUploadPledgeModalUnfinished(t *testing.T) {
+	const (
+		empty      = "This upload has no finished files yet: there is nothing to save."
+		unfinished = "This upload is not finished. Only the finished files will be saved"
+	)
+	withState := func(f *VaultPledgeAddForm, empty, incomplete bool) *VaultPledgeAddForm {
+		f.UploadEmpty, f.UploadIncomplete = empty, incomplete
+		return f
+	}
+	tpl := vaultModal(t)
+	checkModal(t, tpl, []modalCase{
+		{"no file finished", &GetData{VaultPledgeAddForm: withState(uploadAddForm(f64(250)), true, false)},
+			[]string{empty}, []string{storeForm, uploadNotice, unfinished}, [2]string{}},
+		{"a part unfinished", &GetData{VaultPledgeAddForm: withState(uploadAddForm(f64(250)), false, true)},
+			[]string{unfinished, uploadNotice, storeForm}, []string{empty}, [2]string{unfinished, storeForm}},
+		{"a part unfinished, not enough points", &GetData{VaultPledgeAddForm: withState(uploadAddForm(f64(50)), false, true)},
+			nil, []string{unfinished, storeForm}, [2]string{}},
+		{"all finished", &GetData{VaultPledgeAddForm: uploadAddForm(f64(250))},
+			[]string{uploadNotice, storeForm}, []string{empty, unfinished}, [2]string{}},
+		{"saved", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Funded: true, ResourceID: pledgeUpload, UploadEmpty: true}},
+			[]string{uploadNotice}, []string{empty}, [2]string{}},
+	})
+
+	out := renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Status: "error", ErrKey: "vault.uploadEmpty", ResourceID: pledgeUpload, UploadEmpty: true}})
+	if n := strings.Count(out, empty); n != 1 || strings.Contains(out, storeForm) {
+		t.Errorf("refused, no file finished: the text %d times, want once in the error, and no Store button:\n%s", n, out)
+	}
+}

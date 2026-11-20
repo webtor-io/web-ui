@@ -6,7 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/services/private_torrent"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 type VaultPledgeAddForm struct {
@@ -29,6 +31,25 @@ type VaultPledgeAddForm struct {
 	// there is no Store button at all.
 	Private       bool
 	PrivateClosed bool
+	// UploadEmpty: an upload with no finished file, nothing to save, so no
+	// Store button; UploadIncomplete: one with finished files and a part
+	// declared beyond them, which the pledge's seal drops -- said above the
+	// button.
+	UploadEmpty      bool
+	UploadIncomplete bool
+}
+
+// uploadPledgeState is what the pledge modal says of the owner's upload r
+// before the Store button: nothing finished (empty), or a part declared
+// beyond the finished files (incomplete). Never either for anything else.
+func uploadPledgeState(r *ra.ResourceResponse) (empty, incomplete bool) {
+	if r == nil || !uploads.Owned(r.ID) {
+		return false, false
+	}
+	if r.FilesCount == 0 {
+		return true, false
+	}
+	return false, r.Reserved != nil && *r.Reserved > r.Size
 }
 
 type VaultButton struct {
@@ -78,6 +99,10 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs, priva
 	}
 
 	if resource != nil {
+		// What the pledge compares the points with (CreatePledge), so the
+		// modal says the same. An upload's row has it from after its seal.
+		vaultForm.Required = resource.RequiredVP
+
 		// Check if resource is vaulted
 		if resource.Vaulted {
 			vaultForm.Vaulted = true

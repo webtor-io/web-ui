@@ -29,14 +29,16 @@
     </thead>
     <tbody>
       {{ range .Data.Pledges }}
+        {{- $up := uploadOwned .ResourceID }}
         {{ if .Resource }}
         <tr class="border-b border-w-line/50 last:border-b-0 hover:bg-base-300/30 transition-colors"{{ if .ShowProgress }} data-vault-progress data-resource-id="{{ .ResourceID }}" data-csrf="{{ $.CSRF }}" data-status-token="{{ statusToken .ResourceID }}" data-vault-saved-label="{{ t $.Lang "vault.pledges.saved" }}"{{ end }}>
           <td class="text-center">
             {{/* Select mode (partials/bulk_select.html): the box takes the
-                 icon's place. A frozen pledge cannot be removed yet, so its
-                 box is there but disabled, saying why on hover. */}}
-            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer"{{ if .IsFrozen }} title="{{ tp $.Lang "vault.pledges.frozenDesc" "Period" (duration $.Lang $.Data.FreezePeriod) }}"{{ end }}>
-              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="{{ .ResourceID }}" aria-label="{{ .Resource.Name }}"{{ if .IsFrozen }} disabled{{ end }} />
+                 icon's place. A frozen pledge cannot be removed yet, and an
+                 upload's never (deleting the upload gives its VP back), so
+                 its box is there but disabled, saying why on hover. */}}
+            <label class="hidden group-data-[bulk-on]/bulk:inline-flex align-middle cursor-pointer"{{ if $up }} title="{{ t $.Lang "vault.uploadNotice" }}"{{ else if .IsFrozen }} title="{{ tp $.Lang "vault.pledges.frozenDesc" "Period" (duration $.Lang $.Data.FreezePeriod) }}"{{ end }}>
+              <input type="checkbox" class="js-bulk-box checkbox checkbox-xs" value="{{ .ResourceID }}" aria-label="{{ .Resource.Name }}"{{ if or .IsFrozen $up }} disabled{{ end }} />
             </label>
             <span class="group-data-[bulk-on]/bulk:hidden">
             {{ if .Resource.Vaulted }}
@@ -55,8 +57,9 @@
               {{ .Resource.Name }}
             </a>
           </td>
-          <td class="text-center px-1 {{ if .IsFrozen }}text-w-cyan{{ else }}text-w-sub{{ end }}">
-            {{ if .IsFrozen }}
+          <td class="text-center px-1 {{ if and .IsFrozen (not $up) }}text-w-cyan{{ else }}text-w-sub{{ end }}">
+            {{- /* An upload's pledge has no countdown: its end removes nothing. */}}
+            {{ if and .IsFrozen (not $up) }}
               <span class="inline-flex items-center gap-1 whitespace-nowrap">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 shrink-0" role="img" aria-label="{{ t $.Lang "vault.pledges.frozen" }}"><path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/></svg>
                 {{ printf "%.2f" .Amount }}
@@ -174,10 +177,11 @@
     {{ end }}
 
     {{/* The root of "remove selected" (partials/bulk_select.html), offered
-         while at least one pledge is out of its freeze. In select mode the
-         title row sticks, so the buttons stay at hand down a long table. */}}
+         while at least one pledge can go: out of its freeze, and not an
+         upload's. In select mode the title row sticks, so the buttons stay
+         at hand down a long table. */}}
     {{ $removable := false }}
-    {{ range .Data.Pledges }}{{ if and .Resource (not .IsFrozen) }}{{ $removable = true }}{{ end }}{{ end }}
+    {{ range .Data.Pledges }}{{ if and .Resource (not .IsFrozen) (not (uploadOwned .ResourceID)) }}{{ $removable = true }}{{ end }}{{ end }}
     <div class="group/bulk" data-bulk-confirm="{{ t $.Lang "vault.bulkRemoveConfirm" }}">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3 group-data-[bulk-on]/bulk:sticky group-data-[bulk-on]/bulk:top-[72px] group-data-[bulk-on]/bulk:z-10 group-data-[bulk-on]/bulk:py-2 group-data-[bulk-on]/bulk:bg-w-bg/90 group-data-[bulk-on]/bulk:backdrop-blur-lg">
       <h2 class="text-base font-bold tracking-tight">{{ t $.Lang "vault.dashboard.pledgesTitle" }}</h2>

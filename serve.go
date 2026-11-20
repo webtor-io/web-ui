@@ -515,7 +515,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Vault (vaultApi is built earlier — the onboarding middleware
 	// needs to know whether Vault is configured before any route is mounted)
-	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
+	v := vault.New(c, vaultApi, uc, cl, pg, sapi).WithUploads(up)
 
 	// Setting VaultHandler
 	if v != nil {

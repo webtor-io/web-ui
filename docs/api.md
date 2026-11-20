@@ -58,7 +58,7 @@ Base URL: `https://webtor.io/api/v1` (or `https://api.webtor.io/v1`, see
 | `PATCH` | `/library/{id}` | `api:write` | Rename the entry |
 | `DELETE` | `/library/{id}` | `api:write` | Remove from the library |
 | `GET` | `/vault` | `api:read` | Points, content counters, pledges |
-| `POST` | `/vault/pledges` | `api:write` | Pledge to a resource |
+| `POST` | `/vault/pledges` | `api:write` | Pledge to a resource. Pledging an upload closes it for writing for good; its pledge cannot be removed through the API — delete the upload on the site to get the points back. Files that are not fully uploaded yet are dropped |
 | `GET` | `/vault/pledges/{id}` | `api:read` | One pledge, with transfer status and progress |
 | `DELETE` | `/vault/pledges/{id}` | `api:write` | Claim points back |
 | `GET` | `/profile` | `api:read` | User, tier, scopes, preferences |
@@ -147,7 +147,7 @@ it; a client that does not know a reason acts on the code alone.
 | `forbidden` | 403 | Wrong scope, or the plan does not allow it |
 | `payment_required` | 402 | Free plan |
 | `not_found` | 404 | No such resource, file or library entry |
-| `conflict` | 409 | Pledge already exists, or is still frozen |
+| `conflict` | 409 | Pledge already exists, is still frozen, or belongs to an upload (delete the upload to get the points back), or the upload has no finished files yet |
 | `bad_request` | 400 | Malformed body or query |
 | `private_torrent` | 403 / 422 | A private torrent you may not use. `reason`: `sign_in` (only a signed-in user who added it with their own tracker can play it), `no_record` (you have not added it with your own tracker: store its `.torrent` or a magnet with your tracker), `token_in_query`. `POST /vault/pledges` answers it 422 with `no_record` |
 | `private_torrent_file` | 403 | A private torrent's `.torrent` is never served, not even to a user who may play it |

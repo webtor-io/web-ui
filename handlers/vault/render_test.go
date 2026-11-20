@@ -15,6 +15,7 @@ import (
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/statusview"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -55,6 +56,7 @@ func parseVaultWith(t *testing.T, statusToken func(string) string) *template.Tem
 		"statusToken": statusToken,
 		"statusBadge": wr.NewHelper(testSecret).StatusBadge,
 		"withContext": func(ctx, data any) any { return map[string]any{"Ctx": ctx, "Data": data} },
+		"uploadOwned": uploads.Owned,
 	}).ParseFiles("../../templates/views/vault/index.html", "../../templates/partials/status/badge.html", "../../templates/partials/bulk_select.html")
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -469,5 +471,66 @@ func TestVaultFrozenRowSaysTimeLeft(t *testing.T) {
 	out := render("en", d)
 	if guide := out[strings.Index(out, "collapse-content"):]; strings.Contains(guide, "frozen") {
 		t.Error("no freeze configured, but the status guide explains one")
+	}
+}
+
+// An upload's row on /vault offers no removal: its box is disabled and says
+// why, a page of uploads alone has no select mode, and its VP cell has no
+// freeze countdown -- the freeze would end and the pledge still not go. A
+// torrent's row is as before.
+func TestVaultUploadRowIsNotRemovable(t *testing.T) {
+	const upload = "9c5db5752b7c0123456789abcdef0123456789ab"
+	notice := html.EscapeString("Once saved, an upload can't be changed: you can't add or delete files. To get the VP back, delete the upload.")
+	tpl := parseVault(t)
+	render := func(frozen bool, withTorrent bool) string {
+		t.Helper()
+		var frozenFor time.Duration
+		if frozen {
+			frozenFor = 13 * time.Hour
+		}
+		enriched := []vault.EnrichedPledge{{Pledge: vaultModels.Pledge{ResourceID: upload, Funded: true, Amount: 1,
+			Resource: &vaultModels.Resource{ResourceID: upload, Name: "upload", Funded: true, Vaulted: true}}, IsFrozen: frozen, FrozenFor: frozenFor}}
+		if withTorrent {
+			enriched = append(enriched, vault.EnrichedPledge{Pledge: vaultModels.Pledge{ResourceID: vaultedHash, Funded: true, Amount: 1,
+				Resource: &vaultModels.Resource{ResourceID: vaultedHash, Name: "vaulted", Funded: true, Vaulted: true}}, IsFrozen: frozen, FrozenFor: frozenFor})
+		}
+		var page bytes.Buffer
+		d := &PledgeListData{Pledges: buildPledgeDisplay(enriched, time.Hour), Stats: &vault.UserStats{}, FreezePeriod: 24 * time.Hour}
+		if err := tpl.ExecuteTemplate(&page, "main", vaultView{Lang: "en", CSRF: "csrf", Data: d}); err != nil {
+			t.Fatal(err)
+		}
+		return page.String()
+	}
+	box := func(out, id string) (label, input string) {
+		t.Helper()
+		m := regexp.MustCompile(`(<label [^>]*>)\s*(<input type="checkbox" class="js-bulk-box [^>]*value="` + id + `"[^>]*>)`).FindStringSubmatch(out)
+		if m == nil {
+			t.Fatalf("no box for %s", id)
+		}
+		return m[1], m[2]
+	}
+
+	out := render(false, true)
+	label, input := box(out, upload)
+	if !strings.Contains(input, " disabled") || !strings.Contains(label, `title="`+notice+`"`) {
+		t.Errorf("the upload's box is enabled, or does not say why: %s %s", label, input)
+	}
+	if _, input := box(out, vaultedHash); strings.Contains(input, " disabled") {
+		t.Errorf("the torrent's box is disabled: %s", input)
+	}
+	if !strings.Contains(out, `id="bulk-remove"`) {
+		t.Error("a removable torrent, but no select mode")
+	}
+
+	if out := render(false, false); strings.Contains(out, `id="bulk-remove"`) || strings.Contains(out, "bulk_select.js") {
+		t.Error("only an upload, but the select mode is offered")
+	}
+
+	out = render(true, true)
+	if n := strings.Count(out, "data-vault-frozen-left"); n != 1 {
+		t.Errorf("a time left in %d rows, want the torrent's alone", n)
+	}
+	if vp := rowCells(out)["upload"][2]; !strings.Contains(vp, "1.00") || strings.Contains(vp, "data-vault-frozen-left") {
+		t.Errorf("the upload's VP cell: %s", vp)
 	}
 }

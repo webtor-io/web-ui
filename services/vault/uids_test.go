@@ -3,26 +3,33 @@ package vault
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/go-pg/pg/v10"
+	"github.com/golang-jwt/jwt/v5"
 	uuid "github.com/satori/go.uuid"
+	"github.com/urfave/cli"
 
 	"github.com/webtor-io/web-ui/models/pgtest"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 const (
 	privateHash = "0123456789abcdef0123456789abcdef01234567"
 	publicHash  = "fedcba9876543210fedcba9876543210fedcba98"
+	uploadHash  = "9c5db5752b7c0123456789abcdef0123456789ab"
 )
 
 // vaultCall is one request the fake Vault got.
@@ -90,27 +97,130 @@ type uidsEnv struct {
 	s     *Vault
 	db    *pg.DB
 	vault *fakeVault
+
+	mu         sync.Mutex
+	rest       http.HandlerFunc // rest-api's answer; nil: restResource
+	calls      []string         // "GET /resource" from rest-api and "PUT /<id>/" from the seeder, in order
+	sealStatus int              // the seeder's answer to a service PUT it accepts
+	seals      int              // PUTs the seeder got; never cleared, unlike calls
+	tokens     []string         // the token of each PUT
 }
 
 // newUIDsEnv is a Vault on a disposable Postgres holding privateHash and
-// publicHash, as rest-api calls them, both 1 VP.
+// publicHash, as rest-api calls them, both 1 VP, with uploads on: their
+// service requests go to a fake of the seeder behind torrent-http-proxy.
 func newUIDsEnv(t *testing.T) *uidsEnv {
-	db := pgtest.Start(t)
-	s := newTestVault(t, func(w http.ResponseWriter, r *http.Request) {
-		id := strings.TrimPrefix(r.URL.Path, "/resource/")
-		_, _ = fmt.Fprintf(w, `{"id":%q,"name":"n","size":1073741824,"private":%v}`, id, id == privateHash)
-	})
+	e := &uidsEnv{db: pgtest.Start(t), sealStatus: http.StatusNoContent}
+	rest := httptest.NewServer(http.HandlerFunc(e.serveRest))
+	thp := httptest.NewServer(http.HandlerFunc(e.serveSeeder))
 	fv := &fakeVault{known: map[string]bool{}, uidsStatus: http.StatusOK}
 	srv := httptest.NewServer(fv)
-	t.Cleanup(srv.Close)
-	s.vaultApi = &Api{url: srv.URL, cl: srv.Client()}
-	s.pg = pgtest.CS(t, db)
+	for _, s := range []*httptest.Server{rest, thp, srv} {
+		t.Cleanup(s.Close)
+	}
+	ru, _ := url.Parse(rest.URL)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range uploads.RegisterFlags(api.RegisterFlags(nil)) {
+		f.Apply(fs)
+	}
+	// Every flag that decides where a request goes is given: they read the
+	// environment on Apply.
+	if err := fs.Parse([]string{"--webtor-rest-api-host=" + ru.Hostname(), "--webtor-rest-api-port=" + ru.Port(),
+		"--webtor-secret=test", "--webtor-key=k", "--rapidapi-host=", "--rapidapi-key=",
+		"--use-internal-torrent-http-proxy=false", "--upload-url=" + thp.URL}); err != nil {
+		t.Fatal(err)
+	}
+	c := cli.NewContext(cli.NewApp(), fs, nil)
+	a := api.New(c, rest.Client())
+	pgCS := pgtest.CS(t, e.db)
+	e.s = (&Vault{api: a, vaultApi: &Api{url: srv.URL, cl: srv.Client()}, pg: pgCS, claims: claims.New(nil, nil, nil)}).
+		WithUploads(uploads.New(c, pgCS, a))
+	e.vault = fv
 	for _, h := range []string{privateHash, publicHash} {
-		if _, err := vaultModels.CreateResource(context.Background(), db, h, 1, "n"); err != nil {
+		if _, err := vaultModels.CreateResource(context.Background(), e.db, h, 1, "n"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	return &uidsEnv{s: s, db: db, vault: fv}
+	return e
+}
+
+// serveRest is rest-api: rest, or restResource. Like rest-api, it takes the
+// ID in the path in any case.
+func (e *uidsEnv) serveRest(w http.ResponseWriter, r *http.Request) {
+	e.mu.Lock()
+	e.calls = append(e.calls, r.Method+" /resource")
+	h := e.rest
+	e.mu.Unlock()
+	if h == nil {
+		h = restResource
+	}
+	h(w, r)
+}
+
+// restResource answers 1 GiB: private for privateHash and an upload, which
+// also has one finished file and 1 GiB reserved.
+func restResource(w http.ResponseWriter, r *http.Request) {
+	id := strings.ToLower(strings.TrimPrefix(r.URL.Path, "/resource/"))
+	up := ""
+	if uploads.Owned(id) {
+		up = `,"reserved":1073741824,"files_count":1`
+	}
+	_, _ = fmt.Fprintf(w, `{"id":%q,"name":"n","size":1073741824,"private":%v%s}`, id, id == privateHash || uploads.Owned(id), up)
+}
+
+// serveSeeder is torrent-http-proxy and the seeder behind it on a service
+// PUT /<id>/: as the seeder, 403 to a token that is not web-ui's own service
+// one before anything else, then sealStatus. Other requests get 405.
+func (e *uidsEnv) serveSeeder(w http.ResponseWriter, r *http.Request) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.calls = append(e.calls, r.Method+" "+r.URL.Path)
+	if r.Method != http.MethodPut {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	e.seals++
+	token := r.URL.Query().Get("token")
+	e.tokens = append(e.tokens, token)
+	c := &api.Claims{}
+	if _, err := jwt.ParseWithClaims(token, c, func(*jwt.Token) (any, error) { return []byte("test"), nil }); err != nil ||
+		!c.Internal || c.ExpiresAt == nil || c.Lim <= 0 {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	w.WriteHeader(e.sealStatus)
+}
+
+func (e *uidsEnv) setRest(h http.HandlerFunc) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.rest = h
+}
+
+func (e *uidsEnv) setSealStatus(status int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.sealStatus = status
+}
+
+// journal is what rest-api and the seeder got since the last clear.
+func (e *uidsEnv) journal() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]string(nil), e.calls...)
+}
+
+func (e *uidsEnv) clearJournal() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.calls = nil
+}
+
+// sealed is how many PUTs the seeder got, ever.
+func (e *uidsEnv) sealed() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.seals
 }
 
 // user is a new account with unlimited points.
@@ -287,5 +397,30 @@ func TestForgetUserExcludesUser(t *testing.T) {
 	e.vault.failUIDs()
 	if err := e.s.ForgetUser(context.Background(), a.ID); err == nil {
 		t.Error("ForgetUser with Vault failing: no error")
+	}
+}
+
+// An upload's pledger stays on its list unfunded: Vault keeps the upload's
+// only copy for the reaper's grace, and only its owner may read it then.
+// A private torrent's unfunded pledger leaves the list, as before.
+func TestUploadPledgersIncludeUnfunded(t *testing.T) {
+	e := newUIDsEnv(t)
+	if _, err := vaultModels.CreateResource(context.Background(), e.db, uploadHash, 1, "n"); err != nil {
+		t.Fatal(err)
+	}
+	a := e.user(t)
+	e.pledge(t, a, uploadHash)
+	e.pledge(t, a, privateHash)
+	e.defund(t, a)
+
+	for hash, want := range map[string]string{uploadHash: uidsBody(a), privateHash: uidsBody()} {
+		calls := e.vault.with(http.MethodPut, "/resource/"+hash+"/uids")
+		if len(calls) == 0 {
+			t.Errorf("%s: no /uids sent", hash)
+			continue
+		}
+		if got := calls[len(calls)-1].body; got != want {
+			t.Errorf("%s: last /uids %s, want %s", hash, got, want)
+		}
 	}
 }

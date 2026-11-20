@@ -541,6 +541,7 @@ func (s *Handler) get(c *gin.Context) {
 					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
 					return
 				}
+				vaultPledgeAddForm.UploadEmpty, vaultPledgeAddForm.UploadIncomplete = uploadPledgeState(d.Resource.ResourceResponse)
 
 				d.VaultPledgeAddForm = vaultPledgeAddForm
 			}

@@ -109,7 +109,10 @@ func newResourceRouterPics(t *testing.T, restAPI *httptest.Server, v *vault.Vaul
 		"templates/views/resource/get.html": `{{ define "main" }}[resource][name={{ .Data.Resource.Name }}][movie={{ with .Data.Movie }}{{ .Title }}{{ end }}]` +
 			`[upload={{ with .Data.Upload }}{{ .IsOwner }}/{{ .CanWrite }}/{{ .Saved }}{{ end }}][uname={{ with .Data.Upload }}{{ .Name }}{{ end }}]` +
 			`[unknown={{ with .Data.Upload }}{{ .VaultUnknown }}{{ end }}][unpaid={{ with .Data.Upload }}{{ .UnpaidPledge }}{{ end }}]` +
-			`[incomplete={{ with .Data.Upload }}{{ .Incomplete }}{{ end }}]{{ end }}`,
+			`[incomplete={{ with .Data.Upload }}{{ .Incomplete }}{{ end }}]` +
+			`[required={{ with .Data.VaultPledgeAddForm }}{{ printf "%.2f" .Required }}{{ end }}]` +
+			`[pledgeEmpty={{ with .Data.VaultPledgeAddForm }}{{ .UploadEmpty }}{{ end }}]` +
+			`[pledgeIncomplete={{ with .Data.VaultPledgeAddForm }}{{ .UploadIncomplete }}{{ end }}]{{ end }}`,
 		"templates/views/resource/private.html": `{{ define "main" }}[private][key={{ .Data.Key }}][signin={{ .Data.SignIn }}][upload={{ .Data.Upload }}][vault={{ .Data.VaultKept }}][target={{ .Data.Target }}]{{ end }}`,
 	}
 	for name, body := range files {
