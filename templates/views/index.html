@@ -118,9 +118,12 @@
     {{ end }}
 
     {{ if $.ErrKey }}
-    <div id="index-error" class="progress-alert progress-alert-oneline mb-10 relative z-10 w-full max-w-[680px]">
+    {{/* "This upload is gone", shown to its owner, is counted: no properties
+         of its own, sent by private_refusal.js as the refusal card's is. */}}
+    <div id="index-error" class="progress-alert progress-alert-oneline mb-10 relative z-10 w-full max-w-[680px]"{{ if eq $.ErrKey "upload.gone" }} data-umami-impression="upload-gone-shown"{{ end }}>
         <pre class="error">{{ with $.ErrArgs }}{{ tn $.Lang $.ErrKey .Count "Full" .Full }}{{ else }}{{ t $.Lang $.ErrKey }}{{ end }}</pre>
         <a class="close" onclick="document.getElementById('index-error').remove()">{{ t $.Lang "home.ok" }}</a>
+        {{ if eq $.ErrKey "upload.gone" }}{{ "private_refusal.js" | asset }}{{ end }}
     </div>
     {{ end }}
 

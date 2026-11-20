@@ -12,15 +12,23 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
+)
+
+const (
+	embedMagnet = "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10"
+	upload0     = "9c5db5752b7c0123456789abcdef0123456789ab" // an account's own upload
+	torrentT    = "0123456789abcdef0123456789abcdef01234567"
 )
 
 // The player offers an embed code only where the instance serves embeds:
 // the page renders #embed then, and Player.jsx shows the Embed button only
 // when #embed exists. The code names this instance -- without baseUrl the
-// SDK points at webtor.io, which does not serve embeds.
+// SDK points at webtor.io, which does not serve embeds. A resource without a
+// magnet (an upload) has no embed code: the SDK plays a magnet.
 func TestStreamVideoEmbedDialogFollowsTheInstance(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
-		out := renderStreamVideoForEmbed(t, enabled)
+		out := renderStreamVideoForEmbed(t, enabled, embedMagnet, "res")
 		has := strings.Contains(out, `<dialog class="modal" id="embed">`)
 		if has != enabled {
 			t.Fatalf("embedEnabled=%v: #embed rendered=%v", enabled, has)
@@ -28,6 +36,20 @@ func TestStreamVideoEmbedDialogFollowsTheInstance(t *testing.T) {
 		if enabled && !strings.Contains(out, `data-config='{"baseUrl":"https://tv.example.lan"}'`) {
 			t.Errorf("the embed code does not name this instance:\n%s", elementBetween(out, `id="embed"`, `</dialog>`))
 		}
+	}
+	if out := renderStreamVideoForEmbed(t, true, "", upload0); strings.Contains(out, `<dialog class="modal" id="embed">`) {
+		t.Error("no magnet: #embed rendered")
+	}
+}
+
+// Share sends the link of the resource page; an upload's page opens for its
+// owner alone, so its player has no link to share.
+func TestStreamVideoShareURL(t *testing.T) {
+	if out := renderStreamVideoForEmbed(t, true, "", upload0); strings.Contains(out, "data-share-url") {
+		t.Error("an upload: data-share-url rendered")
+	}
+	if out := renderStreamVideoForEmbed(t, true, embedMagnet, torrentT); !strings.Contains(out, `data-share-url="https://tv.example.lan/`+torrentT+`?file=movie.mkv"`) {
+		t.Errorf("a torrent: no data-share-url:\n%s", elementBetween(out, "<video", ">"))
 	}
 }
 
@@ -43,7 +65,7 @@ func elementBetween(s, from, to string) string {
 	return s[i : i+j]
 }
 
-func renderStreamVideoForEmbed(t *testing.T, enabled bool) string {
+func renderStreamVideoForEmbed(t *testing.T, enabled bool, magnet, id string) string {
 	t.Helper()
 	helper := action.NewHelper()
 	echo := func(lang, key string) string { return key }
@@ -78,6 +100,7 @@ func renderStreamVideoForEmbed(t *testing.T, enabled bool) string {
 		"t":                  echo,
 		"tp":                 echoVariadic,
 		"tpHTML":             echoHTML,
+		"uploadOwned":        uploads.Owned,
 	}
 	tpl, err := template.New("stream_video.html").Funcs(funcs).
 		ParseFiles("../../templates/views/action/stream_video.html")
@@ -89,10 +112,10 @@ func renderStreamVideoForEmbed(t *testing.T, enabled bool) string {
 	}
 	data := &scripts.StreamContent{
 		ExportTag:           &ra.ExportTag{},
-		Resource:            &ra.ResourceResponse{MagnetURI: "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10"},
+		Resource:            &ra.ResourceResponse{MagnetURI: magnet},
 		Item:                &ra.ListItem{PathStr: "movie.mkv"},
 		EIURL:               "http://ei.example.com",
-		VideoStreamUserData: &models.VideoStreamUserData{ResourceID: "res", ItemID: "item"},
+		VideoStreamUserData: &models.VideoStreamUserData{ResourceID: id, ItemID: "item"},
 		Settings:            &models.StreamSettings{},
 		ExternalData:        &models.ExternalData{},
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 // The files the JS harness renders into jsdom. They are committed, because
@@ -349,6 +350,7 @@ func renderSubtitlesDialog(t *testing.T) string {
 		"t":             echo,
 		"tp":            echoVariadic,
 		"tpHTML":        echoHTML,
+		"uploadOwned":   uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}

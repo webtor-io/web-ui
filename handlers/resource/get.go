@@ -478,6 +478,11 @@ func (s *Handler) get(c *gin.Context) {
 	d, err := s.prepareGetData(ctx, args)
 	var pe *api.PrivateError
 	if errors.As(err, &pe) && pe.Status == http.StatusForbidden {
+		if pe.Reason == api.ReasonNoRecord && s.uploadGone(ctx, args) {
+			s.forgetGone(ctx, args.ID)
+			s.notFound(c, web.NewUserError("upload.gone", pe))
+			return
+		}
 		s.privateRefusal(ctx, c, args, pe)
 		return
 	}
@@ -487,6 +492,11 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 	if d == nil {
+		if s.uploadGone(ctx, args) {
+			s.forgetGone(ctx, args.ID)
+			s.notFound(c, web.NewUserError("upload.gone", errors.New("upload gone")))
+			return
+		}
 		s.notFound(c, errors.New("resource not found"))
 		return
 	}
@@ -535,7 +545,7 @@ func (s *Handler) get(c *gin.Context) {
 				}
 			}
 			if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
-				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, d.Resource.Private)
+				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, trackerPrivate(d.Resource.ResourceResponse))
 				if err != nil {
 					_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
 					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
@@ -581,7 +591,7 @@ func noStoreNoIndex(c *gin.Context) {
 // says nothing about this user's right and keeps the redirect above.
 func (s *Handler) privateRefusal(ctx context.Context, c *gin.Context, args *GetArgs, pe *api.PrivateError) {
 	noStoreNoIndex(c)
-	r := web.NewPrivateRefusal(pe, args.User.HasAuth())
+	r := web.NewPrivateRefusal(pe, args.User.HasAuth(), args.ID)
 	log.WithError(pe).
 		WithField("err_key", r.Key).
 		WithField("surface", "page").
@@ -592,8 +602,45 @@ func (s *Handler) privateRefusal(ctx context.Context, c *gin.Context, args *GetA
 		return
 	}
 	r.Target = "main"
-	r.VaultKept = args.User.HasAuth() && pe.Reason == api.ReasonNoRecord && s.vaulted(ctx, c, args.ID)
+	// An upload's Vault copy plays for its owner alone, who is not refused.
+	r.VaultKept = args.User.HasAuth() && pe.Reason == api.ReasonNoRecord && !uploads.Owned(args.ID) && s.vaulted(ctx, c, args.ID)
 	s.tb.Build("resource/private").HTML(http.StatusForbidden, web.NewContext(c).WithData(r))
+}
+
+// trackerPrivate says the resource is a private torrent, whose pledge modal
+// warns about the viewer's tracker. An upload is private and has no tracker.
+func trackerPrivate(r *ra.ResourceResponse) bool {
+	return r.Private && !uploads.Owned(r.ID)
+}
+
+// uploadGone says the viewer owns the upload rest-api did not answer for: it
+// is one of theirs, and their library row of it is there. No database, or a
+// failed read, says no.
+func (s *Handler) uploadGone(ctx context.Context, args *GetArgs) bool {
+	if !uploads.Owned(args.ID) || !args.User.HasAuth() {
+		return false
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return false
+	}
+	lib, err := models.GetLibraryByResourceID(ctx, db, args.User.ID, args.ID)
+	if err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to read the owner's library row of an upload")
+		return false
+	}
+	return lib != nil
+}
+
+// forgetGone erases what web-ui derived from the owner's upload that is gone:
+// its enrichment and pictures, which the next page view brings back if the
+// upload is there after all. Not the watch history or the subtitle bindings:
+// rest-api's 404 or no_record is wrong while the upload's home node is away.
+// The page renders whatever this does.
+func (s *Handler) forgetGone(ctx context.Context, id string) {
+	if err := uploads.Forget(ctx, s.pg.Get(), s.pics, id, false); err != nil {
+		log.WithError(err).WithField("resource_id", id).Warn("failed to forget an upload that is gone")
+	}
 }
 
 // vaulted says Vault keeps a copy of the torrent. Unknown (no Vault, or its
@@ -614,7 +661,9 @@ func (s *Handler) vaulted(ctx context.Context, c *gin.Context, id string) bool {
 // all (/wp-login.php, /library, an apple-touch-icon probe -- anything without
 // a run of five hex digits, error.invalid_resource), or rest-api has no
 // torrent under it (a share link whose torrent is gone, a mistyped hash,
-// error.not_found).
+// error.not_found). Its owner's upload that rest-api no longer has -- a 404,
+// or a 403 no_record -- is the second case with its own text, upload.gone
+// (uploadGone).
 //
 // Both used to redirect to /?err=, so every such URL answered with a 200 home
 // page and none of the stale hash links in search indexes could ever leave
@@ -624,7 +673,7 @@ func (s *Handler) vaulted(ctx context.Context, c *gin.Context, id string) bool {
 // "noindex, follow" (web.NoindexDefault; resource pages are not in the
 // sitemap), which is why nothing here sets one.
 //
-// Only these two outcomes come here. A refused resource (banned or
+// Only these outcomes come here. A refused resource (banned or
 // stoplisted: rest-api answers 403, error.forbidden) keeps its redirect -- it
 // has its own policy -- and so does a failure on our side (rest-api or the
 // database did not answer), which says nothing about whether the URL is dead.

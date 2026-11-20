@@ -73,7 +73,7 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		}
 		var pe *api.PrivateError
 		if errors.As(err, &pe) {
-			return s.renderPrivateError(c, j, pe)
+			return s.renderPrivateError(c, j, pe, hash)
 		}
 		if err != nil {
 			return
@@ -160,9 +160,9 @@ func (s *Jobs) renderMagnetError(c *web.Context, j *job.Job, args *scripts.LoadA
 // visitor of the hash must reach rest-api, not this card. Returned as Shown,
 // not nil: the run counts as the refusal it is, rejected for 403/422 and an
 // error for 503/429 (Р6), and the card is not followed by a red line.
-func (s *Jobs) renderPrivateError(c *web.Context, j *job.Job, pe *api.PrivateError) error {
+func (s *Jobs) renderPrivateError(c *web.Context, j *job.Job, pe *api.PrivateError, hash string) error {
 	j.DoNotCache()
-	r := web.NewPrivateRefusal(pe, c.User != nil && c.User.HasAuth())
+	r := web.NewPrivateRefusal(pe, c.User != nil && c.User.HasAuth(), hash)
 	r.Target = "#log-load"
 	log.WithError(pe).WithField("err_key", r.Key).Info("user error shown")
 	tpl := s.tb.Build("load/errors/private").WithLayoutBody(`{{ template "main" . }}`)

@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/helpers"
+	"github.com/webtor-io/web-ui/models"
 
 	"github.com/urfave/cli"
 
@@ -514,7 +515,12 @@ func cacheKey(c *Claims, infohash string) string {
 	return "anon/" + infohash
 }
 
+// GetResourceCached is GetResource with a minute's cache, but for an upload,
+// whose files change while its owner adds or deletes them.
 func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
+	if strings.HasPrefix(infohash, models.UploadPrefix) {
+		return s.GetResource(ctx, c, infohash)
+	}
 	e, err = s.resourcesCache.Get(cacheKey(c, infohash), func() (*ra.ResourceResponse, error) {
 		r, err := s.GetResource(ctx, c, infohash)
 		if err == nil && r == nil {
@@ -663,7 +669,12 @@ func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash strin
 	return
 }
 
+// ListResourceContentCached is ListResourceContent with a minute's cache, but
+// for an upload, as GetResourceCached.
 func (s *Api) ListResourceContentCached(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (*ra.ListResponse, error) {
+	if strings.HasPrefix(infohash, models.UploadPrefix) {
+		return s.ListResourceContent(ctx, c, infohash, args)
+	}
 	key := cacheKey(c, infohash) + fmt.Sprintf("%+v", args)
 	return s.listResponseCache.Get(key, func() (*ra.ListResponse, error) {
 		return s.ListResourceContent(ctx, c, infohash, args)

@@ -11,6 +11,7 @@ import (
 	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/pagination"
 	"github.com/webtor-io/web-ui/services/statusview"
+	"github.com/webtor-io/web-ui/services/uploads"
 	w "github.com/webtor-io/web-ui/services/web"
 )
 
@@ -107,7 +108,12 @@ func (s *Helper) MakeFileInfo(ctx *w.Context, gd *GetData) *ButtonItem {
 	return s.MakeButton(ctx, gd, "resource.fileInfo", "file-info", "/file-info")
 }
 
+// MakeDirDownload is the folder's TAR/ZIP; none for an upload: the archiver
+// lists a folder from the stored .torrent, and an upload has none.
 func (s *Helper) MakeDirDownload(ctx *w.Context, gd *GetData) *ButtonItem {
+	if uploads.HomeHosted(gd.Resource.ID) {
+		return nil
+	}
 	b := s.MakeDirButton(ctx, gd, "resource.downloadDir", "download-dir", "/download-dir")
 	b.Size = helpers.Bytes(uint64(gd.List.Size))
 	return b

@@ -2235,7 +2235,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                                     <google-cast-launcher></google-cast-launcher>
                                 </div>
                             )}
-                            {features.share && (
+                            {/* No link on the <video> (an upload's page opens
+                                for its owner alone): nothing to share. */}
+                            {features.share && videoEl?.dataset?.shareUrl && (
                                 <button type="button" class="wt-player-btn wt-player-top-share" onClick={(e) => { e.stopPropagation(); handleShareClick(); }} aria-label={t('player.share')}>
                                     <ShareIcon />
                                 </button>

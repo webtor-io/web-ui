@@ -28,4 +28,14 @@
 	<script>
 		document.querySelector("#pledge-button").reload();
 	</script>
+	{{/* The pledge renders only this modal and the Vault button again: the
+	     owner's page loses Add files and the × and says saved here. It runs
+	     again in the same document on the next upload saved, so it declares
+	     nothing. */}}
+	{{ if uploadOwned .Data.ResourceID }}
+	<script>
+		document.querySelectorAll("[data-upload-add], [data-upload-add] + input, [data-upload-delete]").forEach((el) => el.remove());
+		document.querySelectorAll("[data-upload-state]").forEach((el) => { el.textContent = {{ t .Ctx.Lang "upload.state.frozen" }}; });
+	</script>
+	{{ end }}
 {{ end }}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 func embedViewFuncs(t *testing.T) (template.FuncMap, *i18n.Helper) {
@@ -78,5 +79,39 @@ func TestEmbedUnauthorizedLinksThisInstance(t *testing.T) {
 		if title := template.HTMLEscapeString(helper.T(lang, "embed.unauthorized.title")); !strings.Contains(out, title) {
 			t.Errorf("%s: missing %q:\n%s", lang, title, out)
 		}
+	}
+}
+
+// An upload's card in the frame names no torrent and no tracker: it plays
+// for its owner alone. A private torrent's card is as before.
+func TestEmbedPrivateCardOfAnUpload(t *testing.T) {
+	const (
+		u0 = "9c5db5752b7c0123456789abcdef0123456789ab"
+		tt = "0123456789abcdef0123456789abcdef01234567"
+	)
+	funcs, helper := embedViewFuncs(t)
+	funcs["uploadOwned"] = uploads.Owned
+	tpl, err := template.New("private.html").Funcs(funcs).ParseFiles("../../templates/views/embed/private.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	render := func(lang, id string) string {
+		var buf bytes.Buffer
+		if err := tpl.Execute(&buf, map[string]any{"Lang": lang, "Data": id}); err != nil {
+			t.Fatalf("%s %s: %v", lang, id, err)
+		}
+		return buf.String()
+	}
+	for _, c := range []struct{ lang, tracker string }{{"en", "tracker"}, {"ru", "трекер"}} {
+		out := render(c.lang, u0)
+		if title := template.HTMLEscapeString(helper.T(c.lang, "embed.upload.title")); !strings.Contains(out, title) {
+			t.Errorf("%s: missing %q:\n%s", c.lang, title, out)
+		}
+		if strings.Contains(strings.ToLower(out), c.tracker) {
+			t.Errorf("%s: an upload's card names a tracker:\n%s", c.lang, out)
+		}
+	}
+	if out, title := render("en", tt), template.HTMLEscapeString(helper.T("en", "embed.private.title")); !strings.Contains(out, title) {
+		t.Errorf("a torrent: missing %q:\n%s", title, out)
 	}
 }

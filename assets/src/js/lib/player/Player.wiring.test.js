@@ -4729,6 +4729,21 @@ async function mountLabelled(t, prepare) {
     return { p, clock, log: playback(p.video) };
 }
 
+// Share sends the link the server put on the <video>. An upload's page gets
+// none -- it opens for its owner alone -- and so no Share button; the overlay
+// with the title and Cast stays.
+test('the share button needs a share URL', async (t) => {
+    await t.test('no URL', async (t) => {
+        await mountLabelled(t);
+        assert.notEqual(document.querySelector('.wt-player-top-overlay'), null, 'the overlay is there');
+        assert.equal(document.querySelector('.wt-player-top-share'), null, 'no Share');
+    });
+    await t.test('a URL', async (t) => {
+        await mountLabelled(t, (page) => page.video.setAttribute('data-share-url', 'https://example.com/res'));
+        assert.notEqual(document.querySelector('.wt-player-top-share'), null, 'Share');
+    });
+});
+
 test('the spinner is a pill that says Buffering, with the spinner\'s visibility', async (t) => {
     assert.ok(CAP_LABEL && CAP_LABEL.cta.url, 'fixture: the status\'s label at a stall at the cap');
     const { p, clock } = await mountLabelled(t);

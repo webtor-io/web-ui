@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 // TestStreamVideoRenders is the render guard called for in the
@@ -85,6 +86,7 @@ func TestStreamVideoRenders(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -104,7 +106,7 @@ func TestStreamVideoRenders(t *testing.T) {
 
 	data := &scripts.StreamContent{
 		ExportTag:            &ra.ExportTag{},
-		Resource:             &ra.ResourceResponse{},
+		Resource:             &ra.ResourceResponse{MagnetURI: "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10"}, // a torrent's: an upload has no magnet and no #embed
 		Item:                 &ra.ListItem{PathStr: "movie.mkv"},
 		Title:                "Movie",
 		MediaProbe:           nil,
@@ -362,6 +364,7 @@ func TestStreamVideoRendersTranslateBadgesAndCTA(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -692,6 +695,7 @@ func TestStreamVideoRendersMySubtitlesTab(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -826,6 +830,7 @@ func TestStreamVideoRendersUploadChipsInsideTheTrackRow(t *testing.T) {
 		"t":             echo,
 		"tp":            echoVariadic,
 		"tpHTML":        echoHTML,
+		"uploadOwned":   uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -957,6 +962,7 @@ func TestStreamVideoSubtitlesToggleFollowsTheDefault(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -1088,6 +1094,7 @@ func TestStreamVideoRendersASuggestedUpload(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -1215,6 +1222,7 @@ func TestStreamVideoRendersTheTranslationOffer(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -1407,6 +1415,7 @@ func TestStreamVideoOfferAndRestoreAreTwoChips(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -1553,6 +1562,7 @@ func TestStreamVideoRendersASavedTranslationAsPlaying(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}
@@ -1676,6 +1686,7 @@ func TestStreamVideoRendersEnglishBesideTheOffer(t *testing.T) {
 		"t":           echo,
 		"tp":          echoVariadic,
 		"tpHTML":      echoHTML,
+		"uploadOwned": uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}

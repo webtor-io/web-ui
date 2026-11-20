@@ -19,7 +19,7 @@
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        <h3 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang "private.page.title" }}</h3>
+        <h3 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang (or .Data.Title "private.page.title") }}</h3>
     </div>
     <p class="text-sm text-w-sub mt-3 leading-relaxed">{{ t $.Lang .Data.Key }}</p>
     {{- if .Data.VaultKept }}

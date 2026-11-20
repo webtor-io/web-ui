@@ -6,6 +6,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"html"
+	"html/template"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,11 +28,16 @@ import (
 	cs "github.com/webtor-io/common-services"
 	ra "github.com/webtor-io/rest-api/services"
 
+	"github.com/webtor-io/web-ui/handlers/index"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/models/pgtest"
+	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/uploads"
+	"github.com/webtor-io/web-ui/services/vault"
+	w "github.com/webtor-io/web-ui/services/web"
 )
 
 const (
@@ -575,4 +582,463 @@ func TestUploadPageErasesStalePictures(t *testing.T) {
 			t.Errorf("%d Erase calls on a torrent's page", n-before)
 		}
 	})
+}
+
+// A stranger and an anonymous visitor are refused an upload in its own words:
+// no .torrent of theirs opens it, and no Vault copy plays for them. A private
+// torrent's refusal is as before.
+func TestUploadRefusalPage(t *testing.T) {
+	user := &models.User{UserID: uuid.NewV4()}
+	refused := func(t *testing.T, rec *httptest.ResponseRecorder) string {
+		t.Helper()
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("status %d, want 403 (Location %q)", rec.Code, rec.Header().Get("Location"))
+		}
+		if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {
+			t.Errorf("Cache-Control %q, want private, no-store", got)
+		}
+		if got := rec.Header().Get("X-Robots-Tag"); got != "noindex" {
+			t.Errorf("X-Robots-Tag %q, want noindex", got)
+		}
+		return rec.Body.String()
+	}
+	get := func(r http.Handler, id string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/"+id, nil))
+		return rec
+	}
+
+	t.Run("anonymous", func(t *testing.T) {
+		srv, answer := privateRestAPI(t, uploadU)
+		answer(http.StatusForbidden, `{"error":"x","code":"private_torrent","reason":"sign_in"}`)
+		body := refused(t, get(newResourceRouterAs(t, srv, nil, nil), uploadU))
+		if want := "[private][key=error.upload_private_sign_in][signin=true][upload=false][vault=false][target=main]"; body != want {
+			t.Errorf("body %q, want %q", body, want)
+		}
+	})
+
+	t.Run("signed in, kept in Vault", func(t *testing.T) {
+		db := pgtest.Start(t)
+		v := vault.New(cli.NewContext(cli.NewApp(), flag.NewFlagSet("v", flag.ContinueOnError), nil), &vault.Api{}, nil, nil, pgtest.CS(t, db), nil)
+		for _, c := range []struct{ id, want string }{
+			{uploadU, "[key=error.upload_private_no_record][signin=false][upload=false][vault=false]"},
+			{torrentT, "[key=error.private_no_record][signin=false][upload=true][vault=true]"},
+		} {
+			if _, err := db.Model(&vaultModels.Resource{ResourceID: c.id, RequiredVP: 1, Name: "probe", Vaulted: true}).Insert(); err != nil {
+				t.Fatal(err)
+			}
+			srv, answer := privateRestAPI(t, c.id)
+			answer(http.StatusForbidden, `{"error":"x","code":"private_torrent","reason":"no_record"}`)
+			if body := refused(t, get(newResourceRouterAs(t, srv, v, user), c.id)); !strings.Contains(body, c.want) {
+				t.Errorf("%s: body %q, want %s", c.id, body, c.want)
+			}
+		}
+	})
+
+	// The card says upload, not torrent, in its heading and the page title.
+	t.Run("the card", func(t *testing.T) {
+		funcs := intentFuncs(t)
+		tpl, err := template.New("private.html").Funcs(funcs).ParseFiles(
+			"../../templates/views/resource/private.html",
+			"../../templates/partials/private/refusal.html",
+		)
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		r := w.NewPrivateRefusal(&api.PrivateError{Status: 403, Code: api.CodePrivateTorrent, Reason: api.ReasonNoRecord}, true, uploadU)
+		r.Target = "main"
+		ctx := &w.Context{Lang: "en", Path: "/" + uploadU, Data: r}
+		if title := strings.TrimSpace(execute(t, tpl, "title", ctx)); title != "Private upload" {
+			t.Errorf("title %q, want Private upload", title)
+		}
+		out := execute(t, tpl, "main", ctx)
+		if !strings.Contains(out, ">Private upload</h3>") {
+			t.Errorf("no Private upload heading:\n%s", out)
+		}
+		// rest-api's code rides along as the event's property; the words
+		// say upload.
+		if text := strings.ReplaceAll(out, `="private_torrent"`, ""); strings.Contains(strings.ToLower(text), "torrent") {
+			t.Errorf("an upload's card names a torrent:\n%s", out)
+		}
+	})
+}
+
+// seedTraces gives id what Forget erases: its enrichment rows, dropped first
+// so that a row can follow one that kept them.
+func seedTraces(t *testing.T, db *pg.DB, id string) {
+	t.Helper()
+	for _, q := range []string{
+		`DELETE FROM media_info WHERE resource_id = ?0`,
+		`DELETE FROM ai_enrich.query WHERE resource_id = ?0`,
+		`INSERT INTO media_info (resource_id, status) VALUES (?0, ?1)`,
+		`INSERT INTO movie (resource_id, title, path) VALUES (?0, 'n', '/a.mkv')`,
+		`INSERT INTO ai_enrich.query (parsed_title, content_type, resource_id, hint_path) VALUES (?0, 1, ?0, '/a.mkv')`,
+	} {
+		if _, err := db.Exec(q, id, models.MediaInfoStatusDone); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// rowsOf counts the rows of id in each table.
+func rowsOf(t *testing.T, db *pg.DB, id string, tables ...string) map[string]int {
+	t.Helper()
+	n := map[string]int{}
+	for _, table := range tables {
+		var c int
+		if _, err := db.QueryOne(pg.Scan(&c), `SELECT count(*) FROM `+table+` WHERE resource_id = ?`, id); err != nil {
+			t.Fatal(err)
+		}
+		n[table] = c
+	}
+	return n
+}
+
+// The owner of an upload rest-api no longer has is told it is gone, on the
+// home page's 404, and the page erases what can come back -- its enrichment
+// and pictures -- but not the owner's watch history or subtitle bindings:
+// rest-api's 404 or no_record may be wrong while the upload's home node is
+// away. Nobody else sets that off.
+func TestUploadGonePage(t *testing.T) {
+	db := pgtest.Start(t)
+	pgCS := pgtest.CS(t, db)
+	ctx := context.Background()
+	owner, stranger := newUploadPageUser(t, db), newUploadPageUser(t, db)
+	for _, id := range []string{uploadU, torrentT} {
+		if err := models.CreateUpload(ctx, db, owner, id, "n"); err != nil {
+			t.Fatal(err)
+		}
+		for _, q := range []string{
+			`INSERT INTO watch_history (user_id, resource_id, path) VALUES (?, ?, '/a.mkv')`,
+			`INSERT INTO user_subtitle (user_id, resource_id, path, hash, original_name, format, size) VALUES (?, ?, '/a.mkv', 'h', 'a.srt', 'srt', 1)`,
+		} {
+			if _, err := db.Exec(q, owner, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	old := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+	hook := logtest.NewGlobal()
+	out := log.StandardLogger().Out
+	log.SetOutput(io.Discard)
+	t.Cleanup(func() {
+		log.StandardLogger().ReplaceHooks(old)
+		log.SetOutput(out)
+	})
+
+	const (
+		notFound = `{"error":"not found"}`
+		noRecord = `{"error":"x","code":"private_torrent","reason":"no_record"}`
+	)
+	traces := []string{"media_info", "movie", "ai_enrich.query"}
+	kept := []string{"watch_history", "user_subtitle", "library", "torrent_resource"}
+	for _, c := range []struct {
+		name    string
+		viewer  *uuid.UUID
+		id      string
+		status  int
+		body    string
+		picsErr error
+		code    int
+		want    string
+		erased  bool
+	}{
+		{"owner, 404", &owner, uploadU, http.StatusNotFound, notFound, nil, http.StatusNotFound, "[home][err=upload.gone]", true},
+		{"owner, 403 no_record", &owner, uploadU, http.StatusForbidden, noRecord, nil, http.StatusNotFound, "[home][err=upload.gone]", true},
+		{"stranger, 404", &stranger, uploadU, http.StatusNotFound, notFound, nil, http.StatusNotFound, "[home][err=error.not_found]", false},
+		{"stranger, 403 no_record", &stranger, uploadU, http.StatusForbidden, noRecord, nil, http.StatusForbidden, "[private][key=error.upload_private_no_record]", false},
+		{"anonymous, 404", nil, uploadU, http.StatusNotFound, notFound, nil, http.StatusNotFound, "[home][err=error.not_found]", false},
+		{"owner, 404, a torrent", &owner, torrentT, http.StatusNotFound, notFound, nil, http.StatusNotFound, "[home][err=error.not_found]", false},
+		{"owner, 404, the bucket fails", &owner, uploadU, http.StatusNotFound, notFound, errors.New("s3 down"), http.StatusNotFound, "[home][err=upload.gone]", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			seedTraces(t, db, c.id)
+			srv, answer := privateRestAPI(t, c.id)
+			answer(c.status, c.body)
+			var user *models.User
+			if c.viewer != nil {
+				user = &models.User{UserID: *c.viewer}
+			}
+			pics := &fakePics{err: c.picsErr}
+			hook.Reset()
+			rec := httptest.NewRecorder()
+			newResourceRouterPics(t, srv, nil, user, pgCS, nil, pics).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/"+c.id, nil))
+			if rec.Code != c.code || !strings.HasPrefix(rec.Body.String(), c.want) {
+				t.Errorf("%d %q, want %d %s", rec.Code, rec.Body.String(), c.code, c.want)
+			}
+			if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {
+				t.Errorf("Cache-Control %q, want private, no-store", got)
+			}
+			for table, n := range rowsOf(t, db, c.id, traces...) {
+				if (n == 0) != c.erased {
+					t.Errorf("%s: %d rows, want erased %v", table, n, c.erased)
+				}
+			}
+			if c.viewer == &owner {
+				for table, n := range rowsOf(t, db, c.id, kept...) {
+					if n == 0 {
+						t.Errorf("%s: no rows, want the owner's kept", table)
+					}
+				}
+			}
+			var wantCalls []string
+			if c.erased {
+				wantCalls = []string{c.id}
+			}
+			if got := pics.called(); !slices.Equal(got, wantCalls) {
+				t.Errorf("Erase calls %v, want %v", got, wantCalls)
+			}
+			warned := false
+			for _, e := range hook.AllEntries() {
+				warned = warned || e.Level == log.WarnLevel && e.Message == "failed to forget an upload that is gone"
+			}
+			if warned != (c.picsErr != nil) {
+				t.Errorf("Warn failed to forget an upload that is gone: %v, want %v", warned, c.picsErr != nil)
+			}
+		})
+	}
+}
+
+// The owner shown "this upload is gone" is counted, by the impression the
+// refusal card uses, with no properties of its own; no other home page error
+// is.
+func TestUploadGoneImpression(t *testing.T) {
+	funcs := intentFuncs(t)
+	funcs["asset"] = func(p string) template.HTML { return template.HTML("[asset " + p + "]") }
+	tpl, err := template.New("index.html").Funcs(funcs).ParseFiles(
+		"../../templates/views/index.html",
+		"../../templates/partials/load/progress.html",
+		"../../templates/partials/job_log.html",
+		"../../templates/partials/about/heading.html",
+	)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	stubTemplates(t, tpl, "hero_backdrop", "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about", "private/refusal")
+	const (
+		event  = `upload-gone-shown`
+		script = `[asset private_refusal.js]`
+	)
+	render := func(key string) string {
+		return execute(t, tpl, "main", &w.Context{Lang: "en", Data: &index.Data{}, ErrKey: key})
+	}
+	block := func(t *testing.T, main string) (tag, block string) {
+		t.Helper()
+		tag = openTag(t, main, `id="index-error"`)
+		i := strings.Index(main, tag)
+		return tag, main[i : i+strings.Index(main[i:], "</div>")]
+	}
+
+	main := render("upload.gone")
+	tag, b := block(t, main)
+	if !strings.Contains(tag, `data-umami-impression="`+event+`"`) {
+		t.Errorf("no impression on the block: %s", tag)
+	}
+	if strings.Contains(tag, "data-umami-impression-") {
+		t.Errorf("the impression has properties: %s", tag)
+	}
+	if !strings.Contains(b, "This upload is gone.") {
+		t.Errorf("no text in the block:\n%s", b)
+	}
+	if n := strings.Count(b, script); n != 1 {
+		t.Errorf("%d private_refusal.js in the block, want 1:\n%s", n, b)
+	}
+	if n := strings.Count(main, event); n != 1 {
+		t.Errorf("the event is declared %d times, want once", n)
+	}
+
+	main = render("error.not_found")
+	block(t, main)
+	for _, s := range []string{event, script} {
+		if strings.Contains(main, s) {
+			t.Errorf("not found: %q is there", s)
+		}
+	}
+
+	main = render("")
+	for _, s := range []string{"index-error", event} {
+		if strings.Contains(main, s) {
+			t.Errorf("no error: %q is there", s)
+		}
+	}
+}
+
+// between is s from the first from to the first to after it, or "".
+func between(s, from, to string) string {
+	i := strings.Index(s, from)
+	if i < 0 {
+		return ""
+	}
+	j := strings.Index(s[i:], to)
+	if j < 0 {
+		return s[i:]
+	}
+	return s[i : i+j]
+}
+
+// The owner's page of an upload says upload, not torrent, and has none of a
+// torrent's tails: no magnet, no .torrent, no archive, no tracker notice, no
+// Share. Its state line says saved only by a funded pledge, says nothing when
+// Vault could not be read, and tells an unfinished upload how to resume.
+func TestUploadPageTemplate(t *testing.T) {
+	upload := func(multi bool, up *UploadView) *GetData {
+		gd := intentPage("", multi)
+		gd.Args.ID, gd.Resource.ID = uploadU, uploadU
+		gd.Resource.MagnetURI, gd.Resource.Private = "", true
+		gd.Upload = up
+		return gd
+	}
+	torrent := func(multi, private bool) *GetData {
+		gd := intentPage("", multi)
+		gd.Args.ID, gd.Resource.ID = torrentT, torrentT
+		gd.Resource.MagnetURI, gd.Resource.Private = "magnet:?xt=urn:btih:"+torrentT, private
+		return gd
+	}
+	owner := func() *UploadView { return &UploadView{IsOwner: true, CanWrite: true} }
+	render := func(t *testing.T, gd *GetData) string {
+		t.Helper()
+		return execute(t, resourceTemplates(t), "main", pageContext("en", gd))
+	}
+	enrich := func(gd *GetData) *GetData {
+		gd.Movie = &models.Movie{
+			VideoContent:  &models.VideoContent{ResourceID: gd.Resource.ID, Title: "Sample Movie"},
+			MovieMetadata: &models.MovieMetadata{VideoMetadata: &models.VideoMetadata{VideoID: "tt0000001", Title: "Sample Movie"}},
+		}
+		return gd
+	}
+
+	t.Run("an upload", func(t *testing.T) {
+		page := render(t, upload(false, owner()))
+		badge := between(page, "badge badge-lg", "</div>")
+		if !strings.Contains(badge, "Upload") || strings.Contains(badge, "Torrent") {
+			t.Errorf("badge %q, want Upload", badge)
+		}
+		checkPage(t, page, nil, []string{`data-magnet-hash`, `download-torrent`, "Webtor uses your tracker account"})
+		checkPage(t, render(t, upload(true, owner())), nil, []string{`js-archive-form`, `data-magnet-hash`})
+		checkPage(t, render(t, torrent(true, false)), []string{`js-archive-form`, `data-magnet-hash`}, nil)
+	})
+
+	t.Run("states", func(t *testing.T) {
+		var (
+			frozen     = html.EscapeString("Saved to Vault and can't be changed")
+			unsaved    = html.EscapeString("Not saved to Vault: the files may be deleted. You can't add files here any more.")
+			temporary  = html.EscapeString("Temporary: files that are not played or downloaded may be deleted within hours.")
+			hint       = html.EscapeString("Save it to Vault.")
+			incomplete = html.EscapeString("This upload is not finished yet.")
+		)
+		for _, c := range []struct {
+			name    string
+			up      *UploadView
+			vault   bool
+			in, out []string
+		}{
+			{"saved", &UploadView{IsOwner: true, Saved: true}, true, []string{frozen}, []string{unsaved, temporary}},
+			{"a row without a pledge", &UploadView{IsOwner: true}, true, []string{unsaved, hint}, []string{frozen, temporary}},
+			{"temporary", owner(), true, []string{temporary, hint}, []string{frozen, unsaved}},
+			{"temporary, no Vault", owner(), false, []string{temporary}, []string{hint}},
+			{"unfinished", &UploadView{IsOwner: true, CanWrite: true, Incomplete: true}, true, []string{incomplete}, []string{temporary, hint, frozen, unsaved}},
+			{"saved before unfinished", &UploadView{IsOwner: true, Saved: true, Incomplete: true}, true, []string{frozen}, []string{incomplete}},
+			{"Vault not read", &UploadView{IsOwner: true, VaultUnknown: true}, true, nil, []string{frozen, unsaved, temporary, hint, incomplete}},
+			{"unknown before saved", &UploadView{IsOwner: true, Saved: true, VaultUnknown: true}, true, nil, []string{frozen}},
+			{"an unpaid pledge of the owner's", &UploadView{IsOwner: true, UnpaidPledge: true}, true, []string{unsaved}, []string{hint, frozen, temporary}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				gd := upload(false, c.up)
+				gd.Resource.FilesCount, gd.Vault = 2, c.vault
+				page := render(t, gd)
+				var line string
+				if c.in != nil {
+					line = between(page, "data-upload-state", "</p>")
+					if line == "" {
+						t.Fatal("no state line")
+					}
+				} else if strings.Contains(page, "data-upload-state") {
+					t.Errorf("a state line: %s", between(page, "data-upload-state", "</p>"))
+				}
+				checkPage(t, line, c.in, nil)
+				checkPage(t, page, nil, c.out)
+			})
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		gd := upload(true, &UploadView{IsOwner: true, CanWrite: true, Incomplete: true})
+		gd.Resource.FilesCount, gd.List, gd.Item = 0, nil, nil
+		page := render(t, gd)
+		checkPage(t, between(page, "data-upload-state", "</p>"), []string{html.EscapeString("This upload is not finished yet.")}, nil)
+		checkPage(t, page, nil, []string{html.EscapeString("Temporary:"), `js-archive-form`, `data-magnet-hash`})
+	})
+
+	t.Run("share", func(t *testing.T) {
+		for _, enriched := range []bool{false, true} {
+			for _, c := range []struct {
+				name  string
+				gd    *GetData
+				share bool
+			}{
+				{"an upload", upload(false, owner()), false},
+				{"a torrent", torrent(false, false), true},
+				{"a private torrent", torrent(false, true), true},
+			} {
+				gd := c.gd
+				if enriched {
+					gd = enrich(gd)
+				}
+				if got := strings.Contains(render(t, gd), "shareResource("); got != c.share {
+					t.Errorf("%s, enriched %v: Share %v, want %v", c.name, enriched, got, c.share)
+				}
+			}
+		}
+	})
+}
+
+// After the pledge only the modal and the Vault button are rendered again:
+// the modal's script takes Add files and the × off the owner's page and says
+// saved. It runs again in the same document on the next upload saved, so it
+// declares nothing. A torrent's modal has none of it.
+func TestUploadPledgeSuccessUpdatesThePage(t *testing.T) {
+	tpl := vaultModal(t)
+	out := renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Status: "success", ResourceID: uploadU, FreezePeriod: freezePeriod}})
+	checkPage(t, out, []string{`[data-upload-add], [data-upload-add] + input, [data-upload-delete]`, `[data-upload-state]`, `Saved to Vault and can`}, nil)
+	if i := strings.Index(out, "[data-upload-state]"); i >= 0 {
+		script := between(out[strings.LastIndex(out[:i], "<script>"):], "<script>", "</script>")
+		checkPage(t, script, nil, []string{"const ", "let "})
+	}
+
+	out = renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Status: "success", ResourceID: intentHash, FreezePeriod: freezePeriod}})
+	checkPage(t, out, nil, []string{`data-upload-add`})
+}
+
+func TestTrackerPrivate(t *testing.T) {
+	for _, c := range []struct {
+		r    *ra.ResourceResponse
+		want bool
+	}{
+		{&ra.ResourceResponse{ID: uploadU, Private: true}, false},
+		{&ra.ResourceResponse{ID: torrentT, Private: true}, true},
+		{&ra.ResourceResponse{ID: kind1, Private: false}, false},
+	} {
+		if got := trackerPrivate(c.r); got != c.want {
+			t.Errorf("%s private=%v: %v, want %v", c.r.ID, c.r.Private, got, c.want)
+		}
+	}
+}
+
+// An upload is in My uploads from the start and leaves the library only as a
+// whole: its page has no library button.
+func TestLibraryButtonHiddenForAnUpload(t *testing.T) {
+	tpl, err := template.New("button.html").Funcs(intentFuncs(t)).ParseFiles("../../templates/partials/library/button.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	ctx := &w.Context{Lang: "en", User: &auth.User{ID: uuid.NewV4()}}
+	render := func(id string) string {
+		return strings.TrimSpace(execute(t, tpl, "library/button", &w.CtxData{Ctx: ctx, Data: &ExtendedResource{ResourceResponse: &ra.ResourceResponse{ID: id}}}))
+	}
+	if out := render(uploadU); out != "" {
+		t.Errorf("an upload: %q, want nothing", out)
+	}
+	if out := render(torrentT); !strings.Contains(out, "/lib/add") {
+		t.Errorf("a torrent: %q, want /lib/add", out)
+	}
 }

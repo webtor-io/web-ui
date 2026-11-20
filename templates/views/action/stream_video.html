@@ -18,7 +18,7 @@
            {{ if .Next }}data-next-item-id="{{ .Next.ItemID }}" data-next-path="{{ .Next.Path }}" data-next-kind="{{ .Next.Kind }}" data-next-label="{{ .Next.Label }}"{{ end }}
            data-path="{{ .Item.PathStr }}"
            {{ if .Title }}data-resource-title="{{ .Title }}"{{ end }}
-           data-share-url="{{ domain }}{{ langPath $.Lang (printf "/%s" .VideoStreamUserData.ResourceID) }}{{ if .Item }}?file={{ .Item.PathStr | urlquery }}{{ end }}"
+           {{ if not (uploadOwned .VideoStreamUserData.ResourceID) }}data-share-url="{{ domain }}{{ langPath $.Lang (printf "/%s" .VideoStreamUserData.ResourceID) }}{{ if .Item }}?file={{ .Item.PathStr | urlquery }}{{ end }}"{{ end }}
            {{ if .ExternalData.Poster }}poster="{{ .ExternalData.Poster }}"
            {{ else if .ExportTag.Poster }}poster="{{ .ExportTag.Poster }}" {{ end }}
            {{ if .TranscoderSession }}data-duration="{{ .TranscoderSession.Duration }}"
@@ -441,8 +441,8 @@
          Only on an instance that serves embeds: the player shows its Embed
          button when this dialog exists (Player.jsx parseFeatures). The
          snippet carries this instance's address -- the SDK otherwise points
-         at webtor.io. */}}
-    {{ if embedEnabled }}
+         at webtor.io. No magnet (an upload), no snippet: it plays a magnet. */}}
+    {{ if and embedEnabled .Resource.MagnetURI }}
     <dialog class="modal" id="embed">
         <div class="modal-box w-full sm:w-11/12 max-w-5xl">
             <div class="flex">
