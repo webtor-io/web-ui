@@ -23,6 +23,7 @@ import (
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 )
 
@@ -44,6 +45,14 @@ type Result struct {
 	Body []byte
 	ETag string
 	Mime string
+	// Private: the bytes come from a private resource's own source — its frame, a file of it, the
+	// artwork of the title it was matched to. Get hands such a result only to a viewer rest-api
+	// admits, and the handler never lets it be cached. The brand banner is nobody's.
+	Private bool
+	// Unknown: rest-api does not have the resource, and its 404 is no proof the resource is public.
+	// The picture goes to everyone, as before, but the handler does not let it be cached. Not set
+	// for the brand banner.
+	Unknown bool
 }
 
 // Service caches rendered posters per (resource_id, file) for in-process
@@ -91,50 +100,92 @@ func New(s3Cl *cs.S3Client, pg *cs.PG, cl *http.Client, thumb *thumbnail.Service
 // miss path to skip the adult blur entirely; reserved for the
 // auth-gated /raw/ route, which is the opt-out for users who've
 // flipped UserSettings.ShowAdult.
-func (s *Service) Get(ctx context.Context, resourceID, file string, force, allowRaw bool) (*Result, error) {
+//
+// viewer is the caller's own claims (api.GetClaimsFromContext): a private
+// resource's picture is served only to the one rest-api opens the resource to.
+func (s *Service) Get(ctx context.Context, viewer *api.Claims, resourceID, file string, force, allowRaw bool) (*Result, error) {
 	mode, err := ParseFileMode(file)
 	if err != nil {
 		return nil, err
 	}
 	mode.Raw = allowRaw
+	var res *Result
 	if force {
-		return s.miss(ctx, resourceID, mode)
+		res, err = s.miss(ctx, resourceID, mode)
+	} else {
+		// Cache key already encodes Mode.Raw via CacheTag's `raw-` prefix
+		// so blurred and unblurred renders of the same source live as
+		// independent lazymap / S3 entries.
+		key := resourceID + "/" + mode.CacheTag()
+		res, err = s.lm.Get(key, func() (*Result, error) {
+			return s.miss(ctx, resourceID, mode)
+		})
 	}
-	// Cache key already encodes Mode.Raw via CacheTag's `raw-` prefix
-	// so blurred and unblurred renders of the same source live as
-	// independent lazymap / S3 entries.
-	key := resourceID + "/" + mode.CacheTag()
-	return s.lm.Get(key, func() (*Result, error) {
-		return s.miss(ctx, resourceID, mode)
-	})
+	if err != nil {
+		return nil, err
+	}
+	// Outside the lazymap entry: one entry serves everyone who asks for the
+	// picture within its TTL, the right is asked on every request.
+	if res.Private {
+		if err := s.admit(ctx, viewer, resourceID); err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+// admit asks rest-api, as the resource page does, whether the viewer may use
+// the resource. A refusal and an unknown resource are ErrNotFound; any other
+// failure is an error, never bytes.
+//
+// The cached read keeps a success for a minute per (viewer, resource): a
+// library page shows dozens of pictures. A revoked right still opens the
+// picture for up to a minute on a pod.
+func (s *Service) admit(ctx context.Context, viewer *api.Claims, resourceID string) error {
+	r, err := s.api.GetResourceCached(ctx, viewer, resourceID)
+	if api.IsPrivateRefusal(err) || errors.Is(err, api.ErrForbidden) || (err == nil && r == nil) {
+		return errors.Wrapf(ErrNotFound, "resource_id=%s: not the viewer's", resourceID)
+	}
+	if err != nil {
+		return errors.Wrap(err, "failed to check the viewer")
+	}
+	return nil
 }
 
 // miss runs the full pipeline: resolve → S3 cache check → render →
 // S3 put. Called from lazymap on cache miss; also called directly on
 // force=true.
 //
-// Adult/sport is checked here (not in Resolve) because it doesn't
-// affect WHICH source is picked — only HOW the rendered output is
-// post-processed. A separate look-up keeps the resolver function pure
-// and lets us flip is_adult via SQL without re-running classification.
+// A private resource has a source only where its viewers are checked, and
+// its picture is marked Private: Get then asks rest-api about every viewer,
+// and the handler keeps it out of every cache. A resource rest-api does not
+// know gets no frame of its own, and its picture is marked Unknown: served to
+// everyone, cached by no one. A failed lookup is an error, never the default.
 func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Result, error) {
-	// The poster is public and edge-cached for a day: a private torrent has
-	// no source, neither its frames nor the enrichment artwork. A failed
-	// lookup is an error, never the default.
 	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to look up resource")
 	}
+	private := r != nil && r.Private
 	var (
 		db  *pg.DB
 		src *Source
 	)
-	if r == nil || !r.Private {
+	// A private resource has a source only where its viewers are checked: Get asks rest-api, and
+	// rest-api refuses nobody unless private access is enforced. Its share card never has one —
+	// crawlers fetch it without a session and get the banner.
+	if !private || (private_torrent.Enforce() && !mode.OG) {
 		db = s.pg.Get()
 		if db == nil {
 			return nil, errors.New("no db")
 		}
-		src, err = Resolve(ctx, db, s.thumb, s.cl, resourceID)
+		th := s.thumb
+		if r == nil {
+			// rest-api does not have the resource, and its 404 is no proof the resource is public:
+			// no frame of it is looked at, only the artwork of a matched title, as before.
+			th = nil
+		}
+		src, err = Resolve(ctx, db, th, s.cl, resourceID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to resolve source")
 		}
@@ -149,7 +200,24 @@ func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Resu
 		// something durable.
 		src = s.defaultOGSource()
 	}
+	res, err := s.produce(ctx, db, resourceID, src, mode)
+	if err != nil {
+		return nil, err
+	}
+	// The one place the flags are set: every way produce returns (S3 hit, render, banner fallback).
+	res.Private = private && src.Kind != sourceDefault
+	res.Unknown = r == nil && src.Kind != sourceDefault
+	return res, nil
+}
 
+// produce turns a source into the served picture: blur decision, S3 cache
+// check, fetch, render, S3 put.
+//
+// Adult/sport is checked here (not in Resolve) because it doesn't
+// affect WHICH source is picked — only HOW the rendered output is
+// post-processed. A separate look-up keeps the resolver function pure
+// and lets us flip is_adult via SQL without re-running classification.
+func (s *Service) produce(ctx context.Context, db *pg.DB, resourceID string, src *Source, mode Mode) (*Result, error) {
 	// Force blur for adult-classified resources. Sport is tracked but
 	// NOT blurred — broadcasts are legitimate content people would
 	// reasonably share. Brand default never blurs — that banner is
@@ -177,9 +245,11 @@ func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Resu
 	}
 
 	img, err := src.Fetch(ctx)
+	// miss marks the result by its own source, not by this banner: the banner
+	// of a resource rest-api does not know goes out Unknown, uncached.
 	if err != nil && mode.OG && src.Kind != sourceDefault && errors.Is(err, ErrNotFound) {
 		// The share card must not fail because the artwork is gone: same
-		// fallback as a resource with no source at all, above. Not cached
+		// fallback as a resource with no source at all, in miss. Not cached
 		// under the dead source's key -- the default has its own.
 		src = s.defaultOGSource()
 		mode.Blur = false

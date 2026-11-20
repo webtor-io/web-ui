@@ -9,7 +9,7 @@ network, and what the site says about itself to crawlers that read `llms.txt`.
 |---|---|---|---|
 | Homepage, the 20 tool pages | `/og-card.png` (brand card) | `summary_large_image` | `templates/views/index.html` block `og` → partial `og_card` |
 | Every other page on the main layout (`/about`, `/donate`, legal, profile…) | `/og-card.png` | `summary_large_image` | `templates/layouts/main.html` block `og` (default) → partial `og_card` |
-| Resource page (`/<hash>`) | `/lib/poster/<resource_id>/og.jpg` (1200×630, `services/poster_resolver`) | `summary_large_image` | `templates/views/resource/get.html` block `og` |
+| Resource page (`/<hash>`) | `/lib/poster/<resource_id>/og.jpg` (1200×630, `services/poster_resolver`); the brand banner for a private resource | `summary_large_image` | `templates/views/resource/get.html` block `og` |
 
 **The `twitter:card` tag belongs inside the `og` block, next to the image it
 describes.** A view that brings its own image overrides the whole block, and
@@ -88,6 +88,38 @@ cookies, will too. Harmless at their volume (one static file per preview
 fetch), but a changed image can still be served from an edge copy until it
 expires: purge `/pub/webtor.jpg` and `/webtor.jpg` after replacing the
 creative.
+
+## Posters of private resources
+
+`/lib/poster/<resource_id>/<width>.jpg` (and its `/raw/` variant) of a
+private resource is served only to a viewer rest-api opens the resource to:
+`poster_resolver.Service.Get` asks rest-api the same question the resource
+page asks, with the viewer's own claims (`admit`, through the minute cache of
+`GetResourceCached`). Everyone else — anonymous, another account, an app
+without a session — gets 404. A failure to ask is a 500, never the picture.
+
+- **Headers.** Every answer of the route that depends on the viewer — the
+  private picture, a refusal, a miss, an error — carries
+  `Cache-Control: private, no-store` and keeps `Set-Cookie`. Only the picture
+  of a resource rest-api knows and does not call private, and the brand
+  banner, carry `public, max-age=86400` without `Set-Cookie`, on 200 and on
+  304.
+- **Share card.** `og.jpg` of a private resource is the brand banner for every
+  caller: crawlers fetch it without a session.
+- **The switch.** Where private access is not enforced
+  (`PRIVATE_ACCESS_ENFORCE` off) a private resource has no picture at all, and
+  no frame of it is made.
+- **Order of the two switches.** web-ui's `PRIVATE_ACCESS_ENFORCE` must never
+  be on while rest-api's is off: rest-api then refuses nobody, and the picture
+  of a private resource would go to anyone who knows its ID. web-ui's switch
+  is turned on last and off first.
+- **A resource rest-api does not know** (404) gets no frame, and the artwork of
+  the title it was matched to is served with `private, no-store`: a 404 is no
+  proof the resource is public.
+- **Caches.** The S3 keys and the in-process cache carry no viewer: one render
+  for everyone, the right checked on every request, outside the in-process
+  cache. A right revoked in rest-api still opens the picture for up to a
+  minute on a pod.
 
 ## `pub/llms.txt`
 
