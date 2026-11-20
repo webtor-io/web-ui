@@ -17,6 +17,7 @@ import (
 
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 const (
@@ -52,6 +53,12 @@ func HomeHosted(id string) bool {
 func Owned(id string) bool {
 	return HomeHosted(id) && id[12] == '0'
 }
+
+// ViewerChecked answers: does rest-api refuse a viewer without a right to
+// this private resource? An upload's viewers are checked always — rest-api
+// decides by its owner file, enforcing or not; a private torrent's only where
+// private access is enforced.
+func ViewerChecked(id string) bool { return Owned(id) || private_torrent.Enforce() }
 
 // NewID is a new upload ID of kind 0.
 func NewID() (string, error) {

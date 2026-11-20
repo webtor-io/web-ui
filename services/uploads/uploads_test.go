@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 func TestPredicates(t *testing.T) {
@@ -101,5 +102,31 @@ func TestEnabled(t *testing.T) {
 				t.Errorf("log %v, want one line %q", hook.AllEntries(), c.line)
 			}
 		})
+	}
+}
+
+// An upload's viewer is checked whether private access is enforced or not; a
+// private torrent's only where it is.
+func TestViewerChecked(t *testing.T) {
+	const (
+		u0 = "9c5db5752b7c0123456789abcdef0123456789ab"
+		u1 = "9c5db5752b7c1123456789abcdef0123456789ab"
+		tt = "0123456789abcdef0123456789abcdef01234567"
+	)
+	was := private_torrent.Enforce()
+	t.Cleanup(func() { private_torrent.SetEnforce(was) })
+	for _, c := range []struct {
+		id            string
+		enforce, want bool
+	}{
+		{u0, false, true},
+		{u1, false, false},
+		{tt, false, false},
+		{tt, true, true},
+	} {
+		private_torrent.SetEnforce(c.enforce)
+		if got := ViewerChecked(c.id); got != c.want {
+			t.Errorf("%s, enforce %v: ViewerChecked %v, want %v", c.id, c.enforce, got, c.want)
+		}
 	}
 }

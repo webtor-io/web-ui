@@ -47,7 +47,6 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/uploads"
 )
 
@@ -322,10 +321,10 @@ func (s *Service) generate(ctx context.Context, claims *api.Claims, resourceID s
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to look up resource")
 	}
-	// A private torrent's picture goes only to a viewer rest-api admits (poster_resolver.Service.Get).
-	// Where private access is not enforced rest-api refuses nobody, the picture would be anyone's,
-	// and none is made.
-	if r != nil && r.Private && !private_torrent.Enforce() {
+	// A private resource's picture goes only to a viewer rest-api admits (poster_resolver.Service.Get).
+	// Where rest-api refuses nobody — a private torrent while private access is not enforced — the
+	// picture would be anyone's, and none is made. An upload's viewers are checked always.
+	if r != nil && r.Private && !uploads.ViewerChecked(resourceID) {
 		return nil, errors.Wrap(ErrNoSource, "private torrent, viewers are not checked")
 	}
 	db := s.pg.Get()

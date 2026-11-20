@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 // The seeder and its disk cleaner say when a file enters or leaves the
@@ -77,4 +80,34 @@ func resourceUncached(ci cacheIndexer, msg []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), cacheEventTimeout)
 	defer cancel()
 	return errors.Wrap(ci.UnmarkFromSeeder(ctx, m.ResourceID, m.FileIdx), "failed to unmark cached")
+}
+
+// uncached: the cache index first, as before; then what web-ui derived from an
+// upload whose directory went.
+func (h *Handler) uncached(ci cacheIndexer, msg []byte) error {
+	if err := resourceUncached(ci, msg); err != nil {
+		return err
+	}
+	h.uploadEvicted(msg)
+	return nil
+}
+
+// uploadEvicted: the cleaner dropped a whole directory. If it was an unsaved
+// upload's, what web-ui derived from its files goes with it (uploads.Forget) —
+// the watch history and the user subtitle bindings too: the cleaner removed
+// the directory itself, so this "gone" is certain, unlike one inferred from a
+// rest-api answer. Best effort: the event is acknowledged whatever happens
+// here, so that cache events never wait for S3; a quota check and the owner's
+// page erase the enrichment rows and the pictures this missed, "Delete
+// upload" — the rest.
+func (h *Handler) uploadEvicted(msg []byte) {
+	m, ok := parseResourceCacheMsg(msg)
+	if !ok || m.FileIdx != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cacheEventTimeout)
+	defer cancel()
+	if err := uploads.Forget(ctx, h.pg.Get(), h.thumb, m.ResourceID, true); err != nil {
+		log.WithError(err).WithField("infohash", m.ResourceID).Warn("failed to forget an evicted upload")
+	}
 }

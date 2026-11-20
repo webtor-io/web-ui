@@ -685,7 +685,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Events
 	if nats != nil {
-		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), offers, cacheIndex)
+		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), offers, cacheIndex, up, thumbnailSvc)
 		if eh != nil {
 			servers = append(servers, eh)
 			defer eh.Close()

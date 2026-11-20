@@ -23,8 +23,8 @@ import (
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 // ErrNotFound is returned when a resource has no resolvable source
@@ -160,21 +160,26 @@ func (s *Service) admit(ctx context.Context, viewer *api.Claims, resourceID stri
 // its picture is marked Private: Get then asks rest-api about every viewer,
 // and the handler keeps it out of every cache. A resource rest-api does not
 // know gets no frame of its own, and its picture is marked Unknown: served to
-// everyone, cached by no one. A failed lookup is an error, never the default.
+// everyone, cached by no one — but an upload rest-api does not know has no
+// source at all. A failed lookup is an error, never the default.
 func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Result, error) {
 	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to look up resource")
 	}
-	private := r != nil && r.Private
+	// An upload is private whether rest-api says so or not, and whether rest-api has it now or not:
+	// a 200 without the flag must not make its frame public, and after eviction the lookup is a 404
+	// while the enrichment rows outlive the files — nothing of it has a source then.
+	private := (r != nil && r.Private) || uploads.Owned(resourceID)
+	gone := r == nil && uploads.Owned(resourceID)
 	var (
 		db  *pg.DB
 		src *Source
 	)
 	// A private resource has a source only where its viewers are checked: Get asks rest-api, and
-	// rest-api refuses nobody unless private access is enforced. Its share card never has one —
+	// rest-api refuses a viewer without a right to it only then. Its share card never has one —
 	// crawlers fetch it without a session and get the banner.
-	if !private || (private_torrent.Enforce() && !mode.OG) {
+	if !gone && (!private || (uploads.ViewerChecked(resourceID) && !mode.OG)) {
 		db = s.pg.Get()
 		if db == nil {
 			return nil, errors.New("no db")

@@ -56,11 +56,14 @@ var (
 // restAPI stands in for rest-api's GET /resource/<hash>. web-ui's own reads
 // and the record holders get the resource; anyone else gets what rest-api
 // tells a caller without a record of a private one. all replaces the answer
-// to every caller, viewers the answer to callers with a uid.
+// to every caller, viewers the answer to callers with a uid. flagless: the
+// body says "private":false whoever asks, as a rest-api without the field
+// does, while who is refused still follows private.
 type restAPI struct {
 	srv        *httptest.Server
 	mu         sync.Mutex
 	private    bool
+	flagless   bool
 	all        *reply
 	viewers    *reply
 	viewerHits int // requests made with a caller's claims, not web-ui's own
@@ -90,7 +93,7 @@ func startRestAPI(t *testing.T, private bool) *restAPI {
 		if !internal {
 			f.viewerHits++
 		}
-		a := reply{http.StatusOK, fmt.Sprintf(`{"id":%q,"private":%t}`, id, f.private)}
+		a := reply{http.StatusOK, fmt.Sprintf(`{"id":%q,"private":%t}`, id, f.private && !f.flagless)}
 		switch {
 		case f.all != nil:
 			a = *f.all

@@ -13,6 +13,8 @@ import (
 	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/notification"
 	"github.com/webtor-io/web-ui/services/offer"
+	"github.com/webtor-io/web-ui/services/thumbnail"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 )
 
@@ -34,6 +36,10 @@ type Handler struct {
 	// winbackTrialEndedFrom: a cancelled trial earns the winback letter from
 	// this instant on; zero keeps that reason off.
 	winbackTrialEndedFrom time.Time
+	// up deletes a banned upload's files on the seeder; nil while uploads are off.
+	up *uploads.Service
+	// thumb erases a banned or evicted upload's pictures; nil without a thumbnail bucket.
+	thumb *thumbnail.Service
 	// ci follows the seeder's cache events (cached.go); nil leaves them unread.
 	ci   cacheIndexer
 	subs []*nats.Subscription
@@ -42,7 +48,9 @@ type Handler struct {
 	done   chan struct{}
 }
 
-func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service, billing notification.Billing, offers *offer.Service, index *cache_index.CacheIndex) *Handler {
+func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Claims, ns *notification.Service,
+	billing notification.Billing, offers *offer.Service, index *cache_index.CacheIndex, up *uploads.Service,
+	thumb *thumbnail.Service) *Handler {
 	if !c.Bool(useEventHandlerFlag) {
 		return nil
 	}
@@ -59,6 +67,8 @@ func New(c *cli.Context, nats *cs.NATS, pg *cs.PG, v *vault.Vault, cl *claims.Cl
 		ns:      ns,
 		billing: billing,
 		offers:  offers,
+		up:      up,
+		thumb:   thumb,
 		done:    make(chan struct{}),
 
 		winbackHoldout:        c.Int(winbackHoldoutFlag),
@@ -95,7 +105,7 @@ func (h *Handler) Serve() error {
 	if err != nil {
 		return err
 	}
-	err = h.subscribe(js, "common", "resource.banned", "web-ui-resource-banned", h.resourceBanned, 0)
+	err = h.subscribe(js, "common", "resource.banned", "web-ui-resource-banned", h.resourceBanned, resourceBannedRetry)
 	if err != nil {
 		return err
 	}
@@ -129,7 +139,7 @@ func (h *Handler) subscribeCacheEvents(js nats.JetStreamContext) {
 		handler           func(cacheIndexer, []byte) error
 	}{
 		{"resource.cached", "web-ui-resource-cached", resourceCached},
-		{"resource.uncached", "web-ui-resource-uncached", resourceUncached},
+		{"resource.uncached", "web-ui-resource-uncached", h.uncached},
 	} {
 		subject, consumer, handler := sub.subject, sub.consumer, sub.handler
 		go retryUntil(h.done, cacheSubscribeRetry, func(attempt int) bool {
@@ -197,26 +207,45 @@ func (h *Handler) subscribe(js nats.JetStreamContext, stream string, subject str
 				err = handler(msg.Data)
 				if err != nil {
 					log.WithError(err).WithField("consumer", consumer).Error("failed to handle message")
-					if retryDelay == 0 {
-						_ = msg.Nak()
-						continue
-					}
-					// Delay the delivery AND this worker: a DB outage affects
-					// different cache keys too, not only this message.
-					if err := msg.NakWithDelay(retryDelay); err != nil {
-						log.WithError(err).WithField("consumer", consumer).Warn("failed to defer cache event")
-					}
-					select {
-					case <-h.done:
-						return
-					case <-time.After(retryDelay):
-					}
-				} else {
-					_ = msg.Ack()
+				}
+				if serr := settle(msg, err, retryDelay); serr != nil {
+					log.WithError(serr).WithField("consumer", consumer).Warn("failed to defer cache event")
+				}
+				if err == nil || retryDelay == 0 {
+					continue
+				}
+				// Delay the delivery AND this worker: a DB outage affects
+				// different cache keys too, not only this message.
+				select {
+				case <-h.done:
+					return
+				case <-time.After(retryDelay):
 				}
 			}
 		}
 	}()
+	return nil
+}
+
+// acker is how a fetched message is answered (*nats.Msg).
+type acker interface {
+	Ack(...nats.AckOpt) error
+	Nak(...nats.AckOpt) error
+	NakWithDelay(time.Duration, ...nats.AckOpt) error
+}
+
+// settle answers a handled message: acknowledged when err is nil, otherwise
+// delivered again — at once when retryDelay is 0, not before retryDelay
+// otherwise. It returns NakWithDelay's error; Ack's and Nak's are dropped.
+func settle(m acker, err error, retryDelay time.Duration) error {
+	switch {
+	case err == nil:
+		_ = m.Ack()
+	case retryDelay == 0:
+		_ = m.Nak()
+	default:
+		return m.NakWithDelay(retryDelay)
+	}
 	return nil
 }
 
