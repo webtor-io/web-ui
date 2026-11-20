@@ -48,6 +48,7 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 const (
@@ -176,8 +177,11 @@ func (s *Service) Enabled() bool { return s != nil }
 // seek offset lands at ~25 % rather than the blind 5-min default. The
 // caller doesn't need to feed a probe in.
 //
-// Returns ErrNoSource when the torrent is private (its thumbnail would be
-// served by hash to anyone), has neither a usable image file
+// A private torrent is listed and exported with the caller's claims:
+// rest-api refuses a caller without a right to it.
+//
+// Returns ErrNoSource when the torrent is private and its viewers are not
+// checked, has neither a usable image file
 // nor a video item, or its video's frames are over maxFramePixels — caller
 // logs this at info and proceeds with the
 // favicon fallback. Other errors are propagated so they show up in the
@@ -190,8 +194,11 @@ func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID s
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to look up resource")
 	}
-	if r != nil && r.Private {
-		return nil, errors.Wrap(ErrNoSource, "private torrent")
+	// A private torrent's picture goes only to a viewer rest-api admits (poster_resolver.Service.Get).
+	// Where private access is not enforced rest-api refuses nobody, the picture would be anyone's,
+	// and none is made.
+	if r != nil && r.Private && !private_torrent.Enforce() {
+		return nil, errors.Wrap(ErrNoSource, "private torrent, viewers are not checked")
 	}
 	db := s.pg.Get()
 	if db == nil {

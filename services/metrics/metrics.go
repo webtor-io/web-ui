@@ -143,7 +143,7 @@ func newSet(r prometheus.Registerer) *set {
 		}, []string{"kind", "cached"}),
 		enforce: f.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace, Name: "private_enforce",
-			Help: "1 when PRIVATE_ACCESS_ENFORCE is on (private Vault pledges open), 0 when off. services/private_torrent.",
+			Help: "1 when PRIVATE_ACCESS_ENFORCE is on (private Vault pledges and pictures of private torrents open), 0 when off. services/private_torrent.",
 		}),
 	}
 	for _, k := range []string{"file", "dir"} {
