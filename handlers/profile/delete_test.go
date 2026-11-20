@@ -19,6 +19,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 )
 
@@ -27,13 +28,14 @@ var deleteTestUser = uuid.FromStringOrNil("01234567-89ab-cdef-0123-456789abcdef"
 
 // postDelete runs POST /profile/delete for deleteTestUser, signed in. revoke
 // stands in for the SuperTokens session (nil: no session, as on an instance
-// without SuperTokens); recordsErr and vaultErr are what rest-api's deletion
-// of the private tracker records and Vault's pledger lists answer. The
-// returned steps are private-records/vault-uids/revoke/delete in the order
-// they ran, and uid is the one rest-api was asked to delete the records of.
-func postDelete(t *testing.T, revoke func() error, recordsErr, vaultErr error) (w *httptest.ResponseRecorder, steps []string, uid string) {
+// without SuperTokens); recordsErr, vaultErr and uploadsErr are what rest-api's
+// deletion of the private tracker records, Vault's pledger lists and erasing
+// the account's uploads answer. The returned steps are
+// private-records/vault-uids/uploads/revoke/delete in the order they ran, and
+// uid is the one rest-api was asked to delete the records of.
+func postDelete(t *testing.T, revoke func() error, recordsErr, vaultErr, uploadsErr error) (w *httptest.ResponseRecorder, steps []string, uid string) {
 	t.Helper()
-	origRecords, origVault, origDelete := deletePrivateRecords, forgetVaultPledger, deleteUser
+	origRecords, origVault, origUploads, origDelete := deletePrivateRecords, forgetVaultPledger, forgetUploads, deleteUser
 	deletePrivateRecords = func(_ context.Context, _ *api.Api, id string) error {
 		steps = append(steps, "private-records")
 		uid = id
@@ -46,11 +48,20 @@ func postDelete(t *testing.T, revoke func() error, recordsErr, vaultErr error) (
 		}
 		return vaultErr
 	}
+	forgetUploads = func(_ context.Context, _ *uploads.Service, userID uuid.UUID) error {
+		steps = append(steps, "uploads")
+		if userID != deleteTestUser {
+			t.Errorf("uploads of %v forgotten, want %v", userID, deleteTestUser)
+		}
+		return uploadsErr
+	}
 	deleteUser = func(context.Context, *pg.DB, uuid.UUID) error {
 		steps = append(steps, "delete")
 		return nil
 	}
-	t.Cleanup(func() { deletePrivateRecords, forgetVaultPledger, deleteUser = origRecords, origVault, origDelete })
+	t.Cleanup(func() {
+		deletePrivateRecords, forgetVaultPledger, forgetUploads, deleteUser = origRecords, origVault, origUploads, origDelete
+	})
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -75,9 +86,9 @@ func postDelete(t *testing.T, revoke func() error, recordsErr, vaultErr error) (
 // to carry the live session, and the auth middleware resolved it by email
 // into a fresh empty account, so deleting an account recreated it at once.
 func TestDeleteEndsTheSessionFirst(t *testing.T) {
-	w, steps, _ := postDelete(t, func() error { return nil }, nil, nil)
-	if got := strings.Join(steps, " "); got != "private-records vault-uids revoke delete" {
-		t.Fatalf("steps [%s], want [private-records vault-uids revoke delete]", got)
+	w, steps, _ := postDelete(t, func() error { return nil }, nil, nil, nil)
+	if got := strings.Join(steps, " "); got != "private-records vault-uids uploads revoke delete" {
+		t.Fatalf("steps [%s], want [private-records vault-uids uploads revoke delete]", got)
 	}
 	if w.Code != http.StatusFound || w.Header().Get("Location") != "/logout" {
 		t.Fatalf("got %d to %q, want 302 to /logout", w.Code, w.Header().Get("Location"))
@@ -87,27 +98,27 @@ func TestDeleteEndsTheSessionFirst(t *testing.T) {
 // A session that could not be ended keeps the account: deleting it anyway
 // would bring back the recreation.
 func TestDeleteKeepsTheAccountWhenTheSessionStays(t *testing.T) {
-	_, steps, _ := postDelete(t, func() error { return context.DeadlineExceeded }, nil, nil)
-	if got := strings.Join(steps, " "); got != "private-records vault-uids revoke" {
-		t.Fatalf("steps [%s], want [private-records vault-uids revoke] only", got)
+	_, steps, _ := postDelete(t, func() error { return context.DeadlineExceeded }, nil, nil, nil)
+	if got := strings.Join(steps, " "); got != "private-records vault-uids uploads revoke" {
+		t.Fatalf("steps [%s], want [private-records vault-uids uploads revoke] only", got)
 	}
 }
 
 func TestDeleteWithoutSuperTokensSession(t *testing.T) {
-	w, steps, _ := postDelete(t, nil, nil, nil)
-	if got := strings.Join(steps, " "); got != "private-records vault-uids delete" || w.Header().Get("Location") != "/logout" {
-		t.Fatalf("steps [%s], location %q, want [private-records vault-uids delete] and /logout", got, w.Header().Get("Location"))
+	w, steps, _ := postDelete(t, nil, nil, nil, nil)
+	if got := strings.Join(steps, " "); got != "private-records vault-uids uploads delete" || w.Header().Get("Location") != "/logout" {
+		t.Fatalf("steps [%s], location %q, want [private-records vault-uids uploads delete] and /logout", got, w.Header().Get("Location"))
 	}
 }
 
 // The account's private tracker records go first, through rest-api under
 // the account's site uid, while the account still exists to retry from; then
-// its uid comes off Vault's pledger lists; only then do the session and the
-// row go.
+// its uid comes off Vault's pledger lists and its uploads are forgotten; only
+// then do the session and the row go.
 func TestDeleteRemovesPrivateRecordsFirst(t *testing.T) {
-	w, steps, uid := postDelete(t, func() error { return nil }, nil, nil)
-	if got := strings.Join(steps, " "); got != "private-records vault-uids revoke delete" {
-		t.Fatalf("steps [%s], want [private-records vault-uids revoke delete]", got)
+	w, steps, uid := postDelete(t, func() error { return nil }, nil, nil, nil)
+	if got := strings.Join(steps, " "); got != "private-records vault-uids uploads revoke delete" {
+		t.Fatalf("steps [%s], want [private-records vault-uids uploads revoke delete]", got)
 	}
 	if w.Code != http.StatusFound || w.Header().Get("Location") != "/logout" {
 		t.Fatalf("got %d to %q, want 302 to /logout", w.Code, w.Header().Get("Location"))
@@ -133,7 +144,7 @@ func assertRetry(t *testing.T, w *httptest.ResponseRecorder) {
 // "try again" whatever the cause: a bare 403 would otherwise read as a
 // rights-holder block.
 func TestDeleteAbortsOnRestAPIError(t *testing.T) {
-	w, steps, _ := postDelete(t, func() error { return nil }, fmt.Errorf("%w url=/internal/private-trackers", api.ErrForbidden), nil)
+	w, steps, _ := postDelete(t, func() error { return nil }, fmt.Errorf("%w url=/internal/private-trackers", api.ErrForbidden), nil, nil)
 	if got := strings.Join(steps, " "); got != "private-records" {
 		t.Fatalf("steps [%s], want [private-records] only", got)
 	}
@@ -143,9 +154,20 @@ func TestDeleteAbortsOnRestAPIError(t *testing.T) {
 // Vault failing to take the uid off a pledger list keeps the account too:
 // the next try sends the lists again.
 func TestDeleteAbortsOnVaultError(t *testing.T) {
-	w, steps, _ := postDelete(t, func() error { return nil }, nil, errors.New("failed to remove the pledger of 0123456789abcdef0123456789abcdef01234567 from vault: connection refused"))
+	w, steps, _ := postDelete(t, func() error { return nil }, nil, errors.New("failed to remove the pledger of 0123456789abcdef0123456789abcdef01234567 from vault: connection refused"), nil)
 	if got := strings.Join(steps, " "); got != "private-records vault-uids" {
 		t.Fatalf("steps [%s], want [private-records vault-uids] only", got)
+	}
+	assertRetry(t, w)
+}
+
+// Erasing the account's uploads failing keeps the account too: once the
+// account is gone, the list of its uploads goes with it, and their pictures
+// would stay in the buckets with nothing left to find them by.
+func TestDeleteAbortsOnUploadsError(t *testing.T) {
+	w, steps, _ := postDelete(t, func() error { return nil }, nil, nil, errors.New("s3 down"))
+	if got := strings.Join(steps, " "); got != "private-records vault-uids uploads" {
+		t.Fatalf("steps [%s], want [private-records vault-uids uploads] only", got)
 	}
 	assertRetry(t, w)
 }

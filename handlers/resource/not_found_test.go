@@ -26,6 +26,7 @@ import (
 	"github.com/webtor-io/web-ui/services/common"
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -94,6 +95,12 @@ func newResourceRouterPG(t *testing.T, restAPI *httptest.Server, v *vault.Vault,
 
 // newResourceRouterEn is newResourceRouterPG with the enricher en (nil: none).
 func newResourceRouterEn(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User, pg *cs.PG, en *enrich.Enricher) *gin.Engine {
+	return newResourceRouterPics(t, restAPI, v, user, pg, en, nil)
+}
+
+// newResourceRouterPics is newResourceRouterEn with pics erasing an upload's
+// pictures (nil: no thumbnail bucket).
+func newResourceRouterPics(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User, pg *cs.PG, en *enrich.Enricher, pics uploads.PictureEraser) *gin.Engine {
 	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
@@ -159,7 +166,7 @@ func newResourceRouterEn(t *testing.T, restAPI *httptest.Server, v *vault.Vault,
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
-	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, pg, v, en, nil)
+	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, pg, v, en, nil, pics)
 	index.RegisterHandler(r, tm, nil)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)

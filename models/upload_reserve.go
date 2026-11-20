@@ -106,6 +106,20 @@ func HasUploadReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id strin
 	return ok, nil
 }
 
+// UploadReserveIDs are the uploads the account was ever given a write token
+// for.
+func UploadReserveIDs(ctx context.Context, db pg.DBI, userID uuid.UUID) ([]string, error) {
+	var ids []string
+	err := db.ModelContext(ctx, (*UploadReserve)(nil)).
+		Column("resource_id").
+		Where("user_id = ?", userID).
+		Select(&ids)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list the account's uploads")
+	}
+	return ids, nil
+}
+
 // UpsertUploadReserve records a token for id with limit lim until exp. A live
 // reserve is never lowered and a token end never moved back.
 func UpsertUploadReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id string, lim int64, exp time.Time) error {

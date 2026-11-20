@@ -373,8 +373,8 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 var uploadEnrichWait = 3 * time.Second     // how long the owner's page waits for a fresh enrichment
 var uploadEnrichTimeout = 30 * time.Minute // the enrichment's own deadline, as jobs.Enrich has
 
-// keepUpload keeps the library row of the owner's upload and enriches the upload again when its files
-// changed since the last enrichment. Neither failure breaks the page.
+// keepUpload keeps the library row of the owner's upload and, when its files changed since the last
+// enrichment, erases its pictures and enriches it again. No failure breaks the page.
 func (s *Handler) keepUpload(ctx context.Context, db *pg.DB, args *GetArgs, res *ra.ResourceResponse) {
 	if err := models.AddUploadToLibrary(ctx, db, args.User.ID, args.ID, res.Name, res.Size, res.FilesCount); err != nil {
 		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to keep the upload's library row")
@@ -390,6 +390,12 @@ func (s *Handler) keepUpload(ctx context.Context, db *pg.DB, args *GetArgs, res 
 	}
 	if kept {
 		return
+	}
+	// The files changed since the pictures were made: a frame may show a file that is no longer there.
+	if s.pics != nil {
+		if err := s.pics.Erase(ctx, args.ID); err != nil {
+			log.WithError(err).WithField("resource_id", args.ID).Warn("failed to erase the upload's stale pictures")
+		}
 	}
 	done := make(chan struct{})
 	go func() {

@@ -415,6 +415,15 @@ func serve(c *cli.Context) error {
 	// pattern as userSubtitleSvc: New returns nil when the bucket isn't
 	// configured, callers branch via Enabled().
 	thumbnailSvc := thumb.New(c, s3Cl, pg, sapi, cl)
+	// pics erases an upload's pictures; nil without a thumbnail bucket (a nil *thumb.Service in the
+	// interface would not be nil).
+	var pics uploads.PictureEraser
+	if thumbnailSvc != nil {
+		pics = thumbnailSvc
+	}
+	if up != nil {
+		up.Pictures = pics
+	}
 
 	// Setting UserSettings. Thin lazymap-backed cache over the
 	// user_settings row; read on the hot path (poster_resolver,
@@ -518,7 +527,7 @@ func serve(c *cli.Context) error {
 	trial.RegisterHandler(r, offers)
 
 	// Setting ResourceHandler
-	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en, offers)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en, offers, pics)
 
 	// Setting UploadHandler -- after uc and sapi: a token is cut from the viewer's claims.
 	if up != nil {

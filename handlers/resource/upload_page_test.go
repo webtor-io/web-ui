@@ -3,12 +3,14 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,6 +30,7 @@ import (
 	"github.com/webtor-io/web-ui/models/pgtest"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/enrich"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 const (
@@ -452,6 +455,124 @@ func TestUploadPageEnriches(t *testing.T) {
 		wantEnrichment(t, 0)
 		if _, ok := status(t, id); ok {
 			t.Error("a media_info row after the library row failed")
+		}
+	})
+}
+
+// fakePics records the IDs Erase is called with and answers err.
+type fakePics struct {
+	mu    sync.Mutex
+	calls []string
+	err   error
+}
+
+func (p *fakePics) Erase(_ context.Context, id string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls = append(p.calls, id)
+	return p.err
+}
+
+func (p *fakePics) called() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]string(nil), p.calls...)
+}
+
+// A frame may show a file that is no longer in the upload: the owner's page
+// erases the upload's pictures when its files changed, and only then.
+func TestUploadPageErasesStalePictures(t *testing.T) {
+	db := pgtest.Start(t)
+	pgCS := pgtest.CS(t, db)
+	ctx := context.Background()
+	u := newUploadPageUser(t, db)
+	user := &models.User{UserID: u}
+	srv := newUploadPageAPI(t, "Example Movie")
+	old := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+	hook := logtest.NewGlobal()
+	out := log.StandardLogger().Out
+	log.SetOutput(io.Discard)
+	t.Cleanup(func() {
+		log.StandardLogger().ReplaceHooks(old)
+		log.SetOutput(out)
+	})
+
+	const mib int64 = 1 << 20
+	another := "/Example Movie/Another.Title.2008.mkv"
+	cat := &fakeMapper{}
+	pics := &fakePics{}
+	page := func(t *testing.T, id string, pics uploads.PictureEraser) {
+		t.Helper()
+		en := enrichEnv(t, srv.Server, pgCS, []enrich.MetadataMapper{cat})
+		getUploadPage(t, newResourceRouterPics(t, srv.Server, nil, user, pgCS, en, pics), id)
+	}
+	wantCalls := func(t *testing.T, want ...string) {
+		t.Helper()
+		if got := pics.called(); !slices.Equal(got, want) {
+			t.Errorf("Erase calls %v, want %v", got, want)
+		}
+	}
+	if err := models.CreateUpload(ctx, db, u, uploadU, "Example Movie"); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("files came", func(t *testing.T) {
+		srv.set(uploadU, videoItem("/Example Movie/Example.Movie.2015.1080p.mkv", 0, 700*mib))
+		page(t, uploadU, pics)
+		wantCalls(t, uploadU)
+	})
+	t.Run("the same page again", func(t *testing.T) {
+		page(t, uploadU, pics)
+		wantCalls(t, uploadU)
+	})
+	t.Run("the file replaced", func(t *testing.T) {
+		srv.set(uploadU, videoItem(another, 0, 900*mib))
+		page(t, uploadU, pics)
+		wantCalls(t, uploadU, uploadU)
+		var paths []string
+		if _, err := db.Query(&paths, `SELECT path FROM movie WHERE resource_id = ?`, uploadU); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(paths, []string{another}) {
+			t.Errorf("movie rows of %v, want the new file only", paths)
+		}
+	})
+	t.Run("the bucket fails", func(t *testing.T) {
+		srv.set(uploadU, videoItem(another, 0, 901*mib))
+		pics.mu.Lock()
+		pics.err = errors.New("s3 down")
+		pics.mu.Unlock()
+		srv.enrichment()
+		hook.Reset()
+		page(t, uploadU, pics)
+		warned := false
+		for _, e := range hook.AllEntries() {
+			warned = warned || e.Level == log.WarnLevel && e.Message == "failed to erase the upload's stale pictures"
+		}
+		if !warned {
+			t.Error("no Warn failed to erase the upload's stale pictures in the log")
+		}
+		if len(srv.enrichment()) == 0 {
+			t.Error("no enrichment request: the run did not start")
+		}
+	})
+	t.Run("no bucket", func(t *testing.T) {
+		id := uploadID(2)
+		if err := models.CreateUpload(ctx, db, u, id, "Example Movie"); err != nil {
+			t.Fatal(err)
+		}
+		srv.set(id, videoItem("/Example Movie/Example.Movie.2015.1080p.mkv", 0, 700*mib))
+		page(t, id, nil)
+	})
+	t.Run("a torrent's page", func(t *testing.T) {
+		before := len(pics.called())
+		srv.mu.Lock()
+		srv.public[torrentT] = true
+		srv.mu.Unlock()
+		srv.set(torrentT, videoItem("/Example Movie/Example.Movie.2015.1080p.mkv", 0, 700*mib))
+		page(t, torrentT, pics)
+		if n := len(pics.called()); n != before {
+			t.Errorf("%d Erase calls on a torrent's page", n-before)
 		}
 	})
 }

@@ -3,12 +3,14 @@ package uploads
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
 	proto "github.com/webtor-io/claims-provider/proto"
 
@@ -639,6 +643,85 @@ func TestQuotaWithoutCheckAsksNothing(t *testing.T) {
 	if n := f.total(); n != 0 {
 		t.Errorf("rest-api asked %d times", n)
 	}
+}
+
+// A check that finds an upload gone erases what enrichment derived from its
+// files and its pictures, and leaves the user's own rows: rest-api's answer
+// may be wrong while the upload's home node is away.
+func TestQuotaCheckForgets(t *testing.T) {
+	s, db, f := newEnv(t)
+	// seed gives u four uploads past their tokens, each 1 GiB: X and N gone
+	// (404, no_record), Y alive with 1 byte, E failing.
+	seed := func(t *testing.T, n int) (u *auth.User, x, no, y, e string) {
+		u = newUser(t, db)
+		x, no, y, e = uid(n), uid(n+1), uid(n+2), uid(n+3)
+		for _, id := range []string{x, no, y, e} {
+			traces(t, db, u, id)
+		}
+		f.set(x, notFound)
+		f.set(no, noRecord)
+		f.set(y, ok(1))
+		f.set(e, reply{status: http.StatusInternalServerError, body: `{"error":"x"}`})
+		return
+	}
+	u, x, no, y, e := seed(t, 0x301)
+	pics := &fakePics{}
+	s.Pictures = pics
+	used := quota(t, s, u)
+	if used != gib+1 {
+		t.Errorf("used %d, want %d", used, gib+1)
+	}
+
+	t.Run("gone", func(t *testing.T) {
+		for _, id := range []string{x, no} {
+			if reserveOf(t, db, u, id).GoneAt == nil {
+				t.Errorf("%s not marked gone", id)
+			}
+			expect(t, db, id, false, derived...)
+			expect(t, db, id, true, userMade...)
+			expect(t, db, id, true, standing...)
+			if !slices.Contains(pics.called(), id) {
+				t.Errorf("Erase calls %v, want %s among them", pics.called(), id)
+			}
+		}
+	})
+	t.Run("alive", func(t *testing.T) {
+		expect(t, db, y, true, allTraces...)
+		if slices.Contains(pics.called(), y) {
+			t.Errorf("Erase calls %v name the live upload", pics.called())
+		}
+	})
+	t.Run("rest-api fails", func(t *testing.T) {
+		expect(t, db, e, true, allTraces...)
+		if reserveOf(t, db, u, e).GoneAt != nil {
+			t.Error("marked gone on a failure")
+		}
+	})
+	t.Run("pictures fail", func(t *testing.T) {
+		old := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+		hook := logtest.NewGlobal()
+		out := log.StandardLogger().Out
+		log.SetOutput(io.Discard)
+		t.Cleanup(func() {
+			log.StandardLogger().ReplaceHooks(old)
+			log.SetOutput(out)
+		})
+		u, _, _, _, _ := seed(t, 0x311)
+		s.Pictures = &fakePics{err: errors.New("s3 down")}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		got, _, err := s.Quota(ctx, u, free, viewer(u), "", true)
+		if err != nil || got != used {
+			t.Errorf("Quota = %d, %v; want %d, nil", got, err, used)
+		}
+		warned := false
+		for _, en := range hook.AllEntries() {
+			warned = warned || en.Level == log.WarnLevel && en.Message == "upload quota check: failed to forget the upload"
+		}
+		if !warned {
+			t.Errorf("log %v, want a Warn upload quota check: failed to forget the upload", hook.AllEntries())
+		}
+	})
 }
 
 func TestReserveRowsGoWithUser(t *testing.T) {

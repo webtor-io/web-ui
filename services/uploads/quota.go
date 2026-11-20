@@ -50,6 +50,9 @@ type Service struct {
 	url string // UPLOAD_URL
 	key string // WEBTOR_API_KEY
 	cl  *http.Client
+	// Pictures erases an upload's pictures; nil where there is no thumbnail bucket. Set once at
+	// wiring, before the server starts.
+	Pictures PictureEraser
 }
 
 // afterQuotaLock runs between taking the account's lock and counting: tests
@@ -100,7 +103,8 @@ func (s *Service) Quota(ctx context.Context, u *auth.User, cd *claims.Data, ac *
 
 // check asks rest-api about each candidate row. Only rest-api's answers
 // write: the seeder's reserved bytes, or gone on a 404 or on no_record for
-// the owner. Anything else, a 200 without reserved included, is a failure.
+// the owner, and then what web-ui derived from the upload is forgotten.
+// Anything else, a 200 without reserved included, is a failure.
 func (s *Service) check(ctx context.Context, db *pg.DB, u *auth.User, ac *api.Claims, exceptID string) error {
 	rows, err := models.UploadCheckCandidates(ctx, db, u.ID, exceptID)
 	if err != nil {
@@ -122,6 +126,12 @@ func (s *Service) check(ctx context.Context, db *pg.DB, u *auth.User, ac *api.Cl
 			case err == nil && res == nil,
 				errors.As(err, &pe) && pe.Code == api.CodePrivateTorrent && pe.Reason == api.ReasonNoRecord:
 				err = models.MarkUploadGone(ctx, db, r)
+				// Gone is inferred from rest-api here, so the user's own rows stay.
+				if err == nil {
+					if ferr := Forget(ctx, db, s.Pictures, r.ResourceID, false); ferr != nil {
+						log.WithError(ferr).WithField("user_hash", auth.LogHash(u.ID)).Warn("upload quota check: failed to forget the upload")
+					}
+				}
 			case err == nil && res.Reserved != nil:
 				err = models.SetUploadReserved(ctx, db, r, *res.Reserved)
 			default:

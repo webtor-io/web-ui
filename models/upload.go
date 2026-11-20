@@ -64,6 +64,30 @@ ON CONFLICT (resource_id) DO UPDATE SET name = COALESCE(NULLIF(EXCLUDED.name, ''
 	})
 }
 
+// DropUploadTraces deletes media_info of id — movie, series, episode and resource_metadata go by
+// cascade — and the ai_enrich.query rows that name it. userData true also deletes the
+// watch_history and user_subtitle rows that name it, the way PurgeResourceByID does. One
+// transaction.
+func DropUploadTraces(ctx context.Context, db *pg.DB, id string, userData bool) error {
+	qs := []string{
+		`DELETE FROM media_info WHERE resource_id = ?`,
+		`DELETE FROM ai_enrich.query WHERE resource_id = ?`,
+	}
+	if userData {
+		qs = append(qs,
+			`DELETE FROM watch_history WHERE resource_id = ?`,
+			`DELETE FROM user_subtitle WHERE resource_id = ?`)
+	}
+	return db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+		for _, q := range qs {
+			if _, err := tx.ExecContext(ctx, q, id); err != nil {
+				return errors.Wrapf(err, "failed to execute cleanup query: %s", q)
+			}
+		}
+		return nil
+	})
+}
+
 // DropStaleMediaInfo deletes the upload's media_info row when it is older than the last change of the
 // upload's size or file count (torrent_resource.updated_at, AddUploadToLibrary); movie, series, episode
 // and resource_metadata go with it by cascade. kept reports whether a row is there afterwards.
