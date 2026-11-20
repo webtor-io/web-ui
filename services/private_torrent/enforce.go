@@ -15,11 +15,12 @@ const EnforceFlag = "private-access-enforce"
 var enforce atomic.Bool
 
 // RegisterFlags adds --private-access-enforce (PRIVATE_ACCESS_ENFORCE), off
-// by default. On, it opens Vault pledges on private torrents.
+// by default. On, it opens Vault pledges on private torrents and their
+// pictures (posters and frames, to a viewer rest-api admits).
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f, cli.BoolFlag{
 		Name:   EnforceFlag,
-		Usage:  "private torrents are enforced: Vault pledges on them are open",
+		Usage:  "private torrents are enforced: Vault pledges on them and their pictures are open",
 		EnvVar: "PRIVATE_ACCESS_ENFORCE",
 	})
 }
@@ -29,11 +30,11 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 func Configure(c *cli.Context) {
 	on := c.Bool(EnforceFlag)
 	SetEnforce(on)
-	pledges := "closed"
+	state := "closed"
 	if on {
-		pledges = "open"
+		state = "open"
 	}
-	log.Infof("private torrents: PRIVATE_ACCESS_ENFORCE=%t, private Vault pledges %s", on, pledges)
+	log.Infof("private torrents: PRIVATE_ACCESS_ENFORCE=%t, private Vault pledges and pictures of private torrents %s", on, state)
 }
 
 // Enforce reports whether the switch is on.

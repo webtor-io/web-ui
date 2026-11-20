@@ -2,8 +2,11 @@ package private_torrent
 
 import (
 	"flag"
+	"strings"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/urfave/cli"
 
 	"github.com/webtor-io/web-ui/services/metrics/metricstest"
@@ -40,5 +43,34 @@ func TestEnforceSwitch(t *testing.T) {
 	}
 	if g := metricstest.Gauge(t, "webui_private_enforce"); g != 1 {
 		t.Errorf("webui_private_enforce = %v with --%s, want 1", g, EnforceFlag)
+	}
+}
+
+// The startup line names everything the switch closes: where it is off,
+// private torrents have no pictures, and the log says so.
+func TestConfigureSaysWhatTheSwitchCloses(t *testing.T) {
+	t.Cleanup(func() { SetEnforce(false) })
+	hook := test.NewGlobal()
+	defer hook.Reset()
+	for _, c := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"off", nil, "pictures of private torrents closed"},
+		{"on", []string{"--" + EnforceFlag}, "pictures of private torrents open"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			configure(t, c.args...)
+			var last string
+			for _, e := range hook.AllEntries() {
+				if e.Level == log.InfoLevel {
+					last = e.Message
+				}
+			}
+			if !strings.Contains(last, c.want) {
+				t.Errorf("last info line %q, want %q in it", last, c.want)
+			}
+		})
 	}
 }
