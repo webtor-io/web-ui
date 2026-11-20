@@ -17,6 +17,9 @@ type TorrentResource struct {
 	SizeBytes        int64     `pg:"size_bytes"`
 	CreatedAt        time.Time `pg:"created_at"`
 	TorrentSizeBytes int64     `pg:"torrent_size_bytes"`
+	// UpdatedAt is when an upload last changed its size or file count; nil
+	// for torrents and for an upload whose contents never changed.
+	UpdatedAt *time.Time `pg:"updated_at"`
 
 	LibraryEntries []*Library `pg:"rel:has-many,fk:resource_id"`
 	MediaInfo      *MediaInfo `pg:"rel:has-one,fk:resource_id"`
