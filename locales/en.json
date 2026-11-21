@@ -793,9 +793,9 @@
     "action.noPeers.timeoutBody": "We waited the full warm-up time and the swarm did not deliver enough to begin. It may pick up in a few minutes — or this torrent is simply short on seeders.",
     "action.noPeers.refusedTitle": "This private tracker isn't letting us through",
     "action.noPeers.refusedBody": "This torrent comes from a private tracker, and the tracker refused our request or didn't answer. Without it we can't reach any peers, so trying again won't help for now. If you're a member of that tracker, open the torrent in your own torrent client.",
-    "action.noPeers.own.title": "The tracker didn't accept your key",
+    "action.noPeers.own.title": "The tracker turned down your request",
     "@action.noPeers.own.body": "Shown in the no-peers card when a private tracker refused the signed-in user's own key while Webtor streamed the torrent; action.noPeers.own.title is its heading. The same reasons as error.private_tracker_refused, whose first sentence is that heading. 'Passkey': the personal secret code a private tracker writes into each member's .torrent files and announce links; it tells the tracker which member is downloading. Keep the term your language's tracker users use (often the English word 'passkey').",
-    "action.noPeers.own.body": "The usual reasons: the key isn't recognized (if you changed your passkey, use a fresh link or .torrent file), your account is restricted on the tracker, the torrent isn't on the tracker, or the tracker doesn't let Webtor's client in.",
+    "action.noPeers.own.body": "Many private trackers only let in approved torrent clients, and Webtor isn't one of them. If that's the case, nothing on your side will fix it: open the torrent in your usual torrent client. Otherwise, check on the tracker's site that the torrent is still there and your account has no restrictions, or use a fresh link or .torrent file in case your passkey has changed.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} received from {{.Peers}} peer in {{.Sec}} s",
         "other": "{{.Bytes}} received from {{.Peers}} peers in {{.Sec}} s"
@@ -2123,7 +2123,7 @@
     "error.private_needs_account": "Private torrents need an account. Sign in and upload the .torrent file again.",
     "error.private_no_tracker": "This private .torrent file has no usable tracker address, so it can't be added.",
     "@error.private_tracker_refused": "Shown when a private tracker refused the user's own key while Webtor checked a link or .torrent file with it. One text for every reason the tracker can give; the tracker's own reply is never shown (it may repeat the key). 'Passkey': the personal secret code a private tracker writes into each member's .torrent files and announce links; it tells the tracker which member is downloading. Keep the term your language's tracker users use (often the English word 'passkey').",
-    "error.private_tracker_refused": "The tracker didn't accept your key. The usual reasons: the key isn't recognized (if you changed your passkey, use a fresh link or .torrent file), your account is restricted on the tracker, the torrent isn't on the tracker, or the tracker doesn't let Webtor's client in.",
+    "error.private_tracker_refused": "The tracker turned down your request. Many private trackers only let in approved torrent clients, and Webtor isn't one of them. If that's the case, nothing on your side will fix it: open the torrent in your usual torrent client. Otherwise, check on the tracker's site that the torrent is still there and your account has no restrictions, or use a fresh link or .torrent file in case your passkey has changed.",
     "error.private_verify_unavailable": "We couldn't check the link with the tracker. Try again in a minute.",
     "error.private.unavailable": "This isn't available for private torrents on this server.",
     "private.page.title": "This is a private torrent",
