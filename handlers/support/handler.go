@@ -1,8 +1,11 @@
 package support
 
 import (
+	"encoding/base32"
+	"encoding/hex"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/web"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -36,20 +40,59 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], asc *abu
 
 type Cause int
 
-var hashRegexp = regexp.MustCompile("[0-9a-f]{40}")
+var (
+	// hashTokenRe walks the text as maximal runs of ASCII letters and digits,
+	// so a hash counts only when bounded by something else or the text's edge:
+	// a 64-hex v2 hash or a longer hex run is one token and yields nothing. A
+	// "btih:" prefix is captured with its value for base32 magnets.
+	hashTokenRe     = regexp.MustCompile(`btih:([0-9a-z]+)|[0-9a-z]+`)
+	infohashRe      = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	percentEscapeRe = regexp.MustCompile(`%[0-9a-fA-F]{2}`)
+)
 
-// extractInfohash pulls the infohash out of whatever the reporter pasted — a
-// bare hash, a magnet link, a webtor URL.
+const maxNoticeHashes = 100
+
+// extractInfohashes pulls every v1 infohash out of whatever the reporter
+// pasted: bare hashes, magnet links (hex or base32), webtor URLs, a list in
+// the description. Lower-cased, first-seen order, no repeats, at most
+// maxNoticeHashes.
 //
-// Lower-casing happens BEFORE matching: the pattern is lower-case hex only, so
-// an upper-case hash (which plenty of trackers emit in magnet links) matched
-// nothing and left the field empty. A report naming no torrent cannot be
-// enforced, and abuse-store used to store it anyway and choke on it.
-func extractInfohash(in string) string {
-	if in == "" {
-		return ""
+// The text is percent-decoded first (up to 3 times, for double-encoded
+// links): the old unanchored match took the first 40 hex characters, so
+// "btih%3A<hash>" yielded a hash shifted by the "3a" of the escape.
+func extractInfohashes(in string) []string {
+	for range 3 {
+		d := percentEscapeRe.ReplaceAllStringFunc(in, func(e string) string {
+			b, _ := strconv.ParseUint(e[1:], 16, 8)
+			return string([]byte{byte(b)})
+		})
+		if d == in {
+			break
+		}
+		in = d
 	}
-	return hashRegexp.FindString(strings.ToLower(in))
+	var hashes []string
+	for _, m := range hashTokenRe.FindAllStringSubmatch(strings.ToLower(in), -1) {
+		h := m[0]
+		if v := m[1]; v != "" {
+			h = v
+			// 32 characters is the base32 form. A 40-character value stays
+			// hex even when every digit is also a base32 letter.
+			if len(v) == 32 {
+				if b, err := base32.StdEncoding.DecodeString(strings.ToUpper(v)); err == nil {
+					h = hex.EncodeToString(b)
+				}
+			}
+		}
+		if !infohashRe.MatchString(h) || slices.Contains(hashes, h) {
+			continue
+		}
+		hashes = append(hashes, h)
+		if len(hashes) == maxNoticeHashes {
+			break
+		}
+	}
+	return hashes
 }
 
 var CauseTypes = map[int]string{
@@ -120,20 +163,33 @@ func (s *Handler) sendForm(c *gin.Context, form *Form) error {
 	if err != nil {
 		return err
 	}
-	infohash := extractInfohash(form.Infohash)
+	// One notice bans every hash it names. The infohash field goes first, so
+	// its first hash is the primary, else the description's; the newline keeps
+	// the two fields from running into one token.
+	hashes := extractInfohashes(form.Infohash + "\n" + form.Description)
+	var primary string
+	if len(hashes) > 0 {
+		primary, hashes = hashes[0], hashes[1:]
+	}
 	pr := &proto.PushRequest{
-		NoticeId:    uuid.New().String(),
-		Infohash:    infohash,
-		Filename:    form.Filename,
-		Work:        form.Work,
-		StartedAt:   time.Now().Unix(),
-		Email:       form.Email,
-		Description: form.Description,
-		Subject:     form.Subject,
-		Cause:       proto.PushRequest_Cause(form.Cause),
-		Source:      proto.PushRequest_FORM,
+		NoticeId:        uuid.New().String(),
+		Infohash:        primary,
+		ExtraInfohashes: hashes,
+		Filename:        form.Filename,
+		Work:            form.Work,
+		StartedAt:       time.Now().Unix(),
+		Email:           form.Email,
+		Description:     form.Description,
+		Subject:         form.Subject,
+		Cause:           proto.PushRequest_Cause(form.Cause),
+		Source:          proto.PushRequest_FORM,
 	}
 	_, err = cl.Push(c.Request.Context(), pr)
+	if status.Code(err) == codes.AlreadyExists {
+		// Every hash is blocked already: for the reporter the notice went
+		// through, it is not a failure to show them.
+		return nil
+	}
 	if err != nil {
 		st, ok := status.FromError(err)
 		if !ok {
@@ -156,7 +212,7 @@ func (s *Handler) process(c *gin.Context) {
 		return
 	}
 	if c.Request.Method == "POST" {
-		if needsInfohash(form.Cause) && extractInfohash(form.Infohash) == "" {
+		if needsInfohash(form.Cause) && len(extractInfohashes(form.Infohash)) == 0 {
 			tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(data).WithErr(web.NewUserError("error.support_infohash_required", errors.New("infohash required for this cause"))))
 			return
 		}
