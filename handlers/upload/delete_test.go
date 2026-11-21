@@ -233,9 +233,15 @@ func (e *deleteEnv) seed(t *testing.T, id string, o seedOpts) *upload {
 // status the redirect carries.
 func (u *upload) post(t *testing.T, as uuid.UUID, ids string) string {
 	t.Helper()
+	return u.postFrom(t, as, ids, "/lib/uploads").Query().Get("status")
+}
+
+// postFrom is post sent from the page ret; it returns where the redirect goes.
+func (u *upload) postFrom(t *testing.T, as uuid.UUID, ids, ret string) *url.URL {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/upload/delete", strings.NewReader(url.Values{"resource_ids": {ids}}.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("X-Return-Url", "/lib/uploads")
+	req.Header.Set("X-Return-Url", ret)
 	req.Header.Set("X-Test-User", as.String())
 	w := httptest.NewRecorder()
 	u.r.ServeHTTP(w, req)
@@ -246,7 +252,7 @@ func (u *upload) post(t *testing.T, as uuid.UUID, ids string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return loc.Query().Get("status")
+	return loc
 }
 
 func (u *upload) count(t *testing.T, q string, args ...any) int {
@@ -392,6 +398,32 @@ func TestDeleteUploads(t *testing.T) {
 		}
 		if used := saved.used(t); used != 0 {
 			t.Errorf("used %d, want 0", used)
+		}
+	})
+
+	// The deleted upload's own page answers 404 now: its owner goes to the
+	// list of their uploads instead, in the page's language. Any other page
+	// is where they stay.
+	t.Run("from the upload's page", func(t *testing.T) {
+		other := next()
+		for _, tc := range []struct {
+			name, from, want string
+		}{
+			{"en", "/{id}", "/lib/uploads"},
+			{"ru, a folder", "/ru/{id}?pwd=%2Fn", "/ru/lib/uploads"},
+			{"another upload's page", "/" + other, "/" + other},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				u := e.seed(t, next(), seedOpts{})
+				e.answer(u.id, ok, http.StatusNoContent)
+				loc := u.postFrom(t, u.o, u.id, strings.ReplaceAll(tc.from, "{id}", u.id))
+				if st := loc.Query().Get("status"); st != "success" {
+					t.Errorf("status %q", st)
+				}
+				if loc.Path != tc.want {
+					t.Errorf("redirect to %s, want %s", loc.Path, tc.want)
+				}
+			})
 		}
 	})
 

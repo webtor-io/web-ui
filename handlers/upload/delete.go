@@ -3,6 +3,8 @@ package upload
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
@@ -13,6 +15,7 @@ import (
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -27,7 +30,28 @@ func (h *Handler) delete(c *gin.Context) {
 		web.RedirectWithError(c, err)
 		return
 	}
+	c.Request.Header.Set("X-Return-Url", returnAfterDelete(c.GetHeader("X-Return-Url"), ids))
 	web.RedirectWithSuccessAndMessage(c, "toast.uploadsDeleted")
+}
+
+// returnAfterDelete is where the owner goes once the uploads ids are deleted:
+// ret, the page the form was on, unless it is the page of one of them, which
+// now answers 404 — then the list of their uploads, in the page's language.
+func returnAfterDelete(ret string, ids []string) string {
+	u, err := url.Parse(ret)
+	if err != nil {
+		return ret
+	}
+	for _, id := range ids {
+		prefix, ok := strings.CutSuffix(u.Path, "/"+id)
+		if !ok {
+			continue
+		}
+		if _, lang := i18n.LangNames[strings.TrimPrefix(prefix, "/")]; prefix == "" || lang {
+			return prefix + "/lib/uploads"
+		}
+	}
+	return ret
 }
 
 // deleteUploads deletes every upload it is given, as the viewer u with the
