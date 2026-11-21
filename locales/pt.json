@@ -2033,7 +2033,6 @@
     "action.showSteps": "Mostrar etapas",
     "action.turnstileInteractive": "Marque a caixa para continuar",
     "error.support_infohash_required": "Informe o infohash, o magnet ou o link do torrent — sem isso não sabemos de qual torrent você fala.",
-    "error.support_infohash_too_long": "O campo do torrent está longo demais. Deixe nele um só infohash, magnet ou link e liste os outros na descrição.",
     "error.support_too_many_hashes": "Esta denúncia cita mais de 20 torrents. Divida-a em várias denúncias de no máximo 20 links cada.",
     "error.subscriptionFailed": "Não foi possível criar a assinatura",
     "error.subscriptionLimit": "Limite de assinaturas atingido. Remova uma ou mude de plano.",

@@ -272,7 +272,7 @@ func TestNoticeHashesBoundedWork(t *testing.T) {
 		wantErr string
 	}{
 		{"token-dense description", &Form{Infohash: hashA, Description: dense}, []string{hashA}, ""},
-		{"token-dense infohash field", &Form{Infohash: dense}, nil, "error.support_infohash_too_long"},
+		{"token-dense infohash field", &Form{Infohash: dense}, nil, "error.support_infohash_required"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -323,20 +323,35 @@ func TestSupportHashCap(t *testing.T) {
 	}
 }
 
-// An infohash field over 4 KiB is refused before anything scans it; one at
-// 4 KiB goes through.
-func TestSupportInfohashFieldBound(t *testing.T) {
-	for _, n := range []int{4 << 10, 4<<10 + 1} {
-		t.Run(strconv.Itoa(n), func(t *testing.T) {
-			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1)}
-			r := newSupportRouter(t, as)
-			w := postSupport(r, url.Values{"cause": {"0"}, "infohash": {hashA + strings.Repeat(" ", n-len(hashA))}})
-			want, body := http.StatusOK, "[success]"
-			if n > 4<<10 {
-				want, body = http.StatusBadRequest, "[form][err=error.support_infohash_too_long]"
+// What the scan bounds and the one-line infohash field do to a notice: a
+// magnet longer than the field's scan still gives its hash, hashes pasted on
+// separate lines (joined by the input) are each taken, and a cut through a
+// longer hex run never leaves a hash nobody named.
+func TestNoticeHashesFieldShapes(t *testing.T) {
+	v2 := strings.Repeat("ab", 32) // a 64-hex v2 hash
+	trackers := strings.Repeat("&tr=udp%3A%2F%2Ftracker.example%3A1337%2Fannounce", 100)
+	cases := []struct {
+		name    string
+		form    *Form
+		want    []string
+		wantErr string
+	}{
+		{"magnet longer than the field's scan", &Form{Infohash: "magnet:?xt=urn:btih:" + hashA + trackers}, []string{hashA}, ""},
+		{"two hashes joined by the input", &Form{Infohash: hashA + hashB}, []string{hashA, hashB}, ""},
+		{"three hashes joined by the input", &Form{Infohash: hashA + hashB + hashC}, []string{hashA, hashB, hashC}, ""},
+		{"v2 hash in the field is no hash", &Form{Infohash: v2}, nil, "error.support_infohash_required"},
+		{"description cut through a v2 hash", &Form{Infohash: hashA, Description: strings.Repeat("x", maxScannedDescription-41) + " " + v2}, []string{hashA}, ""},
+		{"field cut through a hex run", &Form{Infohash: hashA + " " + strings.Repeat("x", maxInfohashField-82) + " " + v2}, []string{hashA}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := noticeHashes(tc.form)
+			var key string
+			if err != nil {
+				key = web.ClassifyError(err)
 			}
-			if w.Code != want || w.Body.String() != body {
-				t.Fatalf("got %d %q, want %d %q", w.Code, w.Body.String(), want, body)
+			if !slices.Equal(got, tc.want) || key != tc.wantErr {
+				t.Errorf("got %q, error %q; want %q, error %q", got, key, tc.want, tc.wantErr)
 			}
 		})
 	}

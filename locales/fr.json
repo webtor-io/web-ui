@@ -2033,7 +2033,6 @@
     "action.showSteps": "Afficher les étapes",
     "action.turnstileInteractive": "Cochez la case pour continuer",
     "error.support_infohash_required": "Indiquez l’infohash, le magnet ou le lien du torrent — sans cela nous ne savons pas de quel torrent il s’agit.",
-    "error.support_infohash_too_long": "Le champ du torrent est trop long. Laissez-y un seul infohash, magnet ou lien et indiquez les autres dans la description.",
     "error.support_too_many_hashes": "Ce signalement cite plus de 20 torrents. Divisez-le en plusieurs signalements de 20 liens au maximum.",
     "error.subscriptionFailed": "Impossible de créer l'abonnement",
     "error.subscriptionLimit": "Limite d'abonnements atteinte. Supprimez-en un ou changez d'offre.",

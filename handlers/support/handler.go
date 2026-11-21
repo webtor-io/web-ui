@@ -51,9 +51,10 @@ const (
 	// notice takes down. A notice naming more is refused whole, and the
 	// reporter is asked to split it.
 	maxNoticeHashes = 20
-	// The form is anonymous and scanned before Turnstile: an infohash field
-	// longer than maxInfohashField is refused unread, and only the first
-	// maxScannedDescription bytes of the description are searched for hashes.
+	// The form is anonymous and scanned before Turnstile: only the first
+	// maxInfohashField bytes of the infohash field (a magnet's btih comes
+	// before its trackers) and maxScannedDescription bytes of the description
+	// are searched for hashes.
 	maxInfohashField      = 4 << 10
 	maxScannedDescription = 64 << 10
 )
@@ -114,18 +115,67 @@ func extractInfohashes(in string) []string {
 	return hashes
 }
 
+// isTokenByte: the bytes extractInfohashes reads as one token.
+func isTokenByte(b byte) bool {
+	return '0' <= b && b <= '9' || 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z'
+}
+
+// scanPrefix is the first n bytes of s, cut back to before the token the cut
+// falls in: a cut through a longer hex run must not leave its first 40
+// characters to read as a hash nobody named.
+func scanPrefix(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	i := n
+	for i > 0 && isTokenByte(s[i-1]) && isTokenByte(s[i]) {
+		i--
+	}
+	return s[:i]
+}
+
+// splitGlued puts a space between hashes pasted into the one-line infohash
+// field: an <input type=text> drops the newlines between them, which leaves
+// one hex run of 80, 120… characters that extractInfohashes reads as no hash
+// at all. A 64-hex v2 hash is not a multiple of 40 and stays whole.
+func splitGlued(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		j := i
+		for j < len(s) && isTokenByte(s[j]) {
+			j++
+		}
+		if j == i {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		run := s[i:j]
+		if len(run) > 40 && len(run)%40 == 0 && strings.Trim(run, "0123456789abcdefABCDEF") == "" {
+			for k := 0; k < len(run); k += 40 {
+				if k > 0 {
+					b.WriteByte(' ')
+				}
+				b.WriteString(run[k : k+40])
+			}
+		} else {
+			b.WriteString(run)
+		}
+		i = j
+	}
+	return b.String()
+}
+
 // noticeHashes checks the hashes a POSTed form names and returns them, the
 // infohash field's first. Every refusal is a user error for the form.
 func noticeHashes(form *Form) ([]string, error) {
-	if len(form.Infohash) > maxInfohashField {
-		return nil, web.NewUserError("error.support_infohash_too_long", errors.New("infohash field too long"))
-	}
-	if needsInfohash(form.Cause) && len(extractInfohashes(form.Infohash)) == 0 {
+	field := splitGlued(scanPrefix(form.Infohash, maxInfohashField))
+	if needsInfohash(form.Cause) && len(extractInfohashes(field)) == 0 {
 		return nil, web.NewUserError("error.support_infohash_required", errors.New("infohash required for this cause"))
 	}
 	// The newline keeps the two fields from running into one token.
-	desc := form.Description[:min(len(form.Description), maxScannedDescription)]
-	hashes := extractInfohashes(form.Infohash + "\n" + desc)
+	desc := scanPrefix(form.Description, maxScannedDescription)
+	hashes := extractInfohashes(field + "\n" + desc)
 	if len(hashes) > maxNoticeHashes {
 		return nil, web.NewUserError("error.support_too_many_hashes", errors.Errorf("notice names more than %d hashes", maxNoticeHashes))
 	}
