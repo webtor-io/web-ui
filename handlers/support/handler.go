@@ -41,21 +41,28 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], asc *abu
 type Cause int
 
 var (
-	// hashTokenRe walks the text as maximal runs of ASCII letters and digits,
-	// so a hash counts only when bounded by something else or the text's edge:
-	// a 64-hex v2 hash or a longer hex run is one token and yields nothing. A
-	// "btih:" prefix is captured with its value for base32 magnets.
-	hashTokenRe     = regexp.MustCompile(`btih:([0-9a-z]+)|[0-9a-z]+`)
 	infohashRe      = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	percentEscapeRe = regexp.MustCompile(`%[0-9a-fA-F]{2}`)
 )
 
-const maxNoticeHashes = 100
+const (
+	// maxNoticeHashes: a form notice bans every hash it names without any
+	// check of the reporter, so the cap bounds how many torrents one false
+	// notice takes down. A notice naming more is refused whole, and the
+	// reporter is asked to split it.
+	maxNoticeHashes = 20
+	// The form is anonymous and scanned before Turnstile: an infohash field
+	// longer than maxInfohashField is refused unread, and only the first
+	// maxScannedDescription bytes of the description are searched for hashes.
+	maxInfohashField      = 4 << 10
+	maxScannedDescription = 64 << 10
+)
 
 // extractInfohashes pulls every v1 infohash out of whatever the reporter
 // pasted: bare hashes, magnet links (hex or base32), webtor URLs, a list in
-// the description. Lower-cased, first-seen order, no repeats, at most
-// maxNoticeHashes.
+// the description. Lower-cased, first-seen order, no repeats, and at most
+// maxNoticeHashes+1: it stops scanning at the first hash past the cap, which
+// is all the caller needs to refuse the notice.
 //
 // The text is percent-decoded first (up to 3 times, for double-encoded
 // links): the old unanchored match took the first 40 hex characters, so
@@ -71,28 +78,58 @@ func extractInfohashes(in string) []string {
 		}
 		in = d
 	}
+	// The text is walked as maximal runs of ASCII letters and digits, so a
+	// hash counts only when bounded by something else or the text's edge: a
+	// 64-hex v2 hash or a longer hex run is one token and yields nothing. A
+	// byte loop, not a regexp: a token costs no allocation.
+	s := strings.ToLower(in)
 	var hashes []string
-	for _, m := range hashTokenRe.FindAllStringSubmatch(strings.ToLower(in), -1) {
-		h := m[0]
-		if v := m[1]; v != "" {
-			h = v
-			// 32 characters is the base32 form. A 40-character value stays
-			// hex even when every digit is also a base32 letter.
-			if len(v) == 32 {
-				if b, err := base32.StdEncoding.DecodeString(strings.ToUpper(v)); err == nil {
-					h = hex.EncodeToString(b)
-				}
+	btihValue := -1 // where the value after the last "btih:" starts
+	for i := 0; i < len(s) && len(hashes) <= maxNoticeHashes; {
+		j := i
+		for j < len(s) && ('0' <= s[j] && s[j] <= '9' || 'a' <= s[j] && s[j] <= 'z') {
+			j++
+		}
+		if j == i {
+			i++
+			continue
+		}
+		h := s[i:j]
+		if h == "btih" && strings.HasPrefix(s[j:], ":") {
+			btihValue = j + 1
+		}
+		// 32 characters right after "btih:" is a base32 magnet. A 40-character
+		// value stays hex even when every digit is also a base32 letter.
+		if i == btihValue && len(h) == 32 {
+			if b, err := base32.StdEncoding.DecodeString(strings.ToUpper(h)); err == nil {
+				h = hex.EncodeToString(b)
 			}
 		}
+		i = j
 		if !infohashRe.MatchString(h) || slices.Contains(hashes, h) {
 			continue
 		}
 		hashes = append(hashes, h)
-		if len(hashes) == maxNoticeHashes {
-			break
-		}
 	}
 	return hashes
+}
+
+// noticeHashes checks the hashes a POSTed form names and returns them, the
+// infohash field's first. Every refusal is a user error for the form.
+func noticeHashes(form *Form) ([]string, error) {
+	if len(form.Infohash) > maxInfohashField {
+		return nil, web.NewUserError("error.support_infohash_too_long", errors.New("infohash field too long"))
+	}
+	if needsInfohash(form.Cause) && len(extractInfohashes(form.Infohash)) == 0 {
+		return nil, web.NewUserError("error.support_infohash_required", errors.New("infohash required for this cause"))
+	}
+	// The newline keeps the two fields from running into one token.
+	desc := form.Description[:min(len(form.Description), maxScannedDescription)]
+	hashes := extractInfohashes(form.Infohash + "\n" + desc)
+	if len(hashes) > maxNoticeHashes {
+		return nil, web.NewUserError("error.support_too_many_hashes", errors.Errorf("notice names more than %d hashes", maxNoticeHashes))
+	}
+	return hashes, nil
 }
 
 var CauseTypes = map[int]string{
@@ -158,15 +195,14 @@ func (s *Handler) bindForm(c *gin.Context) (*Form, error) {
 	return &form, nil
 }
 
-func (s *Handler) sendForm(c *gin.Context, form *Form) error {
+// sendForm pushes one notice that bans every hash it names: the first is the
+// primary, the rest go as ExtraInfohashes, which is empty (nil once decoded)
+// when there are none.
+func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) error {
 	cl, err := s.asc.Get()
 	if err != nil {
 		return err
 	}
-	// One notice bans every hash it names. The infohash field goes first, so
-	// its first hash is the primary, else the description's; the newline keeps
-	// the two fields from running into one token.
-	hashes := extractInfohashes(form.Infohash + "\n" + form.Description)
 	var primary string
 	if len(hashes) > 0 {
 		primary, hashes = hashes[0], hashes[1:]
@@ -212,8 +248,9 @@ func (s *Handler) process(c *gin.Context) {
 		return
 	}
 	if c.Request.Method == "POST" {
-		if needsInfohash(form.Cause) && len(extractInfohashes(form.Infohash)) == 0 {
-			tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(data).WithErr(web.NewUserError("error.support_infohash_required", errors.New("infohash required for this cause"))))
+		hashes, err := noticeHashes(form)
+		if err != nil {
+			tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(data).WithErr(err))
 			return
 		}
 		if s.ts != nil {
@@ -223,7 +260,7 @@ func (s *Handler) process(c *gin.Context) {
 				return
 			}
 		}
-		err = s.sendForm(c, form)
+		err = s.sendForm(c, form, hashes)
 		if err != nil {
 			tpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(data).WithErr(errors.Wrap(err, "failed to send form")))
 			return

@@ -2063,6 +2063,8 @@
     "action.showSteps": "Показать шаги",
     "action.turnstileInteractive": "Поставьте галочку, чтобы продолжить",
     "error.support_infohash_required": "Укажите infohash, magnet или ссылку на раздачу — без этого мы не поймём, о каком торренте речь.",
+    "error.support_infohash_too_long": "Поле торрента слишком длинное. Оставьте в нём один infohash, magnet или ссылку, а остальные перечислите в описании.",
+    "error.support_too_many_hashes": "В обращении больше 20 торрентов. Разделите его на несколько обращений, не больше 20 ссылок в каждом.",
     "error.subscriptionFailed": "Не удалось оформить подписку",
     "error.subscriptionLimit": "Достигнут лимит подписок. Удалите одну или перейдите на платный тариф.",
     "error.subscriptionNotEligible": "Здесь нечего ждать — сезон уже вышел целиком.",

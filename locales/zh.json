@@ -2012,6 +2012,8 @@
     "action.showSteps": "显示步骤",
     "action.turnstileInteractive": "勾选复选框以继续",
     "error.support_infohash_required": "请提供种子哈希值、磁力链接或资源地址，以便确定你报告的种子。",
+    "error.support_infohash_too_long": "种子字段过长。请在此处只保留一个种子哈希值、磁力链接或资源地址，其余的写在说明中。",
+    "error.support_too_many_hashes": "此报告涉及超过 20 个种子。请拆分成多份报告，每份最多 20 个链接。",
     "error.subscriptionFailed": "无法创建订阅",
     "error.subscriptionLimit": "已达到订阅上限，请删除一个或升级套餐。",
     "error.subscriptionNotEligible": "本季已播出完毕，没有新剧集需要等待。",

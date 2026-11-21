@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -62,8 +63,14 @@ func TestExtractInfohashes(t *testing.T) {
 		{"encoded magnet", "magnet%3A%3Fxt%3Durn%3Abtih%3A" + hashA + "%26dn%3Dx", []string{hashA}},
 		{"double-encoded magnet", "magnet%253A%253Fxt%253Durn%253Abtih%253A" + hashA, []string{hashA}},
 		{"triple-encoded magnet", "btih%25253A" + hashA, []string{hashA}},
+		// Only % and two hex digits is an escape: anything else stays text.
+		{"literal percent sign", "100% " + hashA, []string{hashA}},
+		{"malformed escape", "%zz " + hashA, []string{hashA}},
+		{"malformed escape glued to a hash", "%zz" + hashA, nil},
 		{"base32 magnet", "magnet:?xt=urn:btih:" + hashABase32 + "&dn=x", []string{hashA}},
 		{"lower-case base32 magnet", "magnet:?xt=urn:btih:" + strings.ToLower(hashABase32), []string{hashA}},
+		{"base32 without btih:", hashABase32, nil},
+		{"base32 not right after btih:", "btih: " + hashABase32, nil},
 		{"hex magnet made of base32 letters", "magnet:?xt=urn:btih:" + hashBase32Letters, []string{hashBase32Letters}},
 		{"v2 hash", v2, nil},
 		{"v2 magnet", "magnet:?xt=urn:btmh:1220" + v2, nil},
@@ -72,7 +79,8 @@ func TestExtractInfohashes(t *testing.T) {
 		{"two hashes one space apart", hashA + " " + hashB, []string{hashA, hashB}},
 		{"first-seen order", hashC + "\n" + hashA + "\n" + hashB, []string{hashC, hashA, hashB}},
 		{"duplicates", hashA + "\n" + strings.ToUpper(hashA) + " magnet:?xt=urn:btih:" + hashABase32, []string{hashA}},
-		{"cap", strings.Join(many, " "), many[:maxNoticeHashes]},
+		// One past the cap, so the caller can refuse the notice.
+		{"cap", strings.Join(many, " "), many[:maxNoticeHashes+1]},
 		{"no hash at all", "please remove my movie", nil},
 		{"empty", "", nil},
 	}
@@ -248,5 +256,88 @@ func TestSupportNeedsHashInInfohashField(t *testing.T) {
 	}
 	if len(as.got) != 0 {
 		t.Fatal("pushed a notice the form rejected")
+	}
+}
+
+// The form is anonymous and scanned before Turnstile, so what one POST costs
+// must not grow with its size, nor with the tokens it holds: matching every
+// token of a 40 MiB token-dense description took the heap from 76 MB to
+// 1785 MB.
+func TestNoticeHashesBoundedWork(t *testing.T) {
+	dense := strings.Repeat("a ", 8<<20) // 16 MiB, a token every 2 bytes
+	cases := []struct {
+		name    string
+		form    *Form
+		want    []string
+		wantErr string
+	}{
+		{"token-dense description", &Form{Infohash: hashA, Description: dense}, []string{hashA}, ""},
+		{"token-dense infohash field", &Form{Infohash: dense}, nil, "error.support_infohash_too_long"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var before, after runtime.MemStats
+			runtime.ReadMemStats(&before)
+			got, err := noticeHashes(tc.form)
+			runtime.ReadMemStats(&after)
+			if n := after.TotalAlloc - before.TotalAlloc; n > 1<<20 {
+				t.Errorf("allocated %d bytes for %d bytes of input", n, len(tc.form.Infohash)+len(tc.form.Description))
+			}
+			var key string
+			if err != nil {
+				key = web.ClassifyError(err)
+			}
+			if !slices.Equal(got, tc.want) || key != tc.wantErr {
+				t.Errorf("got %q, error %q; want %q, error %q", got, key, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
+// The form says 20 in every language: a notice naming 20 distinct hashes goes
+// through, one naming 21 pushes nothing and asks the reporter to split it.
+func TestSupportHashCap(t *testing.T) {
+	var hs []string
+	for i := 1; i <= 21; i++ {
+		hs = append(hs, fmt.Sprintf("%040x", i))
+	}
+	for _, n := range []int{20, 21} {
+		t.Run(strconv.Itoa(n), func(t *testing.T) {
+			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1)}
+			r := newSupportRouter(t, as)
+			// The field's hash repeated in the description is not another one.
+			w := postSupport(r, url.Values{"cause": {"0"}, "infohash": {hs[0]}, "description": {strings.Join(hs[:n], "\n")}})
+			if n == 21 {
+				if w.Code != http.StatusBadRequest || w.Body.String() != "[form][err=error.support_too_many_hashes]" || len(as.got) != 0 {
+					t.Fatalf("got %d %q, %d pushed; want 400, the split error, nothing pushed", w.Code, w.Body.String(), len(as.got))
+				}
+				return
+			}
+			if w.Code != http.StatusOK || w.Body.String() != "[success]" {
+				t.Fatalf("got %d %q, want 200 [success]", w.Code, w.Body.String())
+			}
+			if pr := <-as.got; pr.GetInfohash() != hs[0] || !slices.Equal(pr.GetExtraInfohashes(), hs[1:n]) {
+				t.Errorf("pushed %q + %q", pr.GetInfohash(), pr.GetExtraInfohashes())
+			}
+		})
+	}
+}
+
+// An infohash field over 4 KiB is refused before anything scans it; one at
+// 4 KiB goes through.
+func TestSupportInfohashFieldBound(t *testing.T) {
+	for _, n := range []int{4 << 10, 4<<10 + 1} {
+		t.Run(strconv.Itoa(n), func(t *testing.T) {
+			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1)}
+			r := newSupportRouter(t, as)
+			w := postSupport(r, url.Values{"cause": {"0"}, "infohash": {hashA + strings.Repeat(" ", n-len(hashA))}})
+			want, body := http.StatusOK, "[success]"
+			if n > 4<<10 {
+				want, body = http.StatusBadRequest, "[form][err=error.support_infohash_too_long]"
+			}
+			if w.Code != want || w.Body.String() != body {
+				t.Fatalf("got %d %q, want %d %q", w.Code, w.Body.String(), want, body)
+			}
+		})
 	}
 }

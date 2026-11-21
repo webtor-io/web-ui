@@ -2063,6 +2063,8 @@
     "action.showSteps": "Pokaż kroki",
     "action.turnstileInteractive": "Zaznacz pole, aby kontynuować",
     "error.support_infohash_required": "Podaj infohash, magnet lub link do torrenta — bez tego nie wiemy, o który torrent chodzi.",
+    "error.support_infohash_too_long": "Pole torrenta jest za długie. Zostaw w nim jeden infohash, magnet lub link, a pozostałe wypisz w opisie.",
+    "error.support_too_many_hashes": "To zgłoszenie wymienia więcej niż 20 torrentów. Podziel je na kilka zgłoszeń, po maksymalnie 20 linków w każdym.",
     "error.subscriptionFailed": "Nie udało się utworzyć subskrypcji",
     "error.subscriptionLimit": "Osiągnięto limit subskrypcji. Usuń jedną lub zmień plan.",
     "error.subscriptionNotEligible": "Nie ma tu na co czekać — ten sezon został już w całości wyemitowany.",
