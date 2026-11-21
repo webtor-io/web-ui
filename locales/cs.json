@@ -2063,6 +2063,7 @@
     "action.showSteps": "Zobrazit kroky",
     "action.turnstileInteractive": "Zaškrtněte políčko a pokračujte",
     "error.support_infohash_required": "Uveďte infohash, magnet nebo odkaz na torrent — bez toho nepoznáme, o který torrent jde.",
+    "error.support_too_many_hashes": "Toto hlášení uvádí víc než 20 torrentů. Rozdělte ho prosím na několik hlášení, v každém nejvýše 20 odkazů.",
     "error.subscriptionFailed": "Odběr se nepodařilo vytvořit",
     "error.subscriptionLimit": "Dosáhl jsi limitu odběrů. Jeden smaž nebo změň tarif.",
     "error.subscriptionNotEligible": "Není tu na co čekat — tato sezóna už byla celá odvysílána.",

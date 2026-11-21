@@ -2029,6 +2029,7 @@
     "action.showSteps": "Stappen tonen",
     "action.turnstileInteractive": "Vink het vakje aan om door te gaan",
     "error.support_infohash_required": "Voeg de infohash, magnet of link van de torrent toe — anders weten we niet welke torrent je bedoelt.",
+    "error.support_too_many_hashes": "Deze melding noemt meer dan 20 torrents. Splits hem op in meerdere meldingen van maximaal 20 links.",
     "error.subscriptionFailed": "Het abonnement kon niet worden aangemaakt",
     "error.subscriptionLimit": "Abonnementslimiet bereikt. Verwijder er een of stap over op een ander plan.",
     "error.subscriptionNotEligible": "Hier valt niets te verwachten — dit seizoen is volledig uitgezonden.",

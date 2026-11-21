@@ -2029,6 +2029,7 @@
     "action.showSteps": "Adımları göster",
     "action.turnstileInteractive": "Devam etmek için kutuyu işaretleyin",
     "error.support_infohash_required": "Torrentin infohash'ini, magnet'ini veya bağlantısını ekleyin — yoksa hangi torrenti kastettiğinizi bilemeyiz.",
+    "error.support_too_many_hashes": "Bu bildirim 20'den fazla torrent içeriyor. Lütfen her birinde en fazla 20 bağlantı olacak şekilde birkaç bildirime bölün.",
     "error.subscriptionFailed": "Abonelik oluşturulamadı",
     "error.subscriptionLimit": "Abonelik sınırına ulaştın. Birini sil ya da planını yükselt.",
     "error.subscriptionNotEligible": "Burada beklenecek bir şey yok — bu sezonun yayını tamamlandı.",

@@ -2029,6 +2029,7 @@
     "action.showSteps": "Schritte anzeigen",
     "action.turnstileInteractive": "Setzen Sie das Häkchen, um fortzufahren",
     "error.support_infohash_required": "Bitte gib Infohash, Magnet oder Link des Torrents an – sonst wissen wir nicht, welchen du meinst.",
+    "error.support_too_many_hashes": "Diese Meldung nennt mehr als 20 Torrents. Bitte teile sie in mehrere Meldungen mit höchstens 20 Links auf.",
     "error.subscriptionFailed": "Abo konnte nicht angelegt werden",
     "error.subscriptionLimit": "Abo-Limit erreicht. Lösche eines oder wechsle den Tarif.",
     "error.subscriptionNotEligible": "Hier gibt es nichts zu erwarten – diese Staffel ist bereits vollständig ausgestrahlt.",
