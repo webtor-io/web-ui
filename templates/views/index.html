@@ -171,7 +171,7 @@
                 {{ else }}
                 <p class="text-[0.95rem] text-w-sub"><span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}</p>
                 {{ end }}
-                <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3">{{ with and uploadsEnabled (uploadCap $.Claims) }}{{ if $.Claims | isPaid }}{{ tp $.Lang "home.sizeLimitUploads" "Cap" . }}{{ else }}{{ t $.Lang "home.sizeLimitUploadsUpsell" }}{{ end }}{{ else }}{{ t $.Lang "home.noSizeLimit" }}{{ end }}</span>
+                <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">{{ with and uploadsEnabled (uploadCap $.Claims) }}{{ if $.Claims | isPaid }}{{ tp $.Lang "home.sizeLimitUploads" "Cap" . }}{{ else }}{{ t $.Lang "home.sizeLimitUploadsUpsell" }}{{ end }}{{ else }}{{ t $.Lang "home.noSizeLimit" }}{{ end }}</span>
             </label>
             <input class="dropzone-input hidden" name="resource" type="file"{{ if uploadsEnabled }} multiple{{ end }} />
             <input name="instruction" value="{{ .Instruction }}" type="hidden" />

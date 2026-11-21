@@ -170,7 +170,9 @@ func TestIndexErrorQuotesItsNumbers(t *testing.T) {
 // have the account's upload cap. It names the cap only where uploads are on
 // and there is a cap to name; a viewer without a paid plan reads the upsell.
 func TestIndexBadgeSaysTheUploadCap(t *testing.T) {
-	const open = `<span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3">`
+	// It wraps on a phone: the upload texts run to 90 characters, and a badge
+	// is one line high.
+	const open = `<span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">`
 	for _, tc := range []struct {
 		name    string
 		enabled bool
