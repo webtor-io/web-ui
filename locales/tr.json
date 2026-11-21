@@ -674,8 +674,8 @@
     "action.noPeers.timeoutBody": "Tüm ısınma süresini bekledik ve sürü başlamaya yetecek kadar veri vermedi. Birkaç dakikada hızlanabilir — ya da bu torrentin seeder'ı az.",
     "action.noPeers.refusedTitle": "Bu özel tracker bizi içeri almıyor",
     "action.noPeers.refusedBody": "Bu torrent özel bir tracker'dan geliyor ve tracker isteğimizi reddetti ya da yanıt vermedi. O olmadan hiçbir eşe ulaşamıyoruz, bu yüzden yeniden denemek şimdilik işe yaramaz. O tracker'a üyeyseniz torrenti kendi torrent istemcinizde açın.",
-    "action.noPeers.own.title": "Tracker anahtarınızı kabul etmedi",
-    "action.noPeers.own.body": "Olağan nedenler: anahtar tanınmıyor (passkey'inizi değiştirdiyseniz yeni bir bağlantı ya da .torrent dosyası kullanın), hesabınız tracker'da kısıtlanmış, torrent tracker'da yok ya da tracker Webtor'un istemcisini kabul etmiyor.",
+    "action.noPeers.own.title": "Tracker isteğinizi reddetti",
+    "action.noPeers.own.body": "Pek çok özel tracker yalnızca onaylı torrent istemcilerini kabul eder ve Webtor bunlardan biri değil. Sorun buysa sizin tarafınızda düzeltilecek bir şey yok: torrent'i her zamanki torrent istemcinizde açın. Değilse tracker'ın sitesinde torrent'in hâlâ orada olduğunu ve hesabınızda kısıtlama olmadığını kontrol edin ya da passkey'iniz değişmiş olabileceği için yeni bir bağlantı veya .torrent dosyası kullanın.",
     "action.noPeers.stats": {
         "one": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı",
         "other": "{{.Peers}} eşten {{.Sec}} s içinde {{.Bytes}} alındı"
@@ -1993,7 +1993,7 @@
     "error.vault_private_no_record": "Bu özel torrenti Vault'a kaydetmek için önce kendi .torrent dosyanızı tracker'ınızdan yükleyin.",
     "error.private_needs_account": "Özel torrentler için bir hesap gerekir. Giriş yapın ve .torrent dosyasını yeniden yükleyin.",
     "error.private_no_tracker": "Bu özel .torrent dosyasında kullanılabilir bir tracker adresi yok, bu yüzden eklenemiyor.",
-    "error.private_tracker_refused": "Tracker anahtarınızı kabul etmedi. Olağan nedenler: anahtar tanınmıyor (passkey'inizi değiştirdiyseniz yeni bir bağlantı ya da .torrent dosyası kullanın), hesabınız tracker'da kısıtlanmış, torrent tracker'da yok ya da tracker Webtor'un istemcisini kabul etmiyor.",
+    "error.private_tracker_refused": "Tracker isteğinizi reddetti. Pek çok özel tracker yalnızca onaylı torrent istemcilerini kabul eder ve Webtor bunlardan biri değil. Sorun buysa sizin tarafınızda düzeltilecek bir şey yok: torrent'i her zamanki torrent istemcinizde açın. Değilse tracker'ın sitesinde torrent'in hâlâ orada olduğunu ve hesabınızda kısıtlama olmadığını kontrol edin ya da passkey'iniz değişmiş olabileceği için yeni bir bağlantı veya .torrent dosyası kullanın.",
     "error.private_verify_unavailable": "Bağlantıyı tracker'da doğrulayamadık. Bir dakika sonra tekrar deneyin.",
     "error.private.unavailable": "Bu sunucuda özel torrentler için bu kullanılamıyor.",
     "private.page.title": "Bu özel bir torrent",

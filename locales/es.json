@@ -674,8 +674,8 @@
     "action.noPeers.timeoutBody": "Esperamos todo el tiempo de calentamiento y el enjambre no entregó lo suficiente para empezar. Puede acelerarse en unos minutos, o este torrent simplemente tiene pocos seeders.",
     "action.noPeers.refusedTitle": "Este tracker privado no nos deja pasar",
     "action.noPeers.refusedBody": "Este torrent viene de un tracker privado, y el tracker rechazó nuestra solicitud o no respondió. Sin él no podemos llegar a ningún par, así que volver a intentarlo no servirá por ahora. Si eres miembro de ese tracker, abre el torrent en tu propio cliente de torrent.",
-    "action.noPeers.own.title": "El tracker no aceptó tu clave",
-    "action.noPeers.own.body": "Los motivos habituales: no reconoce la clave (si cambiaste tu passkey, usa un enlace o archivo .torrent nuevo), tu cuenta tiene restricciones en el tracker, el torrent no está en el tracker o el tracker no deja entrar al cliente de Webtor.",
+    "action.noPeers.own.title": "El tracker rechazó tu solicitud",
+    "action.noPeers.own.body": "Muchos trackers privados solo admiten clientes de torrent aprobados, y Webtor no es uno de ellos. Si es el caso, no hay nada que arreglar por tu parte: abre el torrent en tu cliente de torrent habitual. Si no, comprueba en la web del tracker que el torrent sigue ahí y que tu cuenta no tiene restricciones, o usa un enlace o archivo .torrent nuevo por si cambió tu passkey.",
     "action.noPeers.stats": {
         "one": "{{.Bytes}} recibidos de {{.Peers}} par en {{.Sec}} s",
         "other": "{{.Bytes}} recibidos de {{.Peers}} pares en {{.Sec}} s"
@@ -1993,7 +1993,7 @@
     "error.vault_private_no_record": "Para guardar este torrent privado en Vault, primero sube tu propio archivo .torrent de tu tracker.",
     "error.private_needs_account": "Los torrents privados necesitan una cuenta. Inicia sesión y vuelve a subir el archivo .torrent.",
     "error.private_no_tracker": "Este archivo .torrent privado no tiene ninguna dirección de tracker utilizable, así que no se puede añadir.",
-    "error.private_tracker_refused": "El tracker no aceptó tu clave. Los motivos habituales: no reconoce la clave (si cambiaste tu passkey, usa un enlace o archivo .torrent nuevo), tu cuenta tiene restricciones en el tracker, el torrent no está en el tracker o el tracker no deja entrar al cliente de Webtor.",
+    "error.private_tracker_refused": "El tracker rechazó tu solicitud. Muchos trackers privados solo admiten clientes de torrent aprobados, y Webtor no es uno de ellos. Si es el caso, no hay nada que arreglar por tu parte: abre el torrent en tu cliente de torrent habitual. Si no, comprueba en la web del tracker que el torrent sigue ahí y que tu cuenta no tiene restricciones, o usa un enlace o archivo .torrent nuevo por si cambió tu passkey.",
     "error.private_verify_unavailable": "No pudimos comprobar el enlace con el tracker. Inténtalo de nuevo en un minuto.",
     "error.private.unavailable": "Esto no está disponible para torrents privados en este servidor.",
     "private.page.title": "Este es un torrent privado",
