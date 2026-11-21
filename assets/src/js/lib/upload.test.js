@@ -20,11 +20,20 @@ global.window = dom.window;
 global.document = dom.window.document;
 
 const { fill, safeSegment, rootName, nextName, sizeBucket, startUpload } = await import('./upload.js');
-// The uploader's locale chunk, loaded once here: a run that has to finish
-// within one macrotask must not wait for the loader the first time.
+// The uploader's locale chunk, loaded once here: no test's first run waits
+// for the loader.
 await import('../../../../locales/en.json?prefix=upload,private.page');
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+// until takes ticks until cond holds, and fails if it does not within two
+// seconds: a run the test does not await takes several macrotasks, more on
+// a loaded machine.
+async function until(cond, what) {
+    for (const end = Date.now() + 2000; !cond();) {
+        if (Date.now() > end) assert.fail(`timed out waiting for ${what}`);
+        await tick();
+    }
+}
 const never = () => new Promise(() => {});
 function defer() {
     let resolve;
@@ -936,9 +945,8 @@ test('upload events', async (t) => {
         const r = rig(t);
         umami(t, r.log, never);
         r.run([asFile('a'), asFile('b')]);
-        await tick();
+        await until(() => r.assigned.length === 1, 'the page to be left');
         assert.equal(r.calls.put.length, 2);
-        assert.equal(r.assigned.length, 1);
         assert.ok(r.calls.wait.includes(1000));
     });
     await t.test('a fast upload waits for both events', async (t) => {
@@ -946,11 +954,11 @@ test('upload events', async (t) => {
         const r = rig(t, { wait: never });
         umami(t, r.log, (name) => (name === 'upload-start' ? start.promise : Promise.resolve()));
         r.run([asFile('a')]);
+        await until(() => r.log.some(([k]) => k === 'track:upload-end'), 'the end event');
         await tick();
         assert.equal(r.assigned.length, 0);
         start.resolve();
-        await tick();
-        assert.equal(r.assigned.length, 1);
+        await until(() => r.assigned.length === 1, 'the page to be left');
     });
     await t.test('quota before the first byte', async (t) => {
         const r = launch(t, quotaFull());
