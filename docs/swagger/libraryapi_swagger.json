@@ -105,7 +105,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "The torrents saved to the account, newest first by default.\n\n`type` filters the same way the library tabs do: `movies` and `series` mean a torrent with at least\none recognized film or show, which is decided by enrichment — a torrent added a moment ago may not\nbe classified yet and shows up only under `all`.",
+                "description": "The torrents and uploads saved to the account, newest first by default.\n\n`type` filters the same way the library tabs do: `movies` and `series` mean a torrent or upload with\nat least one recognized film or show, which is decided by enrichment — one added a moment ago may\nnot be classified yet and shows up only under `all`. There is no type for uploads: `all` lists them.",
                 "produces": [
                     "application/json"
                 ],

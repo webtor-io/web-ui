@@ -95,7 +95,8 @@ creative.
 private resource is served only to a viewer rest-api opens the resource to:
 `poster_resolver.Service.Get` asks rest-api the same question the resource
 page asks, with the viewer's own claims (`admit`, through the minute cache of
-`GetResourceCached`). Everyone else — anonymous, another account, an app
+`GetResourceCached`, which an upload's ID never goes through: its answer is
+asked every time). Everyone else — anonymous, another account, an app
 without a session — gets 404. A failure to ask is a 500, never the picture.
 
 - **Headers.** Every answer of the route that depends on the viewer — the
@@ -107,8 +108,13 @@ without a session — gets 404. A failure to ask is a 500, never the picture.
 - **Share card.** `og.jpg` of a private resource is the brand banner for every
   caller: crawlers fetch it without a session.
 - **The switch.** Where private access is not enforced
-  (`PRIVATE_ACCESS_ENFORCE` off) a private resource has no picture at all, and
-  no frame of it is made.
+  (`PRIVATE_ACCESS_ENFORCE` off) a private torrent has no picture at all, and
+  no frame of it is made. An upload is not: rest-api checks an upload's viewer
+  against its owner either way (`uploads.ViewerChecked`), so its picture goes
+  to its owner in both modes.
+- **An upload is private by its ID** (`uploads.Owned`, `docs/uploads.md`),
+  whatever rest-api's `private` says: a 200 without the flag does not make its
+  picture public.
 - **Frames.** A frame or a cover of a private resource is made when a viewer
   starts a stream or a download, with that viewer's claims — rest-api refuses
   the listing and the export to anyone without a right to the resource.
@@ -118,11 +124,20 @@ without a session — gets 404. A failure to ask is a 500, never the picture.
   is turned on last and off first.
 - **A resource rest-api does not know** (404) gets no frame, and the artwork of
   the title it was matched to is served with `private, no-store`: a 404 is no
-  proof the resource is public.
+  proof the resource is public. An upload rest-api does not know gets no
+  picture at all (404): its enrichment rows can outlive its files.
+- **Erasing.** An upload's pictures go with it: its thumbnail rows, and the
+  blob and renders no other resource's row names (`thumbnail.Service.Erase`;
+  objects are keyed by content). Callers: "Delete upload", a DMCA ban of the
+  upload, and — for an upload not saved to Vault — the cleaner's eviction, a
+  quota check that finds it gone and the owner's gone page (`uploads.Forget`),
+  a change of the upload's files (the page drops the stale enrichment and its
+  frames with it). A frame made while its upload was being deleted is taken
+  back once written (`thumbnail.Service.Generate`).
 - **Caches.** The S3 keys and the in-process cache carry no viewer: one render
   for everyone, the right checked on every request, outside the in-process
-  cache. A right revoked in rest-api still opens the picture for up to a
-  minute on a pod.
+  cache. A right revoked in rest-api still opens a torrent's picture for up
+  to a minute on a pod; an upload's, not at all.
 
 ## `pub/llms.txt`
 

@@ -660,11 +660,11 @@ paths:
   /library:
     get:
       description: |-
-        The torrents saved to the account, newest first by default.
+        The torrents and uploads saved to the account, newest first by default.
 
-        `type` filters the same way the library tabs do: `movies` and `series` mean a torrent with at least
-        one recognized film or show, which is decided by enrichment — a torrent added a moment ago may not
-        be classified yet and shows up only under `all`.
+        `type` filters the same way the library tabs do: `movies` and `series` mean a torrent or upload with
+        at least one recognized film or show, which is decided by enrichment — one added a moment ago may
+        not be classified yet and shows up only under `all`. There is no type for uploads: `all` lists them.
       parameters:
       - default: all
         description: Filter

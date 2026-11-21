@@ -116,6 +116,8 @@ The cleanup SQL lives in `models/purge_resource.go` — single source of truth s
 
 Other retrieval failures (DeadlineExceeded, network errors) stay retryable — logged and skipped, picked up on the next backfill run.
 
+**A banned upload** (`uploads.Owned`, `docs/uploads.md`) has files and pictures no SQL removes. The `resource.banned` handler first deletes the upload on its seeder (`uploads.Delete`, through torrent-http-proxy; a 410 — already gone — is no error), then erases its pictures (`thumbnail.Service.Erase`, while the thumbnail rows still name the objects), and only then runs `PurgeResourceByID`. The two calls share a one-minute deadline. Until all three succeed the rows stay and the message is NAKed with a 30 s delay — so is a failed torrent purge now, where it used to come back at once. With uploads off the handler cannot delete the files: it logs a warning and keeps retrying. The stream keeps a message 24 h, so a ban failing longer than that is dropped without a final line; the files, pictures and rows stay.
+
 ## Poster pipeline
 
 Single unified endpoint: `/lib/poster/<resource_id>/<file>` where `<file>` is `<width>.jpg` for card-sized resizes or `og.jpg` for the 1200×630 share canvas. The auth-gated variant `/lib/poster/raw/<resource_id>/<file>` skips the adult blur for opted-in users.
@@ -250,7 +252,7 @@ Loaded into `web.Context.UserSettings` via the user-settings middleware so every
 | `services/web/helper.go` | `PosterURL`, `ShowAdultBadge` (template-registered) |
 | `handlers/library/poster.go` | legacy imdb-keyed poster (Watchlist/Discover) |
 | `handlers/library/poster_resource.go` | unified `/lib/poster/...` + auth-gated `/raw/` |
-| `handlers/event/banned.go` | NATS `resource.banned` consumer (delegates to PurgeResourceByID) |
+| `handlers/event/banned.go` | NATS `resource.banned` consumer (delegates to PurgeResourceByID; an upload's files and pictures go first, `bannedUpload`; a failure is retried in 30 s) |
 | `handlers/profile/handler.go` | profile page + `updateSettings` POST |
 | `templates/partials/profile/adult_content.html` | toggle panel |
 | `templates/partials/file.html` | adult footnote under stream/download buttons |

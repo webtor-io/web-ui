@@ -19,11 +19,11 @@ import (
 // listLibrary godoc
 //
 //	@Summary		List your library
-//	@Description	The torrents saved to the account, newest first by default.
+//	@Description	The torrents and uploads saved to the account, newest first by default.
 //	@Description
-//	@Description	`type` filters the same way the library tabs do: `movies` and `series` mean a torrent with at least
-//	@Description	one recognized film or show, which is decided by enrichment — a torrent added a moment ago may not
-//	@Description	be classified yet and shows up only under `all`.
+//	@Description	`type` filters the same way the library tabs do: `movies` and `series` mean a torrent or upload with
+//	@Description	at least one recognized film or show, which is decided by enrichment — one added a moment ago may
+//	@Description	not be classified yet and shows up only under `all`. There is no type for uploads: `all` lists them.
 //	@Tags			library
 //	@Produce		json
 //	@Security		BearerAuth

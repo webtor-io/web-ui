@@ -67,7 +67,11 @@ round-trippable paths. Below `PrefixDirectory` (all in `services/libfs`):
   `torrents`. Listing `/` returns these; deeper paths route to a child by name.
 - `ContentDirectory` — library-backed (`all`/`movies`/`series`); lists the
   user's torrents and delegates into `TorrentDirectory` for file contents.
-- `TorrentLibraryDirectory` — the `torrents` view.
+  The user's uploads (`docs/uploads.md`) are listed too: all of them in
+  `all`, those with a recognized film or show in `movies`/`series`.
+- `TorrentLibraryDirectory` — the `torrents` view. It hides uploads
+  (`models.LibraryTorrents`; a name lookup there never finds one), as the
+  site's Torrents section does since "My uploads" has its own.
 - `DebugDirectory` — wraps everything and logs every `Stat`/`ReadDir`/`Open`
   (`path=…`, `files=…`). This is how to see what a client actually requested in
   prod: `kubectl logs` and grep `msg="read dir"`.
