@@ -18,6 +18,8 @@ const (
 	SortTypeName
 	SortTypeYear
 	SortTypeRating
+	// SortTypeRecentlyUpdated is last: ?sort=N of the others must not move.
+	SortTypeRecentlyUpdated
 )
 
 // String returns the i18n message key for this sort type.
@@ -32,10 +34,25 @@ func (s SortType) String() string {
 		return "library.sort.year"
 	case SortTypeRating:
 		return "library.sort.rating"
+	case SortTypeRecentlyUpdated:
+		return "library.sort.recentlyUpdated"
 	default:
 		return "library.sort.unknown"
 	}
 }
+
+// LibraryKind picks which rows of a library a list holds.
+type LibraryKind int
+
+const (
+	LibraryAll      LibraryKind = iota // every row: JSON API, WebDAV all/, data export
+	LibraryTorrents                    // everything but uploads
+	LibraryUploads                     // uploads of any kind
+)
+
+// uploadPattern is the LIKE form of the upload class: every ID that starts
+// with UploadPrefix, whatever its kind.
+const uploadPattern = UploadPrefix + "%"
 
 type Library struct {
 	tableName struct{} `pg:"library"`
@@ -60,12 +77,15 @@ func IsInLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, resourceID strin
 	return exists, nil
 }
 
+// GetLibraryByName finds a torrent of the user's library by its name, never an
+// upload: it serves WebDAV torrents/, which does not show uploads.
 func GetLibraryByName(ctx context.Context, db *pg.DB, uID uuid.UUID, name string) (*Library, error) {
 	var lib Library
 	err := db.Model(&lib).
 		Context(ctx).
 		Where("library.user_id = ?", uID).
 		Where("library.name = ?", name).
+		Where("library.resource_id NOT LIKE ?", uploadPattern).
 		Relation("Torrent").
 		Limit(1).
 		Select()
@@ -189,13 +209,25 @@ func UpdateLibraryName(ctx context.Context, db *pg.DB, l *Library) error {
 	return err
 }
 
-func GetLibraryCounts(ctx context.Context, db *pg.DB, uID uuid.UUID) (torrents, movies, series int, err error) {
+// GetLibraryCounts counts the library's sections. Torrents and uploads split
+// the rows; movies and series count uploads too.
+func GetLibraryCounts(ctx context.Context, db *pg.DB, uID uuid.UUID) (torrents, movies, series, uploads int, err error) {
 	torrents, err = db.Model((*Library)(nil)).
 		Context(ctx).
 		Where("user_id = ?", uID).
+		Where("resource_id NOT LIKE ?", uploadPattern).
 		Count()
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "failed to count torrents")
+		return 0, 0, 0, 0, errors.Wrap(err, "failed to count torrents")
+	}
+
+	uploads, err = db.Model((*Library)(nil)).
+		Context(ctx).
+		Where("user_id = ?", uID).
+		Where("resource_id LIKE ?", uploadPattern).
+		Count()
+	if err != nil {
+		return 0, 0, 0, 0, errors.Wrap(err, "failed to count uploads")
 	}
 
 	movies, err = db.Model((*Movie)(nil)).
@@ -205,7 +237,7 @@ func GetLibraryCounts(ctx context.Context, db *pg.DB, uID uuid.UUID) (torrents, 
 		Where("l.user_id = ?", uID).
 		Count()
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "failed to count movies")
+		return 0, 0, 0, 0, errors.Wrap(err, "failed to count movies")
 	}
 
 	series, err = db.Model((*Series)(nil)).
@@ -215,13 +247,13 @@ func GetLibraryCounts(ctx context.Context, db *pg.DB, uID uuid.UUID) (torrents, 
 		Where("l.user_id = ?", uID).
 		Count()
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "failed to count series")
+		return 0, 0, 0, 0, errors.Wrap(err, "failed to count series")
 	}
 
 	return
 }
 
-func GetLibraryTorrentsList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType) ([]*Library, error) {
+func GetLibraryTorrentsList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort SortType, kind LibraryKind) ([]*Library, error) {
 	var list []*Library
 
 	query := db.Model(&list).
@@ -229,9 +261,19 @@ func GetLibraryTorrentsList(ctx context.Context, db *pg.DB, uID uuid.UUID, sort 
 		Where("library.user_id = ?", uID).
 		Relation("Torrent")
 
+	switch kind {
+	case LibraryTorrents:
+		query.Where("library.resource_id NOT LIKE ?", uploadPattern)
+	case LibraryUploads:
+		query.Where("library.resource_id LIKE ?", uploadPattern)
+	}
+
 	switch sort {
 	case SortTypeName:
 		query.OrderExpr("torrent.name ASC") // вместо torrent_resource.name
+	case SortTypeRecentlyUpdated:
+		// An upload never changed counts from when it was added.
+		query.OrderExpr("COALESCE(torrent.updated_at, library.created_at) DESC")
 	case SortTypeRecentlyAdded:
 		fallthrough
 	default:

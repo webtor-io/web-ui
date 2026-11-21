@@ -7,8 +7,10 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -71,6 +73,8 @@ func TestSectionEmpty(t *testing.T) {
 		"really empty":        {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeMovies}, TorrentCount: 3}, true},
 		"items":               {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeSeries}, Items: []any{1}}, false},
 		"empty torrents":      {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeTorrents}, MovieCount: 3}, true},
+		"empty uploads":       {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeUploads}, UploadCount: 0}, true},
+		"uploads counted":     {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeUploads}, UploadCount: 2}, false},
 		"unknown section":     {IndexData{Args: &shared.IndexArgs{Section: "foo"}, MovieCount: 3}, true},
 	} {
 		if got := c.d.SectionEmpty(); got != c.want {
@@ -298,6 +302,122 @@ func TestLibraryBulkSelectNeedsItems(t *testing.T) {
 	for _, b := range bulk {
 		if strings.Contains(without, b) {
 			t.Errorf("filtered to nothing: offers select mode (%s)", b)
+		}
+	}
+}
+
+const (
+	testTorrent = "0123456789abcdef0123456789abcdef01234567"
+	testUpload  = "9c5db5752b7c0123456789abcdef0123456789ab"
+)
+
+// withUploads makes the parsed library answer uploadsEnabled with on.
+func withUploads(tpl *template.Template, on bool) *template.Template {
+	return tpl.Funcs(template.FuncMap{"uploadsEnabled": func() bool { return on }})
+}
+
+// My uploads: its select bar deletes uploads, and asks about deleting them;
+// a row says when the upload last changed, not when it was added.
+func TestUploadsSectionRenders(t *testing.T) {
+	now := time.Now()
+	updated := now.Add(-2 * time.Hour)
+	added := now.Add(-5 * 24 * time.Hour)
+	row := &models.Library{ResourceID: testUpload, CreatedAt: added, Torrent: &models.TorrentResource{Name: "Photos", SizeBytes: 1 << 20, FileCount: 2, UpdatedAt: &updated}}
+	page := func(t *testing.T, section shared.SectionType, on bool, items ...any) string {
+		tpl := withUploads(parseLibrary(t), on)
+		data := &IndexData{Args: &shared.IndexArgs{Section: section}, Items: items, TorrentCount: 1, UploadCount: len(items)}
+		return render(t, tpl, `{{ template "main" . }}`, &web.Context{Lang: "en", Path: "/lib/" + string(section), Data: data})
+	}
+	h := &web.Helper{}
+
+	t.Run("uploads", func(t *testing.T) {
+		out := page(t, shared.SectionTypeUploads, true, row)
+		for _, want := range []string{
+			`<form id="bulk-remove"`,
+			`action="/upload/delete"`,
+			`data-bulk-confirm="Delete the selected uploads for good? Their Vault copies will be deleted too."`,
+			`href="/` + testUpload + `"`,
+			h.TimeAgoLang("en", updated),
+			`class="flex flex-wrap gap-1.5 sm:gap-2"`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if strings.Contains(out, h.TimeAgoLang("en", added)) {
+			t.Errorf("the row says when the upload was added (%s), not when it changed", h.TimeAgoLang("en", added))
+		}
+		if !regexp.MustCompile(`href="/lib/uploads"[^>]*>[^<]*<span[^>]*>1</span>`).MatchString(out) {
+			t.Error("the menu has no My uploads item counting 1")
+		}
+	})
+
+	t.Run("torrents", func(t *testing.T) {
+		out := page(t, shared.SectionTypeTorrents, true, &models.Library{ResourceID: testTorrent, CreatedAt: added, Torrent: &models.TorrentResource{Name: "Film"}})
+		for _, want := range []string{
+			`action="/lib/remove"`,
+			`data-bulk-confirm="Remove the selected items from your library? The torrents themselves stay available."`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if strings.Contains(out, `action="/upload/delete"`) {
+			t.Error("the torrents bar deletes uploads")
+		}
+	})
+
+	// Uploads turned off: the rows stay visible and open, but nothing
+	// deletes them here -- /upload/delete is not served then, and
+	// /lib/remove would leave their files with no row.
+	t.Run("uploads off", func(t *testing.T) {
+		out := page(t, shared.SectionTypeUploads, false, row)
+		for _, bad := range []string{`id="bulk-remove"`, `action="/upload/delete"`} {
+			if strings.Contains(out, bad) {
+				t.Errorf("has %s", bad)
+			}
+		}
+		if !strings.Contains(out, `href="/`+testUpload+`"`) {
+			t.Error("the upload's row is gone")
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		out := page(t, shared.SectionTypeUploads, true)
+		for _, want := range []string{"No uploads yet", `href="/" data-async-target="main">Upload files</a>`} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if strings.Contains(out, "No torrents yet") {
+			t.Error("says there are no torrents")
+		}
+		if off := page(t, shared.SectionTypeUploads, false); !strings.Contains(off, "No uploads yet") || strings.Contains(off, "Upload files") {
+			t.Error("uploads off: want the empty state without the upload button")
+		}
+	})
+}
+
+// My uploads is in the menu while uploads are on, and while there are any
+// to see after they were turned off.
+func TestUploadsMenuItem(t *testing.T) {
+	for _, c := range []struct {
+		on    bool
+		count int
+		want  bool
+	}{
+		{false, 0, false},
+		{false, 2, true},
+		{true, 0, true},
+	} {
+		tpl := withUploads(parseLibrary(t), c.on)
+		data := &IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeTorrents}, TorrentCount: 1, UploadCount: c.count}
+		out := render(t, tpl, `{{ template "library/menu" . }}`, &web.Context{Lang: "en", Path: "/lib/", Data: data})
+		if got := strings.Contains(out, `href="/lib/uploads"`); got != c.want {
+			t.Errorf("uploads on %v, %d uploads: item shown %v, want %v", c.on, c.count, got, c.want)
+		}
+		if c.want && !regexp.MustCompile(`href="/lib/uploads"[^>]*>[^<]*<span[^>]*>` + strconv.Itoa(c.count) + `</span>`).MatchString(out) {
+			t.Errorf("uploads on %v, %d uploads: the item does not count %d", c.on, c.count, c.count)
 		}
 	}
 }

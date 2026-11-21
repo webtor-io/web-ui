@@ -357,7 +357,7 @@ func Build(ctx context.Context, db *pg.DB, u *models.User) (*Export, error) {
 }
 
 func (e *Export) fillLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID) error {
-	libs, err := models.GetLibraryTorrentsList(ctx, db, uID, models.SortTypeRecentlyAdded)
+	libs, err := models.GetLibraryTorrentsList(ctx, db, uID, models.SortTypeRecentlyAdded, models.LibraryAll)
 	if err != nil {
 		return errors.Wrap(err, "failed to load library")
 	}

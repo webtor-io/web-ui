@@ -15,7 +15,7 @@ type Library interface {
 type AllLibrary struct{}
 
 func (s *AllLibrary) GetContent(ctx context.Context, db *pg.DB, uID uuid.UUID) ([]*models.Library, error) {
-	return models.GetLibraryTorrentsList(ctx, db, uID, models.SortTypeName)
+	return models.GetLibraryTorrentsList(ctx, db, uID, models.SortTypeName, models.LibraryAll)
 }
 
 var _ Library = (*AllLibrary)(nil)

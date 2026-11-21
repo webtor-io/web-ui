@@ -1,5 +1,5 @@
 {{ define "library/list"}}
-    {{ if eq .Data.Args.Section "torrents" }}
+    {{ if or (eq .Data.Args.Section "torrents") (eq .Data.Args.Section "uploads") }}
     <div id="list" data-async-layout="{{`{{ template "library/torrent_list" (withContext $ .Data.Items) }}`}}">
         {{ template "library/torrent_list" (withContext $ .Data.Items) }}
     </div>

@@ -353,7 +353,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes the entry from your library. The resource itself stays in the store and keeps working —\nthis is not a takedown, and a Vault pledge on it is a separate thing (`DELETE /vault/pledges`).\n\nNot idempotent: removing something that is not there answers `404`.",
+                "description": "Removes the entry from your library. The resource itself stays in the store and keeps working —\nthis is not a takedown, and a Vault pledge on it is a separate thing (`DELETE /vault/pledges`).\n\nNot idempotent: removing something that is not there answers `404`.\n\nAn upload of your own is not removed from the library: it is deleted as a whole, with its files,\non its page on the site, and this answers `409`.",
                 "produces": [
                     "application/json"
                 ],
@@ -389,6 +389,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "The resource is your upload: delete it on its page",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }

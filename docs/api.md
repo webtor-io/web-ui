@@ -56,7 +56,7 @@ Base URL: `https://webtor.io/api/v1` (or `https://api.webtor.io/v1`, see
 | `POST` | `/library` | `api:write` | Add a stored resource to the library |
 | `GET` | `/library/{id}` | `api:read` | One entry; `404` = not in your library |
 | `PATCH` | `/library/{id}` | `api:write` | Rename the entry |
-| `DELETE` | `/library/{id}` | `api:write` | Remove from the library |
+| `DELETE` | `/library/{id}` | `api:write` | Remove from the library; `409 conflict` for your upload: delete it on its page |
 | `GET` | `/vault` | `api:read` | Points, content counters, pledges |
 | `POST` | `/vault/pledges` | `api:write` | Pledge to a resource. Pledging an upload closes it for writing for good; its pledge cannot be removed through the API — delete the upload on the site to get the points back. Files that are not fully uploaded yet are dropped |
 | `GET` | `/vault/pledges/{id}` | `api:read` | One pledge, with transfer status and progress |

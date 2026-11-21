@@ -219,7 +219,7 @@ func (s *TorrentLibraryDirectory) getLibraryList(ctx context.Context) ([]*models
 	if err != nil {
 		return nil, err
 	}
-	return models.GetLibraryTorrentsList(ctx, db, wcc.User.ID, models.SortTypeName)
+	return models.GetLibraryTorrentsList(ctx, db, wcc.User.ID, models.SortTypeName, models.LibraryTorrents)
 }
 
 func (s *TorrentLibraryDirectory) getLibraryByName(ctx context.Context, name string) (*models.Library, error) {

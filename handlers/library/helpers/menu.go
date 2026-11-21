@@ -14,6 +14,7 @@ var baseMenu Menu = Menu{
 	{shared.SectionTypeTorrents, "/lib/", false},
 	{shared.SectionTypeMovies, "/lib/movies", false},
 	{shared.SectionTypeSeries, "/lib/series", false},
+	{shared.SectionTypeUploads, "/lib/uploads", false},
 }
 
 func (s *VideoContentHelper) MakeMenu(args *shared.IndexArgs) Menu {

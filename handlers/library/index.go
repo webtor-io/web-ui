@@ -35,6 +35,7 @@ type IndexData struct {
 	TorrentCount int
 	MovieCount   int
 	SeriesCount  int
+	UploadCount  int
 	RateForm     *RateFormData
 	// Genres are the options of the genre filter; empty hides it.
 	Genres []GenreOption
@@ -54,6 +55,8 @@ func (d *IndexData) SectionEmpty() bool {
 		return d.MovieCount == 0
 	case shared.SectionTypeSeries:
 		return d.SeriesCount == 0
+	case shared.SectionTypeUploads:
+		return d.UploadCount == 0
 	}
 	return true
 }
@@ -170,7 +173,7 @@ func (s *Handler) index(c *gin.Context) {
 		}
 	}
 
-	tc, mc, sc, err := models.GetLibraryCounts(ctx, db, u.ID)
+	tc, mc, sc, uc, err := models.GetLibraryCounts(ctx, db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get library counts"))
 		return
@@ -182,6 +185,7 @@ func (s *Handler) index(c *gin.Context) {
 		TorrentCount: tc,
 		MovieCount:   mc,
 		SeriesCount:  sc,
+		UploadCount:  uc,
 	}
 
 	// The genre options come from the whole section, not from the filtered
@@ -236,7 +240,9 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	}
 	switch args.Section {
 	case shared.SectionTypeTorrents:
-		return s.getTorrentList(ctx, u.ID, db, args.Sort)
+		return s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryTorrents)
+	case shared.SectionTypeUploads:
+		return s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryUploads)
 	case shared.SectionTypeMovies:
 		return s.getMovieList(ctx, u.ID, db, args.Sort, libraryFilter(args))
 	case shared.SectionTypeSeries:
@@ -245,8 +251,8 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	return
 }
 
-func (s *Handler) getTorrentList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType) (items []any, err error) {
-	ls, err := models.GetLibraryTorrentsList(ctx, db, id, sort)
+func (s *Handler) getTorrentList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, kind models.LibraryKind) (items []any, err error) {
+	ls, err := models.GetLibraryTorrentsList(ctx, db, id, sort, kind)
 	if err != nil {
 		return
 	}

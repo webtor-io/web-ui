@@ -44,6 +44,7 @@ var sorts = map[shared.SectionType]Sort{
 	shared.SectionTypeTorrents: NewSort(models.SortTypeRecentlyAdded, models.SortTypeName),
 	shared.SectionTypeMovies:   videoSort,
 	shared.SectionTypeSeries:   videoSort,
+	shared.SectionTypeUploads:  NewSort(models.SortTypeRecentlyAdded, models.SortTypeRecentlyUpdated, models.SortTypeName),
 }
 
 func (s *SortHelper) MakeSort(args *shared.IndexArgs) *Sort {

@@ -12,6 +12,7 @@ import (
 	restapi "github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/libapi"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -285,6 +286,9 @@ func (s *Handler) renameLibrary(c *gin.Context) {
 //	@Description	this is not a takedown, and a Vault pledge on it is a separate thing (`DELETE /vault/pledges`).
 //	@Description
 //	@Description	Not idempotent: removing something that is not there answers `404`.
+//	@Description
+//	@Description	An upload of your own is not removed from the library: it is deleted as a whole, with its files,
+//	@Description	on its page on the site, and this answers `409`.
 //	@Tags			library
 //	@Produce		json
 //	@Security		BearerAuth
@@ -293,11 +297,22 @@ func (s *Handler) renameLibrary(c *gin.Context) {
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
+//	@Failure		409			{object}	libapi.ErrorResponse	"The resource is your upload: delete it on its page"
 //	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/library/{resource_id} [delete]
 func (s *Handler) deleteLibrary(c *gin.Context) {
+	// Someone else's upload and one not in the library are a 404 as anything
+	// else: the check comes after the row's.
 	if _, err := s.libraryItem(c); err != nil {
 		s.abort(c, err)
+		return
+	}
+	id := normalizeResourceID(c.Param("resource_id"))
+	// An upload is deleted as a whole: taking only its library row away would
+	// leave its files, its Vault copy and its quota with no link to them.
+	if uploads.Owned(id) {
+		s.abort(c, libapi.NewError(http.StatusConflict, libapi.CodeConflict,
+			"an upload is not removed from the library: delete the upload itself on its page", nil))
 		return
 	}
 	db, err := s.db()
@@ -306,7 +321,7 @@ func (s *Handler) deleteLibrary(c *gin.Context) {
 		return
 	}
 	u := auth.GetUserFromContext(c)
-	if derr := models.RemoveFromLibrary(c.Request.Context(), db, u.ID, normalizeResourceID(c.Param("resource_id"))); derr != nil {
+	if derr := models.RemoveFromLibrary(c.Request.Context(), db, u.ID, id); derr != nil {
 		s.abort(c, libapi.NewError(http.StatusInternalServerError, libapi.CodeInternal, "failed to remove from the library", derr))
 		return
 	}
@@ -359,7 +374,7 @@ func loadLibrary(ctx context.Context, db *pg.DB, userID uuid.UUID, typ string, s
 	case libapi.LibraryTypeSeries:
 		return models.GetLibrarySeriesTorrentList(ctx, db, userID, st, watched)
 	default:
-		return models.GetLibraryTorrentsList(ctx, db, userID, st)
+		return models.GetLibraryTorrentsList(ctx, db, userID, st, models.LibraryAll)
 	}
 }
 
