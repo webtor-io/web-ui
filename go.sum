@@ -515,8 +515,8 @@ github.com/vmihailenco/tagparser v0.1.2 h1:gnjoVuB/kljJ5wICEEOpx98oXMWPLj22G67Vb
 github.com/vmihailenco/tagparser v0.1.2/go.mod h1:OeAg3pn3UbLjkWt+rN9oFYB6u/cQgqMEUPoW2WPyhdI=
 github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAhO7/IwNM9g=
 github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
-github.com/webtor-io/abuse-store v0.0.0-20261122155600-4e2988b21ace h1:oDnD1nFj4UxfWQYi12QPiNF/FHu/KtMFLUja4FHlKpA=
-github.com/webtor-io/abuse-store v0.0.0-20261122155600-4e2988b21ace/go.mod h1:ZJUNx7FxTshBmP+OHsVKc51rwOqBiipRDUwJpAVdSQc=
+github.com/webtor-io/abuse-store v0.0.0-20261122192600-360d790c5d08 h1:qvAHOgyD11Rc/ztYC6HFYLJxSpvIcNlG2WA1ThNoNyo=
+github.com/webtor-io/abuse-store v0.0.0-20261122192600-360d790c5d08/go.mod h1:ZJUNx7FxTshBmP+OHsVKc51rwOqBiipRDUwJpAVdSQc=
 github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b h1:SHXZgQSZtZe+xt1wtY7toIYv3s9jYq3pEGgVvrROliE=
 github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b/go.mod h1:o9TAux7A8g2Pl2r3Bp45u4bhWyDYrujfKyJAbGQaxA4=
 github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805 h1:OrhGqRg7SJOaXUp9IYs7ucKYhlocdMsW4KVKWaNf5JQ=
