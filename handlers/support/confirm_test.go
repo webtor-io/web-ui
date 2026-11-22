@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
@@ -27,6 +28,20 @@ const confirmTok = "q5Xh2wJ0-ZbLrT9e_KdM3pVn8sYa1cFgUoIiE7lN4Ow"
 
 func newConfirmStore() *fakeAbuseStore {
 	return &fakeAbuseStore{got: make(chan *proto.PushRequest, 1), confirms: make(chan string, 1)}
+}
+
+// confirmed is the token of the Confirm the request made, and fails the test
+// when it made none: a bare receive would hang the package until go test's
+// timeout instead.
+func confirmed(t *testing.T, as *fakeAbuseStore) string {
+	t.Helper()
+	select {
+	case tok := <-as.confirms:
+		return tok
+	case <-time.After(5 * time.Second):
+		t.Fatal("Confirm was not called")
+		return ""
+	}
 }
 
 // localesDir is absolute: newSupportRouter moves the test into a temp dir.
@@ -95,7 +110,7 @@ func TestSupportConfirmStatuses(t *testing.T) {
 			if strings.Contains(w.Body.String(), `<form`) {
 				t.Error("an answered confirmation still shows the button")
 			}
-			if got := <-as.confirms; got != confirmTok {
+			if got := confirmed(t, as); got != confirmTok {
 				t.Errorf("confirmed %q, want %q", got, confirmTok)
 			}
 		})
@@ -147,7 +162,7 @@ func TestSupportConfirmBoundsTheToken(t *testing.T) {
 		as.confirm = &proto.ConfirmReply{}
 		r := newSupportRouter(t, as)
 		postConfirm(r, url.Values{"t": {long[1:]}})
-		if got := <-as.confirms; got != long[1:] {
+		if got := confirmed(t, as); got != long[1:] {
 			t.Errorf("confirmed %q", got)
 		}
 	})
@@ -188,7 +203,7 @@ func TestSupportConfirmNeedsCSRF(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), english(t, "support.confirm.confirmed")) {
 		t.Fatalf("with the page's CSRF token: got %d:\n%s", w.Code, w.Body.String())
 	}
-	if got := <-as.confirms; got != confirmTok {
+	if got := confirmed(t, as); got != confirmTok {
 		t.Errorf("confirmed %q", got)
 	}
 }
