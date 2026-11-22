@@ -337,7 +337,11 @@ func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) (bool, e
 		return false, nil
 	case codes.ResourceExhausted:
 		// Too many notices wait for confirmation, from this address or in all.
-		return false, web.NewUserError("error.support_too_many_pending", err)
+		// Any other cause is never held: its ResourceExhausted is the
+		// transport's, a message over gRPC's size limit.
+		if held {
+			return false, web.NewUserError("error.support_too_many_pending", err)
+		}
 	}
 	st, ok := status.FromError(err)
 	if !ok {

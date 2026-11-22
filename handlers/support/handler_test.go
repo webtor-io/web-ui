@@ -263,21 +263,30 @@ func TestSupportPushesEveryHash(t *testing.T) {
 // abuse-store answers AlreadyExists only when every hash is blocked already:
 // the reporter sees the usual success page, any other error stays a failure.
 func TestSupportPushErrors(t *testing.T) {
+	question := url.Values{"cause": {"3"}, "email": {"me@example.com"}, "subject": {"s"}, "description": {"d"}}
 	cases := []struct {
+		name   string
+		form   url.Values // a copyright notice when nil
 		err    error
 		status int
 		body   string
 	}{
-		{status.Error(codes.AlreadyExists, "abuse notice with infoHash="+hashA+" already exists"), http.StatusOK, "[success]"},
-		{status.Error(codes.InvalidArgument, "wrong email"), http.StatusInternalServerError, "[form]"},
+		{"exists", nil, status.Error(codes.AlreadyExists, "abuse notice with infoHash="+hashA+" already exists"), http.StatusOK, "[success]"},
+		{"invalid", nil, status.Error(codes.InvalidArgument, "wrong email"), http.StatusInternalServerError, "[form]"},
 		// Too many notices wait for confirmation: the reporter is told so.
-		{status.Error(codes.ResourceExhausted, "store: too many unconfirmed notices"), http.StatusInternalServerError, "[form][err=error.support_too_many_pending]"},
+		{"pending", nil, status.Error(codes.ResourceExhausted, "store: too many unconfirmed notices"), http.StatusInternalServerError, "[form][err=error.support_too_many_pending]"},
+		// A question is never held: its ResourceExhausted is gRPC's size limit.
+		{"oversized question", question, status.Error(codes.ResourceExhausted, "grpc: received message larger than max"), http.StatusInternalServerError, "[form][err=error.generic]"},
 	}
 	for _, tc := range cases {
-		t.Run(status.Code(tc.err).String(), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1), err: tc.err}
 			r := newSupportRouter(t, as)
-			w := postSupport(r, withReporter(url.Values{"cause": {"0"}, "infohash": {hashA}}))
+			form := tc.form
+			if form == nil {
+				form = withReporter(url.Values{"cause": {"0"}, "infohash": {hashA}})
+			}
+			w := postSupport(r, form)
 			if w.Code != tc.status || !strings.HasPrefix(w.Body.String(), tc.body) {
 				t.Fatalf("got %d %q, want %d %s", w.Code, w.Body.String(), tc.status, tc.body)
 			}
