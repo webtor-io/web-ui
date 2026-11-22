@@ -64,6 +64,12 @@ func TestSupportPushesReporterFields(t *testing.T) {
 			&proto.PushRequest{Cause: proto.PushRequest_INTIMATE_IMAGE, Email: "me@example.com", ReporterName: "A. Person"}},
 		{"CSAM without an email", url.Values{"cause": {"4"}, "infohash": {hashA}},
 			&proto.PushRequest{Cause: proto.PushRequest_CSAM_REPORT}},
+		// support.js only hides another cause's fields, and the browser posts
+		// what was typed in them before the cause changed.
+		{"CSAM with a copyright notice's fields", withReporter(url.Values{"cause": {"4"}, "infohash": {hashA}}),
+			&proto.PushRequest{Cause: proto.PushRequest_CSAM_REPORT, Email: "legal@example.com"}},
+		{"intimate image with a copyright notice's statements", withReporter(url.Values{"cause": {"5"}, "infohash": {hashA}}),
+			&proto.PushRequest{Cause: proto.PushRequest_INTIMATE_IMAGE, Email: "legal@example.com", ReporterName: "Example Studio"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -300,6 +300,11 @@ func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) (bool, e
 	if len(hashes) > 0 {
 		primary, hashes = hashes[0], hashes[1:]
 	}
+	cause := proto.PushRequest_Cause(form.Cause)
+	copyright := cause == proto.PushRequest_ILLEGAL_CONTENT
+	// The causes abuse-store holds for confirmation, the ones the form asks
+	// the reporter's name for.
+	held := copyright || cause == proto.PushRequest_INTIMATE_IMAGE
 	pr := &proto.PushRequest{
 		NoticeId:        uuid.New().String(),
 		Infohash:        primary,
@@ -310,11 +315,17 @@ func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) (bool, e
 		Email:           form.Email,
 		Description:     form.Description,
 		Subject:         form.Subject,
-		Cause:           proto.PushRequest_Cause(form.Cause),
+		Cause:           cause,
 		Source:          proto.PushRequest_FORM,
-		ReporterName:    form.ReporterName,
-		GoodFaith:       form.GoodFaith,
-		Authorized:      form.Authorized,
+	}
+	// support.js only hides the fields another cause asks for, so the browser
+	// still posts what was typed before the cause changed, and the letter
+	// prints whatever is set.
+	if held {
+		pr.ReporterName = form.ReporterName
+	}
+	if copyright {
+		pr.GoodFaith, pr.Authorized = form.GoodFaith, form.Authorized
 	}
 	rep, err := cl.Push(c.Request.Context(), pr)
 	switch status.Code(err) {
