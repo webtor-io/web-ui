@@ -95,8 +95,14 @@ func TestExtractInfohashes(t *testing.T) {
 
 type fakeAbuseStore struct {
 	proto.UnimplementedAbuseStoreServer
-	got chan *proto.PushRequest
-	err error
+	got   chan *proto.PushRequest
+	err   error
+	reply *proto.PushReply
+	// confirms gets the token of every Confirm, which answers confirm or
+	// confirmErr.
+	confirms   chan string
+	confirm    *proto.ConfirmReply
+	confirmErr error
 }
 
 func (f *fakeAbuseStore) Push(_ context.Context, in *proto.PushRequest) (*proto.PushReply, error) {
@@ -104,12 +110,24 @@ func (f *fakeAbuseStore) Push(_ context.Context, in *proto.PushRequest) (*proto.
 	if f.err != nil {
 		return nil, f.err
 	}
+	if f.reply != nil {
+		return f.reply, nil
+	}
 	return &proto.PushReply{}, nil
 }
 
-// newSupportRouter serves /support over stand-in views, with the handler's
-// abuse-store client dialing a fake gRPC server.
-func newSupportRouter(t *testing.T, as *fakeAbuseStore) *gin.Engine {
+func (f *fakeAbuseStore) Confirm(_ context.Context, in *proto.ConfirmRequest) (*proto.ConfirmReply, error) {
+	f.confirms <- in.GetToken()
+	if f.confirmErr != nil {
+		return nil, f.confirmErr
+	}
+	return f.confirm, nil
+}
+
+// newSupportRouter serves /support over stand-in views and the real confirm
+// page, with the handler's abuse-store client dialing a fake gRPC server.
+// setup runs on the engine before the handler's routes, for middleware.
+func newSupportRouter(t *testing.T, as *fakeAbuseStore, setup ...func(*gin.Engine)) *gin.Engine {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -137,11 +155,16 @@ func newSupportRouter(t *testing.T, as *fakeAbuseStore) *gin.Engine {
 	}
 	t.Cleanup(func() { _ = locales.Close() })
 	svc := i18n.New(locales.FS())
+	confirmView, err := os.ReadFile("../../templates/views/support/confirm.html")
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := t.TempDir()
 	for name, body := range map[string]string{
 		"templates/layouts/main.html":          `{{ template "main" . }}`,
 		"templates/views/support/form.html":    `{{ define "main" }}[form][err={{ .ErrKey }}]{{ end }}`,
-		"templates/views/support/success.html": `{{ define "main" }}[success]{{ end }}`,
+		"templates/views/support/success.html": `{{ define "main" }}[success]{{ if .Data.ConfirmationSent }}[confirmation-sent]{{ end }}{{ end }}`,
+		"templates/views/support/confirm.html": string(confirmView),
 	} {
 		p := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -161,12 +184,27 @@ func newSupportRouter(t *testing.T, as *fakeAbuseStore) *gin.Engine {
 	r.Use(i18n.GinMiddleware(svc))
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
-	tm := template.NewManager[*web.Context](re)
+	for _, f := range setup {
+		f(r)
+	}
+	tm := template.NewManager[*web.Context](re).
+		WithHelper(i18n.NewHelper(svc)).
+		WithFuncs(template.FuncMap{"langPath": func(_, p string) string { return p }})
 	RegisterHandler(r, tm, asc, nil)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)
 	}
 	return r
+}
+
+// withReporter is form with everything a copyright notice needs to say about
+// its reporter.
+func withReporter(form url.Values) url.Values {
+	form.Set("reporter_name", "Example Studio")
+	form.Set("email", "legal@example.com")
+	form.Set("good_faith", "true")
+	form.Set("authorized", "true")
+	return form
 }
 
 func postSupport(r *gin.Engine, form url.Values) *httptest.ResponseRecorder {
@@ -207,7 +245,7 @@ func TestSupportPushesEveryHash(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1)}
 			r := newSupportRouter(t, as)
-			w := postSupport(r, url.Values{"cause": {tc.cause}, "infohash": {tc.ih}, "description": {tc.desc}})
+			w := postSupport(r, withReporter(url.Values{"cause": {tc.cause}, "infohash": {tc.ih}, "description": {tc.desc}}))
 			if w.Code != http.StatusOK || w.Body.String() != "[success]" {
 				t.Fatalf("got %d %q, want 200 [success]", w.Code, w.Body.String())
 			}
@@ -232,12 +270,14 @@ func TestSupportPushErrors(t *testing.T) {
 	}{
 		{status.Error(codes.AlreadyExists, "abuse notice with infoHash="+hashA+" already exists"), http.StatusOK, "[success]"},
 		{status.Error(codes.InvalidArgument, "wrong email"), http.StatusInternalServerError, "[form]"},
+		// Too many notices wait for confirmation: the reporter is told so.
+		{status.Error(codes.ResourceExhausted, "store: too many unconfirmed notices"), http.StatusInternalServerError, "[form][err=error.support_too_many_pending]"},
 	}
 	for _, tc := range cases {
 		t.Run(status.Code(tc.err).String(), func(t *testing.T) {
 			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1), err: tc.err}
 			r := newSupportRouter(t, as)
-			w := postSupport(r, url.Values{"cause": {"0"}, "infohash": {hashA}})
+			w := postSupport(r, withReporter(url.Values{"cause": {"0"}, "infohash": {hashA}}))
 			if w.Code != tc.status || !strings.HasPrefix(w.Body.String(), tc.body) {
 				t.Fatalf("got %d %q, want %d %s", w.Code, w.Body.String(), tc.status, tc.body)
 			}
@@ -306,7 +346,7 @@ func TestSupportHashCap(t *testing.T) {
 			as := &fakeAbuseStore{got: make(chan *proto.PushRequest, 1)}
 			r := newSupportRouter(t, as)
 			// The field's hash repeated in the description is not another one.
-			w := postSupport(r, url.Values{"cause": {"0"}, "infohash": {hs[0]}, "description": {strings.Join(hs[:n], "\n")}})
+			w := postSupport(r, withReporter(url.Values{"cause": {"0"}, "infohash": {hs[0]}, "description": {strings.Join(hs[:n], "\n")}}))
 			if n == 21 {
 				if w.Code != http.StatusBadRequest || w.Body.String() != "[form][err=error.support_too_many_hashes]" || len(as.got) != 0 {
 					t.Fatalf("got %d %q, %d pushed; want 400, the split error, nothing pushed", w.Code, w.Body.String(), len(as.got))

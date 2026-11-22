@@ -18,7 +18,7 @@
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
         <polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
-      <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">{{ t $.Lang "support.successMessage" }}</p>
+      <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">{{ if .Data.ConfirmationSent }}{{ t $.Lang "support.confirmationSent" }}{{ else }}{{ t $.Lang "support.successMessage" }}{{ end }}</p>
       <a href="{{ langPath $.Lang "/support" }}" data-async-target="main" class="link link-hover text-w-pinkL">{{ t $.Lang "support.sendAnother" }}</a>
     </div>
   </div>
