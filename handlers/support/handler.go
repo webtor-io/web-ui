@@ -1,6 +1,7 @@
 package support
 
 import (
+	"context"
 	"encoding/base32"
 	"encoding/hex"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	proto "github.com/webtor-io/abuse-store/proto"
 	"github.com/webtor-io/web-ui/services/abuse_store"
 	"github.com/webtor-io/web-ui/services/template"
@@ -36,6 +38,11 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], asc *abu
 	}
 	r.GET("/support", h.process)
 	r.POST("/support", h.process)
+	// The link in abuse-store's confirmation letter. Mail scanners fetch
+	// every link in a message, so the GET only shows a button; Confirm runs
+	// on its POST, which the session middleware's CSRF check guards.
+	r.GET("/support/confirm", h.confirm)
+	r.POST("/support/confirm", h.confirm)
 }
 
 type Cause int
@@ -182,35 +189,70 @@ func noticeHashes(form *Form) ([]string, error) {
 	return hashes, nil
 }
 
-var CauseTypes = map[int]string{
-	-1: "support.selectCause",
-	0:  "support.illegalContent",
-	1:  "support.malware",
-	2:  "support.siteError",
-	3:  "support.question",
+type CauseType struct {
+	ID  Cause
+	Key string
+}
+
+// CauseTypes are the form's causes in the order it lists them. An ID is the
+// PushRequest.Cause it is sent as and the value links (?cause=) and the form
+// post, so it never changes.
+var CauseTypes = []CauseType{
+	{-1, "support.selectCause"},
+	{Cause(proto.PushRequest_ILLEGAL_CONTENT), "support.copyright"},
+	{Cause(proto.PushRequest_INTIMATE_IMAGE), "support.intimateImage"},
+	{Cause(proto.PushRequest_CSAM_REPORT), "support.csam"},
+	{Cause(proto.PushRequest_MALWARE), "support.malware"},
+	{Cause(proto.PushRequest_APP_ERROR), "support.siteError"},
+	{Cause(proto.PushRequest_QUESTION), "support.question"},
 }
 
 type Form struct {
-	Cause       Cause  `form:"cause"`
-	Subject     string `form:"subject"`
-	Description string `form:"description"`
-	Infohash    string `form:"infohash"`
-	Filename    string `form:"filename"`
-	Email       string `form:"email"`
-	Work        string `form:"work"`
+	Cause        Cause  `form:"cause"`
+	Subject      string `form:"subject"`
+	Description  string `form:"description"`
+	Infohash     string `form:"infohash"`
+	Filename     string `form:"filename"`
+	Email        string `form:"email"`
+	Work         string `form:"work"`
+	ReporterName string `form:"reporter_name"`
+	GoodFaith    bool   `form:"good_faith"`
+	Authorized   bool   `form:"authorized"`
 }
 
 type Data struct {
 	Form       *Form
-	CauseTypes map[int]string
+	CauseTypes []CauseType
+	// ConfirmationSent: abuse-store holds the notice until the reporter
+	// confirms it from the letter it mailed them.
+	ConfirmationSent bool
 }
 
-// needsInfohash: complaints about content, malware or a site error are about
-// a specific torrent and cannot be acted on without knowing which. Questions
-// are not. Enforced server-side — the form's JS-only `required` used to be the
-// only guard, and tickets arrived with the field empty.
+// needsInfohash: every cause but a question is about a specific torrent and
+// cannot be acted on without knowing which. Enforced server-side — the form's
+// JS-only `required` used to be the only guard, and tickets arrived with the
+// field empty.
 func needsInfohash(cause Cause) bool {
-	return cause >= 0 && cause <= 2
+	return cause >= 0 && cause != Cause(proto.PushRequest_QUESTION)
+}
+
+// reporterErr refuses a notice that does not say who sends it, as its cause
+// requires: a copyright notice needs the reporter's name, an email and both
+// statements; an intimate image report needs an email. Both are what
+// abuse-store holds for confirmation from that address, and it refuses them
+// the same way; here the reporter learns which field is missing.
+func reporterErr(form *Form) error {
+	cause := proto.PushRequest_Cause(form.Cause)
+	copyright := cause == proto.PushRequest_ILLEGAL_CONTENT
+	switch {
+	case copyright && strings.TrimSpace(form.ReporterName) == "":
+		return web.NewUserError("error.support_name_required", errors.New("copyright notice without the reporter's name"))
+	case (copyright || cause == proto.PushRequest_INTIMATE_IMAGE) && strings.TrimSpace(form.Email) == "":
+		return web.NewUserError("error.support_email_required", errors.New("notice without the reporter's email"))
+	case copyright && !(form.GoodFaith && form.Authorized):
+		return web.NewUserError("error.support_statements_required", errors.New("copyright notice without both statements"))
+	}
+	return nil
 }
 
 func (s *Handler) bindForm(c *gin.Context) (*Form, error) {
@@ -228,8 +270,8 @@ func (s *Handler) bindForm(c *gin.Context) (*Form, error) {
 			return nil, err
 		}
 	}
-	if _, ok := CauseTypes[cause]; !ok {
-		return nil, errors.Errorf("cause with id=%v not defined", c)
+	if !slices.ContainsFunc(CauseTypes, func(ct CauseType) bool { return ct.ID == Cause(cause) }) {
+		return nil, errors.Errorf("cause with id=%v not defined", cause)
 	}
 
 	var form Form
@@ -247,16 +289,22 @@ func (s *Handler) bindForm(c *gin.Context) (*Form, error) {
 
 // sendForm pushes one notice that bans every hash it names: the first is the
 // primary, the rest go as ExtraInfohashes, which is empty (nil once decoded)
-// when there are none.
-func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) error {
+// when there are none. It reports whether abuse-store holds the notice for
+// the reporter to confirm.
+func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) (bool, error) {
 	cl, err := s.asc.Get()
 	if err != nil {
-		return err
+		return false, err
 	}
 	var primary string
 	if len(hashes) > 0 {
 		primary, hashes = hashes[0], hashes[1:]
 	}
+	cause := proto.PushRequest_Cause(form.Cause)
+	copyright := cause == proto.PushRequest_ILLEGAL_CONTENT
+	// The causes abuse-store holds for confirmation, the ones the form asks
+	// the reporter's name for.
+	held := copyright || cause == proto.PushRequest_INTIMATE_IMAGE
 	pr := &proto.PushRequest{
 		NoticeId:        uuid.New().String(),
 		Infohash:        primary,
@@ -267,23 +315,39 @@ func (s *Handler) sendForm(c *gin.Context, form *Form, hashes []string) error {
 		Email:           form.Email,
 		Description:     form.Description,
 		Subject:         form.Subject,
-		Cause:           proto.PushRequest_Cause(form.Cause),
+		Cause:           cause,
 		Source:          proto.PushRequest_FORM,
 	}
-	_, err = cl.Push(c.Request.Context(), pr)
-	if status.Code(err) == codes.AlreadyExists {
+	// support.js only hides the fields another cause asks for, so the browser
+	// still posts what was typed before the cause changed, and the letter
+	// prints whatever is set.
+	if held {
+		pr.ReporterName = form.ReporterName
+	}
+	if copyright {
+		pr.GoodFaith, pr.Authorized = form.GoodFaith, form.Authorized
+	}
+	rep, err := cl.Push(c.Request.Context(), pr)
+	switch status.Code(err) {
+	case codes.OK:
+		return rep.GetConfirmationSent(), nil
+	case codes.AlreadyExists:
 		// Every hash is blocked already: for the reporter the notice went
 		// through, it is not a failure to show them.
-		return nil
-	}
-	if err != nil {
-		st, ok := status.FromError(err)
-		if !ok {
-			return errors.Wrap(err, "failed to send form")
+		return false, nil
+	case codes.ResourceExhausted:
+		// Too many notices wait for confirmation, from this address or in all.
+		// Any other cause is never held: its ResourceExhausted is the
+		// transport's, a message over gRPC's size limit.
+		if held {
+			return false, web.NewUserError("error.support_too_many_pending", err)
 		}
-		return errors.New(st.Message())
 	}
-	return err
+	st, ok := status.FromError(err)
+	if !ok {
+		return false, errors.Wrap(err, "failed to send form")
+	}
+	return false, errors.New(st.Message())
 }
 
 func (s *Handler) process(c *gin.Context) {
@@ -299,6 +363,9 @@ func (s *Handler) process(c *gin.Context) {
 	}
 	if c.Request.Method == "POST" {
 		hashes, err := noticeHashes(form)
+		if err == nil {
+			err = reporterErr(form)
+		}
 		if err != nil {
 			tpl.HTML(http.StatusBadRequest, web.NewContext(c).WithData(data).WithErr(err))
 			return
@@ -310,13 +377,82 @@ func (s *Handler) process(c *gin.Context) {
 				return
 			}
 		}
-		err = s.sendForm(c, form, hashes)
+		data.ConfirmationSent, err = s.sendForm(c, form, hashes)
 		if err != nil {
-			tpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(data).WithErr(errors.Wrap(err, "failed to send form")))
+			// Not wrapped: a user error must reach the form as one.
+			tpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(data).WithErr(err))
 			return
 		}
 		s.tb.Build("support/success").HTML(http.StatusOK, web.NewContext(c).WithData(data))
 		return
 	}
 	tpl.HTML(http.StatusOK, web.NewContext(c).WithData(data))
+}
+
+// maxConfirmToken bounds the token taken from the link or the form:
+// abuse-store's are 43 characters (32 bytes, unpadded base64url), and a longer
+// one cannot be one, so it goes no further.
+const maxConfirmToken = 64
+
+// confirmData drives support/confirm: the page with the button while Result
+// is empty, the outcome's message key after.
+type confirmData struct {
+	Token  string
+	Result string
+}
+
+const confirmInvalid = "support.confirm.invalid"
+
+// confirmResults is the message for each ConfirmReply status; UNKNOWN, and a
+// status this build does not know, reads as an invalid link.
+var confirmResults = map[proto.ConfirmReply_Status]string{
+	proto.ConfirmReply_CONFIRMED:         "support.confirm.confirmed",
+	proto.ConfirmReply_ALREADY_CONFIRMED: "support.confirm.alreadyConfirmed",
+	proto.ConfirmReply_EXPIRED:           "support.confirm.expired",
+}
+
+// confirm serves the confirmation link: the GET renders the button and
+// nothing else, the POST confirms. The token is never logged.
+func (s *Handler) confirm(c *gin.Context) {
+	tpl := s.tb.Build("support/confirm")
+	d := &confirmData{Token: c.Query("t")}
+	if c.Request.Method == http.MethodPost {
+		d.Token = c.PostForm("t")
+	}
+	ctx := web.NewContext(c).WithData(d)
+	if d.Token == "" || len(d.Token) > maxConfirmToken {
+		d.Result = confirmInvalid
+		tpl.HTML(http.StatusBadRequest, ctx)
+		return
+	}
+	if c.Request.Method != http.MethodPost {
+		tpl.HTML(http.StatusOK, ctx)
+		return
+	}
+	res, err := s.confirmNotice(c.Request.Context(), d.Token)
+	if err != nil {
+		// The token stays usable: the page keeps its button for a retry.
+		log.WithError(err).Error("failed to confirm notice")
+		tpl.HTML(http.StatusInternalServerError, ctx.WithErrKey("error.support_confirm_failed"))
+		return
+	}
+	d.Result = res
+	tpl.HTML(http.StatusOK, ctx)
+}
+
+// confirmNotice confirms the notice the token holds and returns the message
+// key for the outcome.
+func (s *Handler) confirmNotice(ctx context.Context, token string) (string, error) {
+	cl, err := s.asc.Get()
+	if err != nil {
+		return "", err
+	}
+	rep, err := cl.Confirm(ctx, &proto.ConfirmRequest{Token: token})
+	if err != nil {
+		return "", errors.Wrap(err, "failed to confirm notice")
+	}
+	if key, ok := confirmResults[rep.GetStatus()]; ok {
+		return key, nil
+	}
+	return confirmInvalid, nil
 }

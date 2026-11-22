@@ -36,7 +36,7 @@ require (
 	github.com/swaggo/swag v1.16.6
 	github.com/urfave/cli v1.22.17
 	github.com/utrack/gin-csrf v0.0.0-20190424104817-40fb8d2c8fca
-	github.com/webtor-io/abuse-store v0.0.0-20261121152721-ab56680653cf
+	github.com/webtor-io/abuse-store v0.0.0-20261122192600-360d790c5d08
 	github.com/webtor-io/claims-provider v0.0.0-20251211194931-f79caeeaa72b
 	github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158

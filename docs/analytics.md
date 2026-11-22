@@ -67,8 +67,10 @@ A magnet page is sent as its bare path — `/magnet:` (also `/ru/magnet:`, and
 the browser's `magnet:` handler, which encodes the whole magnet into the
 path), `/ext/magnet` — as the page and as the next page's referrer: its
 address is the magnet, and a private tracker's passkey is part of a tracker
-URL. Every other page keeps its query. Before 2026-11 these rows carried the
-whole magnet. See `docs/private_torrent_logs.md`.
+URL. The report confirmation page (`/support/confirm?t=…`) goes the same
+way: its token confirms the report (`docs/support.md`). Every other page
+keeps its query. Before 2026-11 these rows carried the whole magnet. See
+`docs/private_torrent_logs.md`.
 
 The magnet card's own events carry no link either: `magnet-failed-shown`
 sends kind and timing, `magnet-private-shown` and `magnet-private-upload` the

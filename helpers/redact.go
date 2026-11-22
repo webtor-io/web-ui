@@ -119,6 +119,11 @@ var jwtLike = regexp.MustCompile(`eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za
 // addon), /unsubscribe/ and /email/verify/.
 var tokenSegment = regexp.MustCompile(`((?:^|/)(?:token|unsubscribe|verify)/)[^/?#\s]+`)
 
+// confirmToken is the t= of the confirmation link abuse-store mails a
+// reporter (/support/confirm?t=…): whoever has it confirms their report.
+// Only on that page: elsewhere t= is no credential.
+var confirmToken = regexp.MustCompile(`(support/confirm\?(?:[^#\s"'<>]*&)?t=)[^&#\s"'<>]+`)
+
 const redacted = "<redacted>"
 
 // RedactURL is a request path (query included), a whole URL, or any log text
@@ -130,5 +135,6 @@ func RedactURL(s string) string {
 	s = trackerParamEncoded.ReplaceAllString(s, "${1}"+redacted)
 	s = credentialParam.ReplaceAllString(s, "${1}"+redacted)
 	s = jwtLike.ReplaceAllString(s, redacted)
+	s = confirmToken.ReplaceAllString(s, "${1}"+redacted)
 	return tokenSegment.ReplaceAllString(s, "${1}"+redacted)
 }
