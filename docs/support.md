@@ -29,8 +29,10 @@ gin binds a bool with `strconv.ParseBool`, which refuses the browser's default
 `on`.
 
 Hash extraction, the 20-hash cap and the scan bounds are unchanged (comments
-in `handler.go`). Every notice goes with `Source=FORM`, plus `reporter_name`,
-`good_faith` and `authorized` as typed.
+in `handler.go`). Every notice goes with `Source=FORM`. `reporter_name` goes
+only with a copyright or an intimate image notice, and `good_faith` and
+`authorized` only with a copyright one: the browser still posts fields the
+chosen cause hides, and they must not reach another cause's letter.
 
 ## What abuse-store answers
 
@@ -39,8 +41,10 @@ in `handler.go`). Every notice goes with `Source=FORM`, plus `reporter_name`,
   with the link. The success page says the report takes effect only once
   confirmed from that letter, within 72 hours (`support.confirmationSent`).
 - `AlreadyExists` (every hash already blocked): the usual success page.
-- `ResourceExhausted` (too many notices wait for confirmation, per address or
-  in all): `error.support_too_many_pending`.
+- `ResourceExhausted` on a copyright or intimate image notice (too many
+  notices wait for confirmation, per address or in all):
+  `error.support_too_many_pending`. On any other cause it can only be the
+  transport's size limit, and the form shows the generic error.
 - Anything else: the form with the error, as before.
 
 A CSAM report is never stored or banned by abuse-store: it mails support
