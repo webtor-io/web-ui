@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 type VaultPledgeAddForm struct {
@@ -24,11 +23,8 @@ type VaultPledgeAddForm struct {
 	// when it has none or it is over (Remove is offered only then).
 	FreezePeriod time.Duration
 	FrozenFor    time.Duration
-	// Private: a private torrent, whose Store button comes with a warning;
-	// PrivateClosed: private pledges are not open yet (before enforce), so
-	// there is no Store button at all.
-	Private       bool
-	PrivateClosed bool
+	// Private: a private torrent, whose Store button comes with a warning.
+	Private bool
 }
 
 type VaultButton struct {
@@ -68,7 +64,6 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs, priva
 		ResourceID:    args.ID,
 		FreezePeriod:  s.vault.GetFreezePeriod(),
 		Private:       private,
-		PrivateClosed: private && !private_torrent.Enforce(),
 	}
 
 	// Check if user is supporting this torrent

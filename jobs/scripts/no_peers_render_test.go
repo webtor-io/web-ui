@@ -10,7 +10,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 // The no-peers modal has three variants keyed on Reason; each must resolve in
@@ -121,26 +120,21 @@ func renderModal(t *testing.T, tpl *template.Template, lang string, data any) st
 	return buf.String()
 }
 
-// The own-key card (Р14) speaks of the user's key only when it was theirs:
-// after enforce, and for a user with a uid. In observation the seeder
-// announced with the key of whoever added the torrent first.
+// The own-key card (Р14) speaks of the user's key for a refused tracker and
+// a user with a uid: the seeder announces with the record of the user asking.
 func TestOwnKeyRefused(t *testing.T) {
-	t.Cleanup(func() { private_torrent.SetEnforce(false) })
 	user := &api.Claims{Uid: "76543210fedcba9876543210fedcba9876543210"}
 	for _, c := range []struct {
-		name    string
-		enforce bool
-		reason  string
-		cl      *api.Claims
-		want    bool
+		name   string
+		reason string
+		cl     *api.Claims
+		want   bool
 	}{
-		{"refused, enforce, uid", true, "refused", user, true},
-		{"dead", true, "dead", user, false},
-		{"no uid", true, "refused", &api.Claims{}, false},
-		{"no claims", true, "refused", nil, false},
-		{"observation", false, "refused", user, false},
+		{"refused, uid", "refused", user, true},
+		{"dead", "dead", user, false},
+		{"no uid", "refused", &api.Claims{}, false},
+		{"no claims", "refused", nil, false},
 	} {
-		private_torrent.SetEnforce(c.enforce)
 		if got := ownKeyRefused(c.reason, c.cl); got != c.want {
 			t.Errorf("%s: ownKeyRefused = %v, want %v", c.name, got, c.want)
 		}

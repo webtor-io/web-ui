@@ -26,17 +26,6 @@
 		</div>
 	{{ else if .Data.Funded }}
 		{{ template "vault/pledge-modal/add/success" . }}
-	{{ else if .Data.PrivateClosed }}
-		{{/* Private pledges are not open on this server yet: no Store button. */}}
-		<p class="pt-4 pb-2 text-sm text-w-sub" data-umami-impression="vault-private-refused-shown" data-umami-impression-code="private_unavailable">
-			{{ t .Ctx.Lang "error.private.unavailable" }}
-			{{ "private_refusal.js" | asset }}
-		</p>
-		<div class="modal-action justify-center">
-			<form method="dialog">
-				<button class="btn btn-soft">{{ t .Ctx.Lang "vault.ok" }}</button>
-			</form>
-		</div>
 	{{ else }}
 		{{ if .Data.Available }}
 			{{ if ge (derefFloat64 .Data.Available) .Data.Required }}

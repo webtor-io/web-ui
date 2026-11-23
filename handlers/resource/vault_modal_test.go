@@ -204,11 +204,10 @@ func TestVaultFreezeLinesInEveryLocale(t *testing.T) {
 	}
 }
 
-// A private torrent's Save to Vault: before enforce the pledge is closed --
-// it says so, offers no Store button and counts the refusal; once open, the
-// Store button comes with the warning and nothing is counted (S29). A pledge
-// refused for want of the user's own record counts that refusal after the
-// redirect. A public torrent gets none of it.
+// A private torrent's Save to Vault: the Store button comes with the warning
+// and nothing is counted (S29). A pledge refused for want of the user's own
+// record counts that refusal after the redirect. A public torrent gets none
+// of it.
 func TestPledgeModalPrivate(t *testing.T) {
 	tpl := vaultModal(t)
 	warning := html.EscapeString("Saving downloads the whole torrent under your tracker account, and Webtor doesn't check your tracker's hit-and-run rules.")
@@ -224,16 +223,6 @@ func TestPledgeModalPrivate(t *testing.T) {
 	}
 	if strings.Contains(out, closed) || strings.Contains(out, refused) || strings.Contains(out, "vault-private-warning-shown") {
 		t.Errorf("open: no refusal and no warning event (S29):\n%s", out)
-	}
-
-	shut := addForm(f64(250))
-	shut.Private, shut.PrivateClosed = true, true
-	out = renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: shut})
-	if !strings.Contains(out, closed) || !strings.Contains(out, refused+` data-umami-impression-code="private_unavailable">`) {
-		t.Errorf("closed: want error.private.unavailable and its refusal event:\n%s", out)
-	}
-	if strings.Contains(out, storeForm) || strings.Contains(out, warning) {
-		t.Errorf("closed: no Store button and no warning:\n%s", out)
 	}
 
 	out = renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{

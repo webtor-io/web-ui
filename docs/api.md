@@ -156,7 +156,7 @@ it; a client that does not know a reason acts on the code alone.
 | `private_too_many_trackers` | 422 | The private torrent names too many tracker URLs |
 | `private_magnet` | 422 | `POST /resource` with a magnet without a tracker (no `tr=`) of a private torrent that is not stored yet: send its `.torrent` file, or a magnet that includes the tracker. Nothing was stored; the same magnet gets the same answer. A magnet with `tr=` of a private torrent is stored as usual |
 | `private_tracker_refused` | 422 | Your tracker refused the key in your magnet. `reason` is the class of the refusal: `key`, `account`, `unregistered`, `client`, `other` |
-| `private_unavailable` | 422 / 403 | This deployment does not serve private torrents: 422 on store, 403 on access. `POST /vault/pledges` answers it 422 while pledges on private torrents are not open on this deployment |
+| `private_unavailable` | 422 / 403 | This deployment does not serve private torrents: 422 on store, 403 on access (`POST /vault/pledges` included) |
 | `private_verify_unavailable` | 503 | Your tracker could not be asked now; `Retry-After` says when to try again |
 | `store_outdated` | 503 | Private torrents cannot be checked right now; try again later |
 | `rate_limited` | 429 | Too many requests with this key, or rest-api's limit on tracker checks; `Retry-After` says how long to wait |
