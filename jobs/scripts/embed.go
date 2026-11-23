@@ -275,8 +275,11 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 // name in a listing of pwd missed every file past the listing's first page
 // (ListResourceContentArgs asks for 10 items unless told otherwise). As that
 // listing did, a pwd holding nothing but one directory is also tried one
-// level down. Only the file at exactly that path is accepted, never another
-// of the same name. The error leaves the path out.
+// level down, and a pwd that is itself a file of that name is that file
+// (path "Movie.mkv/Movie.mkv" for a single-file torrent). Only the file at
+// exactly that path is accepted, never another of the same name. The
+// not-found error leaves the path out; a failed request is returned as the
+// api client wrote it, with rest-api's URL, as every listing's error is.
 func (s *EmbedScript) findFile(ctx context.Context, id, pwd, file string) (*ra.ListItem, error) {
 	i, err := s.fileAt(ctx, id, path.Join("/", pwd, file))
 	if i != nil || err != nil {
@@ -291,9 +294,15 @@ func (s *EmbedScript) findFile(ctx context.Context, id, pwd, file string) (*ra.L
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list resource content")
 	}
-	if len(l.Items) == 1 && l.Items[0].Type == ra.ListTypeDirectory {
-		if i, err = s.fileAt(ctx, id, path.Join(l.Items[0].PathStr, file)); i != nil || err != nil {
-			return i, err
+	if len(l.Items) == 1 {
+		switch it := l.Items[0]; {
+		case it.Type == ra.ListTypeDirectory:
+			if i, err = s.fileAt(ctx, id, path.Join(it.PathStr, file)); i != nil || err != nil {
+				return i, err
+			}
+		case it.PathStr == path.Join("/", pwd) && it.Name == file:
+			// Listing a file's own path returns that file.
+			return &it, nil
 		}
 	}
 	return nil, errors.New("failed to find stream content: requested file not found")

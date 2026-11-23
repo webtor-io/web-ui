@@ -72,7 +72,10 @@ func TestEmbedFindsRequestedFile(t *testing.T) {
 		{name: "file under the single top directory, past 10", settings: models.EmbedSettings{File: "e12.mkv"}, want: "/Show/e12.mkv"},
 		{name: "same name in another directory", settings: models.EmbedSettings{PWD: "Show/Extras", File: "e05.mkv"}},
 		{name: "a directory", settings: models.EmbedSettings{Path: "Show/Extras"}},
-		{name: "below a file", settings: models.EmbedSettings{Path: "Show/e01.mkv/e01.mkv"}},
+		{name: "pwd is the file", settings: models.EmbedSettings{PWD: "Show/e01.mkv", File: "e01.mkv"}, want: "/Show/e01.mkv"},
+		{name: "path through the file", settings: models.EmbedSettings{Path: "Show/e01.mkv/e01.mkv"}, want: "/Show/e01.mkv"},
+		{name: "below a file, another name", settings: models.EmbedSettings{Path: "Show/e01.mkv/e02.mkv"}},
+		{name: "below a file, deeper", settings: models.EmbedSettings{Path: "Show/e01.mkv/x/e01.mkv"}},
 		{name: "missing", settings: models.EmbedSettings{Path: "Show/e99.mkv"}},
 		{name: "nothing requested", settings: models.EmbedSettings{}, want: "/Show/e01.mkv"},
 	}
@@ -103,5 +106,27 @@ func TestEmbedFindsRequestedFile(t *testing.T) {
 				t.Errorf("got %s %s, want file %s", i.Type, i.PathStr, tc.want)
 			}
 		})
+	}
+}
+
+// A lookup that fails (an ingress 502 page) is returned as that failure, not
+// taken for a file that is not there.
+func TestEmbedFileLookupFailureIsAnError(t *testing.T) {
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("output") == "list" {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte("<html>502 Bad Gateway</html>"))
+			return
+		}
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer srv.Close()
+	ls := testLoadScript(t, srv, &api.Claims{})
+	s := &EmbedScript{api: ls.api, i18n: ls.i18n, c: &web.Context{Lang: "en", ApiClaims: &api.Claims{}}}
+	j := job.New(context.Background(), "t", "test", nil, &job.NilStorage{}, false, nil)
+	_, err := s.getBestItem(context.Background(), j, hash, &models.EmbedSettings{Path: "Show/e01.mkv"})
+	if err == nil || !strings.Contains(err.Error(), "failed to look up requested file") {
+		t.Fatalf("error %v, want the failed lookup", err)
 	}
 }
