@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -233,6 +234,14 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 		file = parts[len(parts)-1]
 		pwd = strings.Join(parts[:len(parts)-1], "/")
 	}
+	if file != "" {
+		i, err = s.findFile(ctx, id, pwd, file)
+		if err != nil {
+			return nil, err
+		}
+		j.Done()
+		return
+	}
 	l, err := s.api.ListResourceContentCached(apiCtx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
 		Path:   pwd,
 		Output: api.OutputTree,
@@ -251,24 +260,64 @@ func (s *EmbedScript) getBestItem(ctx context.Context, j *job.Job, id string, se
 			return nil, errors.Wrap(err, "failed to list resource content")
 		}
 	}
-	if file != "" {
-		for _, f := range l.Items {
-			if f.Name == file {
-				i = &f
-				break
-			}
-		}
-	} else {
-		i = s.findBestItem(l)
-	}
+	i = s.findBestItem(l)
 	if i == nil {
 		// errors.Wrap(nil, ...) returns nil — every err != nil branch above
 		// already returned, so err is guaranteed nil here. Caller saw
 		// (nil, nil), dereferenced i.MediaFormat, panicked. See embed.go:124.
-		return nil, errors.New("failed to find stream content")
+		return nil, errors.New("failed to find stream content: no file in the listing")
 	}
 	j.Done()
 	return
+}
+
+// findFile is the requested file, looked up by its full path. Matching its
+// name in a listing of pwd missed every file past the listing's first page
+// (ListResourceContentArgs asks for 10 items unless told otherwise). As that
+// listing did, a pwd holding nothing but one directory is also tried one
+// level down. Only the file at exactly that path is accepted, never another
+// of the same name. The error leaves the path out.
+func (s *EmbedScript) findFile(ctx context.Context, id, pwd, file string) (*ra.ListItem, error) {
+	i, err := s.fileAt(ctx, id, path.Join("/", pwd, file))
+	if i != nil || err != nil {
+		return i, err
+	}
+	apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer apiCancel()
+	l, err := s.api.ListResourceContentCached(apiCtx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
+		Path:   pwd,
+		Output: api.OutputTree,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list resource content")
+	}
+	if len(l.Items) == 1 && l.Items[0].Type == ra.ListTypeDirectory {
+		if i, err = s.fileAt(ctx, id, path.Join(l.Items[0].PathStr, file)); i != nil || err != nil {
+			return i, err
+		}
+	}
+	return nil, errors.New("failed to find stream content: requested file not found")
+}
+
+// fileAt is the file at p (absolute, as rest-api writes PathStr), or nil.
+// Listing a file's own path returns that file as the one item. Listing a
+// directory returns what is inside it, and listing a path below a file
+// returns the file: neither has the path asked for. Only a file can.
+func (s *EmbedScript) fileAt(ctx context.Context, id, p string) (*ra.ListItem, error) {
+	apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer apiCancel()
+	l, err := s.api.ListResourceContentCached(apiCtx, s.c.ApiClaims, id, &api.ListResourceContentArgs{
+		Path:   p,
+		Output: api.OutputList,
+		Limit:  1,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to look up requested file")
+	}
+	if len(l.Items) == 1 && l.Items[0].PathStr == p {
+		return &l.Items[0], nil
+	}
+	return nil, nil
 }
 
 func (s *EmbedScript) findBestItem(l *ra.ListResponse) *ra.ListItem {
