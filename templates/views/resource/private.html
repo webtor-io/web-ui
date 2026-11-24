@@ -10,3 +10,6 @@
     </div>
 </section>
 {{ end }}
+{{/* A status renewal refused the same way (resource/get.html, status_inner):
+     the refusal in the status's slot, under the handler's 403. */}}
+{{ define "resource/status_inner" }}{{ template "private/refusal" . }}{{ end }}
