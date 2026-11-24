@@ -145,50 +145,6 @@
         <h2 class="font-semibold text-base text-base-content leading-snug">{{ t $.Lang "private.notice.title" }}</h2>
     </div>
     <p class="text-sm text-w-sub mt-3 leading-relaxed">{{ t $.Lang "private.notice.body" }}</p>
-    {{- if useUmami }}{{ template "resource/seed_door" $ }}{{ end }}
-</div>
-{{ end }}
-{{/* A fake door, temporary: remove by 2026-11-30 (owner, 2026-11-15;
-     docs/analytics.md "Seeding after watching"). Counts who would want Webtor
-     to keep seeding with their key after watching; nothing of it exists. The
-     button opens a <details> saying so, with no request to the server, and
-     cannot be closed again, so its Umami click is the opening only. Counting
-     is all it is for, so it shows only where Umami is configured.
-
-     Days by tier: bronze 3, silver 7, gold 14. Any other paid tier (sparkling,
-     id 6, is above gold) is shown as Gold; free, and no claims, as free. */}}
-{{ define "resource/seed_door" }}
-{{- $tier := $.Claims | tierName }}
-{{- $name := "" }}{{ $days := 0 }}
-{{- if eq $tier "bronze" }}{{ $name = "Bronze" }}{{ $days = 3 }}
-{{- else if eq $tier "silver" }}{{ $name = "Silver" }}{{ $days = 7 }}
-{{- else if ne $tier "free" }}{{ $name = "Gold" }}{{ $days = 14 }}{{ end }}
-{{- $d := "" }}{{ if $days }}{{ $d = tn $.Lang "private.seedDoor.days" $days }}{{ end }}
-<div class="group/seed mt-4 pt-4 border-t border-w-line/40" data-umami-impression="seed-door-shown" data-umami-impression-tier="{{ $tier }}">
-    <div class="group-has-[[open]]/seed:hidden">
-        <h3 class="font-semibold text-sm text-base-content">{{ t $.Lang "private.seedDoor.title" }}</h3>
-        <p class="text-sm text-w-sub mt-1 leading-relaxed">{{ if $days }}{{ tp $.Lang "private.seedDoor.paid" "Tier" $name "Days" $d }}{{ else }}{{ t $.Lang "private.seedDoor.free" }}{{ end }}</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 group-has-[[open]]/seed:mt-0">
-        <details class="peer/door group/door open:basis-full">
-            {{/* Text only: Umami counts a click on an element that is not a
-                 button or a link only when the click lands on the element
-                 itself (lib/umami.js handleClicks). */}}
-            <summary class="btn btn-pink min-h-11 list-none [&::-webkit-details-marker]:hidden group-open/door:hidden" data-umami-event="seed-door-click" data-umami-event-tier="{{ $tier }}">{{ if $days }}{{ tp $.Lang "private.seedDoor.paidButton" "Days" $d }}{{ else }}{{ t $.Lang "private.seedDoor.freeButton" }}{{ end }}</summary>
-            <div role="status">
-                <p class="flex items-start gap-2 font-semibold text-sm text-base-content">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0 text-green-400" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                    {{ t $.Lang "private.seedDoor.thanks" }}
-                </p>
-                <p class="text-sm text-w-sub mt-2 leading-relaxed">{{ if $days }}{{ t $.Lang "private.seedDoor.thanksPaid" }}{{ else }}{{ t $.Lang "private.seedDoor.thanksFree" }}{{ end }}</p>
-                {{- if not $days }}
-                <a href="{{ langPath $.Lang "/donate" }}" data-async-target="main" class="btn btn-pink min-h-11 mt-3" data-umami-event="seed-door-tiers-click" data-umami-event-tier="{{ $tier }}">{{ t $.Lang "private.seedDoor.tiersLink" }}</a>
-                {{- end }}
-            </div>
-        </details>
-        <p class="text-xs text-w-sub peer-open/door:hidden">{{ t $.Lang "private.seedDoor.tiers" }}</p>
-    </div>
-    {{ "private_refusal.js" | asset }}
 </div>
 {{ end }}
 {{ define "title" }}

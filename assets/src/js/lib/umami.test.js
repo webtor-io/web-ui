@@ -156,17 +156,16 @@ test('every other page keeps its query', async () => {
     assert.equal(sent.at(-1).payload.referrer, 'https://search.example/?q=sintel');
 });
 
-// The seed-after-watching door (views/resource/get.html resource/seed_door)
-// is a <details>: its button is the <summary>, which is neither a button nor
-// a link, and Umami counts a click on such an element only when the click
-// lands on the element itself.
+// A <summary> used as a button is neither a button nor a link, and Umami
+// counts a click on such an element only when the click lands on the element
+// itself.
 test('a click on a text-only <summary> is counted with its props', async () => {
     const { sent, window } = setup({ autoTrack: true });
     await settle();
-    window.document.body.innerHTML = '<div><details><summary data-umami-event="seed-door-click" data-umami-event-tier="free">Keep seeding</summary><p>Thanks</p></details></div>';
+    window.document.body.innerHTML = '<div><details><summary data-umami-event="summary-click" data-umami-event-tier="free">Open</summary><p>Body</p></details></div>';
     window.document.querySelector('summary').click();
     await settle();
     const ev = sent.at(-1).payload;
-    assert.equal(ev.name, 'seed-door-click');
+    assert.equal(ev.name, 'summary-click');
     assert.equal(ev.data.tier, 'free');
 });
