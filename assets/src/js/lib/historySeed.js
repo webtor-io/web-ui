@@ -10,7 +10,8 @@
 // day. A resource page stranded under "/" keeps running, and the moment one
 // of its components reloads itself (the status badge renewing its token, the
 // library button) it asks for window.location with ITS layout -- "/" rendered
-// through `resource/status_inner`, a template the index view does not have.
+// through `resource/status_inner`, a template the index view did not have
+// then (it has one now, for a renewal that lands there: views/index.html).
 //
 // Seeded once per document, only if nothing else has claimed the entry.
 export function seedInitialEntry(win = window, doc = document, context = 'links') {
