@@ -83,10 +83,11 @@ func TestNoPeersModalRenders(t *testing.T) {
 			[]string{"private tracker"},
 			[]string{"Save it to Vault", "no-peers-retry", "another torrent"}},
 		// The user's own key was refused (Own, see ownKeyRefused): the
-		// tracker's answer to them, every usual reason in one card, none of
-		// the tracker's own words. Still no retry and no Vault.
+		// tracker's answer to them, a client whitelist first (nothing to fix
+		// here: their own client), then what they can check, none of the
+		// tracker's own words. Still no retry and no Vault.
 		{"refused, own key", trial, func() NoPeersData { d := base; d.Reason = "refused"; d.Own = true; d.ElapsedSec = 60; return d },
-			[]string{"accept your key", "changed your passkey", "your account is restricted", `reason: 'refused'`},
+			[]string{"turned down your request", "approved torrent clients", "your usual torrent client", "your passkey has changed", "no restrictions", `reason: 'refused'`},
 			[]string{"letting us through", "refused our request", "donate-no-peers", "Vault", "no-peers-retry", "another torrent"}},
 	}
 	for _, c := range cases {

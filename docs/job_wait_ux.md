@@ -244,3 +244,29 @@ sticky status away on every click, then scrolled to the top of the page.
   (`services/web/has_guard_test.go`). A page without `#content` falls back to `main`.
 - Still targeting `main` on purpose: directory links when no file is picked, and the
   watched toggles (they keep the header button in sync).
+
+## The wget and curl commands
+
+The download card copies `wget -c -O "<file>" -t 20 "<url>"`
+and `curl -f -o "<file>" -C - --retry 20 "<url>"` (`action/download_file.html`, guarded
+by `TestDownloadCommands`). The link goes to torrent-http-proxy, whose
+session limiter answers 429 with `Retry-After: 5`, and whose claims check answers 403.
+
+- `curl -f`: without it curl writes the error body into the file and exits 0 (on a fresh
+  403 it leaves an empty or error-text file), and a later `-C -` resumes after that body.
+  With a partial file, a 429 without `-f` ends in exit 33 "Cannot resume" and is never
+  retried; with `-f` it is a transient error that `--retry` repeats after `Retry-After`.
+  A 416 to the resume of an already complete file still exits 0.
+- wget has no `--retry-on-http-error=429` on purpose. Without it wget does not retry a 429
+  (exit 8, "ERROR 429: Too Many Requests"); running the same `-c` command again resumes.
+  With it, wget older than 1.19.1 and BusyBox wget (Alpine, routers) refuse the whole line
+  with "unrecognized option": at ingress on 2026-11-16 that was 3 of 25 wget clients over
+  6 h (one `Wget/1.12`, two BusyBox, whose User-Agent is a bare `Wget`), against 7 of 312
+  wget requests answered 429. A command that runs everywhere and stops visibly on a rare
+  429 won over one that retries it but breaks outright for one client in eight.
+- Measured 2026-11-16 with curl 8.7.1 and wget 1.25.0 against a local server: curl
+  finishes a byte-identical file after 429s on a fresh and on a resumed download (wget
+  stops, exit 8), both stop on a 403 without writing its body (curl exit 22, wget exit 8; wget leaves the empty file
+  `-O` creates), and both exit 0 on a complete file. A connection dropped mid-file still
+  ends curl with exit 18, which `--retry` does not cover; running the command again
+  resumes.
