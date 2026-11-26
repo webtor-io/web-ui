@@ -3,6 +3,7 @@ package j
 import (
 	"context"
 	"crypto/sha1"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -40,13 +41,48 @@ func loadJobID(c *web.Context, args *scripts.LoadArgs, hash string) string {
 	return fmt.Sprintf("%x", sha1.Sum([]byte(key)))
 }
 
-func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err error) {
+// uploadKey says which uploads are one: the same load job id (hash, lang,
+// uid) and the same bytes. A guest's uid is empty, as in the id.
+func uploadKey(id string, file []byte) string {
+	return fmt.Sprintf("%s/%x", id, sha256.Sum256(file))
+}
+
+// uploadDone forgets the run in flight under key, if it is still j.
+func (s *Jobs) uploadDone(key string, j *job.Job) {
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	if s.uploads[key] == j {
+		delete(s.uploads, key)
+	}
+}
+
+// Load queues the load job for args. reqCtx is the request's: a client gone
+// by the time the upload is read and parsed gets no job, since nobody would
+// read its log and the run would still send the whole file to rest-api.
+func (s *Jobs) Load(reqCtx context.Context, c *web.Context, args *scripts.LoadArgs) (j *job.Job, err error) {
 	ls, hash, err := scripts.Load(s.api, s.i18n, c, args)
 	if err != nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	if err = reqCtx.Err(); err != nil {
+		return
+	}
 	id := loadJobID(c, args, hash)
+	// An upload purges, so each one used to start its own run, and a browser
+	// that sent one file three times had rest-api read and parse it three
+	// times at once. The same bytes from the same caller while a run is in
+	// flight join that run instead. Only while it runs: the next upload once
+	// it has ended runs again, as before.
+	key := ""
+	if args.File != nil {
+		key = uploadKey(id, args.File)
+		s.uploadsMu.Lock()
+		defer s.uploadsMu.Unlock()
+		if j, ok := s.uploads[key]; ok {
+			return j, nil
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	perUser := perUserLoad(args)
 	// A load job's log is kept in Redis, so a second visit replays the first
 	// run — including a failure. The dead-magnet retry must run again, not
@@ -55,6 +91,9 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 	// Purge drops the stored log first.
 	purge := args.MagnetWait > 0 || args.Debug != "" || args.File != nil
 	j = s.q.GetOrCreate("load").Enqueue(ctx, cancel, id, job.NewScript(func(j *job.Job) (err error) {
+		if key != "" {
+			defer s.uploadDone(key, j)
+		}
 		if perUser {
 			// Not kept for replay: the same user's next magnet may carry a
 			// new passkey and must reach rest-api. Not purge on every magnet
@@ -91,6 +130,15 @@ func (s *Jobs) Load(c *web.Context, args *scripts.LoadArgs) (j *job.Job, err err
 		j.Redirect(web.LangURL(c.Lang, "/"+rID), s.T(c, "job.redirecting"))
 		return
 	}), purge, s.errorFormatter(c))
+	if key != "" {
+		if s.uploads == nil {
+			s.uploads = map[string]*job.Job{}
+		}
+		s.uploads[key] = j
+		// A run the job store refused never starts the script, so the
+		// script's own uploadDone never comes; ctx ends 60 s after the run.
+		context.AfterFunc(ctx, func() { s.uploadDone(key, j) })
+	}
 	return
 }
 
