@@ -54,7 +54,7 @@ func TestUploadAfterMagnetCardRunsAFreshLoad(t *testing.T) {
 			replicaA, replicaB := newJobs(), newJobs()
 			wc := &web.Context{Lang: "en", ApiClaims: &api.Claims{}}
 
-			card, err := replicaA.Load(wc, &scripts.LoadArgs{Query: "magnet:?xt=urn:btih:" + hash})
+			card, err := replicaA.Load(context.Background(), wc, &scripts.LoadArgs{Query: "magnet:?xt=urn:btih:" + hash})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -67,7 +67,7 @@ func TestUploadAfterMagnetCardRunsAFreshLoad(t *testing.T) {
 			}
 
 			upload := &scripts.LoadArgs{File: torrent, Source: "site"}
-			if _, err := replicaB.Load(wc, upload); err != nil {
+			if _, err := replicaB.Load(context.Background(), wc, upload); err != nil {
 				t.Fatal(err)
 			}
 			uploadID := loadJobID(wc, upload, hash)
