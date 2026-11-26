@@ -1,6 +1,7 @@
 package j
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
@@ -93,7 +94,7 @@ func TestPerUserRunIsNotKept(t *testing.T) {
 		{"bare magnet, user A", a, &scripts.LoadArgs{Query: "magnet:?xt=urn:btih:" + h}, true, uidA},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			run, err := jobs.Load(c.c, c.args)
+			run, err := jobs.Load(context.Background(), c.c, c.args)
 			if err != nil {
 				t.Fatal(err)
 			}

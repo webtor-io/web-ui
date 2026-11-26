@@ -1,6 +1,8 @@
 package j
 
 import (
+	"sync"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"github.com/webtor-io/web-ui/jobs/scripts"
@@ -85,6 +87,9 @@ type Jobs struct {
 	cacheIndex    scripts.CacheIndexer
 	warmup        scripts.WarmupSettings
 	grace         scripts.GraceSettings
+	// uploads are the upload runs in flight, by uploadKey (Load).
+	uploadsMu sync.Mutex
+	uploads   map[string]*job.Job
 }
 
 // T translates a message key using the language from web.Context.
