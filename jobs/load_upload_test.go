@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/anacrolix/torrent/metainfo"
@@ -132,4 +133,41 @@ func TestSameUploadJoinsRunInFlight(t *testing.T) {
 	}
 	posted("upload after the run", torrent)
 	st.waitClosed(t, "upload after the run")
+}
+
+// dropFails is a job store that refuses every upload run: an upload purges,
+// and a failed Drop ends the run before its script starts.
+type dropFails struct{ *memStorage }
+
+func (dropFails) Drop(context.Context, string, string) error { return errors.New("store down") }
+
+// A run the job store refuses never starts its script, so the script's own
+// uploadDone never comes. It is forgotten when its context ends, 60 s after
+// the run, and the same upload then runs again instead of joining it.
+func TestRefusedUploadRunIsForgotten(t *testing.T) {
+	torrent, _ := privateTorrent(t)
+	restAPI := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected %v %v", r.Method, r.URL.Path)
+	})
+	st := dropFails{&memStorage{logs: map[string][]job.LogItem{}, closed: make(chan string, 8)}}
+	jobs := testJobsWith(t, restAPI, st)()
+	a := &web.Context{Lang: "en", ApiClaims: &api.Claims{Uid: strings.Repeat("a", 40)}}
+	// The bubble's clock sleeps out the 60 s without the test waiting them.
+	synctest.Test(t, func(t *testing.T) {
+		load := func() *job.Job {
+			t.Helper()
+			j, err := jobs.Load(context.Background(), a, &scripts.LoadArgs{File: bytes.Clone(torrent), Source: "site"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return j
+		}
+		first := load()
+		time.Sleep(61 * time.Second)
+		synctest.Wait()
+		if load() == first {
+			t.Error("the same upload joined a run the job store refused")
+		}
+		time.Sleep(61 * time.Second) // the second run ends in the bubble too
+	})
 }
