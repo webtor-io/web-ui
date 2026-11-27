@@ -122,7 +122,9 @@
 
             {{- /* The progress of "Add files" (lib/upload.js), across the card
                  of the files it adds to, where a folder's archive log shows:
-                 not in the page's header. */}}
+                 not in the page's header. The card rendered anew (a file
+                 picked, the listing paged) gets the running log back in
+                 place of this empty one (upload.js keep). */}}
             {{- if and uploadsEnabled $Upload $Upload.CanWrite }}
             {{ template "upload/log" (withContext $ "rounded-none! shadow-none! border-x-0! border-t-0!") }}
             {{- end }}

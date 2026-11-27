@@ -189,8 +189,12 @@ Done, it opens the upload's page (`/<id>`, `?pwd=` when it went into a
 subfolder) the way a load does, with the log's redirect (an async link into
 "main"; to the URL already shown it makes no history entry), after waiting at most a second for its two Umami events
 (`docs/analytics.md`, "Uploads"). When an async navigation took the log away,
-the outcome is a 10 s toast instead; on `/<id>` picking a file or another
-page of the listing does too, the card being re-rendered. One run per tab
+the outcome is a 10 s toast instead. On `/<id>` the card the log is in is
+rendered anew when a file is picked, the listing paged or another folder
+opened: the run's log, its verdict too, takes the empty log's place in the
+new card (`keep` in `lib/upload.js`, as `keepJobs` in `lib/loadAsyncView.js`
+moves a job's), until the next run, the redirect or the toast; not onto
+another upload's page. One run per tab
 (`window.__uploadBusy`); other tabs of the browser see the run through a
 mark in `localStorage` (`upload-busy:<id>`). "Save to Vault" is held in all of
 them while the run lasts: a pledge closes the upload for writing.

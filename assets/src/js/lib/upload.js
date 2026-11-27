@@ -205,6 +205,14 @@ function transport() {
     };
 }
 
+// keep is the "async" listener of the last run on an upload's page: on that
+// page the log is in the card of the files (partials/list.html), which a
+// file picked or another page or folder of the listing renders anew with an
+// empty log, and the run's own takes its place, as a job's log does
+// (loadAsyncView.js keepJobs). Its verdict too, until the next run, the
+// redirect or the outcome toast.
+let keep = null;
+
 // startUpload sends items into a new upload, or into opts.id ("Add files",
 // into the folder opts.dir), showing its progress in log, the page's
 // [data-upload-log] (partials/upload/log.html): the log of a torrent's load,
@@ -262,6 +270,12 @@ export async function startUpload(log, items, opts = {}) {
         // "Open" would open that same page: neither is in the log.
         pl = initProgressLog(log);
         pl.clear();
+        window.removeEventListener('async', keep);
+        keep = opts.id ? (e) => {
+            const slot = e.detail?.target?.querySelector?.('[data-upload-log]');
+            if (slot && !log.isConnected && doc.querySelector(`[data-upload-add][data-upload-id="${opts.id}"]`)) slot.replaceWith(log);
+        } : null;
+        if (keep) window.addEventListener('async', keep);
         const footer = log.querySelector('.alert-close-wrapper');
         const open = log.querySelector('[data-upload-open]');
         const signIn = log.querySelector('[data-upload-sign-in]');
@@ -568,6 +582,7 @@ export async function startUpload(log, items, opts = {}) {
             // the redirect is then to the page shown (no history entry).
             const pwd = opts.dir && '/' + opts.dir.join('/');
             const withPwd = opts.dir?.length > 1 || (pwd && new URLSearchParams(window.location.search).get('pwd') === pwd);
+            window.removeEventListener('async', keep);
             pl.push({ level: 'redirect', location: langPath('/' + id) + (withPwd ? '?pwd=' + encodeURIComponent(pwd) : '') });
         } else {
             log.querySelector('.closeable-close').hidden = false;
@@ -577,6 +592,7 @@ export async function startUpload(log, items, opts = {}) {
     }
     // An async navigation took the log away: the outcome is a toast, once
     // the tab is seen (a hidden tab would fade it in and out unseen).
+    window.removeEventListener('async', keep);
     const show = () => {
         if (said === undefined && allDone) window.toast?.success(t('upload.done'), OUTCOME_TOAST_MS);
         else window.toast?.error(said ?? t('upload.someFailed'), OUTCOME_TOAST_MS);

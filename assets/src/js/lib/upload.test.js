@@ -40,6 +40,7 @@ useWindow(newWindow());
 
 const { fill, safeSegment, rootName, defaultName, nextName, sizeBucket, startUpload } = await import('./upload.js');
 const { makeI18n } = await import('./i18n.js');
+const { default: loadAsyncView } = await import('./loadAsyncView.js');
 // The uploader's chunks, loaded once here: no test's first run waits for the
 // loader.
 await import('../../../../locales/en.json?prefix=upload');
@@ -1218,6 +1219,104 @@ test("the next run's footer starts over", async (t) => {
         r.tr.token = quota;
         await r.run([asFile('z')]);
         assert.deepEqual(footer(r), { open: true, signIn: true, gotIt: false });
+    });
+});
+
+// On the upload's page the log is in the card of the files
+// (partials/list.html), which a file picked or another page of the listing
+// renders anew (lib/loadAsyncView.js) with an empty log in it: the run's
+// own goes on there, and with it its verdict -- not past its redirect or
+// its toast, nor onto another upload's page.
+test('the log goes on in the card rendered anew', async (t) => {
+    const card = () => `<div class="js-list-card" data-resource-id="${U0}">${uploadLog}</div>`;
+    // stage: "Add files" of the upload `of` in the header, the card with
+    // the run's log in #content; swap renders #content anew.
+    const stage = (t, r, of = U0) => {
+        const page = document.createElement('div');
+        page.innerHTML = `<button data-upload-add data-upload-id="${of}"></button><div id="content">${card()}</div>`;
+        document.body.append(page);
+        t.after(() => page.remove());
+        const content = page.querySelector('#content');
+        content.querySelector('[data-upload-log]').replaceWith(r.host);
+        return { page, content, swap: () => loadAsyncView(content, card()) };
+    };
+    const opts = { id: U0, name: 'Photos', dir: ['Photos'] };
+    const held = () => {
+        const a = defer();
+        return { a, put: (p) => (last(p) === 'a' ? a.promise : ok201) };
+    };
+    await t.test('a file picked while the files go', async (t) => {
+        const { said } = toasts(t);
+        const h = held();
+        const r = rig(t, { put: h.put });
+        const { content, swap } = stage(t, r);
+        const p = r.run([asFile('a'), asFile('b')], opts);
+        await until(() => r.calls.put.length === 2, 'both files sent');
+        swap();
+        assert.ok(content.contains(r.host), "the run's log is in the new card");
+        assert.equal(document.querySelectorAll('[data-upload-log]').length, 1);
+        h.a.resolve(ok201);
+        await p;
+        assert.equal(r.assigned.length, 1, 'done, it shows the files');
+        assert.equal(said.length, 0);
+    });
+    await t.test("another upload's page", async (t) => {
+        const { said } = toasts(t);
+        const h = held();
+        const r = rig(t, { put: h.put });
+        const { swap } = stage(t, r, 'f'.repeat(40));
+        const p = r.run([asFile('a'), asFile('b')], opts);
+        await until(() => r.calls.put.length === 2, 'both files sent');
+        swap();
+        assert.equal(r.host.isConnected, false);
+        h.a.resolve(ok201);
+        await p;
+        assert.deepEqual(said, ['ok:upload.done']);
+    });
+    await t.test('the verdict stays', async (t) => {
+        const s = gone410();
+        const r = rig(t, { put: s.put });
+        const { content, swap } = stage(t, r);
+        await r.run(s.items, opts);
+        swap();
+        assert.ok(content.contains(r.host));
+        assert.match(r.status(), /upload\.unavailable/);
+    });
+    await t.test('the redirect renders the page anew', async (t) => {
+        const r = rig(t);
+        const { swap } = stage(t, r);
+        await r.run([asFile('a')], opts);
+        assert.equal(r.assigned.length, 1);
+        swap();
+        assert.equal(r.host.isConnected, false);
+    });
+    await t.test("a verdict's log is not kept past the next run's redirect", async (t) => {
+        const s = gone410();
+        const r = rig(t, { put: s.put });
+        const { swap } = stage(t, r);
+        await r.run(s.items, opts);
+        r.tr.put = async () => ok201;
+        await r.run([asFile('z')], opts);
+        assert.equal(r.assigned.length, 1);
+        swap();
+        assert.equal(r.host.isConnected, false);
+    });
+    await t.test('the outcome was a toast', async (t) => {
+        const { said } = toasts(t);
+        const h = held();
+        const r = rig(t, { put: h.put });
+        const { page, swap } = stage(t, r);
+        const add = page.querySelector('[data-upload-add]');
+        const p = r.run([asFile('a'), asFile('b')], opts);
+        await until(() => r.calls.put.length === 2, 'both files sent');
+        add.remove();
+        swap();
+        h.a.resolve(ok201);
+        await p;
+        assert.deepEqual(said, ['ok:upload.done']);
+        page.prepend(add);
+        swap();
+        assert.equal(r.host.isConnected, false);
     });
 });
 
