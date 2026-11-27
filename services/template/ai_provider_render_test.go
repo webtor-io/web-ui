@@ -32,6 +32,10 @@ func renderPrivacy(t *testing.T, provider string, enabled bool) string {
 	return whitespace.ReplaceAllString(buf.String(), " ")
 }
 
+// uploadPathToAI is the clause of the uploads line that sends a file's path
+// to the AI provider: there only where a provider key is configured.
+const uploadPathToAI = "the file's path (folder and file names) may be sent, without your account identifier, to our AI provider"
+
 func TestPrivacyNamesTheConfiguredAIProvider(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -46,14 +50,17 @@ func TestPrivacyNamesTheConfiguredAIProvider(t *testing.T) {
 			"Standard Contractual Clauses",
 			"first request to OpenAI",
 			"OpenAI retains API inputs and outputs in abuse-monitoring logs for up to 30&nbsp;days, then deletes them unless longer retention is required by law or reasonably necessary",
+			uploadPathToAI,
 		}, []string{"Anthropic"}},
 		{"anthropic", "anthropic", true, []string{
 			"Anthropic, PBC",
 			"Standard Contractual Clauses",
 			"first request to Anthropic",
 			"Anthropic retains API inputs and outputs for up to 30&nbsp;days",
+			uploadPathToAI,
 		}, []string{"OpenAI"}},
-		{"no_key", "", true, []string{"your watch history and queries are not sent to any AI provider"}, []string{"Anthropic", "OpenAI", "first request to"}},
+		// Without a key the enrichment has no provider: an upload's path goes nowhere.
+		{"no_key", "", true, []string{"your watch history and queries are not sent to any AI provider"}, []string{"Anthropic", "OpenAI", "first request to", uploadPathToAI}},
 		// A key with the flag off (enrichment only): Discover does not run,
 		// so nothing of the user's goes to the provider.
 		{"openai_flag_off", "openai", false, []string{"your watch history and queries are not sent to any AI provider"}, []string{"Anthropic", "OpenAI", "first request to"}},

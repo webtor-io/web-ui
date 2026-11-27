@@ -107,9 +107,6 @@ func TestLLMsTxtKeepsToTheFacts(t *testing.T) {
 		}
 	}
 	for _, tool := range hc.Tools {
-		if tool.Uploads {
-			continue // its llms.txt line ships with the legal texts (feat/uploads-legal)
-		}
 		if link := "(https://webtor.io/" + tool.Url + ")"; !strings.Contains(text, link) {
 			t.Errorf("pub/llms.txt does not list the tool page %s", link)
 		}

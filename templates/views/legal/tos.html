@@ -11,7 +11,7 @@
 
     <h1 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">Terms of Service</h1>
 
-    <p class="text-sm text-w-muted mb-8">Last updated: May 17, 2026</p>
+    <p class="text-sm text-w-muted mb-8">Last updated: November 27, 2026</p>
 
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-8">By using Webtor ("we," "our," or "us"), you agree to these Terms of Service. Please read them carefully.</p>
 
@@ -26,7 +26,7 @@
 
     <div class="bg-warning/10 border border-warning/30 rounded-2xl p-6 mb-6">
       <p class="text-[1.05rem] text-w-sub leading-relaxed font-bold mb-2">3.1. Zero tolerance — strictly forbidden content</p>
-      <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2">The following content is absolutely prohibited on Webtor. Attempting to add, stream, share, embed, vault, or otherwise interact with such material via the service is grounds for immediate account termination, permanent removal of the underlying torrent (by infohash), and — where applicable law requires — reporting to law enforcement and the appropriate national hotlines (e.g. NCMEC in the United States, IWF in the United Kingdom):</p>
+      <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2">The following content is absolutely prohibited on Webtor. Attempting to add, upload, stream, share, embed, vault, or otherwise interact with such material via the service is grounds for immediate account termination, permanent removal of the underlying torrent (by infohash), and — where applicable law requires — reporting to law enforcement and the appropriate national hotlines (e.g. NCMEC in the United States, IWF in the United Kingdom):</p>
       <ul class="list-disc pl-6 space-y-2 mb-2 text-[1.05rem] text-w-sub leading-relaxed">
         <li><strong>Child Sexual Abuse Material (CSAM)</strong>, including any depiction, simulation, or promotion of sexual activity involving minors, regardless of medium or jurisdiction of origin;</li>
         <li>Sexual content involving real or implied minors, including content marketed using minor-age markers (e.g. "Nyo", "preteen", "loli", "kindergarten", "schoolgirl/schoolboy"), erotic webcam captures of minors, and material from known CSAM distribution rings;</li>
@@ -47,6 +47,7 @@
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">4. Content Moderation &amp; Enforcement</h2>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Webtor automatically screens incoming torrents at the storage layer against a constantly-updated abuse blocklist. Torrents matching the blocklist are rejected at intake and not stored, indexed, or served. Already-known illegal infohashes are blocked at playback.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Files that users upload (§11) may be screened as well, automatically or manually, before or after upload.</p>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Where automated screening misses a violation, content can be reported via <a href="/support" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2" data-async-target="main">our support channel</a>. Confirmed reports lead to permanent block of the offending infohash and cascading removal from every part of the service (library, watch history, embeds, vault, cached metadata).</p>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We cooperate with valid law-enforcement requests and may, at our discretion, refer accounts and metadata associated with prohibited content described in §3.1 directly to the appropriate national authority.</p>
 
@@ -68,7 +69,7 @@
     </p>
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">6. Sharing &amp; Anonymous Access</h2>
-    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Webtor lets any user generate a shareable link to a resource page so a third party can preview the content for a limited time without an account. By generating, copying, or distributing such a link, you (the "sharer") accept additional responsibilities:</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">Webtor lets any user generate a shareable link to a resource page (except an upload, see §11.2) so a third party can preview the content for a limited time without an account. By generating, copying, or distributing such a link, you (the "sharer") accept additional responsibilities:</p>
     <ul class="list-disc pl-6 space-y-2 mb-4 text-[1.05rem] text-w-sub leading-relaxed">
         <li>You confirm that the underlying content does not fall within the categories prohibited by §3.1 (Zero-tolerance content) and does not, to your knowledge, infringe third-party rights (see <a href="/legal/dmca" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2" data-async-target="main">DMCA</a>);</li>
         <li>You are responsible for where the link ends up. Sharing into a public space (forum, social network, Discord, Telegram, school chat, etc.) shifts the recipient mix beyond people you know personally — including potentially minors;</li>
@@ -90,6 +91,14 @@
 
     <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">10. Changes to These Terms</h2>
     <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4">We may update these Terms from time to time. Any changes will be posted on this page and become effective immediately upon posting.</p>
+
+    <h2 class="text-[1.3rem] font-bold tracking-tight mt-10 mb-3">11. Your Uploads</h2>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2"><span class="font-semibold">11.1. Who can upload.</span> Only signed-in users can upload their own files and folders.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2"><span class="font-semibold">11.2. Who can see an upload.</span> The page of an upload opens only for the account that uploaded it. Nobody else, signed in or not, can open it, and Webtor offers no way to share it. A direct link to one of your files or to its video stream is different: if you give such a link to someone, it works for them until it expires, within 24&nbsp;hours of being issued. The same applies to a link to the processing log of your upload's page. Deleting the upload stops links to its files and streams, except that video already prepared for playback may keep playing through them until they expire.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2"><span class="font-semibold">11.3. Limits.</span> The uploads of one account that are not saved to Vault may take up to 10&nbsp;GB in total on the free plan and up to 50&nbsp;GB on paid plans. One upload holds up to 10,000 files and folders. Uploads saved to Vault count toward your Vault allowance instead.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2"><span class="font-semibold">11.4. Uploads are temporary.</span> Uploads are kept in temporary storage. An upload that has not been played, downloaded or added to for a while may be deleted without notice when the space is needed. We do not promise how long an upload is kept. Uploads not saved to Vault are kept as a single copy and may also be lost when our storage hardware fails or is changed. To keep an upload, save it to Vault (paid plans); it then stays while it is saved there, and files can no longer be added to it or deleted from it. You can delete an upload at any time, together with its Vault copy; until it is saved to Vault, you can also delete single files and folders in it.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-2"><span class="font-semibold">11.5. Review and complaints.</span> We may review or screen uploaded files, automatically or manually, and may remove an upload that breaks §3, together with any Vault copy, without notice. We are not obliged to review every file. We also act on DMCA notices (see <a href="/legal/dmca" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2" data-async-target="main">DMCA</a>) and on reports sent through <a href="/support" class="font-medium text-w-text underline decoration-current/30 underline-offset-2 transition-all duration-200 hover:text-w-pinkL hover:decoration-w-pinkL hover:decoration-2" data-async-target="main">our support channel</a>. §4 and §7 apply.</p>
+    <p class="text-[1.05rem] text-w-sub leading-relaxed mb-4"><span class="font-semibold">11.6. Your responsibility.</span> You are solely responsible for the files you upload and for any link to them that you give to others. By uploading, you confirm that you have the right to store these files and that they do not fall under §3.</p>
   </div>
 </section>
 {{ end }}
