@@ -616,6 +616,11 @@ func TestCheckOrderIsRandom(t *testing.T) {
 		row(t, db, u, uid(n), 1*gib, expired, "NULL")
 		f.set(uid(n), reply{status: http.StatusServiceUnavailable, body: `{"error":"down"}`, delay: time.Second})
 	}
+	// The pool's connection is opened here, not inside the first 20 ms
+	// deadline: dialing Postgres alone can take longer than that.
+	if _, _, err := s.Quota(context.Background(), u, free, nil, "", false); err != nil {
+		t.Fatal(err)
+	}
 	// A 20 ms deadline lets only the first four checks start: the last row
 	// is missed by all 100 calls with chance 0.8^100.
 	for range 100 {
