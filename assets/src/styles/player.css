@@ -134,11 +134,26 @@ body:not([data-iframe-height]) .wt-preview-mount {
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
-/* The whole picture fits the window under the navbar (72 px, style.css) and
-   the mount's margin: a tall one narrows the player to the width that keeps
-   its ratio, in the middle of the column. Full width, a portrait clip was
-   ~1500 px tall in the 850 px column, its controls far below the window
-   (owner, 2026-11-27). --wt-ratio is the video's own (Player.jsx); without
+/* The whole picture fits the window under what is fixed at its top, and is
+   never taller than 640 px: a tall one narrows the player to the width that
+   keeps its ratio, in the middle of the column. Full width, a portrait clip
+   was ~1500 px tall in the 850 px column, its controls far below the window
+   (owner, 2026-11-27). The height it may take:
+   - 72px: the navbar (style.css).
+   - 67px: the sticky status bar under it (views/resource/get.html,
+     #torrent-status-sticky), measured in Chrome: 67 px with the chain and
+     the piece bar on a desktop, 81 on a phone, 95 with a hint line. It is
+     up whenever the card's status is scrolled away and bytes move -- nearly
+     all the time a film plays -- so it is reserved always: a player that
+     resized as the bar came and went would jump under the viewer.
+   - 2rem: the mount's 1.5rem margin and 0.5rem of air under the player
+     scrolled to the bar. A taller bar (a phone's, a hint's) eats into it
+     and the player still fits; the plan box's (156 px) does not.
+   - 640px: the most on any window (owner, 2026-11-27: portrait clips are
+     mostly low-resolution and look poor blown up to the window's height).
+     On a 2x screen 1280 device px, a 720x1280 clip pixel for pixel. The
+     number to move to make them bigger or smaller.
+   --wt-ratio is the video's own (Player.jsx); without
    it -- before the first frame -- no cap, as before. svh: the size does not
    follow a phone's browser bars in and out on every scroll. Not in the
    embed: its iframe grows to fit the player, and a cap from the iframe's
@@ -150,7 +165,7 @@ body:not([data-iframe-height]) .wt-preview-mount {
    px of the picture, where a narrower player would cut off fullscreen.
    Another button in the row moves this floor. */
 body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen) {
-    max-width: max(18rem, calc((100svh - 72px - 1.5rem) * (var(--wt-ratio))));
+    max-width: max(18rem, calc(min(100svh - 72px - 67px - 2rem, 640px) * (var(--wt-ratio))));
     margin-inline: auto;
 }
 
