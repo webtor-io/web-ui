@@ -450,7 +450,7 @@
     "upload.state.unsaved": "Not saved to Vault: the files may be deleted. You can't add files here any more.",
     "upload.signIn": "Uploading your own files is for signed-in users only: only you can see them. Sign in.",
     "upload.folder": "Upload a folder",
-    "@upload.folder": "Button inside the upload drop zone that opens a folder picker: upload a whole folder of the user's own files. A verb phrase.",
+    "@upload.folder": "Link in the row under the upload drop zone, first, before 'Try the demo' and 'Speed test': opens a folder picker to upload a whole folder of the user's own files. A verb phrase, about as short as its neighbours.",
     "upload.open": "Open",
     "@upload.open": "Button in the upload's progress log to the upload's own page, opened in a new tab once its first file is stored. A verb: open the upload.",
     "upload.uploading": "Uploading your files",

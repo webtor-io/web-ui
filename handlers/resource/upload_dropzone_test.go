@@ -103,11 +103,13 @@ func TestDropzoneUploads(t *testing.T) {
 		if strings.Contains(main, "Magnet links go in the field above") {
 			t.Error("the zone still points at the field above")
 		}
-		// "Upload a folder" is a button inside the zone; its picker is not:
-		// a click on it would bubble up to the zone and open the file picker.
+		// "Upload a folder" is a button under the zone, not in it
+		// (services/template.TestFolderLinkLeadsTheRowUnderTheZone); its
+		// picker is not in the zone either: a click on it would bubble up to
+		// the zone and open the file picker.
 		z := zone(t, main)
-		if !strings.Contains(z, folder) || !strings.Contains(openTag(t, z, "dropzone-folder"), `type="button"`) {
-			t.Errorf("no folder button inside the zone:\n%s", z)
+		if strings.Contains(z, folder) || !strings.Contains(openTag(t, main, "dropzone-folder"), `type="button"`) {
+			t.Errorf("want the folder button under the zone, not in it:\n%s", main)
 		}
 		if strings.Contains(z, "dropzone-dir") || !strings.Contains(main, "dropzone-dir") {
 			t.Errorf("the folder picker is not next to the zone:\n%s", main)

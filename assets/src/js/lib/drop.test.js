@@ -88,8 +88,9 @@ function home(t, { guest = false, vault = false } = {}) {
     root.innerHTML = `${guest ? '<template id="upload-sign-in"><div data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in"><script src="/assets/private_refusal.js"></script></div></template>' : ''}
 <div data-upload-log></div>
 <div class="upload-sign-in-slot"></div>
-<form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><div><p>zone</p><button type="button" class="dropzone-folder"><svg><path/></svg>folder</button></div><input class="dropzone-input" type="file" multiple></form>
-<input type="file" class="dropzone-dir hidden" webkitdirectory multiple>`;
+<form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><div><p>zone</p></div><input class="dropzone-input" type="file" multiple></form>
+<input type="file" class="dropzone-dir hidden" webkitdirectory multiple>
+<div><button type="button" class="dropzone-folder"><svg><path/></svg>folder</button></div>`;
     document.body.append(root);
     const said = [];
     window.toast = { error: (m) => said.push(m) };
@@ -191,10 +192,10 @@ test('a guest: Upload a folder shows the card and opens no picker', async (t) =>
     assert.equal(load.count, 0);
 });
 
-test('Upload a folder sits in the zone and opens the folder picker only', async (t) => {
+test('Upload a folder, under the zone, opens the folder picker only', async (t) => {
     const h = home(t);
     initDrop(h.form, fakeLoad());
-    assert.ok(h.form.contains(h.folder));
+    assert.ok(!h.form.contains(h.folder));
     h.folder.click();
     // A click lands on the icon as often as on the text.
     h.folder.querySelector('path').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));

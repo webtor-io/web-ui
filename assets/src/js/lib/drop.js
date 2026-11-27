@@ -42,9 +42,7 @@ export function initDrop(dropzone, load = () => import('./upload')) {
     const host = dropzone.parentElement;
     const uploads = dropzone.hasAttribute('data-uploads');
 
-    dropzone.addEventListener('click', function(e) {
-        // "Upload a folder" sits in the zone: it opens the folder picker only.
-        if (e.target.closest?.('.dropzone-folder')) return;
+    dropzone.addEventListener('click', function() {
         dropzoneInput.click();
     });
 

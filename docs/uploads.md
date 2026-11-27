@@ -119,9 +119,10 @@ or torrent blocks around the zone (`docs/tool_pages.md`).
 `lib/drop.js` serves the drop zone of the home page and the tool pages, and an
 upload's page ("Add files", or a drop anywhere on it). A drop of `.torrent`
 files only opens them, as before; anything else loads `lib/upload.js` (a lazy
-chunk). "Upload a folder" is a button inside the zone; its picker sits next to
-the form, so a click on it opens the folder picker only. A guest gets the
-sign-in card instead, from a drop and from that button alike.
+chunk). "Upload a folder" leads the row of links under the zone (before "Try
+the demo" and "Speed test", alone on the own-files page); its picker sits
+outside the zone's form, so a click on it opens the folder picker only. A
+guest gets the sign-in card instead, from a drop and from that button alike.
 
 `lib/upload.js` asks a token for the drop's total size and PUTs every file in
 16 MiB parts, two files at once, to

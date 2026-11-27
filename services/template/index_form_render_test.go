@@ -152,11 +152,11 @@ func TestIndexFormSaysOpenOnToolPagesOnly(t *testing.T) {
 }
 
 // The page about uploading one's own files (Tool.Uploads) opens with the drop
-// zone alone: no magnet field, no "or", and no row of the demo magnet and the
-// speed test. The zone says own files or a folder, not .torrent (a dropped
-// .torrent still opens, lib/drop.js, it is just not offered), with the
-// folder button inside it as on the home page. Every other page keeps all of
-// it as it was.
+// zone alone: no magnet field, no "or", no demo magnet and no speed test. The
+// zone says own files or a folder, not .torrent (a dropped .torrent still
+// opens, lib/drop.js, it is just not offered). Every other page keeps all of
+// it as it was. "Upload a folder" is the first link of the row under the zone
+// on every page, the only one on that page (TestFolderLinkLeadsTheRowUnderTheZone).
 func TestUploadsPageHeroIsAboutOwnFiles(t *testing.T) {
 	torrentBits := []string{
 		`placeholder="home.placeholder"`, `class="btn join-item btn-pink`, ">home.or<",
@@ -189,15 +189,76 @@ func TestUploadsPageHeroIsAboutOwnFiles(t *testing.T) {
 			if got := strings.Contains(page, ownZone); got != uploads || strings.Contains(page, "home.dropzoneOwnFiles") != uploads {
 				t.Errorf("the own-files text of the zone rendered: %v, want %v", got, uploads)
 			}
-			i := strings.Index(page, `class="dropzone"`)
-			if i < 0 {
-				t.Fatalf("no drop zone:\n%s", page)
-			}
-			z := page[i : i+strings.Index(page[i:], "</form>")]
-			if !strings.Contains(z, "dropzone-folder") || !strings.Contains(z, "upload.folder") {
-				t.Errorf("no folder button inside the zone:\n%s", z)
-			}
 		})
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
+	}
+}
+
+// "Upload a folder" sat inside the drop zone, where its hover fill read as a
+// grey box on the dashed field. It is the first link of the row under the
+// zone, dressed as the demo and speed test links beside it; on the page about
+// one's own files, which has neither, the row keeps it alone. The row wraps
+// centred: three links do not fit a phone's width. Where uploads are off
+// there is no link, and the page about own files no row at all.
+func TestFolderLinkLeadsTheRowUnderTheZone(t *testing.T) {
+	const link = `class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium"`
+	const folder = `<button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium">`
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		for _, enabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s, uploads %v", name, enabled), func(t *testing.T) {
+				page := renderIndexMainWith(t, tool, template.FuncMap{
+					"uploadsEnabled": func() bool { return enabled },
+					"hasAuth":        func(any) bool { return true },
+				})
+				i := strings.Index(page, `class="dropzone"`)
+				if i < 0 {
+					t.Fatalf("no drop zone:\n%s", page)
+				}
+				zoneEnd := i + strings.Index(page[i:], "</form>")
+				if strings.Contains(page[i:zoneEnd], "dropzone-folder") {
+					t.Errorf("the folder link is inside the zone:\n%s", page[i:zoneEnd])
+				}
+				f := strings.Index(page, "dropzone-folder")
+				if f >= 0 != enabled {
+					t.Fatalf("the folder link rendered: %v, want %v", f >= 0, enabled)
+				}
+				if !strings.Contains(page, `<div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 mt-4">`) != (uploads && !enabled) {
+					t.Fatalf("the row under the zone: want it unless the page has nothing for it:\n%s", page[zoneEnd:])
+				}
+				if !enabled {
+					return
+				}
+				if !strings.Contains(page, folder) || strings.Count(page, "upload.folder") != 1 {
+					t.Errorf("the folder link is not dressed as the row's links: %s", page[f-60:f+200])
+				}
+				rowStart := strings.LastIndex(page[:f], "<div")
+				row := page[rowStart : rowStart+strings.Index(page[rowStart:], "</div>")]
+				if rowStart < zoneEnd || !strings.HasPrefix(row, `<div class="flex flex-wrap justify-center`) {
+					t.Fatalf("the folder link is not in the row under the zone:\n%s", page[zoneEnd:])
+				}
+				if uploads {
+					if strings.Count(row, "class=\"btn ") != 0 {
+						t.Errorf("the row has more than the folder link:\n%s", row)
+					}
+					return
+				}
+				demo, speed := strings.Index(row, `data-umami-event="try-demo"`), strings.Index(row, `data-umami-event="speedtest-hero"`)
+				if demo < 0 || speed < 0 || strings.Index(row, "dropzone-folder") > demo || strings.Count(row, link) != 2 {
+					t.Errorf("want the folder link, then the demo and speed test links dressed alike:\n%s", row)
+				}
+			})
+		}
 	}
 	if own == 0 {
 		t.Fatal("no tool is marked Uploads — the test ran against nothing")
