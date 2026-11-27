@@ -303,7 +303,9 @@ var Tools = []Tool{
 	{Url: "private-cloud-media-server", Title: "tool.privateCloudMediaServer.title", Benefit: "tool.privateCloudMediaServer.benefit",
 		Description: "tool.privateCloudMediaServer.description", Uploads: true, Sections: []AboutSection{
 			{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink"},
-			{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1"}},
+			{Kind: AboutProse, Key: "explained", Badge: "explained", Accent: "purple", Alt: true, Paras: []string{"p1", "p2"}},
+			{Kind: AboutChecklist, Key: "useCases", Badge: "useCases", Accent: "pink", Items: 4},
+			{Kind: AboutCompare, Key: "compare", Badge: "comparison", Accent: "cyan", Alt: true, Cols: []string{"webtor", "server"}, Footer: true},
 		}},
 }
 
