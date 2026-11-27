@@ -1145,6 +1145,26 @@ test('a stored file opens the upload, all stored go there', async (t) => {
     assert.equal(g.assigned.length, 0);
 });
 
+// On the upload's page "Open" would open that same page: there is none,
+// and the footer waits for the end, as "got it" does.
+test("on the upload's page nothing opens it again", async (t) => {
+    const page = { id: U0, name: 'Photos', dir: ['Photos'] };
+    let r;
+    const seen = [];
+    r = rig(t, { put: () => { seen.push(r.host.querySelector('.alert-close-wrapper').classList.contains('hidden')); return ok201; } });
+    await r.run([asFile('a'), asFile('b')], page);
+    assert.deepEqual(seen, [true, true]);
+    assert.equal(r.host.querySelector('[data-upload-open]').hidden, true);
+    assert.deepEqual(r.assigned, [`/${U0}`]);
+
+    const g = launch(t, gone410(), { opts: page });
+    await g.promise;
+    assert.ok(g.calls.put.some((p) => p.path === 'Photos/a'), 'a was stored');
+    assert.equal(g.host.querySelector('[data-upload-open]').hidden, true);
+    assert.equal(g.host.querySelector('.closeable-close').hidden, false);
+    assert.equal(g.host.querySelector('.alert-close-wrapper').classList.contains('hidden'), false);
+});
+
 test('the progress is the line of the log it is given', async (t) => {
     let r;
     const seen = [];
@@ -1414,10 +1434,11 @@ test('the log says it is temporary from the start', async (t) => {
         await w.r.run([asFile('a')], { vault: true });
         assert.deepEqual(w.seen, [withHint, withHint]);
     });
-    await t.test("on the upload's page", async (t) => {
+    // The page says it under its header already.
+    await t.test("not on the upload's page", async (t) => {
         const w = watch(t);
-        await w.r.run([asFile('a')], { id: U0, name: 'Photos', dir: ['Photos'], vault: true });
-        assert.deepEqual(w.seen, [withHint, withHint]);
+        await w.r.run([asFile('a')], { id: U0, name: 'Photos', dir: ['Photos'] });
+        assert.deepEqual(w.seen, [null, null]);
     });
     await t.test('a stop takes its place', async (t) => {
         const sc = gone410();

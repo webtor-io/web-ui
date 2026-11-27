@@ -132,7 +132,6 @@ function addFiles(el, items, load) {
         id: el.dataset.uploadId,
         name: el.dataset.uploadName,
         upsell: el.hasAttribute('data-upload-upsell'),
-        vault: el.hasAttribute('data-upload-vault'),
         dir: destination(raw, el.dataset.uploadName || m.rootName(items)),
     }));
 }

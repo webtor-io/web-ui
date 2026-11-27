@@ -120,6 +120,13 @@
                 {{ end }}
             </div>
 
+            {{- /* The progress of "Add files" (lib/upload.js), across the card
+                 of the files it adds to, where a folder's archive log shows:
+                 not in the page's header. */}}
+            {{- if and uploadsEnabled $Upload $Upload.CanWrite }}
+            {{ template "upload/log" (withContext $ "rounded-none! shadow-none! border-x-0! border-t-0!") }}
+            {{- end }}
+
             <!-- File/folder list -->
             <div class="divide-y divide-w-line">
                 {{ range .List.Items }}

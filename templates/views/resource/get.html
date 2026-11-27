@@ -141,7 +141,7 @@
 {{ define "resource/upload_actions" }}
 {{- if uploadsEnabled }}{{ with .Data.Upload }}
                     {{- if .CanWrite }}
-                    <button type="button" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap shrink-0" data-upload-add data-upload-id="{{ $.Data.Resource.ID }}" data-upload-name="{{ .Name }}" data-upload-dir="{{ $.Data.Args.PWD }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Data.Vault }} data-upload-vault{{ end }}>
+                    <button type="button" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap shrink-0" data-upload-add data-upload-id="{{ $.Data.Resource.ID }}" data-upload-name="{{ .Name }}" data-upload-dir="{{ $.Data.Args.PWD }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
@@ -470,8 +470,10 @@
     {{ end }}
 
     {{ if and .Resource.Private (not (uploadOwned .Resource.ID)) }}{{ template "resource/private_notice" $ }}{{ end }}
-    {{/* The progress of "Add files" (lib/upload.js), on the page that has it. */}}
-    {{ if uploadsEnabled }}{{ with .Upload }}{{ if .CanWrite }}{{ template "upload/log" (withContext $ "mb-4") }}{{ end }}{{ end }}{{ end }}
+    {{/* The progress of "Add files" (lib/upload.js), on the page that has
+         it: in the card of the files (partials/list.html), or here where
+         there is none, an upload of one file. */}}
+    {{ if and uploadsEnabled (not .List) }}{{ with .Upload }}{{ if .CanWrite }}{{ template "upload/log" (withContext $ "mb-4") }}{{ end }}{{ end }}{{ end }}
     {{/* The owner's upload: saved only by a funded pledge; nothing when Vault
          could not be read -- which of the texts is true is unknown then. */}}
     {{ with .Upload }}{{ if not .VaultUnknown }}<p role="note" class="mb-4 text-sm text-w-sub" data-upload-state>{{ if .Saved }}{{ t $.Lang "upload.state.frozen" }}{{ else if not .CanWrite }}{{ t $.Lang "upload.state.unsaved" }}{{ if not .UnpaidPledge }} {{ t $.Lang "upload.state.saveHint" }}{{ end }}{{ else if .Incomplete }}{{ t $.Lang "upload.state.incomplete" }}{{ else }}{{ t $.Lang "upload.state.temporary" }}{{ if $.Data.Vault }} {{ t $.Lang "upload.state.saveHint" }}{{ end }}{{ end }}</p>{{ end }}{{ end }}

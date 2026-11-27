@@ -229,19 +229,6 @@ test('the markup says whether Vault is set up', async (t) => {
         await tick();
         assert.deepEqual(load.calls.slice(1).map((c) => c.opts.vault), [true, true, true]);
     });
-    for (const vault of [true, false]) {
-        await t.test(`the add button, vault ${vault}`, async (t) => {
-            const w = ownWindow(t);
-            w.document.body.innerHTML = `<button data-upload-add data-upload-id="${U0}" data-upload-name="Photos"${vault ? ' data-upload-vault' : ''}></button><input type="file" multiple hidden><p id="elsewhere"></p>`;
-            const btn = w.document.querySelector('[data-upload-add]');
-            const load = fakeLoad();
-            initAddFiles(btn, load);
-            withFiles(btn.nextElementSibling)([file('a.mkv')]);
-            dropOn(w.document.getElementById('elsewhere'), dataTransfer(dropped('a.mkv')));
-            await tick();
-            assert.deepEqual(load.calls.map((c) => c.opts.vault), [vault, vault]);
-        });
-    }
 });
 
 // addPage puts the add button on its own window, with the listing's card
@@ -267,7 +254,7 @@ test('add files: the button opens the picker, the files go to this upload', asyn
     p.pick([file('a.mkv')]);
     await tick();
     assert.equal(load.count, 1);
-    assert.deepEqual(load.calls[0].opts, { id: U0, name: 'Photos', upsell: true, vault: false, dir: ['Photos'] });
+    assert.deepEqual(load.calls[0].opts, { id: U0, name: 'Photos', upsell: true, dir: ['Photos'] });
     assert.equal(load.calls[0].host, p.w.document.querySelector('[data-upload-log]'));
 });
 
@@ -502,7 +489,7 @@ test('page drop', async (t) => {
         const e = p.drop(p.elsewhere);
         await tick();
         assert.equal(load.count, 1);
-        assert.deepEqual(load.calls[0].opts, { id: U0, name: 'Photos', upsell: false, vault: false, dir: ['Photos'] });
+        assert.deepEqual(load.calls[0].opts, { id: U0, name: 'Photos', upsell: false, dir: ['Photos'] });
         assert.equal(e.defaultPrevented, true);
     });
     await t.test('on the button: one upload, not two', async (t) => {

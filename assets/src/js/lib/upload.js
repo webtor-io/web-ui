@@ -257,7 +257,9 @@ export async function startUpload(log, items, opts = {}) {
 
         // The log, cleared of an earlier run: one line for the run, the
         // note that it is temporary under it, then the verdicts. The links
-        // of its footer are this run's own.
+        // of its footer are this run's own. On the upload's own page
+        // (opts.id) the page says it is temporary under its header, and
+        // "Open" would open that same page: neither is in the log.
         pl = initProgressLog(log);
         pl.clear();
         const footer = log.querySelector('.alert-close-wrapper');
@@ -267,7 +269,7 @@ export async function startUpload(log, items, opts = {}) {
         open.hidden = signIn.hidden = true;
         gotIt.hidden = false;
         run = pl.inProgress('upload', t('upload.uploading'));
-        pl.info(t('upload.state.temporary') + (opts.vault ? ' ' + t('upload.state.saveHint') : ''));
+        if (!opts.id) pl.info(t('upload.state.temporary') + (opts.vault ? ' ' + t('upload.state.saveHint') : ''));
         // On the home page the log is above the search field, out of sight
         // of a drop on a phone.
         log.scrollIntoView?.({ block: 'nearest' });
@@ -419,7 +421,7 @@ export async function startUpload(log, items, opts = {}) {
             stored++;
             // The files stored so far open in a new tab while the rest go
             // on; "got it" waits for the end.
-            if (stored === 1) {
+            if (stored === 1 && !opts.id) {
                 open.href = langPath('/' + id);
                 open.hidden = false;
                 gotIt.hidden = true;

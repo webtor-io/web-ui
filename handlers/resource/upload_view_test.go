@@ -111,13 +111,16 @@ func TestUploadView(t *testing.T) {
 		if tag := openTag(t, html, `data-upload-add`); !strings.Contains(tag, busy) {
 			t.Errorf("add files: %s", tag)
 		}
-		// The log of what "Add files" sends, under the header, above the
-		// upload's state line.
-		if tag := openTag(t, html, `data-upload-log`); !strings.Contains(tag, `data-async-target="main"`) || !strings.Contains(tag, `class="hidden progress-alert`) {
+		// The log of what "Add files" sends: once, in the card of the
+		// files, across it, between the folder's path and its rows.
+		if tag := openTag(t, html, `data-upload-log`); !strings.Contains(tag, `data-async-target="main"`) || !strings.Contains(tag, `class="hidden progress-alert`) || !strings.Contains(tag, `rounded-none!`) {
 			t.Errorf("upload log: %s", tag)
 		}
-		if i, j := strings.Index(html, `data-upload-log`), strings.Index(html, `data-upload-state`); j < 0 || i > j {
-			t.Errorf("the upload log at %d, the state line at %d", i, j)
+		if n := strings.Count(html, `data-upload-log`); n != 1 {
+			t.Errorf("%d upload logs, want 1", n)
+		}
+		if card, i, row := strings.Index(html, `js-list-card`), strings.Index(html, `data-upload-log`), strings.Index(html, `js-select-box`); card < 0 || i < card || i > row {
+			t.Errorf("the card at %d, the upload log at %d, the first row at %d", card, i, row)
 		}
 		if tag := openTag(t, html, `data-upload-delete="`+file+`"`); !strings.Contains(tag, busy) {
 			t.Errorf("delete file: %s", tag)
@@ -146,13 +149,19 @@ func TestUploadView(t *testing.T) {
 		checkPage(t, execute(t, uploadTemplates(t, true), "main", ctx), []string{`data-upload-upsell`}, nil)
 	})
 
-	t.Run("vault", func(t *testing.T) {
-		html := render(t, true, uploadPageData(writable()), func(gd *GetData) { gd.Vault = true })
-		if tag := openTag(t, html, `data-upload-add`); !strings.Contains(tag, `data-upload-vault`) {
-			t.Errorf("add files: %s", tag)
+	// One file: the page has no card of files, and the log stands under
+	// the header, above the upload's state line.
+	t.Run("no listing", func(t *testing.T) {
+		html := render(t, true, uploadPageData(writable()), func(gd *GetData) { gd.List = nil })
+		if n := strings.Count(html, `data-upload-log`); n != 1 {
+			t.Errorf("%d upload logs, want 1", n)
 		}
-		html = render(t, true, uploadPageData(writable()), func(gd *GetData) { gd.Vault = false })
-		checkPage(t, html, []string{`data-upload-add`}, []string{`data-upload-vault`})
+		if i, j := strings.Index(html, `data-upload-log`), strings.Index(html, `data-upload-state`); j < 0 || i > j {
+			t.Errorf("the upload log at %d, the state line at %d", i, j)
+		}
+		if tag := openTag(t, html, `data-upload-log`); strings.Contains(tag, `rounded-none!`) {
+			t.Errorf("upload log: %s", tag)
+		}
 	})
 
 	for _, c := range []struct {

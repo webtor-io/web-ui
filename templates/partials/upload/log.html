@@ -4,8 +4,8 @@
      (lib/upload.js) instead of a job's stream. Called with withContext: the
      view's context and the host's own spacing classes. The redirect at the
      end goes through progressLog.js's div-host path, an async link into
-     "main". "Open" shows once the first file is stored, "Sign in" when the
-     session ended; both are hidden with the attribute, as
+     "main". "Open" shows once the first file is stored (not on the upload's own
+     page), "Sign in" when the session ended; both are hidden with the attribute, as
      `.progress-alert .close` sets a display that beats the `hidden` class. */}}
 <div class="hidden progress-alert progress-alert-block closeable relative z-10 w-full text-left {{ .Data }}" data-upload-log data-async-target="main">
     {{ template "job/log" .Ctx.Lang }}
