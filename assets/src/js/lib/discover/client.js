@@ -225,9 +225,10 @@ export class StremioClient {
     // catalogs, see genres.js), sent as the addon protocol's one extra
     // segment: /catalog/movie/top/genre=Action&skip=50.json. The URL is the
     // cache key, so every genre and page has its own slot.
-    async fetchCatalog(baseUrl, type, catalogId, skip = 0, { signal, genre } = {}) {
+    async fetchCatalog(baseUrl, type, catalogId, skip = 0, { signal, genre, extras } = {}) {
         const extra = [];
         if (genre) extra.push(`genre=${encodeURIComponent(genre)}`);
+        for (const [k, v] of Object.entries(extras || {})) extra.push(`${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
         if (skip > 0) extra.push(`skip=${skip}`);
         const url = `${baseUrl}/catalog/${type}/${catalogId}${extra.length ? `/${extra.join('&')}` : ''}.json`;
         const cached = this.cache.get(url);

@@ -21,7 +21,7 @@ import { RatingDialog } from './RatingDialog';
 import { SearchBar } from './SearchBar';
 import { ItemGrid } from './ItemGrid';
 import { CalendarView } from './CalendarView';
-import { TypeTabs, SearchTabs, CatalogSelector, GenreSelector } from './Tabs';
+import { TypeTabs, SearchTabs, CatalogSelector, GenreSelector, ExtraSelectors } from './Tabs';
 import { LoadMore, LoadingSpinner, NoAddons, NoCatalogs, ErrorState, NoResults, CatalogUnavailable } from './EmptyStates';
 import { AddonHealthChip } from './AddonHealthChip';
 import { AISection } from './ai/AISection';
@@ -30,6 +30,34 @@ import { fetchTorznabStreams, hasIndexers, indexerLabel } from '../torznabClient
 import { startProbe, decodedTokens, declaredTokens, takesPart } from '../../player/decode-declaration';
 import { usePlaybackContext } from '../usePlaybackContext';
 import { genreFor } from '../genres';
+
+// The page URL carries a catalog's extra selects as f-<name>=<value>.
+const EXTRA_PREFIX = 'f-';
+function extrasFromParams(params) {
+    const out = {};
+    for (const [k, v] of params.entries()) if (k.startsWith(EXTRA_PREFIX) && k.length > EXTRA_PREFIX.length) out[k.slice(EXTRA_PREFIX.length)] = v;
+    return out;
+}
+// The genre and extra selects are remembered per catalog in localStorage, so a
+// reload or a later visit opens the catalog as it was left. A link with its
+// own filters wins over them.
+const filterKey = (catalog) => catalog ? `${catalog.baseUrl}::${catalog.id}` : null;
+function savedFilters(catalog) {
+    const key = filterKey(catalog);
+    const f = key ? loadPrefs().filters?.[key] : null;
+    return f && typeof f === 'object' ? { genre: f.genre || null, extras: f.extras && typeof f.extras === 'object' ? f.extras : {} } : null;
+}
+function saveFilters(catalog, genre, extras) {
+    const key = filterKey(catalog);
+    if (!key) return;
+    savePrefs({ filters: { ...(loadPrefs().filters || {}), [key]: { genre: genre || null, extras: extras || {} } } });
+}
+// Everything in the current URL's f-* params set to null, for url.push.
+function clearedExtraParams() {
+    const out = {};
+    for (const k of new URLSearchParams(window.location.search).keys()) if (k.startsWith(EXTRA_PREFIX)) out[k] = null;
+    return out;
+}
 
 // The declaration module as the stream modal's switches ask it
 // (usePlaybackContext): one object, so the context is not gathered again on
@@ -121,7 +149,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     }
 
     // --- Load catalog ---
-    const loadCatalog = useCallback(async (catalog, skip, currentItems, genre) => {
+    const loadCatalog = useCallback(async (catalog, skip, currentItems, genre, extras) => {
         if (!catalog) return;
         // Skip the fetch for catalogs whose addon is currently down — the
         // UI renders CatalogUnavailable for these so users see why nothing
@@ -134,7 +162,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const { signal } = abortRef.current;
 
         try {
-            const data = await client.fetchCatalog(catalog.baseUrl, catalog.type, catalog.id, skip, { signal, genre });
+            const data = await client.fetchCatalog(catalog.baseUrl, catalog.type, catalog.id, skip, { signal, genre, extras });
             let metas = data.metas || [];
             if (skip > 0) {
                 const existingIds = new Set(currentItems.map(i => i.id));
@@ -178,6 +206,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                 const urlCatalogBase = urlParams.get('catalog-base');
                 const urlCatalogId = urlParams.get('catalog-id');
                 const urlGenre = urlParams.get('genre');
+                const urlExtras = extrasFromParams(urlParams);
 
                 const prefs = loadPrefs();
                 let selectedType = types[0];
@@ -203,7 +232,8 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                     if (match) selectedCatalog = match;
                 }
 
-                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, selectedGenre: urlGenre, addons, viewMode: getViewMode() });
+                const saved = !urlGenre && !Object.keys(urlExtras).length ? savedFilters(selectedCatalog) : null;
+                dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, selectedGenre: urlGenre ?? saved?.genre ?? null, selectedExtras: saved ? saved.extras : urlExtras, addons, viewMode: getViewMode() });
 
                 // Store page/modal restore targets
                 if (urlPage > 0) restoredPageRef.current = urlPage;
@@ -247,11 +277,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
     useEffect(() => {
         if (state.phase !== 'ready' || state.isSearchMode) return;
         if (!state.selectedCatalog) return;
-        const key = `${state.selectedCatalog.baseUrl}::${state.selectedCatalog.id}::${state.selectedType}::${state.selectedGenre ?? ''}`;
+        const key = `${state.selectedCatalog.baseUrl}::${state.selectedCatalog.id}::${state.selectedType}::${state.selectedGenre ?? ''}::${JSON.stringify(state.selectedExtras)}`;
         if (prevCatalogRef.current === key && state.skip > 0) return;
         prevCatalogRef.current = key;
-        loadCatalog(state.selectedCatalog, 0, [], state.selectedGenre);
-    }, [state.phase, state.selectedCatalog, state.selectedType, state.selectedGenre, state.isSearchMode, loadCatalog]);
+        loadCatalog(state.selectedCatalog, 0, [], state.selectedGenre, state.selectedExtras);
+    }, [state.phase, state.selectedCatalog, state.selectedType, state.selectedGenre, state.selectedExtras, state.isSearchMode, loadCatalog]);
 
     // Batch-localize whatever grid surface is on screen through the server
     // enrichment pipeline (POST /discover/localize). localizeClient holds a
@@ -268,6 +298,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         });
     }, [state.items, state.searchResults, state.watchlistItems, state.isSearchMode, state.watchlistFilterEnabled, state.selectedType]);
 
+    // Choosing another catalog starts it with no filters (the reducer resets
+    // them), so what was remembered for it goes too: a later reload then opens
+    // what is on screen, not a stale choice.
+    const forgetFilters = useCallback((catalog) => saveFilters(catalog, null, {}), []);
+
     // --- Type/Catalog selection ---
     // Each push writes the URL the state→URL sync is about to write (genre
     // and page as the reducer resets them), so a switch writes one URL and
@@ -278,21 +313,23 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         const catalogs = getCatalogsForType(state.catalogs, type);
         const catalog = catalogs[0] || null;
         url.push({
-            type, 'catalog-base': client.addonKey(catalog?.baseUrl), 'catalog-id': catalog?.id, genre: null, page: null,
+            type, 'catalog-base': client.addonKey(catalog?.baseUrl), 'catalog-id': catalog?.id, genre: null, ...clearedExtraParams(), page: null,
             id: null, season: null, episode: null, search: null, 'search-type': null,
         });
         dispatch({ type: 'SELECT_TYPE', selectedType: type });
-    }, [state.catalogs]);
+        forgetFilters(catalog);
+    }, [state.catalogs, forgetFilters]);
 
     const selectCatalog = useCallback((catalog) => {
         abortCatalog();
         savePrefs({ catalogBase: catalog.baseUrl, catalogId: catalog.id });
         url.push({
-            'catalog-base': client.addonKey(catalog.baseUrl), 'catalog-id': catalog.id, genre: null, page: null,
+            'catalog-base': client.addonKey(catalog.baseUrl), 'catalog-id': catalog.id, genre: null, ...clearedExtraParams(), page: null,
             id: null, season: null, episode: null,
         });
         dispatch({ type: 'SELECT_CATALOG', catalog });
-    }, []);
+        forgetFilters(catalog);
+    }, [forgetFilters]);
 
     // genre is the select's value, null for "All genres". The reducer
     // validates it against the catalog's options (genres.js genreFor).
@@ -301,13 +338,27 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         abortCatalog();
         url.push({ genre: genre === genreFor(catalog) ? null : genre, page: null, id: null, season: null, episode: null });
         dispatch({ type: 'SELECT_GENRE', genre });
+        saveFilters(catalog, genre, state.selectedExtras);
         window.umami?.track('discover-genre-selected', { type: catalog?.type, catalog: catalog?.id, genre: genre || 'all' });
-    }, [state.selectedCatalog]);
+    }, [state.selectedCatalog, state.selectedExtras]);
+
+    // One of the catalog's other selects (language, sort, ...); value null
+    // clears it. Genre and the other selects combine.
+    const selectExtra = useCallback((name, value) => {
+        const catalog = state.selectedCatalog;
+        const extras = { ...state.selectedExtras };
+        if (value) extras[name] = value; else delete extras[name];
+        abortCatalog();
+        url.push({ [EXTRA_PREFIX + name]: value || null, page: null, id: null, season: null, episode: null });
+        dispatch({ type: 'SET_EXTRAS', extras });
+        saveFilters(catalog, state.selectedGenre, extras);
+        window.umami?.track('discover-filter-selected', { type: catalog?.type, catalog: catalog?.id, filter: name });
+    }, [state.selectedCatalog, state.selectedGenre, state.selectedExtras]);
 
     // --- Load more ---
     const loadMore = useCallback(() => {
-        loadCatalog(state.selectedCatalog, state.items.length, state.items, state.selectedGenre);
-    }, [state.selectedCatalog, state.selectedGenre, state.items, loadCatalog]);
+        loadCatalog(state.selectedCatalog, state.items.length, state.items, state.selectedGenre, state.selectedExtras);
+    }, [state.selectedCatalog, state.selectedGenre, state.selectedExtras, state.items, loadCatalog]);
 
     // --- Search ---
     const exitSearch = useCallback(() => {
@@ -747,6 +798,16 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             const logUrl = data.job_log_url;
             if (!logUrl) throw new Error('No job log URL');
 
+            // Remember the poster the user is looking at, so Continue Watching
+            // shows the same artwork. Fire and forget: never blocks playback.
+            if (currentPoster && /^[0-9a-f]{40}$/i.test(infoHash)) {
+                fetch('/discover/poster', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window._CSRF },
+                    body: JSON.stringify({ resource_id: infoHash.toLowerCase(), poster_url: currentPoster }),
+                }).catch(() => {});
+            }
+
             dispatch({ type: 'SHOW_MODAL', modal: {
                 view: 'progress', title: currentTitle, poster: currentPoster, ...currentIdentity, logUrl, fileIdx: fileIdx != null ? fileIdx : null,
             }});
@@ -905,6 +966,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         // After the catalog: SELECT_CATALOG resets the genre to the
         // catalog's default, and the reducer drops a value already shown.
         dispatch({ type: 'SELECT_GENRE', genre: urlParams.get('genre') });
+        dispatch({ type: 'SET_EXTRAS', extras: extrasFromParams(urlParams) });
 
         // Handle modal state
         if (!id) {
@@ -953,7 +1015,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         if (restoredPageRef.current > 0 && state.hasMore) {
             restoredPageRef.current--;
             restoreInProgressRef.current = true;
-            loadCatalog(state.selectedCatalog, state.items.length, state.items, state.selectedGenre);
+            loadCatalog(state.selectedCatalog, state.items.length, state.items, state.selectedGenre, state.selectedExtras);
             return;
         }
 
@@ -1003,6 +1065,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // The catalog's default (all genres, the newest year) is left
             // out, so a saved "New" link keeps meaning the newest year.
             if (state.selectedGenre && state.selectedGenre !== genreFor(state.selectedCatalog)) params.genre = state.selectedGenre;
+            for (const [k, v] of Object.entries(state.selectedExtras || {})) params[EXTRA_PREFIX + k] = v;
             if (state.page > 0) params.page = state.page;
         }
 
@@ -1011,7 +1074,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         ['id', 'season', 'episode', 'tab'].forEach(k => { const v = cur.get(k); if (v != null) params[k] = v; });
 
         url.replaceAll(params);
-    }, [state.phase, state.selectedType, state.selectedCatalog, state.selectedGenre, state.isSearchMode, state.searchQuery, state.searchType, state.watchlistFilterEnabled, state.watchlistType, state.page]);
+    }, [state.phase, state.selectedType, state.selectedCatalog, state.selectedGenre, state.selectedExtras, state.isSearchMode, state.searchQuery, state.searchType, state.watchlistFilterEnabled, state.watchlistType, state.page]);
 
     const retry = useCallback(() => {
         dispatch({ type: 'SET_PHASE', phase: 'loading' });
@@ -1098,7 +1161,7 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             // Force a fresh catalog load when the previous selection
             // becomes available again or changes.
             prevCatalogRef.current = null;
-            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, selectedGenre: cur?.selectedGenre, addons, viewMode: stateRef.current?.viewMode });
+            dispatch({ type: 'INIT_SUCCESS', manifests, catalogs, selectedType, selectedCatalog, selectedGenre: cur?.selectedGenre, selectedExtras: cur?.selectedExtras, addons, viewMode: stateRef.current?.viewMode });
         } catch (e) {
             // Keep the page rendered as-is; chip retains failure state.
         }
@@ -1211,6 +1274,20 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
         closeModal();
         setShowWizard(true);
     }, [state.modal, state.selectedType, closeModal]);
+
+    // Deep link from the profile page ("Add from list"): /discover?setup-addons=1
+    // reopens the addon picker for users who already have addons. The param is
+    // consumed once so a reload or back navigation does not reopen it.
+    // The param is read once at mount: Discover's own URL sync rewrites the
+    // query string during startup, so reading it later would miss it.
+    const wantsAddonSetupRef = useRef(
+        typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('setup-addons')
+    );
+    useEffect(() => {
+        if (state.phase !== 'ready' || !wantsAddonSetupRef.current) return;
+        wantsAddonSetupRef.current = false;
+        setShowWizard(true);
+    }, [state.phase]);
 
     // --- Watched / Rating ---
     const handleToggleWatched = useCallback(async (item) => {
@@ -1749,10 +1826,11 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
                         </div>
                         {/* The genre select comes after the catalog one, and
                             shows on a catalog with no others to choose from. */}
-                        {!state.watchlistFilterEnabled && (catalogsForType.length > 1 || state.selectedCatalog?.filter) && (
+                        {!state.watchlistFilterEnabled && (catalogsForType.length > 1 || state.selectedCatalog?.filter || state.selectedCatalog?.extraFilters?.length) && (
                             <div class="mt-2 flex flex-col sm:flex-row gap-2">
                                 <CatalogSelector catalogs={catalogsForType} selectedCatalog={state.selectedCatalog} onSelect={selectCatalog} />
                                 <GenreSelector filter={state.selectedCatalog?.filter} value={state.selectedGenre} onSelect={selectGenre} />
+                                <ExtraSelectors filters={state.selectedCatalog?.extraFilters} values={state.selectedExtras} onSelect={selectExtra} />
                             </div>
                         )}
                     </>
@@ -1836,7 +1914,12 @@ export function DiscoverApp({ addonUrls, addonSeeds, hasCustomAddons }) {
             )}
 
             {showWizard && state.phase === 'ready' && (
-                <AddonWizard onComplete={onWizardComplete} onSkip={onWizardSkip} />
+                <AddonWizard
+                    onComplete={onWizardComplete}
+                    onSkip={onWizardSkip}
+                    installedUrls={hasCustomAddons || addonsInstalled ? client.addonUrls : []}
+                    installedNames={(addonSeeds || []).map(a => a.name).filter(Boolean)}
+                />
             )}
 
             {ratingTarget && (
