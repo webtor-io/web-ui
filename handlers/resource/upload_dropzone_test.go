@@ -238,3 +238,37 @@ func TestDropzoneUploads(t *testing.T) {
 		}
 	})
 }
+
+// The page about uploading one's own files has no features or FAQ section
+// (partials/about.html), so a guest's navbar points "Features" and "FAQ" at
+// the home page's sections there, as the menu does on every other page,
+// instead of at anchors that are not on the page. Elsewhere they stay as
+// they were.
+func TestNavOnUploadsPagePointsHome(t *testing.T) {
+	tpl, err := template.New("nav.html").Funcs(intentFuncs(t)).ParseFiles("../../templates/partials/nav.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	stubTemplates(t, tpl, "lang_suggest_banner", "open_instance_banner")
+	nav := func(tool string) string {
+		return execute(t, tpl, "nav", &w.Context{Lang: "en", Path: "/" + tool, User: &auth.User{},
+			Data: &index.Data{Tool: common.ToolByURL(tool)}})
+	}
+	const bare = `<li><a href="#features" class="text-w-sub hover:text-base-content transition-colors">`
+	own := nav("private-cloud-media-server")
+	for _, want := range []string{`<li><a href="/#features" class="text-w-sub hover:text-base-content transition-colors">`,
+		`<li><a href="/#faq" class="text-w-sub hover:text-base-content transition-colors">`,
+		`<li><a href="#how" class="text-w-sub hover:text-base-content transition-colors">`} {
+		if !strings.Contains(own, want) {
+			t.Errorf("uploads page: no %q", want)
+		}
+	}
+	if strings.Contains(own, bare) {
+		t.Error("uploads page: Features points at an anchor the page does not have")
+	}
+	for _, tool := range []string{"", "magnet-to-torrent"} {
+		if out := nav(tool); !strings.Contains(out, bare) || !strings.Contains(out, `<li><a href="#faq" class="text-w-sub`) {
+			t.Errorf("/%s: the navbar's anchors changed", tool)
+		}
+	}
+}
