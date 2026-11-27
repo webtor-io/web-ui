@@ -277,12 +277,20 @@ export async function startUpload(log, items, opts = {}) {
         for (const f of files) if (f.error) fail(f);
         paint();
 
+        // stopped: nothing more goes to this upload, no PUT, no token.
+        // closed: no new file starts; the files in flight finish.
+        let stopped = false;
+        let closed = false;
         // A stop's text is the run's verdict, the first one; it is also
-        // remembered for the toast when the log has left the document. A
-        // pause is not an outcome.
+        // remembered for the toast when the log has left the document. The
+        // verdict ends the line, so after a close it waits for the files in
+        // flight: until then the line shows them going on. A pause is not an
+        // outcome.
+        let verdict;
         const stop = (text, more) => {
             said ??= text;
-            run.error(more ? text + '\n' + more : text);
+            verdict ??= more ? text + '\n' + more : text;
+            if (stopped) run.error(verdict);
         };
         const pause = (key) => {
             paused = true;
@@ -295,10 +303,6 @@ export async function startUpload(log, items, opts = {}) {
         };
         const upsell = () => (opts.upsell ? t('upload.upsell') : '');
 
-        // stopped: nothing more goes to this upload, no PUT, no token.
-        // closed: no new file starts; the files in flight finish.
-        let stopped = false;
-        let closed = false;
         const gone = (text) => {
             causes.add('gone');
             stopped = true;
@@ -508,6 +512,7 @@ export async function startUpload(log, items, opts = {}) {
                 }
             };
             await Promise.all(Array.from({ length: FILES_AT_ONCE }, worker));
+            if (closed) run.error(verdict);
         }
     } finally {
         window.removeEventListener('beforeunload', onLeave);

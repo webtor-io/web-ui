@@ -1139,6 +1139,83 @@ test('the progress is the line of the log it is given', async (t) => {
     assert.equal(r.host.querySelector('.job-stage').hidden, true);
 });
 
+// A stop after which no new file starts but the ones in flight finish: the
+// line goes on while they do, the verdict comes once they have. a is in
+// flight until the test lets it go; b's answers close the upload.
+test('the files in flight go on in the line after a stop', async (t) => {
+    const quotaOnSecond = (body, n) => (n === 1 ? grant(1) : { status: 413, json: { code: 'quota', used: 10, cap: 10 } });
+    for (const [name, b, token, closedAt, verdict] of [
+        ['413 files', { status: 413, text: 'files' }, undefined, (r) => r.calls.put.length === 2, /upload\.tooManyFiles/],
+        ['a second 413 size', { status: 413, text: 'size' }, undefined, (r) => r.calls.put.length === 3, /upload\.quotaOut/],
+        ['413 quota on the re-request', { status: 413, text: 'size' }, quotaOnSecond, (r) => r.calls.token.length === 2, /upload\.quotaOut/],
+    ]) {
+        await t.test(name, async (t) => {
+            const a = defer();
+            let progress;
+            const r = rig(t, {
+                token,
+                put: (p, onProgress) => {
+                    if (last(p) !== 'a') return b;
+                    progress = onProgress;
+                    return a.promise;
+                },
+            });
+            const stage = () => r.host.querySelector('.job-stage');
+            const run = r.run([asFile('a', 10), asFile('b', 20), asFile('c', 30)]);
+            await until(() => closedAt(r), 'the stop');
+            await tick();
+            assert.equal(stage().hidden, false, 'the line stays while a goes on');
+            assert.equal(r.host.querySelector('[task-summary="upload"]'), null, 'no verdict yet');
+            assert.equal(r.host.querySelectorAll('pre.info-summary').length, 1, 'the note stays');
+            progress(5);
+            assert.equal(r.meta(), '0 / 3 · 8%');
+            assert.equal(r.host.querySelector('.job-stage-bar').value, 8);
+            assert.equal(window.__uploadBusy, true);
+            a.resolve(ok201);
+            await run;
+            assert.match(r.status(), verdict);
+            assert.equal(r.host.querySelectorAll('[task-summary="upload"]').length, 1);
+            assert.equal(stage().hidden, true);
+            assert.equal(r.host.querySelector('[data-upload-open]').hidden, false);
+            assert.equal(r.host.querySelector('.closeable-close').hidden, false);
+            assert.equal(r.host.querySelector('.alert-close-wrapper').classList.contains('hidden'), false);
+            assert.equal(r.calls.put.filter((p) => last(p) === 'c').length, 0);
+            assert.equal(r.assigned.length, 0);
+            assert.equal(window.__uploadBusy, false);
+        });
+    }
+    // A stop that sends nothing more is the verdict at once, before the
+    // part in flight comes back.
+    await t.test('410', async (t) => {
+        const a = defer();
+        const r = rig(t, { put: (p) => (last(p) === 'a' ? a.promise : { status: 410, text: '' }) });
+        const run = r.run([asFile('a', 10), asFile('b', 20)]);
+        await until(() => r.calls.put.length === 2, 'the stop');
+        await tick();
+        assert.match(r.status(), /upload\.unavailable/);
+        assert.equal(r.host.querySelector('.job-stage').hidden, true);
+        a.resolve(ok201);
+        await run;
+        assert.equal(r.host.querySelectorAll('[task-summary="upload"]').length, 1);
+    });
+    // A close, then a stop on the file in flight: the first verdict, said
+    // at the stop, once.
+    await t.test('413 files, then 410', async (t) => {
+        const a = defer();
+        const r = rig(t, { put: (p) => (last(p) === 'a' ? a.promise : { status: 413, text: 'files' }) });
+        const run = r.run([asFile('a', 10), asFile('b', 20)]);
+        await until(() => r.calls.put.length === 2, 'the close');
+        await tick();
+        assert.equal(r.host.querySelector('.job-stage').hidden, false);
+        a.resolve({ status: 410, text: '' });
+        await run;
+        assert.match(r.status(), /upload\.tooManyFiles/);
+        assert.doesNotMatch(r.status(), /upload\.unavailable/);
+        assert.equal(r.host.querySelectorAll('[task-summary="upload"]').length, 1);
+        assert.equal(r.host.querySelector('.job-stage').hidden, true);
+    });
+});
+
 // toasts writes the outcome toasts down for one test: kind and text, and
 // how long each one stays.
 function toasts(t) {
