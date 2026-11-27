@@ -341,6 +341,14 @@ func TestUploadsPageHasNoTorrentBlocks(t *testing.T) {
 						t.Errorf("no %s", s)
 					}
 				}
+				// The related cards stay, under a heading that does not call
+				// them "more torrent tools" there, and with no line under it
+				// about a client nobody installs to upload a file.
+				for s, want := range map[string]bool{"tool.related.more": uploads, "tool.related.title": !uploads, "tool.related.subtitle": !uploads} {
+					if got := strings.Contains(out, s); got != want {
+						t.Errorf("%s rendered: %v, want %v", s, got, want)
+					}
+				}
 			}
 		})
 	}

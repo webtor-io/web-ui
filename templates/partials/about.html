@@ -263,11 +263,18 @@
 
 {{ if $.Data.Tool }}
 <!-- Related tools (contextual cross-links) -->
+{{/* On the page about one's own files the cards are not "more torrent
+     tools" of the same kind, and "no client" says nothing of an upload:
+     a neutral heading, no line under it. */}}
 <section id="related-tools" class="py-24 px-3 sm:px-6 border-t border-w-line">
     <div class="max-w-[1100px] mx-auto">
         <div class="text-center mb-14">
+            {{ if $ownFiles }}
+            <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.related.more" }}</h2>
+            {{ else }}
             <h2 class="text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight leading-tight mb-4">{{ t $.Lang "tool.related.title" }}</h2>
             <p class="text-[1.05rem] text-w-sub max-w-[600px] mx-auto leading-relaxed">{{ t $.Lang "tool.related.subtitle" }}</p>
+            {{ end }}
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-[980px] mx-auto">
             {{ range tools }}{{ if ne .Url $.Data.Tool.Url }}
