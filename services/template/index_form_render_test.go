@@ -128,6 +128,10 @@ func TestIndexFormSaysOpenOnToolPagesOnly(t *testing.T) {
 	}
 
 	for _, tool := range hc.Tools {
+		// No magnet field there at all: TestUploadsPageHeroIsAboutOwnFiles.
+		if tool.Uploads {
+			continue
+		}
 		t.Run(tool.Url, func(t *testing.T) {
 			page := renderIndexMain(t, &tool)
 			button := submitButton(t, page)
@@ -144,6 +148,59 @@ func TestIndexFormSaysOpenOnToolPagesOnly(t *testing.T) {
 				t.Error("tool page still shows the loupe")
 			}
 		})
+	}
+}
+
+// The page about uploading one's own files (Tool.Uploads) opens with the drop
+// zone alone: no magnet field, no "or", and no row of the demo magnet and the
+// speed test. The zone says own files or a folder, not .torrent (a dropped
+// .torrent still opens, lib/drop.js, it is just not offered), with the
+// folder button inside it as on the home page. Every other page keeps all of
+// it as it was.
+func TestUploadsPageHeroIsAboutOwnFiles(t *testing.T) {
+	torrentBits := []string{
+		`placeholder="home.placeholder"`, `class="btn join-item btn-pink`, ">home.or<",
+		`data-umami-event="try-demo"`, "magnet:?xt=urn:btih:demo", `data-umami-event="speedtest-hero"`,
+		`>home.dropzoneUploads</span> home.dropzoneUploadsHint`,
+	}
+	const ownZone = `>home.dropzoneOwnFiles</span> home.dropzoneUploadsHint`
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		t.Run(name, func(t *testing.T) {
+			// Signed in: the guest's sign-in card needs the real context
+			// (TestDropzoneUploads, which also reads the real copy).
+			page := renderIndexMainWith(t, tool, template.FuncMap{
+				"uploadsEnabled": func() bool { return true },
+				"hasAuth":        func(any) bool { return true },
+			})
+			for _, s := range torrentBits {
+				if got := strings.Contains(page, s); got == uploads {
+					t.Errorf("%q rendered: %v, want %v", s, got, !uploads)
+				}
+			}
+			if got := strings.Contains(page, ownZone); got != uploads || strings.Contains(page, "home.dropzoneOwnFiles") != uploads {
+				t.Errorf("the own-files text of the zone rendered: %v, want %v", got, uploads)
+			}
+			i := strings.Index(page, `class="dropzone"`)
+			if i < 0 {
+				t.Fatalf("no drop zone:\n%s", page)
+			}
+			z := page[i : i+strings.Index(page[i:], "</form>")]
+			if !strings.Contains(z, "dropzone-folder") || !strings.Contains(z, "upload.folder") {
+				t.Errorf("no folder button inside the zone:\n%s", z)
+			}
+		})
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
 	}
 }
 
@@ -168,24 +225,39 @@ func TestIndexErrorQuotesItsNumbers(t *testing.T) {
 // The size badge under the drop zone: torrents have no size limit, own files
 // have the account's upload cap. It names the cap only where uploads are on
 // and there is a cap to name; a viewer without a paid plan reads the upsell.
+// On the page about uploading one's own files (Tool.Uploads) it is the own
+// files half alone, and with no cap to name there is no badge: "no size
+// limit" would be said of the user's own files there.
 func TestIndexBadgeSaysTheUploadCap(t *testing.T) {
 	// It wraps on a phone: the upload texts run to 90 characters, and a badge
 	// is one line high.
 	const open = `<span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">`
+	other := hc.ToolByURL("magnet-to-torrent")
+	own := hc.ToolByURL("private-cloud-media-server")
+	if other == nil || own == nil || other.Uploads || !own.Uploads {
+		t.Fatalf("the pages this test needs moved: %v, %v", other, own)
+	}
 	for _, tc := range []struct {
 		name    string
+		tool    *hc.Tool
 		enabled bool
 		cap     string
 		paid    bool
-		want    string
+		want    string // "" is no badge
 	}{
-		{"paid", true, "50\u00a0GB", true, "home.sizeLimitUploads"},
-		{"free", true, "10\u00a0GB", false, "home.sizeLimitUploadsUpsell"},
-		{"no claims", true, "", true, "home.noSizeLimit"},
-		{"uploads off", false, "50\u00a0GB", true, "home.noSizeLimit"},
+		{"paid", nil, true, "50\u00a0GB", true, "home.sizeLimitUploads"},
+		{"free", nil, true, "10\u00a0GB", false, "home.sizeLimitUploadsUpsell"},
+		{"no claims", nil, true, "", true, "home.noSizeLimit"},
+		{"uploads off", nil, false, "50\u00a0GB", true, "home.noSizeLimit"},
+		{"tool page, paid", other, true, "50\u00a0GB", true, "home.sizeLimitUploads"},
+		{"tool page, free", other, true, "10\u00a0GB", false, "home.sizeLimitUploadsUpsell"},
+		{"tool page, no claims", other, true, "", true, "home.noSizeLimit"},
+		{"uploads page, paid", own, true, "50\u00a0GB", true, "home.sizeLimitOwnFiles"},
+		{"uploads page, free", own, true, "10\u00a0GB", false, "home.sizeLimitOwnFilesUpsell"},
+		{"uploads page, no claims", own, true, "", true, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			page := renderIndexMainWith(t, nil, template.FuncMap{
+			page := renderIndexMainWith(t, tc.tool, template.FuncMap{
 				"uploadsEnabled": func() bool { return tc.enabled },
 				"uploadCap":      func(any) string { return tc.cap },
 				"isPaid":         func(any) bool { return tc.paid },
@@ -193,6 +265,12 @@ func TestIndexBadgeSaysTheUploadCap(t *testing.T) {
 				"hasAuth": func(any) bool { return true },
 			})
 			i := strings.Index(page, open)
+			if tc.want == "" {
+				if i >= 0 {
+					t.Errorf("a badge with nothing to say: %s", page[i:i+strings.Index(page[i:], "</span>")])
+				}
+				return
+			}
 			if i < 0 {
 				t.Fatal("no size badge under the drop zone")
 			}

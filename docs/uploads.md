@@ -109,7 +109,10 @@ data export (`docs/data_export.md`).
   nothing: the row keeps its last known reserve.
 
 The profile shows used of cap (`profile/uploads_quota.html`, no live check);
-the drop zone's badge says the cap, or the free tier's upsell.
+the drop zone's badge says the cap, or the free tier's upsell. On the tool
+page about uploads (`Tool.Uploads`) it is the own-files half alone, and
+there is no badge without claims; that page also has no magnet field, demo
+or torrent blocks around the zone (`docs/tool_pages.md`).
 
 ## The browser's way
 
@@ -143,7 +146,8 @@ folder dropped, the one file's name without its extension, or
 | anything else | that file fails; the others go on |
 
 The progress shows in the page's upload log (`partials/upload/log.html`,
-above the search field on the home and tool pages, under the header on
+above the search field on the home and tool pages (above the drop zone on
+the uploads tool page, which has no search field), under the header on
 `/<id>`): the same log as a torrent's load (`lib/progressLog.js`), fed by the
 uploader instead of a job's stream. One line, "Uploading your files", with
 files stored of files dropped and the percent of the bytes sent, which fills

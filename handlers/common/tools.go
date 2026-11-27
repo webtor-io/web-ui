@@ -23,7 +23,10 @@ type Tool struct {
 	// list and in the FAQPage JSON-LD alike; answers go through tHTML.
 	FAQ int
 	// Uploads marks a page about uploading one's own files: routed and
-	// listed only where uploads are on (DropUploadPages).
+	// listed only where uploads are on (DropUploadPages). Its hero and body
+	// leave out what speaks of torrents -- the magnet field, the demo, the
+	// shared strips and FAQ -- and its drop zone, badge and CTA speak of own
+	// files (views/index.html, partials/about.html).
 	Uploads bool
 }
 

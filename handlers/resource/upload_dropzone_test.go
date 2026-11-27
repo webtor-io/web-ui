@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	uuid "github.com/satori/go.uuid"
+	proto "github.com/webtor-io/claims-provider/proto"
 
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/handlers/index"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/job"
 	w "github.com/webtor-io/web-ui/services/web"
 )
@@ -123,6 +125,41 @@ func TestDropzoneUploads(t *testing.T) {
 		main := dropzone(t, guest, &index.Data{Tool: common.ToolByURL("magnet-to-torrent")}, "/magnet-to-torrent", true)
 		if !strings.Contains(main, `return-url=%2fmagnet-to-torrent"`) {
 			t.Errorf("the sign-in link does not come back to the tool page:\n%s", main)
+		}
+	})
+
+	// The page about uploading one's own files, with the real copy: the zone
+	// says own files, the badge the own-files half only, and nothing of the
+	// magnet field and the demo is left.
+	t.Run("uploads page", func(t *testing.T) {
+		const path = "/private-cloud-media-server"
+		data := &index.Data{Tool: common.ToolByURL("private-cloud-media-server")}
+		if data.Tool == nil || !data.Tool.Uploads {
+			t.Fatal("no uploads page")
+		}
+		free := &claims.Data{Context: &proto.Context{Tier: &proto.Tier{Id: 0}}}
+		for _, u := range []*auth.User{guest, signedIn} {
+			main := dropzoneCtx(t, &w.Context{Lang: "en", Path: path, User: u, Data: data, Vault: true, Claims: free}, true)
+			for _, want := range []string{
+				`<span class="text-w-pinkL font-semibold">Drop your own files or a folder</span> — or click to choose.`,
+				"Your files: up to 10 GB, with a subscription up to 50 GB</span>",
+				folder, "data-uploads",
+			} {
+				if !strings.Contains(main, want) {
+					t.Errorf("signed in %v: no %q", u.HasAuth(), want)
+				}
+			}
+			for _, s := range []string{"Drop a .torrent", "Torrents:", "Magnet link or infohash", "Try the demo", "Speed test", `name="resource" value="magnet:`} {
+				if strings.Contains(main, s) {
+					t.Errorf("signed in %v: %q on the uploads page", u.HasAuth(), s)
+				}
+			}
+			if got := strings.Contains(main, tplOpen); got != !u.HasAuth() {
+				t.Errorf("signed in %v: sign-in template %v", u.HasAuth(), got)
+			}
+			if !u.HasAuth() && !strings.Contains(main, `return-url=%2fprivate-cloud-media-server"`) {
+				t.Error("the sign-in link does not come back to the page")
+			}
 		}
 	})
 

@@ -53,3 +53,28 @@ func TestPrivateCloudMediaServerSaysNoTorrent(t *testing.T) {
 		}
 	}
 }
+
+// Around that copy the page renders these in place of the home page's torrent
+// texts (views/index.html, partials/about.html under Tool.Uploads): the drop
+// zone, its badge, the closing CTA, and the home texts it shares. None of them
+// says torrent either.
+func TestOwnFilesFrameSaysNoTorrent(t *testing.T) {
+	keys := []string{"home.dropzoneOwnFiles", "home.dropzoneUploadsHint", "home.sizeLimitOwnFiles",
+		"home.sizeLimitOwnFilesUpsell", "about.cta.title", "about.cta.ownFiles", "about.cta.button"}
+	torrent := regexp.MustCompile(`(?i)torrent|торрент|种子`)
+	locales := localeFiles(t)
+	if len(locales) != 12 {
+		t.Fatalf("%d locales, want 12", len(locales))
+	}
+	for lang, msgs := range locales {
+		for _, k := range keys {
+			v, ok := msgs[k]
+			if !ok {
+				t.Fatalf("%s: no %s", lang, k)
+			}
+			if torrent.MatchString(v) {
+				t.Errorf("%s: %s says torrent: %q", lang, k, v)
+			}
+		}
+	}
+}

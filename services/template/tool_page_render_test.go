@@ -178,9 +178,11 @@ func TestFAQDoesNotLinkAGuideToItself(t *testing.T) {
 		}
 	}
 
-	for i := range hc.Tools {
-		tool := &hc.Tools[i]
-		t.Run(tool.Url, func(t *testing.T) {
+	for name, tool := range faqPages() {
+		if tool == nil {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
 			want := home
 			if tool.Guide {
 				want = without(home, tool.Url)
@@ -279,5 +281,70 @@ func TestAboutSDKCardFollowsEmbed(t *testing.T) {
 		if got := strings.Contains(out, `class="group card md:col-span-2 `); got == enabled {
 			t.Errorf("embedEnabled=%v: API card spans two columns=%v", enabled, got)
 		}
+	}
+}
+
+// TestUploadsPageHasNoTorrentBlocks: the page about uploading one's own files
+// (Tool.Uploads) leaves out the shared blocks that speak of torrents -- the
+// stats strip ("torrents processed"), the trust strip ("no client", "your IP
+// stays out of the swarm"), the torrent toolkit and the shared FAQ with its
+// JSON-LD -- and its closing CTA says to sign in and drop files rather than
+// "no signup, paste a magnet". It keeps its own sections and the related
+// pages. Every other page, the home page among them, keeps all of it.
+func TestUploadsPageHasNoTorrentBlocks(t *testing.T) {
+	tpl := aboutPageTemplates(t)
+	torrentBlocks := []string{"about.stats.torrents", "about.trust.ipPrivate", `id="features"`, `id="faq"`, "<!--faq:", "about.cta.subtitle"}
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		t.Run(name, func(t *testing.T) {
+			instruction := ""
+			if tool != nil {
+				instruction = tool.Url
+			}
+			var buf bytes.Buffer
+			if err := tpl.ExecuteTemplate(&buf, "about", map[string]interface{}{
+				"Lang": "en",
+				"Data": map[string]interface{}{"Tool": tool, "Instruction": instruction},
+			}); err != nil {
+				t.Fatalf("render about: %v", err)
+			}
+			out := buf.String()
+			uploads := tool != nil && tool.Uploads
+			if uploads {
+				own++
+			}
+			for _, s := range torrentBlocks {
+				if got := strings.Contains(out, s); got == uploads {
+					t.Errorf("%q rendered: %v, want %v", s, got, !uploads)
+				}
+			}
+			// The CTA: its own line there, the same heading and button everywhere.
+			if got := strings.Contains(out, "about.cta.ownFiles"); got != uploads {
+				t.Errorf("the own-files CTA line rendered: %v, want %v", got, uploads)
+			}
+			for _, s := range []string{"about.cta.title", "about.cta.button"} {
+				if !strings.Contains(out, s) {
+					t.Errorf("no %s", s)
+				}
+			}
+			// Its button scrolls to the drop zone, the others to the top as before.
+			if got := strings.Contains(out, "querySelector('.dropzone')"); got != uploads {
+				t.Errorf("the CTA scrolls to the drop zone: %v, want %v", got, uploads)
+			}
+			if tool != nil {
+				for _, s := range []string{`id="how"`, `id="related-tools"`} {
+					if !strings.Contains(out, s) {
+						t.Errorf("no %s", s)
+					}
+				}
+			}
+		})
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
 	}
 }
