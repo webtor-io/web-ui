@@ -15,17 +15,14 @@ import (
 	"github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/tmdb"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
-)
-
-const (
-	awsPosterCacheBucket = "aws-poster-cache-bucket"
 )
 
 func RegisterFlags(f []cli.Flag) []cli.Flag {
 	return append(f,
 		cli.StringFlag{
-			Name:   awsPosterCacheBucket,
+			Name:   thumbnail.PosterCacheBucketFlag,
 			Usage:  "aws poster cache bucket",
 			EnvVar: "AWS_POSTER_CACHE_BUCKET",
 		},
@@ -45,10 +42,12 @@ type Handler struct {
 	posterCacheS3Bucket string
 	// tmdbImageBaseURL is where cast photos are fetched from (person_photo.go).
 	tmdbImageBaseURL string
+	// uploads counts My files' quota; nil where uploads are off.
+	uploads *uploads.Service
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, pg *cs.PG, jobs *j.Jobs, cl *http.Client, s3Cl *cs.S3Client, en *enrich.Enricher, thumb *thumbnail.Service) {
-	bucket := c.String(awsPosterCacheBucket)
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, pg *cs.PG, jobs *j.Jobs, cl *http.Client, s3Cl *cs.S3Client, en *enrich.Enricher, thumb *thumbnail.Service, up *uploads.Service) {
+	bucket := c.String(thumbnail.PosterCacheBucketFlag)
 	h := &Handler{
 		tb: tm.MustRegisterViews("library/*").
 			WithHelper(helpers.NewStarsHelper()).
@@ -66,6 +65,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		posterResolver:      poster_resolver.New(s3Cl, pg, cl, thumb, api, bucket),
 		posterCacheS3Bucket: bucket,
 		tmdbImageBaseURL:    tmdb.ImageBaseURL(c),
+		uploads:             up,
 	}
 	lg := r.Group("/lib")
 	lg.GET("/", h.index)

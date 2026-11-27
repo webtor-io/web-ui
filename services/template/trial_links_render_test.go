@@ -18,6 +18,7 @@ import (
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/offer/offertest"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 var (
@@ -119,6 +120,7 @@ func TestGracePopupStartsTheTrialThroughTrial(t *testing.T) {
 			"t":                  echo,
 			"tp":                 echoVariadic,
 			"tpHTML":             func(lang, key string, args ...interface{}) template.HTML { return template.HTML(key) },
+			"uploadOwned":        uploads.Owned,
 
 			"embedEnabled": func() bool { return true },
 		}

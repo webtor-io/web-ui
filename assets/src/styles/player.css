@@ -103,6 +103,7 @@ body:not([data-iframe-height]) .wt-preview-mount {
 
     body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player--video {
         width: 100%;
+        max-width: none;
         height: 100%;
         border-radius: 0;
         box-shadow: none;
@@ -131,6 +132,52 @@ body:not([data-iframe-height]) .wt-preview-mount {
 .wt-player--video {
     cursor: pointer;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* The whole picture fits the window under what is fixed at its top, and is
+   never taller than 640 px: a tall one narrows the player to the width that
+   keeps its ratio, in the middle of the column. Full width, a portrait clip
+   was ~1500 px tall in the 850 px column, its controls far below the window
+   (owner, 2026-11-27). The height it may take:
+   - 72px: the navbar (style.css).
+   - max(67px + 2rem, --wt-sticky-h): the sticky status bar under it
+     (views/resource/get.html, #torrent-status-sticky). It is up whenever
+     the card's status is scrolled away and bytes move -- nearly all the
+     time a film plays -- so it is reserved always: a player that resized
+     as the bar came and went would jump under the viewer. 67 px is the bar
+     with the chain and the piece bar on a desktop, measured in Chrome; 2rem
+     the mount's 1.5rem margin and 0.5rem of air under the player scrolled
+     to the bar. A taller bar eats into the 2rem first -- a phone's (81), a
+     one-line hint's (95) -- and the player keeps its size. A two-line hint
+     (113 px, 135 with the Vault link; 163-185 on a phone) is not reserved
+     either: it comes with a stall and goes, and a player shrunk for it
+     would stay shrunk. While it is up, the last 14-36 px of a player the
+     window holds back run past it (31-53 on a phone; with the box up, the
+     hint's whole height). The plan box (156, 272 on a phone) gets its
+     whole height: --wt-sticky-h is the bar with the box up at its tallest
+     on this page view, measured up or not and without its hint
+     (lib/stickyStatus.js). The player shrinks once as the box comes up and
+     keeps that size to the end of the page view -- the box gone, another
+     file, the next episode: growing back would resize a playing player
+     under the viewer.
+   - 640px: the most on any window (owner, 2026-11-27: portrait clips are
+     mostly low-resolution and look poor blown up to the window's height).
+     On a 2x screen 1280 device px, a 720x1280 clip pixel for pixel. The
+     number to move to make them bigger or smaller.
+   --wt-ratio is the video's own (Player.jsx); without
+   it -- before the first frame -- no cap, as before. svh: the size does not
+   follow a phone's browser bars in and out on every scroll. Not in the
+   embed: its iframe grows to fit the player, and a cap from the iframe's
+   own height would shrink both in turn. Fullscreen and a phone on its side
+   (the focus rule above) fill the window instead. Never narrower than the
+   controls row with every button and nothing that gives way (time, volume
+   slider: .wt-player-controls-left) -- 282 px with Next and the three dots,
+   287 on a phone: a window too short for that scrolls the last few dozen
+   px of the picture, where a narrower player would cut off fullscreen.
+   Another button in the row moves this floor. */
+body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen) {
+    max-width: max(18rem, calc(min(100svh - 72px - max(67px + 2rem, var(--wt-sticky-h, 0px)), 640px) * (var(--wt-ratio))));
+    margin-inline: auto;
 }
 
 /* Idle pointer follows the controls: once they auto-hide (playing, no
@@ -426,8 +473,16 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     padding: 0.5rem 0.75rem;
 }
 
+/* A row wider than the player gives way in order: first the time, then the
+   volume slider -- never a button. A narrow player (a tall picture fitted
+   to the window, a small phone or embed) had fullscreen and the three dots
+   cut off by the player's overflow:hidden, and the slider opening on hover
+   pushed them further out. The time takes only the room left over
+   (.wt-player-time); the right group shrinks only by the slider
+   (.wt-player-volume), its buttons keep their size (.wt-player-btn). */
 .wt-player-controls-left {
     display: flex;
+    flex-grow: 1;
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
@@ -438,7 +493,7 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     align-items: center;
     gap: 0.25rem;
     margin-left: auto;
-    flex-shrink: 0;
+    min-width: 0;
 }
 
 /* Buttons */
@@ -469,8 +524,22 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     padding: 0.375rem;
 }
 
-/* Time display */
+/* Time display. It gets the room left over in the row, up to its own width
+   (controls-left), and drops what does not fit whole -- the duration first
+   (TimeDisplay.jsx), then the current time -- rather than cut it to "0:1…".
+   A flex line one digit high: a piece that wraps goes onto the next line,
+   out of sight. ::before is the line's first item, so that the current
+   time can wrap away too -- a first item never wraps; a zero-width space,
+   since Chrome makes no flex item of an empty content and cut "0:00" to a
+   sliver instead. */
 .wt-player-time {
+    display: flex;
+    flex-wrap: wrap;
+    width: 0;
+    max-width: max-content;
+    height: 1em;
+    flex-grow: 1;
+    overflow: hidden;
     font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.7);
     white-space: nowrap;
@@ -478,9 +547,16 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     line-height: 1;
 }
 
+.wt-player-time::before {
+    content: "\200b";
+}
+
+/* pre: its spaces begin a piece of their own now (above), where a leading
+   space would collapse. */
 .wt-player-time-sep {
     color: rgba(255, 255, 255, 0.4);
     margin: 0 0.125rem;
+    white-space: pre;
 }
 
 /* Progress bar */
@@ -583,11 +659,13 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
     margin-bottom: 0.25rem;
 }
 
-/* Volume control */
+/* Volume control. min-width: in a row too narrow for it the slider opens
+   only as far as there is room (controls-left), its track as long as that. */
 .wt-player-volume {
     display: flex;
     align-items: center;
     gap: 0;
+    min-width: 0;
 }
 
 .wt-player-volume-slider-wrap {
@@ -603,6 +681,7 @@ body[data-iframe-height][data-fixed-height] .wt-player-mount {
 .wt-player-volume-slider {
     position: relative;
     width: 4rem;
+    max-width: calc(100% - 0.5rem);
     height: 1.5rem;
     margin-left: 0.25rem;
     display: flex;
@@ -1551,11 +1630,17 @@ button.wt-buffering-pill:focus-visible {
 }
 
 /* Between two players the stage is empty (next-item-go.js holds its height):
-   black, with a spinner, so the page neither jumps nor goes blank. */
+   black, with a spinner, so the page neither jumps nor goes blank. Black only
+   while empty: the next player, mounted in the old one's shape, covers the
+   stage until its first frame -- except a tall one, narrowed to fit the
+   window, which stood in a black box the column's width. */
 .wt-player-stage--switching {
     position: relative;
-    background: #000;
     border-radius: var(--rounded-btn, 0.5rem);
+}
+
+.wt-player-stage--empty {
+    background: #000;
 }
 
 /* The player's own spinner (icons.jsx LoadingSpinner), not a look-alike: the

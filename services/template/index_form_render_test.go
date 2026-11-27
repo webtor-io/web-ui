@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"maps"
 	"os"
 	"reflect"
 	"strings"
@@ -29,6 +30,12 @@ type indexData struct {
 // funcs echoing their key, and the sub-templates it pulls in stubbed out.
 func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{}) string {
 	t.Helper()
+	return renderIndexMainWith(t, tool, nil, extra...)
+}
+
+// renderIndexMainWith is renderIndexMain with funcs put over its stubs.
+func renderIndexMainWith(t *testing.T, tool *hc.Tool, over template.FuncMap, extra ...map[string]interface{}) string {
+	t.Helper()
 	echo := func(lang, key string, args ...interface{}) string { return key }
 	funcs := template.FuncMap{
 		"t": echo,
@@ -51,7 +58,13 @@ func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{
 		"withContext": func(ctx, data interface{}) interface{} {
 			return map[string]interface{}{"Ctx": ctx, "Data": data}
 		},
+		// Uploads are off here: their markup is TestDropzoneUploads' subject.
+		"uploadsEnabled": func() bool { return false },
+		"hasAuth":        func(any) bool { return false },
+		"tp":             func(lang, key string, args ...interface{}) string { return key },
+		"uploadCap":      func(any) string { return "" },
 	}
+	maps.Copy(funcs, over)
 	b, err := os.ReadFile("../../templates/views/index.html")
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +76,7 @@ func renderIndexMain(t *testing.T, tool *hc.Tool, extra ...map[string]interface{
 	if _, err := tpl.ParseFiles("../../templates/partials/about/heading.html"); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"hero_backdrop", "hero_wave", "load/progress", "promo", "onboarding_checklist", "continue_watching", "discover", "about"} {
+	for _, name := range []string{"hero_backdrop", "hero_wave", "load/progress", "promo", "onboarding_checklist", "continue_watching", "discover", "about", "private/refusal", "upload/log"} {
 		if _, err := tpl.Parse(`{{ define "` + name + `" }}{{ end }}`); err != nil {
 			t.Fatal(err)
 		}
@@ -114,6 +127,10 @@ func TestIndexFormSaysOpenOnToolPagesOnly(t *testing.T) {
 	}
 
 	for _, tool := range hc.Tools {
+		// No magnet field there at all: TestUploadsPageHeroIsAboutOwnFiles.
+		if tool.Uploads {
+			continue
+		}
 		t.Run(tool.Url, func(t *testing.T) {
 			page := renderIndexMain(t, &tool)
 			button := submitButton(t, page)
@@ -133,6 +150,156 @@ func TestIndexFormSaysOpenOnToolPagesOnly(t *testing.T) {
 	}
 }
 
+// The page about uploading one's own files (Tool.Uploads) opens with the drop
+// zone alone: no magnet field, no "or", no demo magnet and no speed test. The
+// zone says own files or a folder, not .torrent (a dropped .torrent still
+// opens, lib/drop.js, it is just not offered). Every other page keeps all of
+// it as it was. "Upload a folder" is the first link of the row under the zone
+// on every page, the only one on that page (TestFolderLinkLeadsTheRowUnderTheZone).
+func TestUploadsPageHeroIsAboutOwnFiles(t *testing.T) {
+	torrentBits := []string{
+		`placeholder="home.placeholder"`, `class="btn join-item btn-pink`, ">home.or<",
+		`data-umami-event="try-demo"`, "magnet:?xt=urn:btih:demo", `data-umami-event="speedtest-hero"`,
+		`>home.dropzoneUploads</span> home.dropzoneUploadsHint`,
+	}
+	const ownZone = `>home.dropzoneOwnFiles</span> home.dropzoneUploadsHint`
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		t.Run(name, func(t *testing.T) {
+			// Signed in: the guest's sign-in card needs the real context
+			// (TestDropzoneUploads, which also reads the real copy).
+			page := renderIndexMainWith(t, tool, template.FuncMap{
+				"uploadsEnabled": func() bool { return true },
+				"hasAuth":        func(any) bool { return true },
+			})
+			for _, s := range torrentBits {
+				if got := strings.Contains(page, s); got == uploads {
+					t.Errorf("%q rendered: %v, want %v", s, got, !uploads)
+				}
+			}
+			if got := strings.Contains(page, ownZone); got != uploads || strings.Contains(page, "home.dropzoneOwnFiles") != uploads {
+				t.Errorf("the own-files text of the zone rendered: %v, want %v", got, uploads)
+			}
+		})
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
+	}
+}
+
+// "Upload a folder" is the first link of the row under the drop zone, dressed
+// as the demo and speed test links beside it; on the page about one's own
+// files, which has neither, the row keeps it alone. None of the three fills
+// on hover or keyboard focus: btn-ghost's fill read as a grey box, in the
+// zone and in the row alike. The text brightens on hover and focus keeps its
+// outline. The row wraps centred: three links do not fit a phone's width.
+// Where uploads are off there is no link, and the page about own files no
+// row at all.
+func TestFolderLinkLeadsTheRowUnderTheZone(t *testing.T) {
+	const dress = `btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent`
+	const link = `class="` + dress + `"`
+	const folder = `<button type="button" class="dropzone-folder ` + dress + `">`
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		for _, enabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s, uploads %v", name, enabled), func(t *testing.T) {
+				page := renderIndexMainWith(t, tool, template.FuncMap{
+					"uploadsEnabled": func() bool { return enabled },
+					"hasAuth":        func(any) bool { return true },
+				})
+				i := strings.Index(page, `class="dropzone"`)
+				if i < 0 {
+					t.Fatalf("no drop zone:\n%s", page)
+				}
+				zoneEnd := i + strings.Index(page[i:], "</form>")
+				if strings.Contains(page[i:zoneEnd], "dropzone-folder") {
+					t.Errorf("the folder link is inside the zone:\n%s", page[i:zoneEnd])
+				}
+				f := strings.Index(page, "dropzone-folder")
+				if f >= 0 != enabled {
+					t.Fatalf("the folder link rendered: %v, want %v", f >= 0, enabled)
+				}
+				if !strings.Contains(page, `<div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 mt-4">`) != (uploads && !enabled) {
+					t.Fatalf("the row under the zone: want it unless the page has nothing for it:\n%s", page[zoneEnd:])
+				}
+				if !enabled {
+					return
+				}
+				if !strings.Contains(page, folder) || strings.Count(page, "upload.folder") != 1 {
+					t.Errorf("the folder link is not dressed as the row's links: %s", page[f-60:f+200])
+				}
+				rowStart := strings.LastIndex(page[:f], "<div")
+				row := page[rowStart : rowStart+strings.Index(page[rowStart:], "</div>")]
+				if rowStart < zoneEnd || !strings.HasPrefix(row, `<div class="flex flex-wrap justify-center`) {
+					t.Fatalf("the folder link is not in the row under the zone:\n%s", page[zoneEnd:])
+				}
+				if uploads {
+					if strings.Count(row, "class=\"btn ") != 0 {
+						t.Errorf("the row has more than the folder link:\n%s", row)
+					}
+					return
+				}
+				demo, speed := strings.Index(row, `data-umami-event="try-demo"`), strings.Index(row, `data-umami-event="speedtest-hero"`)
+				if demo < 0 || speed < 0 || strings.Index(row, "dropzone-folder") > demo || strings.Count(row, link) != 2 {
+					t.Errorf("want the folder link, then the demo and speed test links dressed alike:\n%s", row)
+				}
+			})
+		}
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
+	}
+}
+
+// Elsewhere the hero's bottom padding and the first section's top padding are
+// kept apart by the stats and trust strips. The page about one's own files has
+// neither (TestUploadsPageHasNoTorrentBlocks), and the two paddings stacked
+// into 152px of nothing under the drop zone, against 88px at most on a tool
+// page. Its hero has no bottom padding of its own; every other hero keeps it.
+func TestUploadsPageHeroLeavesNoGapToTheSteps(t *testing.T) {
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		t.Run(name, func(t *testing.T) {
+			page := renderIndexMain(t, tool)
+			i := strings.Index(page, "<section ")
+			if i < 0 {
+				t.Fatal("no hero section")
+			}
+			hero := page[i : i+strings.Index(page[i:], ">")]
+			if got := strings.Contains(hero, " pb-16 "); got == uploads {
+				t.Errorf("the hero's bottom padding rendered: %v, want %v: %s", got, !uploads, hero)
+			}
+		})
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
+	}
+}
+
 // The error above the form quotes its numbers when it has them
 // (error.hash_length: how many characters were pasted, how many a full
 // infohash has) and is a plain message otherwise.
@@ -148,6 +315,72 @@ func TestIndexErrorQuotesItsNumbers(t *testing.T) {
 	page = renderIndexMain(t, nil, map[string]interface{}{"ErrKey": "error.free_text"})
 	if !strings.Contains(page, `<pre class="error">error.free_text</pre>`) {
 		t.Errorf("a plain message changed:\n%s", errorBlock(page))
+	}
+}
+
+// The size badge under the drop zone is the page about uploading one's own
+// files' (Tool.Uploads) alone: there it names the account's upload cap, or
+// the upsell to a viewer without a paid plan, and with no cap to name (no
+// claims) there is none. The home page and the other tool pages have no badge
+// at all, whatever the plan, the claims or the uploads: "no size limit" for
+// torrents went with it, by the owner's decision.
+func TestIndexBadgeSaysTheUploadCap(t *testing.T) {
+	// It wraps on a phone: its texts run to about 60 characters, and a badge
+	// is one line high.
+	const open = `<span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">`
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		for _, tc := range []struct {
+			name    string
+			enabled bool
+			cap     string
+			paid    bool
+			want    string // on the uploads page; "" is no badge
+		}{
+			{"paid", true, "50\u00a0GB", true, "home.sizeLimitOwnFiles"},
+			{"free", true, "10\u00a0GB", false, "home.sizeLimitOwnFilesUpsell"},
+			{"no claims", true, "", true, ""},
+			{"uploads off", false, "50\u00a0GB", true, ""},
+		} {
+			t.Run(name+", "+tc.name, func(t *testing.T) {
+				page := renderIndexMainWith(t, tool, template.FuncMap{
+					"uploadsEnabled": func() bool { return tc.enabled },
+					"uploadCap":      func(any) string { return tc.cap },
+					"isPaid":         func(any) bool { return tc.paid },
+					// Signed in: the guest's sign-in card is TestDropzoneUploads' subject.
+					"hasAuth": func(any) bool { return true },
+				})
+				want := ""
+				if uploads {
+					want = tc.want
+				}
+				i := strings.Index(page, "badge-sm")
+				if want == "" {
+					if i >= 0 {
+						t.Errorf("a badge under the zone: %s", page[i:i+strings.Index(page[i:], "</span>")])
+					}
+					return
+				}
+				if i = strings.Index(page, open); i < 0 {
+					t.Fatal("no size badge under the drop zone")
+				}
+				i += len(open)
+				if got := page[i : i+strings.Index(page[i:], "</span>")]; got != want {
+					t.Errorf("badge says %q, want %q", got, want)
+				}
+			})
+		}
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads \u2014 the test ran against nothing")
 	}
 }
 

@@ -2,21 +2,35 @@ package library
 
 import (
 	"bytes"
+	"context"
+	"flag"
 	"html/template"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
+	uuid "github.com/satori/go.uuid"
+	"github.com/urfave/cli"
+	proto "github.com/webtor-io/claims-provider/proto"
 	"github.com/webtor-io/web-ui/handlers/library/helpers"
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/models/pgtest"
+	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -71,6 +85,8 @@ func TestSectionEmpty(t *testing.T) {
 		"really empty":        {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeMovies}, TorrentCount: 3}, true},
 		"items":               {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeSeries}, Items: []any{1}}, false},
 		"empty torrents":      {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeTorrents}, MovieCount: 3}, true},
+		"empty uploads":       {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeUploads}, UploadCount: 0}, true},
+		"uploads counted":     {IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeUploads}, UploadCount: 2}, false},
 		"unknown section":     {IndexData{Args: &shared.IndexArgs{Section: "foo"}, MovieCount: 3}, true},
 	} {
 		if got := c.d.SectionEmpty(); got != c.want {
@@ -298,6 +314,286 @@ func TestLibraryBulkSelectNeedsItems(t *testing.T) {
 	for _, b := range bulk {
 		if strings.Contains(without, b) {
 			t.Errorf("filtered to nothing: offers select mode (%s)", b)
+		}
+	}
+}
+
+const (
+	testTorrent = "0123456789abcdef0123456789abcdef01234567"
+	testUpload  = "9c5db5752b7c0123456789abcdef0123456789ab"
+)
+
+// withUploads makes the parsed library answer uploadsEnabled with on.
+func withUploads(tpl *template.Template, on bool) *template.Template {
+	return tpl.Funcs(template.FuncMap{"uploadsEnabled": func() bool { return on }})
+}
+
+// My files: its select bar deletes uploads, and asks about deleting them;
+// a row says when the upload last changed, not when it was added.
+func TestUploadsSectionRenders(t *testing.T) {
+	now := time.Now()
+	updated := now.Add(-2 * time.Hour)
+	added := now.Add(-5 * 24 * time.Hour)
+	row := &models.Library{ResourceID: testUpload, CreatedAt: added, Torrent: &models.TorrentResource{Name: "Photos", SizeBytes: 1 << 20, FileCount: 2, UpdatedAt: &updated}}
+	page := func(t *testing.T, section shared.SectionType, on bool, items ...any) string {
+		tpl := withUploads(parseLibrary(t), on)
+		data := &IndexData{Args: &shared.IndexArgs{Section: section}, Items: items, TorrentCount: 1, UploadCount: len(items)}
+		return render(t, tpl, `{{ template "main" . }}`, &web.Context{Lang: "en", Path: "/lib/" + string(section), Data: data})
+	}
+	h := &web.Helper{}
+
+	t.Run("uploads", func(t *testing.T) {
+		out := page(t, shared.SectionTypeUploads, true, row)
+		for _, want := range []string{
+			`<form id="bulk-remove"`,
+			`action="/upload/delete"`,
+			`data-bulk-confirm="Delete the selection with all its files for good? Vault copies will be deleted too."`,
+			`href="/` + testUpload + `"`,
+			h.TimeAgoLang("en", updated),
+			`class="flex flex-wrap gap-1.5 sm:gap-2"`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if strings.Contains(out, h.TimeAgoLang("en", added)) {
+			t.Errorf("the row says when the upload was added (%s), not when it changed", h.TimeAgoLang("en", added))
+		}
+		if !regexp.MustCompile(`href="/lib/uploads"[^>]*>\s*My files\s*<span[^>]*>1</span>`).MatchString(out) {
+			t.Error("the menu has no My files item counting 1")
+		}
+		// The one-word tabs are capitalised by CSS; "My files" is a phrase in
+		// sentence case, which capitalize would turn into "My Files" ("Мои
+		// Файлы", "I Miei File").
+		class := func(section string) string {
+			m := regexp.MustCompile(`<a class="([^"]*)" href="/lib/` + section + `"`).FindStringSubmatch(out)
+			if m == nil {
+				t.Fatalf("no %s tab", section)
+			}
+			return m[1]
+		}
+		if strings.Contains(class("uploads"), "capitalize") || !strings.Contains(class("movies"), "capitalize") {
+			t.Errorf("tabs: uploads %q, movies %q; want only the one-word tab capitalised", class("uploads"), class("movies"))
+		}
+	})
+
+	// The bulk action of My files deletes for good, and says so; the
+	// Torrents one takes rows out of the library.
+	bulkLabel := regexp.MustCompile(`(?s)class="js-bulk-submit[^>]*>.*?</svg>\s*(\S[^<]*)<span class="js-bulk-count">`)
+	label := func(t *testing.T, out string) string {
+		t.Helper()
+		m := bulkLabel.FindStringSubmatch(out)
+		if m == nil {
+			t.Fatal("no bulk submit")
+		}
+		return m[1]
+	}
+	if got := label(t, page(t, shared.SectionTypeUploads, true, row)); got != "Delete" {
+		t.Errorf("My files: the bulk action is %q, want Delete", got)
+	}
+	if got := label(t, page(t, shared.SectionTypeTorrents, true, row)); got != "Remove" {
+		t.Errorf("Torrents: the bulk action is %q, want Remove", got)
+	}
+
+	// My files says how much of the space is used, by the sort; nothing
+	// without a count (uploads off, no claims, a failed count).
+	t.Run("quota", func(t *testing.T) {
+		data := &IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeUploads}, Items: []any{row}, UploadCount: 1, Quota: &uploads.Usage{Used: 3 << 30, Cap: 50 << 30}}
+		tpl := withUploads(parseLibrary(t), true)
+		for lang, want := range map[string]string{"en": "3.0\u00a0GB of 50\u00a0GB used", "ru": "Занято 3.0\u00a0GB из 50\u00a0GB"} {
+			out := render(t, tpl, `{{ template "main" . }}`, &web.Context{Lang: lang, Path: "/lib/uploads", Data: data})
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: no %q", lang, want)
+			}
+			if i, j := strings.Index(out, want), strings.Index(out, `name="sort"`); i < 0 || j < 0 || i > j {
+				t.Errorf("%s: the quota at %d, the sort at %d; want it just before", lang, i, j)
+			}
+		}
+		data.Quota = nil
+		if out := render(t, tpl, `{{ template "main" . }}`, &web.Context{Lang: "en", Path: "/lib/uploads", Data: data}); strings.Contains(out, "50\u00a0GB") {
+			t.Error("a quota line without a count")
+		}
+	})
+
+	t.Run("torrents", func(t *testing.T) {
+		out := page(t, shared.SectionTypeTorrents, true, &models.Library{ResourceID: testTorrent, CreatedAt: added, Torrent: &models.TorrentResource{Name: "Film"}})
+		for _, want := range []string{
+			`action="/lib/remove"`,
+			`data-bulk-confirm="Remove the selected items from your library? The torrents themselves stay available."`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if strings.Contains(out, `action="/upload/delete"`) {
+			t.Error("the torrents bar deletes uploads")
+		}
+	})
+
+	// Uploads turned off: the rows stay visible and open, but nothing
+	// deletes them here -- /upload/delete is not served then, and
+	// /lib/remove would leave their files with no row.
+	t.Run("uploads off", func(t *testing.T) {
+		out := page(t, shared.SectionTypeUploads, false, row)
+		for _, bad := range []string{`id="bulk-remove"`, `action="/upload/delete"`} {
+			if strings.Contains(out, bad) {
+				t.Errorf("has %s", bad)
+			}
+		}
+		if !strings.Contains(out, `href="/`+testUpload+`"`) {
+			t.Error("the upload's row is gone")
+		}
+	})
+
+	// Files storage removed: the name and the icon are dimmed, the line
+	// under them says so where the size was, as readable as any row's, and
+	// the row leads nowhere -- its page would only say they are gone.
+	// Select mode still deletes it.
+	t.Run("gone", func(t *testing.T) {
+		gone := *row
+		gone.Gone = true
+		out := page(t, shared.SectionTypeUploads, true, &gone)
+		for _, want := range []string{
+			`<div class="flex items-center gap-4 p-4">`,
+			`bulk:invisible opacity-60">`,
+			`transition-colors opacity-60">Photos</div>`,
+			`<div class="text-xs text-w-muted mt-0.5">Removed from storage · 2 files`,
+			`class="js-bulk-box checkbox checkbox-sm" value="` + testUpload + `"`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		for _, bad := range []string{`href="/` + testUpload + `"`, h.BitsForHumans(1 << 20)} {
+			if strings.Contains(out, bad) {
+				t.Errorf("has %s", bad)
+			}
+		}
+		if live := page(t, shared.SectionTypeUploads, true, row); strings.Contains(live, `opacity-60`) || strings.Contains(live, `Removed from storage`) {
+			t.Error("a live row is dimmed")
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		out := page(t, shared.SectionTypeUploads, true)
+		for _, want := range []string{"Nothing here yet", `href="/" data-async-target="main">Upload files</a>`} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		if strings.Contains(out, "No torrents yet") {
+			t.Error("says there are no torrents")
+		}
+		if off := page(t, shared.SectionTypeUploads, false); !strings.Contains(off, "Nothing here yet") || strings.Contains(off, "Upload files") {
+			t.Error("uploads off: want the empty state without the upload button")
+		}
+	})
+}
+
+// My files is in the menu while uploads are on, and while there are any
+// to see after they were turned off.
+func TestUploadsMenuItem(t *testing.T) {
+	for _, c := range []struct {
+		on    bool
+		count int
+		want  bool
+	}{
+		{false, 0, false},
+		{false, 2, true},
+		{true, 0, true},
+	} {
+		tpl := withUploads(parseLibrary(t), c.on)
+		data := &IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeTorrents}, TorrentCount: 1, UploadCount: c.count}
+		out := render(t, tpl, `{{ template "library/menu" . }}`, &web.Context{Lang: "en", Path: "/lib/", Data: data})
+		if got := strings.Contains(out, `href="/lib/uploads"`); got != c.want {
+			t.Errorf("uploads on %v, %d uploads: item shown %v, want %v", c.on, c.count, got, c.want)
+		}
+		if c.want && !regexp.MustCompile(`href="/lib/uploads"[^>]*>[^<]*<span[^>]*>`+strconv.Itoa(c.count)+`</span>`).MatchString(out) {
+			t.Errorf("uploads on %v, %d uploads: the item does not count %d", c.on, c.count, c.count)
+		}
+	}
+}
+
+// My files marks the uploads whose files storage removed: those whose
+// reserve has gone_at. Another account's mark and an upload without a
+// reserve row leave a row as it is.
+func TestUploadsGoneRows(t *testing.T) {
+	const (
+		gone = "9c5db5752b7c0a23456789abcdef0123456789ab"
+		live = "9c5db5752b7c0b23456789abcdef0123456789ab"
+		bare = "9c5db5752b7c0c23456789abcdef0123456789ab"
+	)
+	db := pgtest.Start(t)
+	h := &Handler{pg: pgtest.CS(t, db)}
+	user := func() uuid.UUID {
+		var id uuid.UUID
+		if _, err := db.QueryOne(pg.Scan(&id), `INSERT INTO "user" (email) VALUES (?) RETURNING user_id`, uuid.NewV4().String()+"@example.com"); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	u, other := user(), user()
+	for _, id := range []string{gone, live, bare} {
+		if _, err := db.Exec(`INSERT INTO torrent_resource (resource_id, name, file_count, size_bytes) VALUES (?, ?, 1, 1)`, id, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO library (user_id, resource_id, name) VALUES (?, ?, 'n')`, u, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, r := range []struct {
+		user uuid.UUID
+		id   string
+		gone bool
+	}{{u, gone, true}, {u, live, false}, {other, live, true}} {
+		if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id, reserved_bytes, gone_at) VALUES (?, ?, 1, CASE WHEN ? THEN now() END)`, r.user, r.id, r.gone); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := h.getLibraryList(context.Background(), &auth.User{ID: u}, &shared.IndexArgs{Section: shared.SectionTypeUploads, Sort: models.SortTypeName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, it := range items {
+		l := it.(*models.Library)
+		got[l.ResourceID] = l.Gone
+	}
+	if want := map[string]bool{gone: true, live: false, bare: false}; !reflect.DeepEqual(got, want) {
+		t.Errorf("gone: %v, want %v", got, want)
+	}
+}
+
+// The space used is counted for My files alone: the other sections show no
+// line and run no count.
+func TestQuotaOnlyInMyFiles(t *testing.T) {
+	db := pgtest.Start(t)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range uploads.RegisterFlags(api.RegisterFlags(nil)) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--upload-url=http://127.0.0.1:1", "--webtor-secret=test", "--rapidapi-host=", "--rapidapi-key="}); err != nil {
+		t.Fatal(err)
+	}
+	c := cli.NewContext(cli.NewApp(), fs, nil)
+	up := uploads.New(c, pgtest.CS(t, db), api.New(c, http.DefaultClient))
+	if up == nil {
+		t.Fatal("uploads are off")
+	}
+	h := &Handler{uploads: up}
+	var id uuid.UUID
+	if _, err := db.QueryOne(pg.Scan(&id), `INSERT INTO "user" (email) VALUES (?) RETURNING user_id`, uuid.NewV4().String()+"@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	u := &auth.User{ID: id}
+	free := &claims.Data{Context: &proto.Context{Tier: &proto.Tier{Id: 0}}}
+	ctx := context.Background()
+	if got := h.quota(ctx, u, free, shared.SectionTypeUploads); got == nil || got.Cap != uploads.FreeCap {
+		t.Errorf("My files: %+v, want the free cap", got)
+	}
+	for _, sec := range []shared.SectionType{shared.SectionTypeTorrents, shared.SectionTypeMovies, shared.SectionTypeSeries} {
+		if got := h.quota(ctx, u, free, sec); got != nil {
+			t.Errorf("%s: %+v, want no line", sec, got)
 		}
 	}
 }

@@ -6,8 +6,11 @@
 			<p class="text-sm text-w-sub">{{ t .Ctx.Lang "vault.pledgeSuccess" }}</p>
 		{{ end }}
 		{{/* The viewer's own pledge still frozen: when Remove will work, in
-		     place of a Remove that is certain to be refused until then. */}}
-		{{ if .Data.FrozenFor }}
+		     place of a Remove that is certain to be refused until then. An
+		     upload's pledge is never removed: how its VP come back instead. */}}
+		{{ if uploadOwned .Data.ResourceID }}
+			{{ template "vault/pledge-modal/freeze-note" (t .Ctx.Lang "vault.uploadNotice") }}
+		{{ else if .Data.FrozenFor }}
 			{{ template "vault/pledge-modal/frozen-for" . }}
 		{{ end }}
 	</div>
@@ -15,7 +18,7 @@
 		<form method="dialog">
 			<button class="btn btn-soft" data-umami-event="vault-pledge-confirmed">{{ t .Ctx.Lang "vault.gotIt" }}</button>
 		</form>
-		{{ if not .Data.FrozenFor }}
+		{{ if and (not .Data.FrozenFor) (not (uploadOwned .Data.ResourceID)) }}
 		<form method="get" action="{{ langPath .Ctx.Lang .Ctx.Path }}" data-async-target="#pledge-modal" data-async-push-state="false">
 			<input type="hidden" name="pledge-remove-form" value="true" />
 			<button type="submit" class="btn btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content" data-umami-event="vault-pledge-remove-requested">{{ t .Ctx.Lang "vault.removePledge" }}</button>
@@ -25,4 +28,14 @@
 	<script>
 		document.querySelector("#pledge-button").reload();
 	</script>
+	{{/* The pledge renders only this modal and the Vault button again: the
+	     owner's page loses Add files and the × and says saved here. It runs
+	     again in the same document on the next upload saved, so it declares
+	     nothing. */}}
+	{{ if uploadOwned .Data.ResourceID }}
+	<script>
+		document.querySelectorAll("[data-upload-add], [data-upload-add] + input, [data-upload-delete]").forEach((el) => el.remove());
+		document.querySelectorAll("[data-upload-state]").forEach((el) => { el.textContent = {{ t .Ctx.Lang "upload.state.frozen" }}; });
+	</script>
+	{{ end }}
 {{ end }}

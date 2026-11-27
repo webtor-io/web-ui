@@ -256,7 +256,7 @@ func pickFileIdx(ctx context.Context, lister torrentLister, apiClaims *api.Claim
 		// for: a server free to return fewer items than the limit would
 		// otherwise have whole blocks of files skipped silently. An empty
 		// page ends the walk rather than looping on the same offset.
-		if len(resp.Items) == 0 || (resp.Count-int(offset)) <= len(resp.Items) {
+		if api.LastListPage(resp, offset) {
 			break
 		}
 		offset += uint(len(resp.Items))

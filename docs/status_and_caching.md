@@ -6,12 +6,24 @@ edge and browsers may keep the built assets. Since 2026-09-23.
 ## Resource URLs that name nothing: 404 with the home page
 
 `GET /:resource_id` (`handlers/resource/get.go`, `notFound`) answers **404
-with the home page** — the form, and the reason above it — in two cases:
+with the home page** — the form, and the reason above it — in three cases:
 
 | Case | Key | Example |
 |---|---|---|
 | the ID is not one: no run of five hex digits (`common.SHA1R`) | `error.invalid_resource` | `/wp-login.php`, `/library`, `/index.html`, `/apple-touch-icon-precomposed.png` |
 | rest-api has no torrent under it (answers 404) | `error.not_found` | a share link whose torrent is gone, a mistyped hash |
+| the viewer's own upload (`uploads.Owned`) that rest-api no longer has — a 404, or a 403 `no_record` — while the viewer's library row of it is there (`uploadGone`) | `upload.gone` | an upload the cleaner evicted |
+
+The third case is the second with its own text: the owner learns the upload
+is gone rather than that it never was. It also erases what web-ui derived
+from the upload's files — enrichment rows and pictures, not the watch history
+or the subtitle bindings (`uploads.Forget` with `certain` false: the answer
+is wrong while the upload's home node is away) — and the error block carries
+the Umami impression `upload-gone-shown` (`docs/analytics.md`, "Uploads").
+Anyone else, the owner without a library row included, gets
+`error.not_found` or rest-api's refusal. A deleted upload has no library row
+left: "Delete all" on its own page returns to `/lib/uploads` instead of
+this page (`docs/uploads.md`).
 
 The body is `index.Render` with an empty `index.Data` — the same page the
 visitor used to reach through the redirect, now at the URL they asked for;
@@ -25,7 +37,7 @@ signed-in navbar and continue-watching row included, and some of these URLs
 end in a static extension an edge may cache 404s for. Each answer logs
 `user error shown` with `err_key` and `surface=page`.
 
-**Why.** Both cases used to be `302 /?err=…`, i.e. a 200 home page with
+**Why.** The first two cases used to be `302 /?err=…`, i.e. a 200 home page with
 `index, follow`. A search engine cannot drop a URL that answers 200: in
 September 2026 one index held 2,335 stale hash URLs, about 27% of them
 answering that redirect. In the 24 h to 2026-09-23 12:00 UTC the two

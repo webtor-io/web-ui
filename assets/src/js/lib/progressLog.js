@@ -357,6 +357,15 @@ class Renderer {
                 const a = document.createElement('a');
                 a.href = u.toString();
                 a.setAttribute('data-async-target', target);
+                // To the page already shown ("Add files" on an upload's own
+                // page) no new entry, or Back lands on the same page: a
+                // browser's own navigation to the URL it shows replaces too.
+                // The query is compared decoded: html/template escapes in
+                // lower case (%2f), encodeURIComponent in upper.
+                const query = (s) => String(new URLSearchParams(s));
+                if (u.pathname === window.location.pathname && query(u.search) === query(window.location.search)) {
+                    a.setAttribute('data-async-push-state', 'false');
+                }
                 a.classList.add('hidden');
                 this.el.appendChild(a);
                 rebindAsync(this.el);

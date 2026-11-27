@@ -1266,9 +1266,13 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                 if (!restartNoteRef.current && !hlsRef.current && videoEl.currentTime > 1) {
                     videoEl.currentTime = 0;
                 }
-                // Set container aspect-ratio from actual video dimensions
+                // Set container aspect-ratio from actual video dimensions.
+                // --wt-ratio is the same ratio for player.css, which caps
+                // the width so a tall picture fits the window.
                 if (videoEl.videoWidth && videoEl.videoHeight) {
-                    containerEl.style.aspectRatio = `${videoEl.videoWidth} / ${videoEl.videoHeight}`;
+                    const ratio = `${videoEl.videoWidth} / ${videoEl.videoHeight}`;
+                    containerEl.style.aspectRatio = ratio;
+                    containerEl.style.setProperty('--wt-ratio', ratio);
                 }
                 window.dispatchEvent(new CustomEvent('player_ready'));
             }
@@ -2235,7 +2239,9 @@ function PlayerComponent({ videoEl, settings, containerEl, showControls, fixedSi
                                     <google-cast-launcher></google-cast-launcher>
                                 </div>
                             )}
-                            {features.share && (
+                            {/* No link on the <video> (an upload's page opens
+                                for its owner alone): nothing to share. */}
+                            {features.share && videoEl?.dataset?.shareUrl && (
                                 <button type="button" class="wt-player-btn wt-player-top-share" onClick={(e) => { e.stopPropagation(); handleShareClick(); }} aria-label={t('player.share')}>
                                     <ShareIcon />
                                 </button>
@@ -2371,7 +2377,10 @@ export async function initPlayer(target, opts = {}) {
     // holding the old height -- and the controls, pinned to the container's
     // bottom, jumped up and back (owner, 2026-09-20). Episodes of a series
     // share their shape; if this one does not, canplay corrects it.
-    if (opts.aspectRatio) playerContainer.style.aspectRatio = opts.aspectRatio;
+    if (opts.aspectRatio) {
+        playerContainer.style.aspectRatio = opts.aspectRatio;
+        playerContainer.style.setProperty('--wt-ratio', opts.aspectRatio);
+    }
     // Its kind at once, not first in the component's effect (after a painted
     // frame): the stage's full-window size on a phone on its side keys on
     // .wt-player--video (player.css), and between two episodes it dropped for

@@ -37,11 +37,15 @@ func renderFAQ(t *testing.T, tpl *template.Template, tool *hc.Tool) string {
 	return strings.TrimSpace(whitespace.ReplaceAllString(faq, " "))
 }
 
-// faqPages is the home page plus every tool, keyed by the snapshot name.
+// faqPages is the home page plus every tool with the shared FAQ, keyed by the
+// snapshot name. A page about uploading one's own files has none
+// (TestUploadsPageHasNoTorrentBlocks).
 func faqPages() map[string]*hc.Tool {
 	out := map[string]*hc.Tool{"home": nil}
 	for i := range hc.Tools {
-		out[hc.Tools[i].Url] = &hc.Tools[i]
+		if !hc.Tools[i].Uploads {
+			out[hc.Tools[i].Url] = &hc.Tools[i]
+		}
 	}
 	return out
 }

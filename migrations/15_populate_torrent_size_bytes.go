@@ -12,7 +12,11 @@ func PopulateTorrentSizeBytes(col *migrations.Collection, a *api.Api) {
 		ctx := db.Context()
 		var resources []*models.TorrentResource
 
+		// Only the column this migration reads: the model's full column list
+		// includes columns that later migrations add, which a fresh database
+		// does not have yet at this version.
 		err := db.Model(&resources).
+			Column("resource_id").
 			Where("torrent_size_bytes is null").
 			Select()
 		if err != nil {

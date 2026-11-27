@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/helpers"
+	"github.com/webtor-io/web-ui/models"
 
 	"github.com/urfave/cli"
 
@@ -293,6 +294,11 @@ type Claims struct {
 	Rules    []Rule `json:"rules,omitempty"`
 	Uid      string `json:"uid,omitempty"`      // sha1(user_id) of the signed-in user; set only by Api.RegisterHandler
 	Internal bool   `json:"internal,omitempty"` // web-ui's server-side reads without a user
+	// Up and Lim make a write token of an upload, bound by Hash: "new" on
+	// the answer that creates the upload, "add" otherwise; Lim is how many
+	// bytes the upload may hold.
+	Up  string `json:"up,omitempty"`
+	Lim int64  `json:"lim,omitempty"`
 }
 
 // InternalClaims are the claims of web-ui's own server-side reads, made for
@@ -364,6 +370,21 @@ func (s *ListResourceContentArgs) ToQuery() url.Values {
 	return q
 }
 
+// RapidAPIConfigured says rest-api is reached through RapidAPI.
+func RapidAPIConfigured(c *cli.Context) bool {
+	return c.String(rapidApiHostFlag) != "" && c.String(rapidApiKeyFlag) != ""
+}
+
+// SecretConfigured says web-ui has the secret it signs tokens with.
+func SecretConfigured(c *cli.Context) bool {
+	return c.String(apiSecretFlag) != ""
+}
+
+// Key is the site's api key.
+func Key(c *cli.Context) string {
+	return c.String(apiKeyFlag)
+}
+
 func New(c *cli.Context, cl *http.Client) *Api {
 	host := c.String(apiHostFlag)
 	port := c.Int(apiPortFlag)
@@ -393,7 +414,7 @@ func New(c *cli.Context, cl *http.Client) *Api {
 		r.Header.Set("X-Api-Key", key)
 		return r, nil
 	}
-	rapidAPI := rapidApiHost != "" && rapidApiKey != ""
+	rapidAPI := RapidAPIConfigured(c)
 	if rapidAPI {
 		log.Info("using RapidAPI")
 		log.Info("private torrents are off: rest-api is reached through RapidAPI, which carries one account for every user of this instance")
@@ -494,7 +515,12 @@ func cacheKey(c *Claims, infohash string) string {
 	return "anon/" + infohash
 }
 
+// GetResourceCached is GetResource with a minute's cache, but for an upload,
+// whose files change while its owner adds or deletes them.
 func (s *Api) GetResourceCached(ctx context.Context, c *Claims, infohash string) (e *ra.ResourceResponse, err error) {
+	if strings.HasPrefix(infohash, models.UploadPrefix) {
+		return s.GetResource(ctx, c, infohash)
+	}
 	e, err = s.resourcesCache.Get(cacheKey(c, infohash), func() (*ra.ResourceResponse, error) {
 		r, err := s.GetResource(ctx, c, infohash)
 		if err == nil && r == nil {
@@ -643,7 +669,12 @@ func (s *Api) ListResourceContent(ctx context.Context, c *Claims, infohash strin
 	return
 }
 
+// ListResourceContentCached is ListResourceContent with a minute's cache, but
+// for an upload, as GetResourceCached.
 func (s *Api) ListResourceContentCached(ctx context.Context, c *Claims, infohash string, args *ListResourceContentArgs) (*ra.ListResponse, error) {
+	if strings.HasPrefix(infohash, models.UploadPrefix) {
+		return s.ListResourceContent(ctx, c, infohash, args)
+	}
 	key := cacheKey(c, infohash) + fmt.Sprintf("%+v", args)
 	return s.listResponseCache.Get(key, func() (*ra.ListResponse, error) {
 		return s.ListResourceContent(ctx, c, infohash, args)
@@ -776,7 +807,10 @@ func (s *Api) Download(ctx context.Context, u string) (io.ReadCloser, int, error
 	return s.DownloadWithRange(ctx, u, 0, -1)
 }
 
-func (s *Api) proxyURL(u string) (string, error) {
+// ProxyURL is where web-ui's server side sends u, a torrent-http-proxy URL:
+// with the internal proxy configured, its host and port over http, path and
+// query kept; otherwise u as it is.
+func (s *Api) ProxyURL(u string) (string, error) {
 	if s.useInternalTorrentHTTPProxy {
 		ur, err := url.Parse(u)
 		if err != nil {
@@ -802,7 +836,7 @@ func (s *Api) do(req *http.Request) (*http.Response, error) {
 }
 
 func (s *Api) makeTorrentHTTPProxyRequest(ctx context.Context, u string) (*http.Request, error) {
-	resolved, err := s.proxyURL(u)
+	resolved, err := s.ProxyURL(u)
 	if err != nil {
 		return nil, err
 	}
@@ -884,7 +918,7 @@ func (s *Api) CreateTranscoderSession(ctx context.Context, baseURL string, decod
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to construct session URL")
 	}
-	resolved, err := s.proxyURL(sessionURL)
+	resolved, err := s.ProxyURL(sessionURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to resolve proxy URL")
 	}
@@ -924,7 +958,7 @@ func (s *Api) DeleteTranscoderSession(ctx context.Context, baseURL string, sessi
 	if err != nil {
 		return errors.Wrap(err, "failed to construct delete URL")
 	}
-	resolved, err := s.proxyURL(deleteURL)
+	resolved, err := s.ProxyURL(deleteURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve proxy URL")
 	}

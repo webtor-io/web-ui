@@ -10,6 +10,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/libapi"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 )
 
@@ -52,6 +53,10 @@ func (s *Handler) getVault(c *gin.Context) {
 //	@Description
 //	@Description	The required amount is derived from the torrent size, so a pledge fails with `403` when the account
 //	@Description	does not have that many points available.
+//	@Description
+//	@Description	Pledging an upload closes it for writing for good; its pledge cannot be removed through the API —
+//	@Description	delete the upload on the site to get the points back. Files that are not fully uploaded yet are
+//	@Description	dropped.
 //	@Tags			vault
 //	@Accept			json
 //	@Produce		json
@@ -63,7 +68,7 @@ func (s *Handler) getVault(c *gin.Context) {
 //	@Failure		402		{object}	libapi.ErrorResponse
 //	@Failure		403		{object}	libapi.ErrorResponse	"Not enough Vault Points, or `private_unavailable` (this deployment does not serve private torrents)"
 //	@Failure		404		{object}	libapi.ErrorResponse	"No such resource"
-//	@Failure		409		{object}	libapi.ErrorResponse	"A pledge for this resource already exists"
+//	@Failure		409		{object}	libapi.ErrorResponse	"A pledge for this resource already exists, or the upload has no finished files yet"
 //	@Failure		422		{object}	libapi.ErrorResponse	"A private torrent refused: code `private_torrent` with `reason` `no_record` (store its .torrent file with your own tracker first)"
 //	@Failure		503		{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
 //	@Failure		429		{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
@@ -172,7 +177,8 @@ func (s *Handler) pledgeStatus(ctx context.Context, resourceID string, u *auth.U
 //
 //	@Summary		Claim Vault Points back
 //	@Description	Removes the pledge for a resource and returns its points to the balance. A pledge that is still
-//	@Description	frozen cannot be removed and answers `409`.
+//	@Description	frozen cannot be removed and answers `409`. An upload's pledge cannot be removed: delete the upload
+//	@Description	instead; it answers `409`.
 //	@Tags			vault
 //	@Produce		json
 //	@Security		BearerAuth
@@ -181,7 +187,7 @@ func (s *Handler) pledgeStatus(ctx context.Context, resourceID string, u *auth.U
 //	@Failure		401			{object}	libapi.ErrorResponse
 //	@Failure		402			{object}	libapi.ErrorResponse
 //	@Failure		404			{object}	libapi.ErrorResponse
-//	@Failure		409			{object}	libapi.ErrorResponse	"Pledge is frozen"
+//	@Failure		409			{object}	libapi.ErrorResponse	"Pledge is frozen, or the resource is an upload"
 //	@Failure		503			{object}	libapi.ErrorResponse	"Vault is not configured on this deployment"
 //	@Failure		429			{object}	libapi.ErrorResponse	"Too many requests with this key — the `Retry-After` header says how long to wait"
 //	@Router			/vault/pledges/{resource_id} [delete]
@@ -242,7 +248,8 @@ func (s *Handler) createPledge(ctx context.Context, resourceID string, u *auth.U
 // pledgeError answers a pledge GetOrCreateResource refused: a private torrent
 // without the user's own record is 422 private_torrent / no_record; any other
 // rest-api code passes as it came (403 private_unavailable where the
-// deployment does not serve private torrents).
+// deployment does not serve private torrents); an upload with no finished
+// file is 409 conflict.
 func pledgeError(err error) *libapi.Error {
 	var pe *api.PrivateError
 	switch {
@@ -251,6 +258,8 @@ func pledgeError(err error) *libapi.Error {
 			Message: "private torrent: upload your own .torrent file of it before saving it to Vault", Err: err}
 	case errors.As(err, &pe):
 		return upstreamError(err, "")
+	case errors.Is(err, vault.ErrUploadEmpty):
+		return libapi.NewError(http.StatusConflict, libapi.CodeConflict, "the upload has no finished files yet", err)
 	case errors.Is(err, vault.ErrResourceNotFound):
 		return notFound("no such resource")
 	}
@@ -261,6 +270,11 @@ func (s *Handler) removePledge(ctx context.Context, resourceID string, u *auth.U
 	resourceID = normalizeResourceID(resourceID)
 	if resourceID == "" {
 		return libapi.NewError(http.StatusBadRequest, libapi.CodeBadRequest, "resource_id is required", nil)
+	}
+	// As on the site: an upload's copy in Vault is its only one, and its VP
+	// come back by deleting the upload.
+	if uploads.Owned(resourceID) {
+		return libapi.NewError(http.StatusConflict, libapi.CodeConflict, "this is an upload: delete the upload to get the points back", nil)
 	}
 	res, err := s.vault.GetResource(ctx, resourceID)
 	if err != nil {

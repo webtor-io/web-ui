@@ -336,6 +336,8 @@ test('player.css sizes the stage under the very query the script watches; the na
     const m = findRule(rules, 'body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player-mount', at);
     assert.equal(m.margin, '0', 'all of it: the phone rule\'s side bleed would pan the page');
     assert.equal(m.width, '100%');
+    const v = findRule(rules, 'body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player--video', at);
+    assert.equal(v['max-width'], 'none', 'the window\'s width: the page\'s cap for a tall picture stands down');
     const style = cssRules(new URL('../../styles/style.css', import.meta.url));
     const nav = findRule(style, 'html.wt-focus .navbar-redesign');
     assert.equal(nav.transform, 'translateY(-100%)');

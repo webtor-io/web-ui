@@ -27,7 +27,7 @@ Render points: the job progress log (`jobs/jobs.go` errorFormatter), the error
 page (`services/web/middleware.go`), redirects with `?err=` (`services/web/helper.go`),
 and the 404 home page of a resource URL that names nothing
 (`handlers/resource/get.go` `notFound`: `error.invalid_resource` /
-`error.not_found`, see `docs/status_and_caching.md`). An unknown legal page
+`error.not_found` / `upload.gone`, see `docs/status_and_caching.md`). An unknown legal page
 answers 404 with `error.page_not_found` (`handlers/legal`).
 Every render logs one structured line — `user error shown` with `err_key` and
 `surface=job|page` — so the distribution, and the share still landing in
@@ -181,6 +181,21 @@ warn (the text Loki is read by stays); a 503 or 429 stays `error`.
 Every class names an action — a generic apology was the thing being replaced.
 Adding a class: a `case` in `ClassifyError`, a row in
 `TestClassifyError_StreamingChain`, the key in all 11 locale files, a row here.
+
+## Uploads (2026-11)
+
+An account's own upload (`uploads.Owned`, `docs/uploads.md`) is seen by its
+owner alone: no tracker, and no .torrent of anyone's opens it. Each of these
+is a `UserError` with its key set where it is raised, not a `ClassifyError`
+case.
+
+| Key | Where | What happened | What the user can do |
+|---|---|---|---|
+| `error.upload_private_sign_in` (403) | `web.NewPrivateRefusal` for an upload's ID: rest-api's `private_torrent`, reason `sign_in`; the card's title is `private.page.uploadTitle` | nobody is signed in | sign in (the card's button) |
+| `error.upload_private_no_record` (403) | the same, reason `no_record` — unless the viewer is the owner and still has the library row, which is `upload.gone` | another account opened the link, or the owner's upload is gone with its library row | nothing: the card offers no .torrent upload and no Vault line |
+| `upload.gone` (404) | `handlers/resource/get.go` `uploadGone`: the viewer's own upload, rest-api 404 or 403 `no_record`, the viewer's library row there; the home page answers 404 (`docs/status_and_caching.md`) | the upload's files are gone: a temporary upload evicted, a Vault copy no longer funded | the text says what keeps an upload: Save to Vault |
+| `vault.uploadNotice` | `handlers/vault/remove.go`: removing the pledge of an upload, before the freeze check | an upload's Vault copy is its only one, its pledge is not removed | delete the upload to get the VP back |
+| `vault.uploadEmpty` | `vault.ErrUploadEmpty` through `handlers/vault/add.go` `pledgeErr`: rest-api shows no finished file (JSON API: 409 `conflict`) | there is nothing to save yet | finish uploading a file first |
 
 ## Route refusals (HEVC passthrough, 2026-09)
 

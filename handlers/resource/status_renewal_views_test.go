@@ -71,9 +71,12 @@ func TestStatusRenewalOnAnotherView(t *testing.T) {
 		WithFuncs(template.FuncMap{
 			"langPath": func(_, p string) string { return p },
 			"asset":    func(string) template.HTML { return "" },
+			// Uploads off: the drop zone takes torrents only.
+			"uploadsEnabled": func() bool { return false },
 			// Parsed, never run by the status slot.
 			"canonicalURL": stub, "demoMagnet": stub, "domain": stub, "has": stub,
 			"isPaid": stub, "promoOffer": stub, "seoFriendly": stub, "withContext": stub,
+			"bitsForHumans": stub, "hasAuth": stub, "uploadCap": stub,
 		})
 	tm.MustRegisterViews("*")
 	tm.MustRegisterViews("resource/*")
@@ -82,7 +85,7 @@ func TestStatusRenewalOnAnotherView(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	refusal := web.NewPrivateRefusal(&api.PrivateError{Status: http.StatusForbidden, Code: api.CodePrivateTorrent, Reason: api.ReasonSignIn}, false)
+	refusal := web.NewPrivateRefusal(&api.PrivateError{Status: http.StatusForbidden, Code: api.CodePrivateTorrent, Reason: api.ReasonSignIn}, false, "")
 	refusal.Target = "main"
 	home := func(key string, args *web.ErrArgs) func(*web.Context) *web.Context {
 		return func(c *web.Context) *web.Context {

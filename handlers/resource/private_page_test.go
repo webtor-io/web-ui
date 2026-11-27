@@ -25,14 +25,14 @@ import (
 
 const privHash = "0123456789abcdef0123456789abcdef01234567"
 
-// privateRestAPI answers /resource/<privHash> and its .torrent with whatever
-// the test last set.
-func privateRestAPI(t *testing.T) (*httptest.Server, func(status int, body string)) {
+// privateRestAPI answers /resource/<id> and its .torrent with whatever the
+// test last set.
+func privateRestAPI(t *testing.T, id string) (*httptest.Server, func(status int, body string)) {
 	t.Helper()
 	var mu sync.Mutex
 	status, body := http.StatusNotFound, `{"error":"not found"}`
 	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/resource/"+privHash) {
+		if !strings.HasPrefix(r.URL.Path, "/resource/"+id) {
 			t.Errorf("unexpected rest-api call %s", r.URL.Path)
 			rw.WriteHeader(http.StatusTeapot)
 			return
@@ -69,7 +69,7 @@ func getPage(r http.Handler, accept string) *httptest.ResponseRecorder {
 // it. The page of whoever may play it carries the same two headers: it has
 // the name. A 403 without a code (a ban) and a coded 503 keep the redirect.
 func TestPrivateRefusalPage(t *testing.T) {
-	restAPI, answer := privateRestAPI(t)
+	restAPI, answer := privateRestAPI(t, privHash)
 	anon := newResourceRouter(t, restAPI)
 	user := &models.User{UserID: uuid.NewV4()}
 
@@ -153,7 +153,7 @@ func TestPrivateRefusalPage(t *testing.T) {
 		// here because this router has no database for a signed-in page.
 		answer(http.StatusOK, `{"id":"`+privHash+`","name":"probe","private":true}`)
 		rec := getPage(anon, "")
-		if rec.Code != http.StatusOK || rec.Body.String() != "[resource][name=probe]" {
+		if rec.Code != http.StatusOK || rec.Body.String() != "[resource][name=probe][movie=][upload=][uname=][unknown=][unpaid=][incomplete=][required=][pledgeEmpty=][pledgeIncomplete=]" {
 			t.Fatalf("status %d body %q, want the resource page", rec.Code, rec.Body.String())
 		}
 		if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {
@@ -208,9 +208,9 @@ func TestPrivateRefusalPartialRenders(t *testing.T) {
 	render := func(lang string, r *w.PrivateRefusal) string {
 		return execute(t, tpl, "main", &w.Context{Lang: lang, Path: "/" + privHash, Data: r})
 	}
-	signIn := w.NewPrivateRefusal(&api.PrivateError{Status: 403, Code: api.CodePrivateTorrent, Reason: api.ReasonSignIn}, false)
+	signIn := w.NewPrivateRefusal(&api.PrivateError{Status: 403, Code: api.CodePrivateTorrent, Reason: api.ReasonSignIn}, false, "")
 	signIn.Target = "main"
-	upload := w.NewPrivateRefusal(&api.PrivateError{Status: 403, Code: api.CodePrivateTorrent, Reason: api.ReasonNoRecord}, true)
+	upload := w.NewPrivateRefusal(&api.PrivateError{Status: 403, Code: api.CodePrivateTorrent, Reason: api.ReasonNoRecord}, true, "")
 	upload.Target, upload.VaultKept = "#log-load", true
 
 	for _, lang := range []string{"en", "ru"} {
@@ -284,7 +284,7 @@ func TestPrivateRefusalPartialRenders(t *testing.T) {
 // (a ban) and a torrent rest-api does not have are 404; never a 500. A coded
 // 429 or 503 is a failure: its status and Retry-After, not a final 403.
 func TestDownloadTorrentPrivate(t *testing.T) {
-	restAPI, answer := privateRestAPI(t)
+	restAPI, answer := privateRestAPI(t, privHash)
 	r := newResourceRouter(t, restAPI)
 	token, err := SignTorrentFileToken("test-secret", privHash, time.Now())
 	if err != nil {

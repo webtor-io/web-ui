@@ -43,7 +43,10 @@
      [data-status-mirror-for] once and updates both from the same stream.
      Hidden until the card's block scrolls out of view, and only while bytes
      move somewhere on the chain or the plan binds (view.sticky) -- see
-     stickyStatus.js. */}}
+     stickyStatus.js. Its height is reserved above a tall player (player.css,
+     the cap on .wt-player--video): 67 px, a desktop's, and 2rem, or the bar
+     as measured with the plan box up when that is taller (a hint line is
+     not reserved) -- taller padding here moves the 67. */}}
 {{ define "resource/status_sticky" }}
 <div id="torrent-status-sticky" hidden
      {{/* Same glass as the navbar above it (nav.html + .navbar-redesign:
@@ -88,6 +91,9 @@
 </div>
 {{ end }}
 {{ define "resource/torrent_magnet_split" }}
+                    {{- /* No magnet (an upload): no .torrent, no magnet, no report
+                         about a torrent. */}}
+                    {{- if .Data.MagnetURI }}
                     {{- $tool := "" }}{{ with .Ctx.Data }}{{ with .Args }}{{ with .FromTool }}{{ $tool = .Url }}{{ end }}{{ end }}{{ end }}
                     {{- $magnet := eq $tool "torrent-to-magnet" }}
                     {{/* Right-aligned only from md, where it shares the line with the
@@ -130,7 +136,35 @@
                             </svg>
                         </a>
                     </div>
+                    {{- end }}
 {{ end }}
+{{/* The owner's actions on their own upload: add files while it is not in
+     Vault, and delete it. Called with the view context. Nothing while uploads
+     are off: their routes are not mounted then. */}}
+{{ define "resource/upload_actions" }}
+{{- if uploadsEnabled }}{{ with .Data.Upload }}
+                    {{- if .CanWrite }}
+                    <button type="button" class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-pink hover:text-base-content whitespace-nowrap shrink-0" data-upload-add data-upload-id="{{ $.Data.Resource.ID }}" data-upload-name="{{ .Name }}" data-upload-dir="{{ $.Data.Args.PWD }}" data-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        {{ t $.Lang "upload.addFiles" }}
+                    </button><input type="file" multiple hidden>
+                    {{- end }}
+                    {{- if .IsOwner }}
+                    <form method="post" enctype="multipart/form-data" action="{{ langPath $.Lang "/upload/delete" }}" data-async-target="main" class="shrink-0">
+                        <input type="hidden" name="resource_id" value="{{ $.Data.Resource.ID }}" />
+                        {{/* On the submit button, not the form: async.js sends the
+                             form on submit without asking whether it was cancelled.
+                             The dialog names what goes, and says the Vault copy goes
+                             too where one may be kept: the upload is not writable. */}}
+                        <button type="submit" class="btn btn-ghost btn-sm text-w-muted hover:text-error whitespace-nowrap" onclick="return confirm('{{ tp $.Lang "upload.deleteConfirm" "Name" .Name }}{{ if not .CanWrite }} {{ t $.Lang "upload.deleteConfirmVault" }}{{ end }}')">
+                            {{ t $.Lang "upload.delete" }}
+                        </button>
+                    </form>
+                    {{- end }}
+{{- end }}{{ end }}
+{{- end }}
 {{/* What playing a private torrent does on the viewer's tracker account
      (design §8, private.notice.*), on the page of whoever may play it -- an
      upload ends on this page too, so it is also the notice "on upload". A
@@ -228,7 +262,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
         </svg>
-        {{ if . | isEnrichedMovie }}{{ t $.Lang "resource.movie" }}{{ else if . | isEnrichedSeries }}{{ t $.Lang "resource.series" }}{{ else }}{{ t $.Lang "resource.torrent" }}{{ end }}
+        {{ if uploadOwned .Resource.ID }}{{ t $.Lang "resource.upload" }}{{ else if . | isEnrichedMovie }}{{ t $.Lang "resource.movie" }}{{ else if . | isEnrichedSeries }}{{ t $.Lang "resource.series" }}{{ else }}{{ t $.Lang "resource.torrent" }}{{ end }}
     </div>
 
     <!-- Torrent header card -->
@@ -275,11 +309,14 @@
             <div class="col-[2/3] row-start-1 min-w-0 [&>*:last-child]:mb-0">
                 <div class="flex items-center gap-2">
                     <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug break-words line-clamp-2 text-balance" title="{{ . | getEnrichedTitle }}">{{ . | getEnrichedTitle }}</h1>
+                    {{- /* An upload's page opens for its owner alone: no link to share. */}}
+                    {{- if not (uploadOwned .Resource.ID) }}
                     <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200 cursor-pointer" onclick="shareResource({location:'header'})" aria-label="Share">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
                         </svg>
                     </button>
+                    {{- end }}
                 </div>
                 <div class="flex flex-wrap items-center gap-2 mb-1 text-sm text-w-sub">
                     {{ if . | hasEnrichedYear }}<span>{{ . | getEnrichedYear }}</span>{{ end }}
@@ -350,6 +387,7 @@
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
+                    {{- template "resource/upload_actions" $ }}
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
@@ -400,11 +438,14 @@
             <div class="col-[2/3] row-start-1 min-w-0">
                 <div class="flex items-center gap-2">
                     <h1 class="text-[clamp(1.5rem,3.5vw,2rem)] font-bold tracking-tight leading-snug break-words line-clamp-2 text-balance" title="{{ .Resource.Name }}">{{ .Resource.Name }}</h1>
+                    {{- /* An upload's page opens for its owner alone: no link to share. */}}
+                    {{- if not (uploadOwned .Resource.ID) }}
                     <button type="button" class="shrink-0 text-w-muted hover:text-base-content transition-colors duration-200 cursor-pointer" onclick="shareResource({location:'header'})" aria-label="Share">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
                         </svg>
                     </button>
+                    {{- end }}
                 </div>
             </div>
             {{ if .TorrentStatus }}
@@ -419,6 +460,7 @@
                             {{ template "vault/button" (withContext $ .VaultButton) }}
                         {{ end }}
                     </div>
+                    {{- template "resource/upload_actions" $ }}
                     <div id="library-button" class="shrink-0" data-async-layout="{{`{{ with .Data }}{{ if has . "Resource" }}{{ template "library/button" (withContext $ .Resource) }}{{ end }}{{ end }}`}}">
                         {{ template "library/button" (withContext $ .Resource) }}
                     </div>
@@ -430,7 +472,14 @@
     </div>
     {{ end }}
 
-    {{ if .Resource.Private }}{{ template "resource/private_notice" $ }}{{ end }}
+    {{ if and .Resource.Private (not (uploadOwned .Resource.ID)) }}{{ template "resource/private_notice" $ }}{{ end }}
+    {{/* The progress of "Add files" (lib/upload.js), on the page that has
+         it: in the card of the files (partials/list.html), or here where
+         there is none, an upload of one file. */}}
+    {{ if and uploadsEnabled (not .List) }}{{ with .Upload }}{{ if .CanWrite }}{{ template "upload/log" (withContext $ "mb-4") }}{{ end }}{{ end }}{{ end }}
+    {{/* The owner's upload: saved only by a funded pledge; nothing when Vault
+         could not be read -- which of the texts is true is unknown then. */}}
+    {{ with .Upload }}{{ if not .VaultUnknown }}<p role="note" class="mb-4 text-sm text-w-sub" data-upload-state>{{ if .Saved }}{{ t $.Lang "upload.state.frozen" }}{{ else if not .CanWrite }}{{ t $.Lang "upload.state.unsaved" }}{{ if not .UnpaidPledge }} {{ t $.Lang "upload.state.saveHint" }}{{ end }}{{ else if .Incomplete }}{{ t $.Lang "upload.state.incomplete" }}{{ else }}{{ t $.Lang "upload.state.temporary" }}{{ if $.Data.Vault }} {{ t $.Lang "upload.state.saveHint" }}{{ end }}{{ end }}</p>{{ end }}{{ end }}
 
     {{ if $.ErrKey }}
     <div class="progress-alert progress-alert-oneline mb-4">

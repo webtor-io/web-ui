@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// testApi is an Api pointed at an httptest server: proxyURL passes the URL
+// testApi is an Api pointed at an httptest server: ProxyURL passes the URL
 // through untouched while useInternalTorrentHTTPProxy is false, so the
 // request goes straight to srv.URL.
 func testApi() *Api {

@@ -22,6 +22,7 @@ import (
 	"github.com/webtor-io/web-ui/services/embed"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/libapi"
+	"github.com/webtor-io/web-ui/services/uploads"
 
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
@@ -200,6 +201,7 @@ type Helper struct {
 	useSuperTokens bool
 	apiDocsURL     string
 	embedEnabled   bool
+	uploadsEnabled bool
 }
 
 func NewHelper(c *cli.Context) *Helper {
@@ -214,7 +216,27 @@ func NewHelper(c *cli.Context) *Helper {
 		useSuperTokens: c.String(auth.SupertokensHostFlag) != "",
 		apiDocsURL:     libapi.PublicEndpoint(c) + "/docs/index.html",
 		embedEnabled:   embed.Enabled(c),
+		uploadsEnabled: uploads.Enabled(c),
 	}
+}
+
+// UploadsEnabled: does this instance take uploads.
+// Template usage: {{ if uploadsEnabled }}
+func (s *Helper) UploadsEnabled() bool {
+	return s.uploadsEnabled
+}
+
+// UploadOwned: is id an account's own upload.
+// Template usage: {{ if uploadOwned .ID }}
+func (s *Helper) UploadOwned(id string) bool {
+	return uploads.Owned(id)
+}
+
+// UploadHomeHosted: does id's content live on its home node, not in a
+// swarm: an upload ID of any kind.
+// Template usage: {{ if uploadHomeHosted .ID }}
+func (s *Helper) UploadHomeHosted(id string) bool {
+	return uploads.HomeHosted(id)
 }
 
 // EmbedEnabled: does this instance serve embeds to other sites. Pages that
@@ -270,6 +292,17 @@ func (s *Helper) IsPaid(c *claims.Data) bool {
 		return true
 	}
 	return c.Context.Tier.Id != 0
+}
+
+// UploadCap is the account's upload quota for people ("50 GB"), or "" with
+// no claims to read the tier from.
+// Template usage: {{ with uploadCap $.Claims }}
+func (s *Helper) UploadCap(c *claims.Data) string {
+	limit, err := uploads.Limit(c)
+	if err != nil {
+		return ""
+	}
+	return helpers.Bytes(uint64(limit))
 }
 
 func (s *Helper) TierName(c *claims.Data) string {

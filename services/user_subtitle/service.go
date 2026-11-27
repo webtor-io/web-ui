@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"hash/fnv"
 	"io"
 	"net/url"
 	"path/filepath"
@@ -163,7 +162,7 @@ func (s *Service) Upload(ctx context.Context, userID uuid.UUID, resourceID, path
 	}
 
 	err = db.RunInTransaction(ctx, func(tx *pg.Tx) error {
-		if err := advisoryLock(ctx, tx, hash); err != nil {
+		if err := models.AdvisoryXactLock(ctx, tx, hash); err != nil {
 			return err
 		}
 		if err := s.putObject(ctx, hash, data); err != nil {
@@ -230,7 +229,7 @@ func (s *Service) Delete(ctx context.Context, userID, id uuid.UUID) error {
 	hash := us.Hash
 
 	return db.RunInTransaction(ctx, func(tx *pg.Tx) error {
-		if err := advisoryLock(ctx, tx, hash); err != nil {
+		if err := models.AdvisoryXactLock(ctx, tx, hash); err != nil {
 			return err
 		}
 		deletedHash, err := models.DeleteUserSubtitleTx(ctx, tx, userID, id)
@@ -343,22 +342,6 @@ func (s *Service) deleteObject(ctx context.Context, hash string) error {
 			return nil
 		}
 		return errors.Wrap(err, "failed to delete user subtitle object")
-	}
-	return nil
-}
-
-// advisoryLock uses a non-cryptographic FNV hash to fit the hex digest into
-// a bigint — pg_advisory_xact_lock(bigint). Collisions are harmless: the
-// lock only needs to serialise operations on the same content, and a
-// collision just serialises two unrelated blobs for the duration of one
-// transaction.
-func advisoryLock(ctx context.Context, tx *pg.Tx, hash string) error {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(hash))
-	key := int64(h.Sum64())
-	_, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?)", key)
-	if err != nil {
-		return errors.Wrap(err, "failed to take advisory lock")
 	}
 	return nil
 }

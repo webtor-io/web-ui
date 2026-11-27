@@ -30,6 +30,17 @@
 				<button class="btn btn-soft" data-umami-event="vault-pledge-remove-error-confirmed">{{ t .Ctx.Lang "vault.ok" }}</button>
 			</form>
 		</div>
+	{{ else if uploadOwned .Data.ResourceID }}
+		{{/* An upload's pledge is not removed, frozen or not: deleting the
+		     upload gives its VP back. */}}
+		<p class="pt-4 pb-2 text-sm text-w-sub">
+			{{ t .Ctx.Lang "vault.uploadNotice" }}
+		</p>
+		<div class="modal-action justify-center">
+			<form method="dialog">
+				<button class="btn btn-soft">{{ t .Ctx.Lang "vault.gotIt" }}</button>
+			</form>
+		</div>
 	{{ else if .Data.FrozenFor }}
 		<div class="pt-1 pb-2">
 			{{ template "vault/pledge-modal/frozen-for" . }}

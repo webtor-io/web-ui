@@ -36,6 +36,7 @@ import (
 	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	"github.com/webtor-io/web-ui/services/s3"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	"github.com/webtor-io/web-ui/services/vault"
@@ -87,6 +88,7 @@ type Data struct {
 	Is4KAvailable         bool
 	MinBitrateFor4KMbps   int64
 	VaultStats            *vault.UserStats
+	UploadQuota           *uploads.Usage
 	UserSettings          *models.UserSettings
 	ErrKey                string
 	DisableWebDAV         bool
@@ -148,6 +150,8 @@ type Handler struct {
 	// restAPI holds the account's private tracker records, which the export
 	// reads through rest-api's internal endpoint.
 	restAPI *api.Api
+	// uploads is nil where uploads are off.
+	uploads *uploads.Service
 	// billing: who takes the money and where it is managed; zero when no
 	// provider is configured, and the tier card then says nothing about it.
 	billing       notification.Billing
@@ -183,7 +187,7 @@ type Handler struct {
 	emailLimiter *libapi.RateLimiter
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient, restAPI *api.Api) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], a *auth.Auth, at *at.AccessToken, ual *ua.UrlAlias, pg *cs.PG, cl *claims.Claims, v *vault.Vault, us *usettings.Service, payments *pay.Client, releaseSubs *rss.Service, ns *notification.Service, rdb redis.UniversalClient, restAPI *api.Api, up *uploads.Service) {
 	h := &Handler{
 		tb:               tm.MustRegisterViews("profile/*").WithLayout("main"),
 		at:               at,
@@ -196,6 +200,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		releaseSubs:      releaseSubs,
 		notification:     ns,
 		restAPI:          restAPI,
+		uploads:          up,
 		billing:          donate.Billing(c),
 		disableWebDAV:    c.Bool(common.DisableWebDAVFlag),
 		disableS3:        c.Bool(common.DisableS3Flag),
@@ -357,14 +362,21 @@ var forgetVaultPledger = func(ctx context.Context, v *vault.Vault, userID uuid.U
 	return v.ForgetUser(ctx, userID)
 }
 
+// forgetUploads erases what web-ui derived from the account's uploads, saved in Vault or not, while
+// upload_reserve still names them: the row cascade takes that list away with the account.
+var forgetUploads = func(ctx context.Context, up *uploads.Service, userID uuid.UUID) error {
+	return up.ForgetUser(ctx, userID)
+}
+
 func (s *Handler) delete(c *gin.Context) {
 	u := auth.GetUserFromContext(c)
 	db := s.pg.Get()
 	ctx := c.Request.Context()
-	// The private tracker records and the uid on Vault's pledger lists go
-	// first, while the session and the account are still there to try again
-	// from: once the row is gone, nothing deletes them. Either failing stops
-	// the deletion. The log names the account by its hash, never by uid.
+	// The private tracker records, the uid on Vault's pledger lists and what
+	// web-ui derived from the account's uploads go first, while the session
+	// and the account are still there to try again from: once the row is
+	// gone, nothing deletes them. Any of them failing stops the deletion.
+	// The log names the account by its hash, never by uid.
 	if err := deletePrivateRecords(ctx, s.restAPI, api.GenerateSessionIDFromUser(u)); err != nil {
 		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to delete private tracker records")
 		web.RedirectWithError(c, web.NewUserError("error.generic", err))
@@ -372,6 +384,11 @@ func (s *Handler) delete(c *gin.Context) {
 	}
 	if err := forgetVaultPledger(ctx, s.vault, u.ID); err != nil {
 		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to take the account off vault pledger lists")
+		web.RedirectWithError(c, web.NewUserError("error.generic", err))
+		return
+	}
+	if err := forgetUploads(ctx, s.uploads, u.ID); err != nil {
+		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("account deletion: failed to forget the account's uploads")
 		web.RedirectWithError(c, web.NewUserError("error.generic", err))
 		return
 	}
@@ -559,6 +576,8 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
+	uploadQuota := s.uploads.Usage(c.Request.Context(), u, claims.GetFromContext(c))
+
 	// Per-user preferences (adult-content visibility, etc). Missing row
 	// falls through to Default() — the toggle renders unchecked.
 	userSettings, err := s.userSettings.Get(c.Request.Context(), u.ID)
@@ -622,6 +641,7 @@ func (s *Handler) get(c *gin.Context) {
 		StreamingBackends:     streamingBackends,
 		AvailableBackendTypes: getAvailableBackendTypes(),
 		VaultStats:            vaultStats,
+		UploadQuota:           uploadQuota,
 		UserSettings:          userSettings,
 		ErrKey:                c.Query("err"),
 		HasPayments:           hasPayments,

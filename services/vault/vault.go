@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-pg/pg/v10"
@@ -15,6 +16,7 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 const (
@@ -62,6 +64,7 @@ type Vault struct {
 	freezePeriod          time.Duration
 	expirePeriod          time.Duration
 	transferTimeoutPeriod time.Duration
+	up                    *uploads.Service // seals an upload before its pledge; nil: uploads are off
 }
 
 func New(c *cli.Context, vaultApi *Api, cl *claims.Claims, client *http.Client, pg *cs.PG, restApi *api.Api) *Vault {
@@ -84,6 +87,16 @@ func New(c *cli.Context, vaultApi *Api, cl *claims.Claims, client *http.Client, 
 		expirePeriod:          expirePeriod,
 		transferTimeoutPeriod: transferTimeoutPeriod,
 	}
+}
+
+// WithUploads is s sealing an upload on the seeder before its pledge; nil
+// when s is nil.
+func (s *Vault) WithUploads(up *uploads.Service) *Vault {
+	if s == nil {
+		return nil
+	}
+	s.up = up
+	return s
 }
 
 // GetFreezePeriod returns the pledge freeze period
@@ -288,6 +301,10 @@ type UserStats struct {
 	VaultedCount  int      // Resources fully saved in Vault (vaulted=true and not expired)
 	LoadingCount  int      // Funded but not yet vaulted (transfer in progress)
 	ExpiringCount int      // Resources whose pledges lost backing (expired=true) — counted regardless of vaulted state
+
+	// FundedOwnFiles and FundedTorrents split Funded: uploads, and the rest.
+	FundedOwnFiles float64
+	FundedTorrents float64
 }
 
 // GetUserStats returns vault points statistics and enriched pledges for a user.
@@ -338,6 +355,11 @@ func (s *Vault) GetUserStats(ctx context.Context, user *auth.User) (*UserStats, 
 		// Funded: sum of all pledges with funded=true
 		if pledge.Funded {
 			stats.Funded += pledge.Amount
+			if uploads.HomeHosted(pledge.ResourceID) {
+				stats.FundedOwnFiles += pledge.Amount
+			} else {
+				stats.FundedTorrents += pledge.Amount
+			}
 		}
 
 		// Claimable: funded but not frozen
@@ -520,19 +542,47 @@ func (s *Vault) CreatePledge(ctx context.Context, user *auth.User, resource *vau
 // a private torrent the pledger has no tracker record for.
 var ErrPrivateNoRecord = errors.New("private torrent: no tracker record for this user")
 
+// ErrUploadEmpty refuses the pledge of an upload with no finished file:
+// there is nothing to save, and the pledge's seal would end the upload.
+var ErrUploadEmpty = errors.New("upload has no finished files")
+
+// errNoReserved: rest-api answers an upload with what it reserves, always.
+// An answer without it is a broken link's, and nothing is sealed on it.
+var errNoReserved = errors.New("rest-api gave no reserved for an upload")
+
 // GetOrCreateResource retrieves an existing resource or creates a new one if
 // it doesn't exist. Every pledge asks rest-api first, with the pledger's
 // claims, before the early return below: every private resource pledged so
 // far already has its row. A private torrent without the pledger's record and
-// rest-api's failure refuse the pledge.
+// rest-api's failure refuse the pledge. The owner's upload is checked on that
+// answer too, before the early return: a row left by a pledge refused for VP
+// is not returned for an upload that is gone or has nothing finished. Without
+// a row the upload is sealed first (createUpload).
 func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, resourceID string) (*vaultModels.Resource, error) {
-	_, err := s.api.GetResource(ctx, claims, resourceID)
+	// An upload's ID is lower case. rest-api takes one in any case and would
+	// answer its owner, and the ID would go the torrent's way below: no seal,
+	// VP by size, a row under an ID nothing else names.
+	if uploads.HomeHosted(strings.ToLower(resourceID)) && !uploads.HomeHosted(resourceID) {
+		return nil, ErrResourceNotFound
+	}
+	r, err := s.api.GetResource(ctx, claims, resourceID)
 	var pe *api.PrivateError
 	if errors.As(err, &pe) && pe.Code == api.CodePrivateTorrent {
 		return nil, errors.Wrap(ErrPrivateNoRecord, "pledge refused")
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check the resource")
+	}
+	owned := uploads.Owned(resourceID)
+	if owned {
+		switch {
+		case r == nil:
+			return nil, ErrResourceNotFound
+		case r.Reserved == nil:
+			return nil, errNoReserved
+		case r.FilesCount == 0:
+			return nil, ErrUploadEmpty
+		}
 	}
 
 	db := s.pg.Get()
@@ -551,6 +601,10 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 		return resource, nil
 	}
 
+	if owned {
+		return s.createUpload(ctx, db, claims, resourceID)
+	}
+
 	requiredVP, err := s.GetRequiredVP(ctx, claims, resourceID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get required vault points")
@@ -567,6 +621,40 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 		return nil, errors.Wrap(err, "failed to create resource")
 	}
 
+	return resource, nil
+}
+
+// createUpload makes the row of the owner's upload: it seals the upload on
+// the seeder -- a saved upload takes no more writes, and a pledge without the
+// seal does not happen -- then reads rest-api again and takes the VP from
+// what is reserved after the seal, the finished files alone. The seal is for
+// good: a pledge refused for VP after it leaves the upload sealed with its
+// row, and the next pledge takes the row.
+func (s *Vault) createUpload(ctx context.Context, db *pg.DB, claims *api.Claims, resourceID string) (*vaultModels.Resource, error) {
+	if s.up == nil {
+		return nil, errors.New("uploads are off")
+	}
+	if err := s.up.Seal(ctx, resourceID); errors.Is(err, uploads.ErrGone) {
+		return nil, errors.Wrap(ErrResourceNotFound, "upload is gone")
+	} else if err != nil {
+		return nil, errors.Wrap(err, "failed to seal the upload")
+	}
+	// Not the minute cache: the pledge modal put the answer from before the
+	// seal there.
+	r, err := s.api.GetResource(ctx, claims, resourceID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check the sealed upload")
+	}
+	if r == nil {
+		return nil, ErrResourceNotFound
+	}
+	if r.Reserved == nil {
+		return nil, errNoReserved
+	}
+	resource, err := vaultModels.CreateResource(ctx, db, resourceID, float64(*r.Reserved)/(1<<30), r.Name)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create resource")
+	}
 	return resource, nil
 }
 
@@ -903,9 +991,15 @@ func (s *Vault) recalculatePledgeFunding(ctx context.Context, tx *pg.Tx, user *a
 
 // pledgerUIDs are the uids of a resource's funded pledgers, earliest pledge
 // first, without except's (uuid.Nil: nobody's). Never nil: an empty list
-// clears Vault's.
+// clears Vault's. An upload's pledger counts unfunded too: the upload's copy
+// in Vault is its only one, and its owner keeps reading it while the pledge
+// waits for points.
 func (s *Vault) pledgerUIDs(ctx context.Context, db pg.DBI, resourceID string, except uuid.UUID) ([]string, error) {
-	ids, err := vaultModels.GetFundedPledgerIDs(ctx, db, resourceID)
+	pledgers := vaultModels.GetFundedPledgerIDs
+	if uploads.Owned(resourceID) {
+		pledgers = vaultModels.GetPledgerIDs
+	}
+	ids, err := pledgers(ctx, db, resourceID)
 	if err != nil {
 		return nil, err
 	}

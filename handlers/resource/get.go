@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -18,9 +19,11 @@ import (
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/statusview"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	ra "github.com/webtor-io/rest-api/services"
@@ -135,6 +138,69 @@ type GetData struct {
 	// adultUnknown is set when the resource_metadata read failed. Unlike a
 	// resource that was never classified, its adult flag is then unknown.
 	adultUnknown bool
+	// Upload is the owner's view of their upload; nil on any other page.
+	Upload *UploadView
+}
+
+// UploadView is what the owner's page of an upload adds to a torrent's.
+type UploadView struct {
+	// IsOwner: rest-api showed the upload, and it shows one only to its owner.
+	IsOwner bool
+	// CanWrite: no vault.resource row, so files can be added and deleted.
+	CanWrite bool
+	// Name is the upload's root folder, for files added to it; empty while the
+	// upload has no name yet.
+	Name string
+	// Saved: the owner's pledge is there and funded, a copy is kept.
+	Saved bool
+	// Incomplete: writable, and no file is done yet or a declared part is not.
+	Incomplete bool
+	// VaultUnknown: Vault is configured and could not be read, so CanWrite and
+	// Saved are false for want of an answer, not because the answer is no.
+	VaultUnknown bool
+	// UnpaidPledge: the owner's own pledge of the upload is there and not
+	// funded. Read only when the upload is neither writable nor saved.
+	UnpaidPledge bool
+}
+
+// uploadView is the owner's view of the upload on d: rest-api showed it, so
+// the viewer owns it. A Vault read that failed is an error on c and leaves
+// the view unknown, not "not in Vault".
+func (s *Handler) uploadView(ctx context.Context, c *gin.Context, d *GetData) *UploadView {
+	u := &UploadView{IsOwner: true, CanWrite: true, Name: d.Resource.Name}
+	if u.Name == "" {
+		if db := s.pg.Get(); db != nil {
+			if r, err := models.GetResourceByID(ctx, db, d.Args.ID); err == nil && r != nil {
+				u.Name = r.Name
+			}
+		}
+	}
+	if s.vault != nil {
+		r, err := s.vault.GetResource(ctx, d.Args.ID)
+		if err != nil {
+			_ = c.Error(errors.Wrap(err, "failed to get vault resource"))
+			u.CanWrite, u.VaultUnknown = false, true
+		} else {
+			u.CanWrite = r == nil
+		}
+	}
+	res := d.Resource
+	u.Incomplete = u.CanWrite && (res.FilesCount == 0 || (res.Reserved != nil && *res.Reserved > res.Size))
+	return u
+}
+
+// ownUnpaidPledge says the viewer has a pledge of the resource and it is not
+// funded.
+func (s *Handler) ownUnpaidPledge(ctx context.Context, args *GetArgs) (bool, error) {
+	resource, err := s.vault.GetResource(ctx, args.ID)
+	if err != nil || resource == nil {
+		return false, err
+	}
+	pledge, err := s.vault.GetPledge(ctx, args.User, resource)
+	if err != nil {
+		return false, err
+	}
+	return pledge != nil && !pledge.Funded, nil
 }
 
 type RateForm struct {
@@ -215,6 +281,11 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 
 	db := s.pg.Get()
 	if db != nil {
+		// Only the owner gets this far on an upload: rest-api refused
+		// anyone else above.
+		if uploads.Owned(args.ID) && args.User.HasAuth() {
+			s.keepUpload(ctx, db, args, res)
+		}
 		if args.User.HasAuth() {
 			d.Resource.InLibrary, err = models.IsInLibrary(ctx, db, args.User.ID, d.Resource.ID)
 			if err != nil {
@@ -299,6 +370,58 @@ func (s *Handler) prepareGetData(ctx context.Context, args *GetArgs) (*GetData, 
 	return d, nil
 }
 
+var uploadEnrichWait = 3 * time.Second     // how long the owner's page waits for a fresh enrichment
+var uploadEnrichTimeout = 30 * time.Minute // the enrichment's own deadline, as jobs.Enrich has
+
+// keepUpload keeps the library row of the owner's upload and, when its files changed since the last
+// enrichment, erases its pictures and enriches it again. No failure breaks the page.
+func (s *Handler) keepUpload(ctx context.Context, db *pg.DB, args *GetArgs, res *ra.ResourceResponse) {
+	if err := models.AddUploadToLibrary(ctx, db, args.User.ID, args.ID, res.Name, res.Size, res.FilesCount); err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to keep the upload's library row")
+		return
+	}
+	if s.enricher == nil || !s.enricher.HasMappers() {
+		return
+	}
+	kept, err := models.DropStaleMediaInfo(ctx, db, args.ID)
+	if err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to drop the upload's stale enrichment")
+		return
+	}
+	if kept {
+		return
+	}
+	// The files changed since the pictures were made: a frame may show a file that is no longer there.
+	if s.pics != nil {
+		if err := s.pics.Erase(ctx, args.ID); err != nil {
+			log.WithError(err).WithField("resource_id", args.ID).Warn("failed to erase the upload's stale pictures")
+		}
+	}
+	done := make(chan struct{})
+	go func() {
+		// A panic here would pass gin's recovery and take the process down;
+		// the files' names are the user's.
+		defer func() {
+			if r := recover(); r != nil {
+				log.WithField("stack", string(debug.Stack())).Errorf("upload enrichment panic: %v", r)
+			}
+			close(done)
+		}()
+		// Not the request's context: a run cut at the page's deadline would
+		// leave the row Processing, and no later call takes such a row.
+		ectx, cancel := context.WithTimeout(context.Background(), uploadEnrichTimeout)
+		defer cancel()
+		if err := s.enricher.Enrich(ectx, args.ID, false, ""); err != nil {
+			log.WithError(err).WithField("resource_id", args.ID).Warn("failed to enrich the upload")
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(uploadEnrichWait):
+	case <-ctx.Done():
+	}
+}
+
 // creditsTarget names the title whose directors and cast the page shows:
 // none for anonymous visitors (owner, 2026-10-23), and none on an adult
 // torrent, or one whose classification could not be read, where a wrong
@@ -355,6 +478,11 @@ func (s *Handler) get(c *gin.Context) {
 	d, err := s.prepareGetData(ctx, args)
 	var pe *api.PrivateError
 	if errors.As(err, &pe) && pe.Status == http.StatusForbidden {
+		if pe.Reason == api.ReasonNoRecord && s.uploadGone(ctx, args) {
+			s.forgetGone(ctx, args)
+			s.notFound(c, web.NewUserError("upload.gone", pe))
+			return
+		}
 		s.privateRefusal(ctx, c, args, pe)
 		return
 	}
@@ -364,6 +492,11 @@ func (s *Handler) get(c *gin.Context) {
 		return
 	}
 	if d == nil {
+		if s.uploadGone(ctx, args) {
+			s.forgetGone(ctx, args)
+			s.notFound(c, web.NewUserError("upload.gone", errors.New("upload gone")))
+			return
+		}
 		s.notFound(c, errors.New("resource not found"))
 		return
 	}
@@ -380,6 +513,10 @@ func (s *Handler) get(c *gin.Context) {
 	d.TorrentStatus = s.prepareInitialStatus(ctx, args.ID)
 	d.StatusView = s.initialView(c, d.TorrentStatus)
 
+	if uploads.Owned(args.ID) {
+		d.Upload = s.uploadView(ctx, c, d)
+	}
+
 	// Prepare vault button state. The vault button is a non-critical UI
 	// element (and is also re-fetched async), so if its state can't be
 	// resolved — e.g. a transient vault failure or a canceled request — log
@@ -388,15 +525,33 @@ func (s *Handler) get(c *gin.Context) {
 		vaultButton, err := s.prepareVaultButton(ctx, args)
 		if err != nil {
 			_ = c.Error(errors.Wrap(err, "failed to prepare vault button"))
+			if d.Upload != nil {
+				d.Upload.VaultUnknown = true
+			}
 		} else {
 			d.VaultButton = vaultButton
+			if d.Upload != nil {
+				d.Upload.Saved = vaultButton.Funded
+				// The button reads no pledge of an unfunded row: the
+				// owner's own one is read here.
+				if !d.Upload.CanWrite && !d.Upload.Saved {
+					unpaid, err := s.ownUnpaidPledge(ctx, args)
+					if err != nil {
+						_ = c.Error(errors.Wrap(err, "failed to read the viewer's pledge"))
+						d.Upload.VaultUnknown = true
+					} else {
+						d.Upload.UnpaidPledge = unpaid
+					}
+				}
+			}
 			if c.Query("pledge-form") == "true" || c.Query("from") == "/vault/add" {
-				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, d.Resource.Private)
+				vaultPledgeAddForm, err := s.prepareVaultPledgeAddForm(c, args, trackerPrivate(d.Resource.ResourceResponse))
 				if err != nil {
 					_ = c.Error(errors.Wrap(err, "failed to prepare vault form"))
 					getTpl.HTML(http.StatusInternalServerError, web.NewContext(c).WithData(d).WithErr(err))
 					return
 				}
+				vaultPledgeAddForm.UploadEmpty, vaultPledgeAddForm.UploadIncomplete = uploadPledgeState(d.Resource.ResourceResponse)
 
 				d.VaultPledgeAddForm = vaultPledgeAddForm
 			}
@@ -436,7 +591,7 @@ func noStoreNoIndex(c *gin.Context) {
 // says nothing about this user's right and keeps the redirect above.
 func (s *Handler) privateRefusal(ctx context.Context, c *gin.Context, args *GetArgs, pe *api.PrivateError) {
 	noStoreNoIndex(c)
-	r := web.NewPrivateRefusal(pe, args.User.HasAuth())
+	r := web.NewPrivateRefusal(pe, args.User.HasAuth(), args.ID)
 	log.WithError(pe).
 		WithField("err_key", r.Key).
 		WithField("surface", "page").
@@ -447,8 +602,54 @@ func (s *Handler) privateRefusal(ctx context.Context, c *gin.Context, args *GetA
 		return
 	}
 	r.Target = "main"
-	r.VaultKept = args.User.HasAuth() && pe.Reason == api.ReasonNoRecord && s.vaulted(ctx, c, args.ID)
+	// An upload's Vault copy plays for its owner alone, who is not refused.
+	r.VaultKept = args.User.HasAuth() && pe.Reason == api.ReasonNoRecord && !uploads.Owned(args.ID) && s.vaulted(ctx, c, args.ID)
 	s.tb.Build("resource/private").HTML(http.StatusForbidden, web.NewContext(c).WithData(r))
+}
+
+// trackerPrivate says the resource is a private torrent, whose pledge modal
+// warns about the viewer's tracker. An upload is private and has no tracker.
+func trackerPrivate(r *ra.ResourceResponse) bool {
+	return r.Private && !uploads.Owned(r.ID)
+}
+
+// uploadGone says the viewer owns the upload rest-api did not answer for: it
+// is one of theirs, and their library row of it is there. No database, or a
+// failed read, says no.
+func (s *Handler) uploadGone(ctx context.Context, args *GetArgs) bool {
+	if !uploads.Owned(args.ID) || !args.User.HasAuth() {
+		return false
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return false
+	}
+	lib, err := models.GetLibraryByResourceID(ctx, db, args.User.ID, args.ID)
+	if err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to read the owner's library row of an upload")
+		return false
+	}
+	return lib != nil
+}
+
+// forgetGone marks the owner's upload that is gone as gone, so that its row
+// in My files dims as the page says, and erases what web-ui derived from it:
+// its enrichment and pictures. The next page view that rest-api answers
+// clears the mark and brings those back if the upload is there after all.
+// Not the watch history or the subtitle bindings: rest-api's 404 or
+// no_record is wrong while the upload's home node is away. The mark is the
+// one a quota check writes on the same answers (models.MarkOwnUploadGone).
+// The page renders whatever this does.
+func (s *Handler) forgetGone(ctx context.Context, args *GetArgs) {
+	db := s.pg.Get()
+	if db != nil {
+		if err := models.MarkOwnUploadGone(ctx, db, args.User.ID, args.ID); err != nil {
+			log.WithError(err).WithField("resource_id", args.ID).Warn("failed to mark an upload gone")
+		}
+	}
+	if err := uploads.Forget(ctx, db, s.pics, args.ID, false); err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to forget an upload that is gone")
+	}
 }
 
 // vaulted says Vault keeps a copy of the torrent. Unknown (no Vault, or its
@@ -469,7 +670,9 @@ func (s *Handler) vaulted(ctx context.Context, c *gin.Context, id string) bool {
 // all (/wp-login.php, /library, an apple-touch-icon probe -- anything without
 // a run of five hex digits, error.invalid_resource), or rest-api has no
 // torrent under it (a share link whose torrent is gone, a mistyped hash,
-// error.not_found).
+// error.not_found). Its owner's upload that rest-api no longer has -- a 404,
+// or a 403 no_record -- is the second case with its own text, upload.gone
+// (uploadGone).
 //
 // Both used to redirect to /?err=, so every such URL answered with a 200 home
 // page and none of the stale hash links in search indexes could ever leave
@@ -479,7 +682,7 @@ func (s *Handler) vaulted(ctx context.Context, c *gin.Context, id string) bool {
 // "noindex, follow" (web.NoindexDefault; resource pages are not in the
 // sitemap), which is why nothing here sets one.
 //
-// Only these two outcomes come here. A refused resource (banned or
+// Only these outcomes come here. A refused resource (banned or
 // stoplisted: rest-api answers 403, error.forbidden) keeps its redirect -- it
 // has its own policy -- and so does a failure on our side (rest-api or the
 // database did not answer), which says nothing about whether the URL is dead.

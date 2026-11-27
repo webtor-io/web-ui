@@ -64,7 +64,7 @@ func wantUnavailable(t *testing.T, err error, respID any, status int) {
 	if got := web.ClassifyError(err); got != "error.private.unavailable" {
 		t.Errorf("ClassifyError=%s, want error.private.unavailable", got)
 	}
-	if r := web.NewPrivateRefusal(pe, true); r.SignIn || r.Upload {
+	if r := web.NewPrivateRefusal(pe, true, ""); r.SignIn || r.Upload {
 		t.Errorf("the card offers sign-in=%v upload=%v, which would not help here", r.SignIn, r.Upload)
 	}
 	if respID != nil {

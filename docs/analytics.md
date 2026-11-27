@@ -94,7 +94,13 @@ data and no tracker:
   script would run while the page is parsed, before umami exists, and lose
   it. Like every impression (`lib/impression.js`) it is sent once per page
   load per `{code, reason}`: a re-render is not a second refusal, another
-  refusal is.
+  refusal is. `{code: upload, reason: sign_in}` is not rest-api's: it is the
+  sign-in prompt `lib/drop.js` shows a guest who dropped their own files (or
+  pressed "Upload a folder") on the home page or a tool page, where uploads
+  need an account: one line and a "Sign in" button where a signed-in user's
+  upload shows its progress, not the refusal card. The prompt waits in a
+  `<template>` and `lib/drop.js` counts it when it is shown, once per page
+  load; it carries no script.
 - `private-reupload-upload`: a `.torrent` file picked in the refusal's upload
   (a signed-in user without a record, or a tracker that refused or names
   nothing usable). A click that ends in "cancel" is not counted.
@@ -110,6 +116,100 @@ way (`data-umami-impression`, `app/private_refusal.js`):
   added the torrent with their own tracker. The warning shown above the Store
   button of a private torrent is not counted. `TestPledgeModalPrivate` pins
   both.
+
+## Uploads
+
+The uploader (`lib/upload.js`) sends two events through `window.umami.track`;
+no template declares them:
+
+- `upload-start` `{files, sizeBucket, add}`: the first part of a run was
+  accepted (PUT 204 or 201). `files` is the number of files dropped,
+  `sizeBucket` their total size (`<100M`, `<1G`, `<10G`, `10G+`), `add` is 1
+  for "Add files" on an upload's page (a resumed upload included), else 0.
+- `upload-end` `{result, sizeBucket, minutes, add}`: once per run, on every
+  way out. `result`: `done` (every file stored), `quota` (no token: the
+  space is full), `size` (the space ran out mid-upload), `gone` (the upload
+  can no longer be written: deleted, evicted, saved to Vault), `auth` (the
+  session ended), `errors` (anything else, failed files included).
+
+A run stopped before its first byte (`quota`) has an end and no start; a
+closed tab has a start and no end: abandoned runs = starts − ends, by
+session. A browser that blocks Umami sends neither.
+
+The properties are numbers and buckets only: no id, no file or folder name.
+The event's URL is the page's, as with a page view: on an upload's page it
+carries the upload's id and `?pwd=/<name>/<folder>`.
+
+`upload_reserve` (web-ui database) is the exact count of uploads started
+and of their reserved size: the first token writes the row and deleting the
+upload does not remove it. The events add what the server cannot see:
+whether a run finished, how long it took, why it stopped.
+
+There is no event for "saved to Vault". Uploads saved right now (a deleted
+upload leaves this count: its pledge goes with it; a pledge that lost its
+funding is not counted: the page says "Not saved" then):
+
+```sql
+SELECT count(*) FROM vault.pledge p JOIN upload_reserve r USING (resource_id, user_id)
+WHERE p.funded;
+```
+
+The way to it, by the existing Vault events on an upload's page.
+`vault-clicked` counts presses, not opened forms: it is also sent when the
+press was held back because an upload was running in the tab (a toast is
+shown instead of the form). The step that means "the form was open" is
+`vault-store-confirmed`:
+
+```sql
+SELECT event_name, count(*) AS events, count(DISTINCT session_id) AS sessions
+FROM website_event
+WHERE website_id = '<website>' AND event_type = 2
+  AND event_name IN ('vault-clicked', 'vault-store-confirmed', 'vault-pledge-confirmed')
+  AND url_path LIKE '%/9c5db5752b7c0%'
+  AND created_at > now() - interval '7 days'
+GROUP BY 1;
+```
+
+The owner's "this upload is gone" page — the home page under a 404, with
+`upload.gone` above the form — is counted:
+
+- `upload-gone-shown`, no properties of its own (the common ones go with
+  it, as with every event: see "On every event and identify call"):
+  declared on the error block (`data-umami-impression` on `#index-error`,
+  for that key only) and sent by `app/private_refusal.js`, like the
+  refusals above; once per page load.
+  Only the owner is shown that text; anyone else gets the plain 404. A
+  hand-typed `/?status=error&err=upload.gone` shows it to anyone and is
+  counted too. The event's URL is the page's: the id of the upload that is
+  gone. `TestUploadGoneImpression` pins the markup.
+
+The share of regret: sessions that found an upload gone against sessions
+that finished one, over the same period. The event is the text shown to
+the owner, not an eviction: it also counts an upload whose run broke off
+before its first part reached the seeder (a closed tab, a lost
+connection). The first token has already made its row in the owner's
+list, there is no folder behind it, and its page says the same words. The
+event has no properties of its own, so the two cannot be told apart, and
+how many such runs there are has not been measured: read the share as an
+upper bound of regret. It is a ratio of two flows, not a cohort. Filter
+`event_data` by the same window, or the query times out:
+
+```sql
+WITH ev AS MATERIALIZED (
+  SELECT event_id, event_name, session_id FROM website_event
+  WHERE website_id = '<website>' AND event_type = 2
+    AND created_at >= '<from>' AND created_at < '<to>'
+    AND event_name IN ('upload-gone-shown', 'upload-end')),
+done AS (
+  SELECT DISTINCT ev.session_id FROM ev
+  JOIN event_data d ON d.website_event_id = ev.event_id
+    AND d.data_key = 'result' AND d.string_value = 'done'
+    AND d.created_at >= '<from>' AND d.created_at < '<to>'
+  WHERE ev.event_name = 'upload-end')
+SELECT
+  (SELECT count(DISTINCT session_id) FROM ev WHERE event_name = 'upload-gone-shown') AS gone_sessions,
+  (SELECT count(*) FROM done) AS done_sessions;
+```
 
 ## On every event and identify call
 

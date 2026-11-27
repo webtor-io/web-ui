@@ -85,6 +85,8 @@ func resourceTemplates(t *testing.T) *template.Template {
 		"../../templates/partials/button.html",
 		"../../templates/partials/stream_button.html",
 		"../../templates/partials/icons.html",
+		"../../templates/partials/upload/log.html",
+		"../../templates/partials/job_log.html",
 	)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -168,7 +170,7 @@ func TestProgressPageKeepsTheToolPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	stubTemplates(t, tpl, "hero_backdrop", "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about")
+	stubTemplates(t, tpl, "hero_backdrop", "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about", "private/refusal", "upload/log")
 	j := &job.Job{ID: "j1", Queue: "load"}
 	render := func(instruction string) (title, main string) {
 		ctx := &w.Context{Lang: "en", Data: newPostData(j, &PostArgs{Instruction: instruction})}

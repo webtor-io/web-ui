@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -141,6 +142,37 @@ func TestToolByURL(t *testing.T) {
 		if got := ToolByURL(v); got != nil {
 			t.Errorf("ToolByURL(%q) = /%s, want nil", v, got.Url)
 		}
+	}
+}
+
+// TestDropUploadPages: where uploads are off, the page about uploading one's
+// own files leaves the list every route, the sitemap, the footer and the
+// related cards read; the other pages stay, in their order.
+func TestDropUploadPages(t *testing.T) {
+	saved := slices.Clone(Tools)
+	t.Cleanup(func() { Tools = saved })
+	const url = "private-cloud-media-server"
+	if tool := ToolByURL(url); tool == nil || !tool.Uploads {
+		t.Fatalf("ToolByURL(%q) = %v, want the uploads page", url, tool)
+	}
+	DropUploadPages()
+	if tool := ToolByURL(url); tool != nil {
+		t.Errorf("ToolByURL(%q) = /%s after DropUploadPages, want nil", url, tool.Url)
+	}
+	if len(Tools) != len(saved)-1 {
+		t.Errorf("%d pages after DropUploadPages, want %d", len(Tools), len(saved)-1)
+	}
+	var want, got []string
+	for _, tool := range saved {
+		if tool.Url != url {
+			want = append(want, tool.Url)
+		}
+	}
+	for _, tool := range Tools {
+		got = append(got, tool.Url)
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("pages after DropUploadPages:\n got %v\nwant %v", got, want)
 	}
 }
 

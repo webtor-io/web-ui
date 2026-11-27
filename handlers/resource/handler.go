@@ -20,6 +20,7 @@ import (
 	"github.com/webtor-io/web-ui/services/metrics"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -39,9 +40,11 @@ type Handler struct {
 	// offers sells the way out of a plan cap in the status's plan box
 	// (services/statusview); nil-safe — no catalog, nothing sold.
 	offers *offer.Service
+	// pics erases an upload's pictures, nil without a thumbnail bucket.
+	pics uploads.PictureEraser
 }
 
-func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault, en *enrich.Enricher, offers *offer.Service) {
+func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Context], api *api.Api, jobs *j.Jobs, pg *cs.PG, v *vault.Vault, en *enrich.Enricher, offers *offer.Service, pics uploads.PictureEraser) {
 	secret := c.String(common.SessionSecretFlag)
 	helper := NewHelper(secret)
 	h := &Handler{
@@ -54,6 +57,7 @@ func RegisterHandler(c *cli.Context, r *gin.Engine, tm *template.Manager[*web.Co
 		useDirectLinks: c.BoolT(common.UseDirectLinks),
 		secret:         secret,
 		offers:         offers,
+		pics:           pics,
 	}
 	if v != nil {
 		h.statusVault = v

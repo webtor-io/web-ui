@@ -21,6 +21,7 @@ import (
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/stremio"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -70,6 +71,7 @@ func capCardTemplate(t *testing.T, svc *i18n.Service, o *offer.Offer) *template.
 		"tp":                 h.Tp,
 		"tn":                 h.Tn,
 		"tpHTML":             h.TpHTML,
+		"uploadOwned":        uploads.Owned,
 
 		"embedEnabled": func() bool { return true },
 	}

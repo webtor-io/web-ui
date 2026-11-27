@@ -1,4 +1,6 @@
 {{ define "library/button" }}
+{{/* An upload is in My files from the start and leaves the library only as a whole. */}}
+{{ if not (uploadOwned .Data.ID) }}
     {{ if .Ctx.User | hasAuth }}
         {{ with .Data }}
             {{ if .InLibrary }}
@@ -31,4 +33,5 @@
             {{ t $.Ctx.Lang "library.addToLibrary" }}
         </a>
     {{ end }}
+{{ end }}
 {{ end }}

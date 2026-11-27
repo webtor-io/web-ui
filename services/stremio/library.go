@@ -13,6 +13,7 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 const idPrefix = "wt-"
@@ -333,9 +334,12 @@ func humanizeBytes(n int64) string {
 // rest-api /list pagination that used to run on every /stream request and,
 // under the CompositeStream 5s timeout, intermittently dropped the whole
 // Library result. Rows enriched before the file_idx column existed
-// (fileIdx == nil) fall back to the list walk.
+// (fileIdx == nil) fall back to the list walk, and so does an upload: its
+// files change order with no change of size or count (the live copy lists
+// the directory walk, the Vault copy sorts by path), so a stored index may
+// name another file.
 func (s *Library) resolveFileItem(ctx context.Context, hash, p string, fileIdx *int) (int, string, error) {
-	if fileIdx != nil {
+	if fileIdx != nil && !uploads.HomeHosted(hash) {
 		return *fileIdx, path.Base(p), nil
 	}
 	ti, idx, err := s.retrieveTorrentItem(ctx, hash, s.cla, p)
@@ -472,7 +476,7 @@ func (s *Library) retrieveTorrentItem(ctx context.Context, hash string, claims *
 				return &item, item.Index, nil
 			}
 		}
-		if (resp.Count - int(offset)) == len(resp.Items) {
+		if api.LastListPage(resp, offset) {
 			break
 		}
 		offset += limit

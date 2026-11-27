@@ -527,8 +527,8 @@ github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a h1:LmYfSO3oVs630
 github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a/go.mod h1:noIeMCqd9BmJsPsyDt/fYcyvFpdQ+7LnvQKtISl7kMk=
 github.com/webtor-io/magnet2torrent v1.0.1-0.20261114125219-733d1efe207c h1:keZew6ayduDuOya+3lIfFcQeozWj8m4HWkp1j3wR7Kg=
 github.com/webtor-io/magnet2torrent v1.0.1-0.20261114125219-733d1efe207c/go.mod h1:G5CTwi3kRuIH5VaAGmG/TcSR4FJdwT7SaomPVk7Ok7c=
-github.com/webtor-io/rest-api v1.0.1-0.20261127004127-bb03d3ca7f28 h1:Z2xHArXkK0LhjVIG3RsAGIRnLNJ1/ycx6wIXp6JHaxw=
-github.com/webtor-io/rest-api v1.0.1-0.20261127004127-bb03d3ca7f28/go.mod h1:qSuAC+Ir+NI6xeraOBEohi3afTzdWfd3ZhmRn1GliL8=
+github.com/webtor-io/rest-api v1.0.1-0.20261127064023-74ad3167c81f h1:pl5SBnYeezrPBZdG3YSlizDVfFP26b21qll0qC2U888=
+github.com/webtor-io/rest-api v1.0.1-0.20261127064023-74ad3167c81f/go.mod h1:qSuAC+Ir+NI6xeraOBEohi3afTzdWfd3ZhmRn1GliL8=
 github.com/webtor-io/torrent-store v1.1.0 h1:4STiGsoY7Xm3MsmH9M6X121NDYnRM5NUebga6gxu4pM=
 github.com/webtor-io/torrent-store v1.1.0/go.mod h1:t2ziJm137/boTgiwJhdED+6qBOba+BmPTsB6XQ19tVA=
 github.com/willf/bitset v1.1.9/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=

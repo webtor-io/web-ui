@@ -201,6 +201,13 @@ Idempotent. Returns existing resource or creates new one:
 - Calculates `required_vp` from torrent size via REST API (`size / 1GB`)
 - Extracts torrent name from API response
 
+**An upload's pledge** (the owner's own files, `uploads.Owned`; the service gets the uploads service through `WithUploads`):
+- rest-api's first answer, with the pledger's claims, is the owner check, and is checked before the early return on an existing row: 404 → `ErrResourceNotFound`, no `reserved` → error, no finished file (`files_count == 0`) → `ErrUploadEmpty` (site: `vault.uploadEmpty`; JSON API: 409 `conflict`). A row left by a pledge refused for VP is not returned for an upload that is gone. An upload's ID in upper case is refused before any request: rest-api would answer it as the upload, and it would go the torrent's way.
+- Without a row: `uploads.Seal` closes the upload for writing on the seeder (410 → `ErrResourceNotFound`, any other failure → error, no row), then rest-api is read again, uncached — the modal's answer from before the seal sits in the minute cache — and `required_vp` is `reserved / 1GB` of that answer: the finished files alone, the seal drops unfinished parts. No seal, no pledge: without the uploads service the pledge fails. The seal is for good; a pledge refused for VP after it leaves the upload sealed with its row, and the next pledge takes the row without sealing again.
+- The pledge cannot be removed, on the site (`deletePledge`) or through the API (`removePledge`): the copy in Vault is the upload's only one. "Delete all" (`POST /upload/delete`) gives the VP back, frozen or not. `RemovePledge` itself has no guard: the reaper and the upload deletion call it.
+- The upload's pledgers stay on Vault's uid list unfunded too (`GetPledgerIDs`): the owner keeps reading the copy while the pledge waits for points.
+- The modal takes `Required` from the row when there is one (what `CreatePledge` compares with, for any resource), says `vault.uploadEmpty` instead of the Store button when nothing is finished, and warns `vault.uploadIncomplete` above it when a part is declared beyond the finished files (`uploadPledgeState`). An upload's lines say `vault.uploadNotice` where a torrent's say the freeze; `/vault` disables its box and draws no countdown; the profile splits the funded points into own files and torrents (`UserStats.FundedOwnFiles`, `FundedTorrents`).
+
 #### IsPledgeFrozen, FrozenFor
 
 Dynamic check: `FrozenFor(pledge)` is what is left of the freeze, `frozen_at + freeze_period - now()`, 0 once it is over, regardless of vault status; `IsPledgeFrozen` is `FrozenFor > 0`. One computation, so a page that says "frozen" always has a time left to say (`services/vault` `TestFrozenForIsTheFreezeLeft`). `GetUserStats` puts both on each `EnrichedPledge` (`IsFrozen`, `FrozenFor`).
@@ -272,7 +279,7 @@ Creates a new pledge. Auth required.
 Removes pledges. Auth required (middleware).
 
 - Form: `resource_id` (the resource page's remove modal) and/or `resource_ids`, comma-joined (the dashboard's "remove selected"). One field rather than a box per field: `lib/async.js` posts multipart, Go's multipart reader stops at 1000 parts and gin swallows that error, so a part per box arrived cut to nothing or to a tail. `web.FormBulkIDs` reads both, drops empty and repeated values (a repeat would fail its second removal as "pledge not found") and refuses more than `web.MaxBulkIDs` (1000; the page's "Select all" stops there)
-- Per id (`deletePledge`): checks freeze status, error if frozen; calls `RemovePledge` — one transaction per pledge, as before
+- Per id (`deletePledge`): an upload's pledge is refused first (`vault.uploadNotice`, see "An upload's pledge"); checks freeze status, error if frozen; calls `RemovePledge` — one transaction per pledge, as before
 - One failure does not stop the rest (`deletePledges`): the ones before it are already committed, and the user gets as many as can go rather than a selection cut at an arbitrary row. The first failure is the one reported, wrapped as `failed to remove N of M pledges: …` — `ClassifyError` matches by substring, so `frozen` still reads as `error.pledge_frozen`. The dashboard says it: `GET /vault` reads `status=error&err=` into `ErrKey` and draws it above the table (the resource page's modal reads its own, `from=/vault/remove`)
 - Redirects with `status=success` or `status=error&err=<message>`
 

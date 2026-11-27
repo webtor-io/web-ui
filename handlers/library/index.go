@@ -16,8 +16,10 @@ import (
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
@@ -35,9 +37,12 @@ type IndexData struct {
 	TorrentCount int
 	MovieCount   int
 	SeriesCount  int
+	UploadCount  int
 	RateForm     *RateFormData
 	// Genres are the options of the genre filter; empty hides it.
 	Genres []GenreOption
+	// Quota is My files' use of the account's space; nil shows no line.
+	Quota *uploads.Usage
 }
 
 // SectionEmpty reports whether the section has nothing at all, as opposed to
@@ -54,6 +59,8 @@ func (d *IndexData) SectionEmpty() bool {
 		return d.MovieCount == 0
 	case shared.SectionTypeSeries:
 		return d.SeriesCount == 0
+	case shared.SectionTypeUploads:
+		return d.UploadCount == 0
 	}
 	return true
 }
@@ -170,7 +177,7 @@ func (s *Handler) index(c *gin.Context) {
 		}
 	}
 
-	tc, mc, sc, err := models.GetLibraryCounts(ctx, db, u.ID)
+	tc, mc, sc, uc, err := models.GetLibraryCounts(ctx, db, u.ID)
 	if err != nil {
 		_ = c.AbortWithError(http.StatusInternalServerError, errors.Wrap(err, "failed to get library counts"))
 		return
@@ -182,7 +189,10 @@ func (s *Handler) index(c *gin.Context) {
 		TorrentCount: tc,
 		MovieCount:   mc,
 		SeriesCount:  sc,
+		UploadCount:  uc,
 	}
+
+	indexData.Quota = s.quota(ctx, u, claims.GetFromContext(c), args.Section)
 
 	// The genre options come from the whole section, not from the filtered
 	// list, so picking one genre does not take the others away.
@@ -229,6 +239,15 @@ func (s *Handler) index(c *gin.Context) {
 	s.tb.Build("library/index").HTML(http.StatusOK, wctx.WithData(indexData))
 }
 
+// quota is the line of My files: the space its uploads use, from the same
+// count as the profile's line. No other section counts it.
+func (s *Handler) quota(ctx context.Context, u *auth.User, cd *claims.Data, section shared.SectionType) *uploads.Usage {
+	if section != shared.SectionTypeUploads {
+		return nil
+	}
+	return s.uploads.Usage(ctx, u, cd)
+}
+
 func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared.IndexArgs) (items []any, err error) {
 	db := s.pg.Get()
 	if db == nil {
@@ -236,7 +255,13 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	}
 	switch args.Section {
 	case shared.SectionTypeTorrents:
-		return s.getTorrentList(ctx, u.ID, db, args.Sort)
+		return s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryTorrents)
+	case shared.SectionTypeUploads:
+		items, err = s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryUploads)
+		if err == nil {
+			annotateGone(ctx, db, u.ID, items)
+		}
+		return
 	case shared.SectionTypeMovies:
 		return s.getMovieList(ctx, u.ID, db, args.Sort, libraryFilter(args))
 	case shared.SectionTypeSeries:
@@ -245,8 +270,8 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	return
 }
 
-func (s *Handler) getTorrentList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType) (items []any, err error) {
-	ls, err := models.GetLibraryTorrentsList(ctx, db, id, sort)
+func (s *Handler) getTorrentList(ctx context.Context, id uuid.UUID, db *pg.DB, sort models.SortType, kind models.LibraryKind) (items []any, err error) {
+	ls, err := models.GetLibraryTorrentsList(ctx, db, id, sort, kind)
 	if err != nil {
 		return
 	}
@@ -283,6 +308,20 @@ func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, so
 		items[i] = v
 	}
 	return
+}
+
+// annotateGone marks the uploads in items whose files storage removed. A
+// failed read marks none: the rows look as they did before the mark.
+func annotateGone(ctx context.Context, db *pg.DB, userID uuid.UUID, items []any) {
+	ids, err := models.UploadGoneIDs(ctx, db, userID)
+	if err != nil {
+		return
+	}
+	for _, it := range items {
+		if l, ok := it.(*models.Library); ok && slices.Contains(ids, l.ResourceID) {
+			l.Gone = true
+		}
+	}
 }
 
 // annotateWatched sets the transient UserWatched flag on each Movie/Series in

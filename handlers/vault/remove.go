@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -61,6 +62,13 @@ func (h *Handler) deletePledge(ctx context.Context, resourceID string, user *aut
 	// Validate resource_id
 	if resourceID == "" {
 		return errors.New("resource_id is required")
+	}
+
+	// An upload's copy in Vault is its only one: removing its pledge would
+	// delete the files without a word. Deleting the upload gives the VP
+	// back. Before the freeze check, which would promise a later removal.
+	if uploads.Owned(resourceID) {
+		return web.NewUserError("vault.uploadNotice", errors.New("an upload's pledge is removed by deleting the upload"))
 	}
 
 	// Get vault resource

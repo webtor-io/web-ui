@@ -24,7 +24,9 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/common"
+	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/vault"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -81,12 +83,36 @@ func newResourceRouter(t *testing.T, restAPI *httptest.Server) *gin.Engine {
 // newResourceRouterAs is newResourceRouter with a Vault (nil: none) and, when
 // user is set, that user signed in on every request.
 func newResourceRouterAs(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User) *gin.Engine {
+	// A database handle without a host (Get is nil): an anonymous visitor's
+	// page renders without a database, a signed-in one's does not.
+	return newResourceRouterPG(t, restAPI, v, user, &cs.PG{})
+}
+
+// newResourceRouterPG is newResourceRouterAs on the database pg.
+func newResourceRouterPG(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User, pg *cs.PG) *gin.Engine {
+	return newResourceRouterEn(t, restAPI, v, user, pg, nil)
+}
+
+// newResourceRouterEn is newResourceRouterPG with the enricher en (nil: none).
+func newResourceRouterEn(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User, pg *cs.PG, en *enrich.Enricher) *gin.Engine {
+	return newResourceRouterPics(t, restAPI, v, user, pg, en, nil)
+}
+
+// newResourceRouterPics is newResourceRouterEn with pics erasing an upload's
+// pictures (nil: no thumbnail bucket).
+func newResourceRouterPics(t *testing.T, restAPI *httptest.Server, v *vault.Vault, user *models.User, pg *cs.PG, en *enrich.Enricher, pics uploads.PictureEraser) *gin.Engine {
 	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
-		"templates/layouts/main.html":           `{{ template "main" . }}`,
-		"templates/views/index.html":            `{{ define "main" }}[home][err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
-		"templates/views/resource/get.html":     `{{ define "main" }}[resource][name={{ .Data.Resource.Name }}]{{ end }}`,
+		"templates/layouts/main.html": `{{ template "main" . }}`,
+		"templates/views/index.html":  `{{ define "main" }}[home][err={{ .ErrKey }}][instruction={{ .Data.Instruction }}]{{ end }}`,
+		"templates/views/resource/get.html": `{{ define "main" }}[resource][name={{ .Data.Resource.Name }}][movie={{ with .Data.Movie }}{{ .Title }}{{ end }}]` +
+			`[upload={{ with .Data.Upload }}{{ .IsOwner }}/{{ .CanWrite }}/{{ .Saved }}{{ end }}][uname={{ with .Data.Upload }}{{ .Name }}{{ end }}]` +
+			`[unknown={{ with .Data.Upload }}{{ .VaultUnknown }}{{ end }}][unpaid={{ with .Data.Upload }}{{ .UnpaidPledge }}{{ end }}]` +
+			`[incomplete={{ with .Data.Upload }}{{ .Incomplete }}{{ end }}]` +
+			`[required={{ with .Data.VaultPledgeAddForm }}{{ printf "%.2f" .Required }}{{ end }}]` +
+			`[pledgeEmpty={{ with .Data.VaultPledgeAddForm }}{{ .UploadEmpty }}{{ end }}]` +
+			`[pledgeIncomplete={{ with .Data.VaultPledgeAddForm }}{{ .UploadIncomplete }}{{ end }}]{{ end }}`,
 		"templates/views/resource/private.html": `{{ define "main" }}[private][key={{ .Data.Key }}][signin={{ .Data.SignIn }}][upload={{ .Data.Upload }}][vault={{ .Data.VaultKept }}][target={{ .Data.Target }}]{{ end }}`,
 	}
 	for name, body := range files {
@@ -143,9 +169,7 @@ func newResourceRouterAs(t *testing.T, restAPI *httptest.Server, v *vault.Vault,
 	re := multitemplate.NewRenderer()
 	r.HTMLRender = re
 	tm := template.NewManager[*web.Context](re)
-	// A database handle without a host (Get is nil): an anonymous visitor's
-	// page renders without a database, a signed-in one's does not.
-	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, &cs.PG{}, v, nil, nil)
+	RegisterHandler(c, r, tm, api.New(c, restAPI.Client()), nil, pg, v, en, nil, pics)
 	index.RegisterHandler(r, tm, nil)
 	if err := tm.Init(); err != nil {
 		t.Fatal(err)

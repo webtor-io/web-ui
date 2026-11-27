@@ -5,6 +5,7 @@ import { initStickyStatus, stickyBottom } from '../../lib/stickyStatus';
 import { initLandscapeFocus } from '../../lib/landscapeFocus';
 import { initToolIntent } from '../../lib/toolIntent';
 import { initStreamToggle } from '../../lib/streamToggle';
+import { bindUploadFileDelete } from '../../lib/uploadFile';
 import '../../lib/share/share';
 import { takesPart, whenDeclared, setPendingFallback } from '../../lib/player/decode-declaration';
 import { hasJob } from '../../lib/actionBusy';
@@ -49,6 +50,11 @@ function initPlotClamp() {
     renderCollapsed();
 }
 av( async function() {
+    // "Add files" of the owner's unsaved upload: the uploader's entry, a drop
+    // anywhere on the page and the hold on "Save to Vault" while an upload
+    // runs. A page without the button loads none of it.
+    const add = this.querySelector('[data-upload-add]');
+    if (add) import('../../lib/drop').then((m) => m.initAddFiles(add));
     initPlotClamp();
     // The line under the .torrent button for a visitor from a tool page
     // (partials/resource/tool_intent) — before the #action early return.
@@ -56,6 +62,9 @@ av( async function() {
     // Watch / Listen pressed while its player plays pauses it (once per
     // page: lib/streamToggle.js guards a second wiring).
     initStreamToggle(document);
+    // The × of a file or a folder of the owner's upload (partials/list.html),
+    // before the #action early return.
+    bindUploadFileDelete(document);
     // Before the early return below: the status mirror is for every visit to
     // this page, not only the ones that arrive with #action=stream.
     const stopSticky = initStickyStatus(document);

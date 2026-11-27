@@ -2238,6 +2238,11 @@ input:-webkit-autofill:focus {
   padding-left: 0;
   padding-right: 0;
 }
+/* An upload's log (partials/upload/log.html) has one step, the line itself:
+   nothing to unfold. */
+[data-upload-log] .job-steps {
+  display: none;
+}
 
 /* A button whose job is running (lib/actionBusy.js). Not :disabled — a
    disabled button reads as "you cannot do this", and this one is doing it:

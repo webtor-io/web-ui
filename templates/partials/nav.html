@@ -17,11 +17,14 @@
         </a>
     </div>
     {{ if and .Data (eq (printf "%T" .Data) "*index.Data") (not (.User | hasAuth)) }}
+        {{/* A page about uploading one's own files (Tool.Uploads) has no
+             features or FAQ section: those two point at the home page's. */}}
+        {{ $sections := "" }}{{ with .Data.Tool }}{{ if .Uploads }}{{ $sections = langPath $.Lang "/" }}{{ end }}{{ end }}
         <div class="navbar-center hidden xl:flex">
         <ul class="menu menu-horizontal px-1 gap-1 text-sm font-medium">
             <li><a href="#how" class="text-w-sub hover:text-base-content transition-colors">{{ t $.Lang "nav.howItWorks" }}</a></li>
-            <li><a href="#features" class="text-w-sub hover:text-base-content transition-colors">{{ t $.Lang "nav.features" }}</a></li>
-            <li><a href="#faq" class="text-w-sub hover:text-base-content transition-colors">{{ t $.Lang "nav.faq" }}</a></li>
+            <li><a href="{{ $sections }}#features" class="text-w-sub hover:text-base-content transition-colors">{{ t $.Lang "nav.features" }}</a></li>
+            <li><a href="{{ $sections }}#faq" class="text-w-sub hover:text-base-content transition-colors">{{ t $.Lang "nav.faq" }}</a></li>
             <li><a href="https://blog.webtor.io/{{ blogLang $.Lang }}/post/" target="_blank" class="text-w-sub hover:text-base-content transition-colors">{{ t $.Lang "nav.blog" }}</a></li>
         </ul>
     </div>

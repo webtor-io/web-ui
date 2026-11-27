@@ -29,6 +29,7 @@ breaks consumers.
   "generated_at": "2026-05-17T12:34:56Z",
   "user": { "user_id": "...", "email": "...", "tier": "...", ... },
   "library": [...],
+  "upload_reserves": [...],
   "watch_history": [...],
   "movie_statuses": [...],
   "series_statuses": [...],
@@ -61,6 +62,7 @@ omitted entirely when the user has never used the feature.
 | --------------------- | ------------------------------------------------------------------ |
 | `user`                | `models.User` (via `GetUserByID`)                                  |
 | `library`             | `models.GetLibraryTorrentsList` (with `TorrentResource` join)      |
+| `upload_reserves`     | `models.ListAllUploadReserves`: the quota each of the account's uploads holds, `{resource_id, reserved_bytes, write_until, gone_at}` |
 | `watch_history`       | `models.ListAllWatchHistory`                                       |
 | `movie_statuses`      | `models.ListAllMovieStatuses`                                      |
 | `series_statuses`     | `models.ListAllSeriesStatuses`                                     |

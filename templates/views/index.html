@@ -76,8 +76,16 @@
 {{ end }}
 {{ define "main" }}
 {{ with .Data }}
+{{/* A page about uploading one's own files (Tool.Uploads) opens with the drop
+     zone alone: no magnet field, no "or", no demo magnet. The zone and its
+     badge speak of own files only; a dropped .torrent still opens
+     (lib/drop.js), the page just does not offer it. See docs/tool_pages.md. */}}
+{{ $ownFiles := and .Tool .Tool.Uploads }}
+{{/* Its hero has no bottom padding: elsewhere the stats and trust strips
+     stand between it and the first section's top padding, here the two
+     would stack into an empty band under the drop zone. */}}
 <!-- Hero Section -->
-<section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] pb-16 px-3 sm:px-6">
+<section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] {{ if not $ownFiles }}pb-16 {{ end }}px-3 sm:px-6">
     {{ template "hero_backdrop" }}
 
     <!-- big logo -->
@@ -127,16 +135,32 @@
         {{ template "load/progress" $ }}
     </div>
     {{ end }}
+    {{/* The upload of a signed-in user's own files shows its progress where a
+         load shows its log (lib/upload.js). A guest's drop, or the folder
+         button, shows the sign-in prompt in the same place: one line and a
+         button, as "My subtitles" asks a guest, not the refusal card with a
+         lock. It is kept in a <template> so its impression is sent when it
+         is shown, not on page load; drop.js counts it, so it carries no
+         script. */}}
+    {{ if uploadsEnabled }}{{ if $.User | hasAuth }}{{ template "upload/log" (withContext $ "mb-10 max-w-[680px]") }}{{ else }}<div class="upload-sign-in-slot relative z-10 w-full max-w-[680px]"></div>
+    <template id="upload-sign-in"><div class="mb-10 p-4 rounded-xl bg-base-300/20 border border-w-line/40 text-center" data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in">
+        <p class="mb-4 text-w-sub">{{ t $.Lang "upload.signIn" }}</p>
+        <a href="{{ langPath $.Lang "/login" }}?return-url={{ langPath $.Lang $.Path }}" class="btn btn-soft" data-async-target="main">{{ t $.Lang "private.page.signIn" }}</a>
+    </div></template>{{ end }}{{ end }}
 
     {{ if $.ErrKey }}
-    <div id="index-error" class="progress-alert progress-alert-oneline mb-10 relative z-10 w-full max-w-[680px]">
+    {{/* "This upload is gone", shown to its owner, is counted: no properties
+         of its own, sent by private_refusal.js as the refusal card's is. */}}
+    <div id="index-error" class="progress-alert progress-alert-oneline mb-10 relative z-10 w-full max-w-[680px]"{{ if eq $.ErrKey "upload.gone" }} data-umami-impression="upload-gone-shown"{{ end }}>
         <pre class="error">{{ with $.ErrArgs }}{{ tn $.Lang $.ErrKey .Count "Full" .Full }}{{ else }}{{ t $.Lang $.ErrKey }}{{ end }}</pre>
         <a class="close" onclick="document.getElementById('index-error').remove()">{{ t $.Lang "home.ok" }}</a>
+        {{ if eq $.ErrKey "upload.gone" }}{{ "private_refusal.js" | asset }}{{ end }}
     </div>
     {{ end }}
 
     <!-- input area -->
     <div class="relative z-10 w-full max-w-[680px]">
+        {{ if not $ownFiles }}
         <!-- search -->
         <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="join w-full" data-async-target="main">
             <div class="join-item flex items-center bg-base-300 border border-w-line rounded-l-[14px] flex-1 h-12 focus-within:border-w-pink focus-within:shadow-[0_0_40px_rgba(232,67,147,0.12)] transition-all">
@@ -163,32 +187,58 @@
 
         <!-- divider -->
         <div class="divider text-w-muted text-xs font-semibold tracking-widest uppercase my-5 before:bg-w-line after:bg-w-line">{{ t $.Lang "home.or" }}</div>
+        {{ end }}
 
         <!-- upload zone -->
-        <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main">
-            <label for="dropzone-input" class="upload-dashed rounded-2xl py-6 px-6 text-center cursor-pointer block">
-                <p class="text-[0.95rem] text-w-sub"><span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}</p>
-                <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3">{{ t $.Lang "home.noSizeLimit" }}</span>
-            </label>
-            <input class="dropzone-input hidden" name="resource" type="file" />
+        {{/* With uploads on, the zone also takes the user's own files and
+             folders (lib/drop.js), and "Upload a folder" leads the row under
+             it. The folder picker stays outside the form: its click would
+             bubble up to the zone and open the file picker too. */}}
+        <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main"{{ if uploadsEnabled }} data-uploads data-upload-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Vault }} data-upload-vault{{ end }}{{ end }}>
+            <div class="upload-dashed rounded-2xl py-6 px-6 text-center cursor-pointer">
+                <p class="text-[0.95rem] text-w-sub">{{ if uploadsEnabled }}<span class="text-w-pinkL font-semibold">{{ if $ownFiles }}{{ t $.Lang "home.dropzoneOwnFiles" }}{{ else }}{{ t $.Lang "home.dropzoneUploads" }}{{ end }}</span> {{ t $.Lang "home.dropzoneUploadsHint" }}{{ else }}<span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}{{ end }}</p>
+                {{/* The size badge is the own-files page's alone, and there
+                     only with a cap to name: "no size limit" would be said of
+                     the user's own files. Elsewhere the zone has none. */}}
+                {{ if $ownFiles }}{{ with and uploadsEnabled (uploadCap $.Claims) }}
+                <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">{{ if $.Claims | isPaid }}{{ tp $.Lang "home.sizeLimitOwnFiles" "Cap" . }}{{ else }}{{ t $.Lang "home.sizeLimitOwnFilesUpsell" }}{{ end }}</span>
+                {{ end }}{{ end }}
+            </div>
+            <input class="dropzone-input hidden" name="resource" type="file"{{ if uploadsEnabled }} multiple{{ end }} />
             <input name="instruction" value="{{ .Instruction }}" type="hidden" />
         </form>
+        {{ if uploadsEnabled }}<input type="file" class="dropzone-dir hidden" webkitdirectory multiple>{{ end }}
 
-        <!-- demo & speedtest links -->
-        <div class="flex justify-center items-center gap-4 mt-4">
+        {{/* The row wraps centred on a phone: three links do not fit its
+             width. The page about own files keeps the folder link alone.
+             The links take no fill on hover or keyboard focus (btn-ghost's
+             reads as a grey box): the text brightens, focus keeps its
+             outline. */}}
+        {{ if or uploadsEnabled (not $ownFiles) }}
+        <!-- folder, demo & speedtest links -->
+        <div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 mt-4">
+            {{ if uploadsEnabled }}
+            <button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                {{ t $.Lang "upload.folder" }}
+            </button>
+            {{ end }}
+            {{ if not $ownFiles }}
             <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="main">
                 <input type="hidden" name="resource" value="{{ demoMagnet }}" />
                 <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-                <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="try-demo">
+                <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent" data-umami-event="try-demo">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     {{ t $.Lang "home.tryDemo" }}
                 </button>
             </form>
-            <a href="{{ langPath $.Lang "/speedtest" }}" data-async-target="main" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="speedtest-hero">
+            <a href="{{ langPath $.Lang "/speedtest" }}" data-async-target="main" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent" data-umami-event="speedtest-hero">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 {{ t $.Lang "home.speedTest" }}
             </a>
+            {{ end }}
         </div>
+        {{ end }}
     </div>
 
     {{/* `has` is required, not defensive: this view is also rendered by

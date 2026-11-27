@@ -88,3 +88,24 @@ func UpsertThumbnail(ctx context.Context, db *pg.DB, t *Thumbnail) error {
 		Insert()
 	return err
 }
+
+// ListThumbnailContents is the distinct contents (Hash and Format only) a
+// resource's thumbnail rows name.
+func ListThumbnailContents(ctx context.Context, db pg.DBI, resourceID string) ([]Thumbnail, error) {
+	var list []Thumbnail
+	_, err := db.QueryContext(ctx, &list, `SELECT DISTINCT hash, format FROM thumbnail WHERE resource_id = ?`, resourceID)
+	return list, err
+}
+
+// DeleteResourceThumbnails deletes the resource's rows that name the content hash.
+func DeleteResourceThumbnails(ctx context.Context, db pg.DBI, resourceID, hash string) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM thumbnail WHERE resource_id = ? AND hash = ?`, resourceID, hash)
+	return err
+}
+
+// CountThumbnailsByHash is how many rows, of any resource, name the content hash.
+func CountThumbnailsByHash(ctx context.Context, db pg.DBI, hash string) (int, error) {
+	var n int
+	_, err := db.QueryOneContext(ctx, pg.Scan(&n), `SELECT count(*) FROM thumbnail WHERE hash = ?`, hash)
+	return n, err
+}

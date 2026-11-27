@@ -113,7 +113,7 @@ const docTemplatelibraryapi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "The torrents saved to the account, newest first by default.\n\n` + "`" + `type` + "`" + ` filters the same way the library tabs do: ` + "`" + `movies` + "`" + ` and ` + "`" + `series` + "`" + ` mean a torrent with at least\none recognized film or show, which is decided by enrichment — a torrent added a moment ago may not\nbe classified yet and shows up only under ` + "`" + `all` + "`" + `.",
+                "description": "The torrents and uploads saved to the account, newest first by default.\n\n` + "`" + `type` + "`" + ` filters the same way the library tabs do: ` + "`" + `movies` + "`" + ` and ` + "`" + `series` + "`" + ` mean a torrent or upload with\nat least one recognized film or show, which is decided by enrichment — one added a moment ago may\nnot be classified yet and shows up only under ` + "`" + `all` + "`" + `. There is no type for uploads: ` + "`" + `all` + "`" + ` lists them.",
                 "produces": [
                     "application/json"
                 ],
@@ -361,7 +361,7 @@ const docTemplatelibraryapi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes the entry from your library. The resource itself stays in the store and keeps working —\nthis is not a takedown, and a Vault pledge on it is a separate thing (` + "`" + `DELETE /vault/pledges` + "`" + `).\n\nNot idempotent: removing something that is not there answers ` + "`" + `404` + "`" + `.",
+                "description": "Removes the entry from your library. The resource itself stays in the store and keeps working —\nthis is not a takedown, and a Vault pledge on it is a separate thing (` + "`" + `DELETE /vault/pledges` + "`" + `).\n\nNot idempotent: removing something that is not there answers ` + "`" + `404` + "`" + `.\n\nAn upload of your own is not removed from the library: it is deleted as a whole, with its files,\non its page on the site, and this answers ` + "`" + `409` + "`" + `.",
                 "produces": [
                     "application/json"
                 ],
@@ -397,6 +397,12 @@ const docTemplatelibraryapi = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/libapi.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "The resource is your upload: delete it on its page",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -1085,7 +1091,7 @@ const docTemplatelibraryapi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a pledge, which is what keeps a torrent available long-term. Idempotent per resource: an\naccount holds at most one pledge for a given resource, and pledging again answers ` + "`" + `409` + "`" + `.\n\nThe required amount is derived from the torrent size, so a pledge fails with ` + "`" + `403` + "`" + ` when the account\ndoes not have that many points available.",
+                "description": "Creates a pledge, which is what keeps a torrent available long-term. Idempotent per resource: an\naccount holds at most one pledge for a given resource, and pledging again answers ` + "`" + `409` + "`" + `.\n\nThe required amount is derived from the torrent size, so a pledge fails with ` + "`" + `403` + "`" + ` when the account\ndoes not have that many points available.\n\nPledging an upload closes it for writing for good; its pledge cannot be removed through the API —\ndelete the upload on the site to get the points back. Files that are not fully uploaded yet are\ndropped.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1145,7 +1151,7 @@ const docTemplatelibraryapi = `{
                         }
                     },
                     "409": {
-                        "description": "A pledge for this resource already exists",
+                        "description": "A pledge for this resource already exists, or the upload has no finished files yet",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -1247,7 +1253,7 @@ const docTemplatelibraryapi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Removes the pledge for a resource and returns its points to the balance. A pledge that is still\nfrozen cannot be removed and answers ` + "`" + `409` + "`" + `.",
+                "description": "Removes the pledge for a resource and returns its points to the balance. A pledge that is still\nfrozen cannot be removed and answers ` + "`" + `409` + "`" + `. An upload's pledge cannot be removed: delete the upload\ninstead; it answers ` + "`" + `409` + "`" + `.",
                 "produces": [
                     "application/json"
                 ],
@@ -1287,7 +1293,7 @@ const docTemplatelibraryapi = `{
                         }
                     },
                     "409": {
-                        "description": "Pledge is frozen",
+                        "description": "Pledge is frozen, or the resource is an upload",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -2018,6 +2024,10 @@ const docTemplatelibraryapi = `{
                 "private": {
                     "description": "Private is true for a BEP 27 private torrent. Always present: its\nabsence must never be read as false.",
                     "type": "boolean"
+                },
+                "reserved": {
+                    "description": "Reserved is set for an upload only: the bytes it holds on its seeder\n(finished files plus the declared size of unfinished ones), or the sum\nof its files for a copy kept in Vault. A torrent has no such key.",
+                    "type": "integer"
                 },
                 "size": {
                     "description": "Size is the torrent's total size in bytes (sum of all files). Lets\nclients read the size without paginating /list — a real win on torrents\nwith tens of thousands of files.",

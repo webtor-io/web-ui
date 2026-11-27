@@ -2,7 +2,7 @@
      code, handlers/resource/get.go privateRefusal). Its title is the
      refusal's, not the torrent's: rest-api gave no name.
      .Data = *web.PrivateRefusal. */}}
-{{ define "title" }}{{ t $.Lang "private.page.title" }}{{ end }}
+{{ define "title" }}{{ t $.Lang (or .Data.Title "private.page.title") }}{{ end }}
 {{ define "main" }}
 <section class="min-h-[70vh] pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
     <div class="max-w-[680px] mx-auto">

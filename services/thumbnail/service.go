@@ -20,7 +20,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"hash/fnv"
 	"image"
 	_ "image/gif"  // register decoder
 	_ "image/jpeg" // register decoder
@@ -48,10 +47,15 @@ import (
 	"github.com/webtor-io/web-ui/helpers"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 const (
 	bucketFlag = "aws-thumbnail-bucket"
+
+	// PosterCacheBucketFlag names the bucket of the poster renders:
+	// handlers/library registers it, New reads it.
+	PosterCacheBucketFlag = "aws-poster-cache-bucket"
 
 	// MaxImageBytes caps an image-file pull so a torrent that mislabels
 	// a 50 MB raw scan as poster.jpg doesn't OOM the web-ui pod. Real
@@ -143,11 +147,12 @@ func RegisterFlags(f []cli.Flag) []cli.Flag {
 }
 
 type Service struct {
-	s3Cl   *cs.S3Client
-	pg     *cs.PG
-	api    *api.Api
-	cl     *http.Client
-	bucket string
+	s3Cl         *cs.S3Client
+	pg           *cs.PG
+	api          *api.Api
+	cl           *http.Client
+	bucket       string
+	posterBucket string // the renders of thumbnails; empty: no render cache
 }
 
 // New returns nil when the deployment is missing any required infra so
@@ -161,10 +166,99 @@ func New(c *cli.Context, s3Cl *cs.S3Client, pg *cs.PG, a *api.Api, hcl *http.Cli
 	if hcl == nil {
 		hcl = &http.Client{Timeout: downloadHTTPTimeout}
 	}
-	return &Service{s3Cl: s3Cl, pg: pg, api: a, cl: hcl, bucket: bucket}
+	return &Service{s3Cl: s3Cl, pg: pg, api: a, cl: hcl, bucket: bucket, posterBucket: c.String(PosterCacheBucketFlag)}
 }
 
 func (s *Service) Enabled() bool { return s != nil }
+
+// RenderPrefix is where poster_resolver keeps the renders of the thumbnail
+// with this content hash.
+func RenderPrefix(hash string) string { return "poster/thumb-" + hash + "/" }
+
+// Erase removes a resource's pictures for good: its thumbnail rows and, for
+// content no other resource's row names, the blob and its renders. Objects
+// are keyed by content — the same cover file in a torrent and in an upload
+// is one object — so an object stays while any row names it.
+func (s *Service) Erase(ctx context.Context, resourceID string) error {
+	if s == nil {
+		return nil
+	}
+	db := s.pg.Get()
+	if db == nil {
+		return errors.New("no db")
+	}
+	contents, err := models.ListThumbnailContents(ctx, db, resourceID)
+	if err != nil {
+		return errors.Wrap(err, "failed to erase thumbnail")
+	}
+	for _, c := range contents {
+		if err := s.eraseContent(ctx, db, resourceID, c.Hash, c.Format); err != nil {
+			return errors.Wrap(err, "failed to erase thumbnail")
+		}
+	}
+	return nil
+}
+
+// eraseContent removes the resource's rows that name this content and, when
+// no other row names it, the blob and its renders — in one transaction, under
+// the lock store() takes for the hash. The resource may have no such row left
+// (a purge took it): the content goes all the same. A storage failure rolls
+// the rows back, so a retry finds the objects by them.
+func (s *Service) eraseContent(ctx context.Context, db *pg.DB, resourceID, hash, format string) error {
+	return db.RunInTransaction(ctx, func(tx *pg.Tx) error {
+		if err := models.AdvisoryXactLock(ctx, tx, hash); err != nil {
+			return err
+		}
+		if err := models.DeleteResourceThumbnails(ctx, tx, resourceID, hash); err != nil {
+			return err
+		}
+		n, err := models.CountThumbnailsByHash(ctx, tx, hash)
+		if err != nil || n > 0 {
+			return err
+		}
+		if err := s.deleteObject(ctx, s.bucket, s.objectKey(hash, format)); err != nil {
+			return err
+		}
+		return s.deleteRenders(ctx, hash)
+	})
+}
+
+// deleteRenders removes the renders of the content hash.
+// ponytail: one DELETE per render — a thumbnail has a handful (the widths the
+// templates ask for, og, their blur and raw variants); DeleteObjects in
+// batches if that ever grows.
+func (s *Service) deleteRenders(ctx context.Context, hash string) error {
+	if s.posterBucket == "" {
+		return nil
+	}
+	var keys []string
+	err := s.s3Cl.Get().ListObjectsV2PagesWithContext(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.posterBucket),
+		Prefix: aws.String(RenderPrefix(hash)),
+	}, func(p *s3.ListObjectsV2Output, _ bool) bool {
+		for _, o := range p.Contents {
+			keys = append(keys, aws.StringValue(o.Key))
+		}
+		return true
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to list thumbnail renders")
+	}
+	for _, k := range keys {
+		if err := s.deleteObject(ctx, s.posterBucket, k); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) deleteObject(ctx context.Context, bucket, key string) error {
+	_, err := s.s3Cl.Get().DeleteObjectWithContext(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	return errors.Wrap(err, "failed to delete thumbnail object")
+}
 
 // Generate produces (or returns the existing) thumbnail for a resource.
 // Idempotent: a row already in `public.thumbnail` short-circuits the
@@ -176,22 +270,52 @@ func (s *Service) Enabled() bool { return s != nil }
 // seek offset lands at ~25 % rather than the blind 5-min default. The
 // caller doesn't need to feed a probe in.
 //
-// Returns ErrNoSource when the torrent is private (its thumbnail would be
-// served by hash to anyone), has neither a usable image file
+// A private torrent is listed and exported with the caller's claims:
+// rest-api refuses a caller without a right to it, and its picture goes only
+// to a viewer rest-api admits (poster_resolver.Service.Get).
+//
+// Returns ErrNoSource when the torrent has neither a usable image file
 // nor a video item, or its video's frames are over maxFramePixels — caller
 // logs this at info and proceeds with the
 // favicon fallback. Other errors are propagated so they show up in the
 // daily error budget.
+//
+// An upload can be deleted while its frame is being made (up to two
+// minutes, detached from the request): once the row is in, ask whether the
+// upload is still there, and take the picture back if it is not — or if
+// nobody can say. Only a picture this call wrote: an existing row is
+// returned as it is, with no question asked.
 func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID string) (*models.Thumbnail, error) {
+	owned := s != nil && uploads.Owned(resourceID)
+	had := false
+	if owned {
+		if db := s.pg.Get(); db != nil {
+			existing, err := models.GetThumbnailByResourceID(ctx, db, resourceID)
+			had = err == nil && existing != nil
+		}
+	}
+	t, err := s.generate(ctx, claims, resourceID)
+	if t == nil || err != nil || !owned || had {
+		return t, err
+	}
+	// The frame's own budget may be spent by now.
+	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	if r, lerr := s.api.LookupResource(cctx, api.InternalClaims(), resourceID); lerr == nil && r != nil {
+		return t, nil
+	}
+	// By the hash of what was written, not by the resource's rows: a purge may
+	// have taken the row already, and the blob would be left with no row to
+	// find it by.
+	if eerr := s.eraseContent(cctx, s.pg.Get(), resourceID, t.Hash, t.Format); eerr != nil {
+		log.WithError(eerr).WithField("resource_id", resourceID).Warn("failed to take back the picture of a deleted upload")
+	}
+	return nil, errors.Wrap(ErrNoSource, "the upload is gone")
+}
+
+func (s *Service) generate(ctx context.Context, claims *api.Claims, resourceID string) (*models.Thumbnail, error) {
 	if s == nil {
 		return nil, nil
-	}
-	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to look up resource")
-	}
-	if r != nil && r.Private {
-		return nil, errors.Wrap(ErrNoSource, "private torrent")
 	}
 	db := s.pg.Get()
 	if db == nil {
@@ -334,7 +458,7 @@ func (s *Service) listAllItems(ctx context.Context, claims *api.Claims, resource
 			return nil, err
 		}
 		items = append(items, resp.Items...)
-		if (resp.Count - int(offset)) == len(resp.Items) {
+		if api.LastListPage(resp, offset) {
 			break
 		}
 		offset += limit
@@ -652,7 +776,7 @@ func (s *Service) store(ctx context.Context, db *pg.DB, resourceID, path string,
 	}
 
 	err := db.RunInTransaction(ctx, func(tx *pg.Tx) error {
-		if err := advisoryLock(ctx, tx, hash); err != nil {
+		if err := models.AdvisoryXactLock(ctx, tx, hash); err != nil {
 			return err
 		}
 		if err := s.putObject(ctx, hash, format, data); err != nil {
@@ -680,19 +804,6 @@ func (s *Service) putObject(ctx context.Context, hash, format string, data []byt
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to put thumbnail object")
-	}
-	return nil
-}
-
-// advisoryLock — FNV-fold the hex hash into a bigint and take a
-// per-transaction lock. Mirrors the user_subtitle pattern; collisions
-// are harmless (they only serialise unrelated content).
-func advisoryLock(ctx context.Context, tx *pg.Tx, hash string) error {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(hash))
-	_, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?)", int64(h.Sum64()))
-	if err != nil {
-		return errors.Wrap(err, "failed to take advisory lock")
 	}
 	return nil
 }

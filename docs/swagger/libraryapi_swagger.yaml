@@ -529,6 +529,12 @@ definitions:
           Private is true for a BEP 27 private torrent. Always present: its
           absence must never be read as false.
         type: boolean
+      reserved:
+        description: |-
+          Reserved is set for an upload only: the bytes it holds on its seeder
+          (finished files plus the declared size of unfinished ones), or the sum
+          of its files for a copy kept in Vault. A torrent has no such key.
+        type: integer
       size:
         description: |-
           Size is the torrent's total size in bytes (sum of all files). Lets
@@ -654,11 +660,11 @@ paths:
   /library:
     get:
       description: |-
-        The torrents saved to the account, newest first by default.
+        The torrents and uploads saved to the account, newest first by default.
 
-        `type` filters the same way the library tabs do: `movies` and `series` mean a torrent with at least
-        one recognized film or show, which is decided by enrichment — a torrent added a moment ago may not
-        be classified yet and shows up only under `all`.
+        `type` filters the same way the library tabs do: `movies` and `series` mean a torrent or upload with
+        at least one recognized film or show, which is decided by enrichment — one added a moment ago may
+        not be classified yet and shows up only under `all`. There is no type for uploads: `all` lists them.
       parameters:
       - default: all
         description: Filter
@@ -806,6 +812,9 @@ paths:
         this is not a takedown, and a Vault pledge on it is a separate thing (`DELETE /vault/pledges`).
 
         Not idempotent: removing something that is not there answers `404`.
+
+        An upload of your own is not removed from the library: it is deleted as a whole, with its files,
+        on its page on the site, and this answers `409`.
       parameters:
       - description: Infohash
         example: 08ada5a7a6183aae1e09d831df6748d566095a10
@@ -828,6 +837,10 @@ paths:
             $ref: '#/definitions/libapi.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/libapi.ErrorResponse'
+        "409":
+          description: 'The resource is your upload: delete it on its page'
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "429":
@@ -1415,6 +1428,10 @@ paths:
 
         The required amount is derived from the torrent size, so a pledge fails with `403` when the account
         does not have that many points available.
+
+        Pledging an upload closes it for writing for good; its pledge cannot be removed through the API —
+        delete the upload on the site to get the points back. Files that are not fully uploaded yet are
+        dropped.
       parameters:
       - description: Resource to pledge to
         in: body
@@ -1451,7 +1468,8 @@ paths:
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "409":
-          description: A pledge for this resource already exists
+          description: A pledge for this resource already exists, or the upload has
+            no finished files yet
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "422":
@@ -1477,7 +1495,8 @@ paths:
     delete:
       description: |-
         Removes the pledge for a resource and returns its points to the balance. A pledge that is still
-        frozen cannot be removed and answers `409`.
+        frozen cannot be removed and answers `409`. An upload's pledge cannot be removed: delete the upload
+        instead; it answers `409`.
       parameters:
       - description: Resource (infohash) the pledge is held against
         in: path
@@ -1502,7 +1521,7 @@ paths:
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "409":
-          description: Pledge is frozen
+          description: Pledge is frozen, or the resource is an upload
           schema:
             $ref: '#/definitions/libapi.ErrorResponse'
         "429":

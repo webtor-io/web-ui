@@ -1,4 +1,5 @@
 import av from '../../lib/av';
+import { humanBytes } from '../../lib/humanBytes';
 
 // Partial-archive selection mode for the file browser card. Selection is
 // keyed per (resource, directory) at module level so it survives the async
@@ -13,21 +14,6 @@ const state = new Map();
 // download URL (edge proxies cap request lines at ~8k).
 const MAX_PATHS = 1024;
 const MAX_ENCODED_LEN = 6000;
-
-// Mirrors helpers.Bytes (the template's bitsForHumans): base 1024, one
-// decimal below 10, so the client-side sum renders exactly like the SSR
-// full-directory size it replaces.
-function humanBytes(n) {
-    if (n < 10) return `${n}\u00a0B`;
-    // Base 1024 with KB/MB/GB labels — the same arithmetic as helpers.Bytes on
-    // the server (and as Chrome's own download UI), so the selected-files sum
-    // agrees with the SSR directory size next to it. 1000 here used to make
-    // the two differ by 5–7% on the same bytes.
-    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
-    const e = Math.floor(Math.log(n) / Math.log(1024));
-    const val = Math.floor((n / Math.pow(1024, e)) * 10 + 0.5) / 10;
-    return `${val < 10 ? val.toFixed(1) : Math.round(val)}\u00a0${units[e]}`; // no-break space, as helpers.Bytes
-}
 
 // Drops entries covered by a selected ancestor folder (a checked folder
 // already spans its subtree), then sorts — the selection is a set, and a

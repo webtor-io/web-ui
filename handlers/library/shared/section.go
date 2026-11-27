@@ -6,4 +6,5 @@ const (
 	SectionTypeTorrents SectionType = "torrents"
 	SectionTypeMovies   SectionType = "movies"
 	SectionTypeSeries   SectionType = "series"
+	SectionTypeUploads  SectionType = "uploads"
 )

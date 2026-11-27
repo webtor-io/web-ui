@@ -26,6 +26,14 @@
 		</div>
 	{{ else if .Data.Funded }}
 		{{ template "vault/pledge-modal/add/success" . }}
+	{{ else if .Data.UploadEmpty }}
+		{{/* An upload with no finished file: nothing to save, no Store button. */}}
+		<p class="pt-4 pb-2 text-sm text-w-sub">{{ t .Ctx.Lang "vault.uploadEmpty" }}</p>
+		<div class="modal-action justify-center">
+			<form method="dialog">
+				<button class="btn btn-soft">{{ t .Ctx.Lang "vault.ok" }}</button>
+			</form>
+		</div>
 	{{ else }}
 		{{ if .Data.Available }}
 			{{ if ge (derefFloat64 .Data.Available) .Data.Required }}
@@ -88,12 +96,20 @@
 		{{/* What the click commits to, next to the button that does it (the
 		     pledge freezes at once, services/vault CreatePledge) -- wherever
 		     the button is, unlimited points included: they cannot be taken
-		     back before the freeze ends either. No freeze configured, no line. */}}
+		     back before the freeze ends either. No freeze configured, no line.
+		     An upload's line is its own, freeze or not: saving closes it for
+		     good, its pledge is never removed, deleting it gives the VP back.
+		     An unfinished part is lost to the save: said first. */}}
 		{{ $canStore := or (not .Data.Available) (ge (derefFloat64 .Data.Available) .Data.Required) }}
+		{{ if and $canStore .Data.UploadIncomplete }}
+			<p class="pb-2 text-sm text-w-sub">{{ t .Ctx.Lang "vault.uploadIncomplete" }}</p>
+		{{ end }}
 		{{ if and $canStore .Data.Private }}
 			<p class="pb-2 text-sm text-w-sub">{{ t .Ctx.Lang "vault.private.warning" }}</p>
 		{{ end }}
-		{{ if and $canStore .Data.FreezePeriod }}
+		{{ if and $canStore (uploadOwned .Data.ResourceID) }}
+			{{ template "vault/pledge-modal/freeze-note" (t .Ctx.Lang "vault.uploadNotice") }}
+		{{ else if and $canStore .Data.FreezePeriod }}
 			{{ $period := duration .Ctx.Lang .Data.FreezePeriod }}
 			{{ $note := tp .Ctx.Lang "vault.freezeNoticeShort" "Period" $period }}
 			{{ if .Data.Available }}{{ $note = tp .Ctx.Lang "vault.freezeNotice" "Amount" (printf "%.2f" .Data.Required) "Period" $period }}{{ end }}

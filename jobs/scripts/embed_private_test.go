@@ -23,6 +23,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
 	tpl "github.com/webtor-io/web-ui/services/template"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -203,9 +204,10 @@ func TestEmbedPrivateRenders(t *testing.T) {
 	t.Cleanup(func() { _ = locales.Close() })
 	helper := i18n.NewHelper(i18n.New(locales.FS()))
 	p, err := template.New("private.html").Funcs(template.FuncMap{
-		"t":      helper.T,
-		"tpHTML": helper.TpHTML,
-		"domain": func() string { return "https://webtor.example" },
+		"t":           helper.T,
+		"tpHTML":      helper.TpHTML,
+		"uploadOwned": uploads.Owned,
+		"domain":      func() string { return "https://webtor.example" },
 	}).ParseFiles("../../templates/views/embed/private.html")
 	if err != nil {
 		t.Fatal(err)

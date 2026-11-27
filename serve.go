@@ -11,6 +11,7 @@ import (
 	wa "github.com/webtor-io/web-ui/handlers/action"
 	japi "github.com/webtor-io/web-ui/handlers/api"
 	wau "github.com/webtor-io/web-ui/handlers/auth"
+	hc "github.com/webtor-io/web-ui/handlers/common"
 	wdev "github.com/webtor-io/web-ui/handlers/device"
 	"github.com/webtor-io/web-ui/handlers/discover"
 	"github.com/webtor-io/web-ui/handlers/discover_ai"
@@ -45,6 +46,7 @@ import (
 	"github.com/webtor-io/web-ui/handlers/tests"
 	"github.com/webtor-io/web-ui/handlers/torznab_indexer"
 	"github.com/webtor-io/web-ui/handlers/trial"
+	wup "github.com/webtor-io/web-ui/handlers/upload"
 	ush "github.com/webtor-io/web-ui/handlers/user_subtitle"
 	uvsh "github.com/webtor-io/web-ui/handlers/user_video_status"
 	vh "github.com/webtor-io/web-ui/handlers/vault"
@@ -74,6 +76,7 @@ import (
 	"github.com/webtor-io/web-ui/services/transcodercaps"
 	"github.com/webtor-io/web-ui/services/turnstile"
 	"github.com/webtor-io/web-ui/services/umami"
+	"github.com/webtor-io/web-ui/services/uploads"
 	ua "github.com/webtor-io/web-ui/services/url_alias"
 	usettings "github.com/webtor-io/web-ui/services/user_settings"
 	usv "github.com/webtor-io/web-ui/services/user_subtitle"
@@ -148,9 +151,14 @@ func configureServe(c *cli.Command) {
 	c.Flags = memwatch.RegisterFlags(c.Flags)
 	c.Flags = streamprefs.RegisterFlags(c.Flags)
 	c.Flags = transcodercaps.RegisterFlags(c.Flags)
+	c.Flags = uploads.RegisterFlags(c.Flags)
 }
 
 func serve(c *cli.Context) error {
+	if !uploads.Enabled(c) {
+		hc.DropUploadPages()
+	}
+
 	// Setting HTTP Client
 	cl := http.DefaultClient
 
@@ -356,6 +364,9 @@ func serve(c *cli.Context) error {
 	// Setting ApiClaimsHandler -- after ats and uc: uid is the user they put in, an API key's too.
 	sapi.RegisterHandler(r)
 
+	// Setting Uploads: nil when they are off
+	up := uploads.New(c, pg, sapi)
+
 	// Setting Migration from v1 to v2
 	wm.RegisterHandler(r)
 
@@ -405,6 +416,15 @@ func serve(c *cli.Context) error {
 	// pattern as userSubtitleSvc: New returns nil when the bucket isn't
 	// configured, callers branch via Enabled().
 	thumbnailSvc := thumb.New(c, s3Cl, pg, sapi, cl)
+	// pics erases an upload's pictures; nil without a thumbnail bucket (a nil *thumb.Service in the
+	// interface would not be nil).
+	var pics uploads.PictureEraser
+	if thumbnailSvc != nil {
+		pics = thumbnailSvc
+	}
+	if up != nil {
+		up.Pictures = pics
+	}
 
 	// Setting UserSettings. Thin lazymap-backed cache over the
 	// user_settings row; read on the hot path (poster_resolver,
@@ -496,7 +516,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Vault (vaultApi is built earlier — the onboarding middleware
 	// needs to know whether Vault is configured before any route is mounted)
-	v := vault.New(c, vaultApi, uc, cl, pg, sapi)
+	v := vault.New(c, vaultApi, uc, cl, pg, sapi).WithUploads(up)
 
 	// Setting VaultHandler
 	if v != nil {
@@ -508,7 +528,12 @@ func serve(c *cli.Context) error {
 	trial.RegisterHandler(r, offers)
 
 	// Setting ResourceHandler
-	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en, offers)
+	wr.RegisterHandler(c, r, tm, sapi, jobs, pg, v, en, offers, pics)
+
+	// Setting UploadHandler -- after uc and sapi: a token is cut from the viewer's claims.
+	if up != nil {
+		wup.RegisterHandler(r, up, sapi, v, pg, thumbnailSvc)
+	}
 
 	// Setting IndexHandler
 	wi.RegisterHandler(r, tm, pg)
@@ -538,7 +563,7 @@ func serve(c *cli.Context) error {
 	notifications.RegisterHandler(r, tm, ns, donate.Billing(c), offers)
 
 	// Setting ProfileHandler
-	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get(), sapi)
+	p.RegisterHandler(c, r, tm, a, ats, ual, pg, uc, v, userSettingsSvc, payClient, releaseSubSvc, ns, redis.Get(), sapi, up)
 
 	// Setting device authorization confirmation page (the human half of the
 	// device flow; the API half lives in handlers/api)
@@ -606,7 +631,7 @@ func serve(c *cli.Context) error {
 	discover_watchlist.RegisterHandler(r, pg, en)
 
 	// Setting Library
-	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en, thumbnailSvc)
+	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en, thumbnailSvc, up)
 
 	// Setting UserSubtitle handler. When AWS_USER_SUBTITLE_BUCKET is not
 	// set the service is nil; RegisterHandler skips its routes and the UI
@@ -661,7 +686,7 @@ func serve(c *cli.Context) error {
 
 	// Setting Events
 	if nats != nil {
-		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), offers, cacheIndex)
+		eh := event.New(c, nats, pg, v, uc, ns, donate.Billing(c), offers, cacheIndex, up, thumbnailSvc)
 		if eh != nil {
 			servers = append(servers, eh)
 			defer eh.Close()

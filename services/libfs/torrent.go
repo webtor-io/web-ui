@@ -150,7 +150,7 @@ func (s *TorrentDirectory) retrieveTorrentItems(ctx context.Context, hash string
 			return nil, err
 		}
 		items = append(items, resp.Items...)
-		if (resp.Count - int(offset)) == len(resp.Items) {
+		if api.LastListPage(resp, offset) {
 			break
 		}
 		offset += limit
