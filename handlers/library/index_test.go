@@ -3,7 +3,9 @@ package library
 import (
 	"bytes"
 	"context"
+	"flag"
 	"html/template"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
@@ -18,12 +20,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-pg/pg/v10"
 	uuid "github.com/satori/go.uuid"
+	"github.com/urfave/cli"
+	proto "github.com/webtor-io/claims-provider/proto"
 	"github.com/webtor-io/web-ui/handlers/library/helpers"
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/models/pgtest"
+	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
@@ -370,6 +377,44 @@ func TestUploadsSectionRenders(t *testing.T) {
 		}
 	})
 
+	// The bulk action of My files deletes for good, and says so; the
+	// Torrents one takes rows out of the library.
+	bulkLabel := regexp.MustCompile(`(?s)class="js-bulk-submit[^>]*>.*?</svg>\s*(\S[^<]*)<span class="js-bulk-count">`)
+	label := func(t *testing.T, out string) string {
+		t.Helper()
+		m := bulkLabel.FindStringSubmatch(out)
+		if m == nil {
+			t.Fatal("no bulk submit")
+		}
+		return m[1]
+	}
+	if got := label(t, page(t, shared.SectionTypeUploads, true, row)); got != "Delete" {
+		t.Errorf("My files: the bulk action is %q, want Delete", got)
+	}
+	if got := label(t, page(t, shared.SectionTypeTorrents, true, row)); got != "Remove" {
+		t.Errorf("Torrents: the bulk action is %q, want Remove", got)
+	}
+
+	// My files says how much of the space is used, by the sort; nothing
+	// without a count (uploads off, no claims, a failed count).
+	t.Run("quota", func(t *testing.T) {
+		data := &IndexData{Args: &shared.IndexArgs{Section: shared.SectionTypeUploads}, Items: []any{row}, UploadCount: 1, Quota: &uploads.Usage{Used: 3 << 30, Cap: 50 << 30}}
+		tpl := withUploads(parseLibrary(t), true)
+		for lang, want := range map[string]string{"en": "3.0\u00a0GB of 50\u00a0GB used", "ru": "Занято 3.0\u00a0GB из 50\u00a0GB"} {
+			out := render(t, tpl, `{{ template "main" . }}`, &web.Context{Lang: lang, Path: "/lib/uploads", Data: data})
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: no %q", lang, want)
+			}
+			if i, j := strings.Index(out, want), strings.Index(out, `name="sort"`); i < 0 || j < 0 || i > j {
+				t.Errorf("%s: the quota at %d, the sort at %d; want it just before", lang, i, j)
+			}
+		}
+		data.Quota = nil
+		if out := render(t, tpl, `{{ template "main" . }}`, &web.Context{Lang: "en", Path: "/lib/uploads", Data: data}); strings.Contains(out, "50\u00a0GB") {
+			t.Error("a quota line without a count")
+		}
+	})
+
 	t.Run("torrents", func(t *testing.T) {
 		out := page(t, shared.SectionTypeTorrents, true, &models.Library{ResourceID: testTorrent, CreatedAt: added, Torrent: &models.TorrentResource{Name: "Film"}})
 		for _, want := range []string{
@@ -509,5 +554,39 @@ func TestUploadsGoneRows(t *testing.T) {
 	}
 	if want := map[string]bool{gone: true, live: false, bare: false}; !reflect.DeepEqual(got, want) {
 		t.Errorf("gone: %v, want %v", got, want)
+	}
+}
+
+// The space used is counted for My files alone: the other sections show no
+// line and run no count.
+func TestQuotaOnlyInMyFiles(t *testing.T) {
+	db := pgtest.Start(t)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	for _, f := range uploads.RegisterFlags(api.RegisterFlags(nil)) {
+		f.Apply(fs)
+	}
+	if err := fs.Parse([]string{"--upload-url=http://127.0.0.1:1", "--webtor-secret=test", "--rapidapi-host=", "--rapidapi-key="}); err != nil {
+		t.Fatal(err)
+	}
+	c := cli.NewContext(cli.NewApp(), fs, nil)
+	up := uploads.New(c, pgtest.CS(t, db), api.New(c, http.DefaultClient))
+	if up == nil {
+		t.Fatal("uploads are off")
+	}
+	h := &Handler{uploads: up}
+	var id uuid.UUID
+	if _, err := db.QueryOne(pg.Scan(&id), `INSERT INTO "user" (email) VALUES (?) RETURNING user_id`, uuid.NewV4().String()+"@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	u := &auth.User{ID: id}
+	free := &claims.Data{Context: &proto.Context{Tier: &proto.Tier{Id: 0}}}
+	ctx := context.Background()
+	if got := h.quota(ctx, u, free, shared.SectionTypeUploads); got == nil || got.Cap != uploads.FreeCap {
+		t.Errorf("My files: %+v, want the free cap", got)
+	}
+	for _, sec := range []shared.SectionType{shared.SectionTypeTorrents, shared.SectionTypeMovies, shared.SectionTypeSeries} {
+		if got := h.quota(ctx, u, free, sec); got != nil {
+			t.Errorf("%s: %+v, want no line", sec, got)
+		}
 	}
 }

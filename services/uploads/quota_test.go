@@ -745,3 +745,25 @@ func TestReserveRowsGoWithUser(t *testing.T) {
 		t.Errorf("%d reserve rows outlived their account", n)
 	}
 }
+
+// Usage is what a page shows: the reserves alone, without asking rest-api.
+// No line, not a failed page, where uploads are off or there are no claims.
+func TestUsage(t *testing.T) {
+	s, db, f := newEnv(t)
+	u := newUser(t, db)
+	row(t, db, u, idX, 3*gib, expired, "NULL")
+	paid := &claims.Data{Context: &proto.Context{Tier: &proto.Tier{Id: 1}}}
+	ctx := context.Background()
+	if got := s.Usage(ctx, u, paid); got == nil || *got != (Usage{Used: 3 * gib, Cap: PaidCap}) {
+		t.Errorf("usage %+v, want 3 GiB of the paid cap", got)
+	}
+	if f.total() != 0 {
+		t.Errorf("rest-api asked %d times", f.total())
+	}
+	if got := s.Usage(ctx, u, nil); got != nil {
+		t.Errorf("no claims: %+v, want nil", got)
+	}
+	if got := (*Service)(nil).Usage(ctx, u, paid); got != nil {
+		t.Errorf("uploads off: %+v, want nil", got)
+	}
+}

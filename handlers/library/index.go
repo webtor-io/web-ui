@@ -16,8 +16,10 @@ import (
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
+	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/genre"
 	"github.com/webtor-io/web-ui/services/i18n"
+	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
@@ -39,6 +41,8 @@ type IndexData struct {
 	RateForm     *RateFormData
 	// Genres are the options of the genre filter; empty hides it.
 	Genres []GenreOption
+	// Quota is My files' use of the account's space; nil shows no line.
+	Quota *uploads.Usage
 }
 
 // SectionEmpty reports whether the section has nothing at all, as opposed to
@@ -188,6 +192,8 @@ func (s *Handler) index(c *gin.Context) {
 		UploadCount:  uc,
 	}
 
+	indexData.Quota = s.quota(ctx, u, claims.GetFromContext(c), args.Section)
+
 	// The genre options come from the whole section, not from the filtered
 	// list, so picking one genre does not take the others away.
 	if ct, ok := sectionContentType[args.Section]; ok {
@@ -231,6 +237,15 @@ func (s *Handler) index(c *gin.Context) {
 		wctx = wctx.WithErrKey(c.Query("err"))
 	}
 	s.tb.Build("library/index").HTML(http.StatusOK, wctx.WithData(indexData))
+}
+
+// quota is the line of My files: the space its uploads use, from the same
+// count as the profile's line. No other section counts it.
+func (s *Handler) quota(ctx context.Context, u *auth.User, cd *claims.Data, section shared.SectionType) *uploads.Usage {
+	if section != shared.SectionTypeUploads {
+		return nil
+	}
+	return s.uploads.Usage(ctx, u, cd)
 }
 
 func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared.IndexArgs) (items []any, err error) {

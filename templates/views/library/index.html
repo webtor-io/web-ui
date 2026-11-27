@@ -37,6 +37,7 @@
                `contents`: the selects wrap in this row together with the
                select-mode button, two lines on a 360px phone. */}}
           {{ if not .Data.SectionEmpty }}
+          {{ with .Data.Quota }}<span class="text-xs text-w-muted whitespace-nowrap group-data-[bulk-on]/bulk:hidden">{{ tp $.Lang "library.uploads.quota" "Used" (bitsForHumans .Used) "Cap" (bitsForHumans .Cap) }}</span>{{ end }}
           <form action="{{ langPath $.Lang $.Path }}" data-async-target="main" data-async-no-scroll="true" class="contents group-data-[bulk-on]/bulk:hidden">
             {{ template "library/watched_filter" (withContext $ .Data.Args) }}
             {{ template "library/genre_filter" (withContext $ .Data) }}

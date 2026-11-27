@@ -101,6 +101,21 @@ func (s *Service) Quota(ctx context.Context, u *auth.User, cd *claims.Data, ac *
 	return used, cap, nil
 }
 
+// Usage is the account's quota use as a page shows it, from the reserves
+// alone, without asking rest-api. Nil where uploads are off (s nil), without
+// claims, or when the count fails: the page then has no line, not an error.
+func (s *Service) Usage(ctx context.Context, u *auth.User, cd *claims.Data) *Usage {
+	if s == nil {
+		return nil
+	}
+	used, cap, err := s.Quota(ctx, u, cd, nil, "", false)
+	if err != nil {
+		log.WithError(err).WithField("user_hash", auth.LogHash(u.ID)).Warn("failed to get upload quota")
+		return nil
+	}
+	return &Usage{Used: used, Cap: cap}
+}
+
 // check asks rest-api about each candidate row. Only rest-api's answers
 // write: the seeder's reserved bytes, or gone on a 404 or on no_record for
 // the owner, and then what web-ui derived from the upload is forgotten.

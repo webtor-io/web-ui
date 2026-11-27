@@ -576,17 +576,7 @@ func (s *Handler) get(c *gin.Context) {
 		}
 	}
 
-	// The upload quota line reads only the reserves, without asking rest-api;
-	// a failure hides the line, not the page.
-	var uploadQuota *uploads.Usage
-	if s.uploads != nil {
-		used, limit, qerr := s.uploads.Quota(c.Request.Context(), u, claims.GetFromContext(c), nil, "", false)
-		if qerr != nil {
-			log.WithError(qerr).WithField("user_hash", auth.LogHash(u.ID)).Warn("failed to get upload quota")
-		} else {
-			uploadQuota = &uploads.Usage{Used: used, Cap: limit}
-		}
-	}
+	uploadQuota := s.uploads.Usage(c.Request.Context(), u, claims.GetFromContext(c))
 
 	// Per-user preferences (adult-content visibility, etc). Missing row
 	// falls through to Default() — the toggle renders unchecked.

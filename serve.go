@@ -631,7 +631,7 @@ func serve(c *cli.Context) error {
 	discover_watchlist.RegisterHandler(r, pg, en)
 
 	// Setting Library
-	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en, thumbnailSvc)
+	library.RegisterHandler(c, r, tm, sapi, pg, jobs, cl, s3Cl, en, thumbnailSvc, up)
 
 	// Setting UserSubtitle handler. When AWS_USER_SUBTITLE_BUCKET is not
 	// set the service is nil; RegisterHandler skips its routes and the UI

@@ -116,7 +116,10 @@ data export (`docs/data_export.md`).
   and forgets the upload (below, `certain` false). Any other answer writes
   nothing: the row keeps its last known reserve.
 
-The profile shows used of cap (`profile/uploads_quota.html`, no live check).
+The profile shows used of cap (`profile/uploads_quota.html`), and so does
+My files, by its sort (`library.uploads.quota`): one count for the page,
+from the reserves alone, no live check (`Service.Usage`). No claims, uploads
+off or a failed count: no line.
 Only the tool page about uploads (`Tool.Uploads`) states the cap, in the
 badge under its drop zone, or the free tier's upsell; there is no badge
 without claims. The home page and the other tool pages have no badge under
@@ -264,6 +267,9 @@ data export list them with the rest (`models.LibraryAll`, `docs/api.md`,
 `docs/webdav.md`). "My files" sorts by date added, by last update
 (`torrent_resource.updated_at`, which moves when the size or the file count
 changes) and by name.
+
+Its bulk bar deletes (`/upload/delete`) and says so, "Delete"
+(`bulk.delete`); the other sections' bar says "Remove".
 
 An upload marked gone (`upload_reserve.gone_at`, `models.UploadGoneIDs`) is
 dimmed, says "Removed from storage" (`library.uploads.gone`) where its size
