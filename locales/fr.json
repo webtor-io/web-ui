@@ -451,6 +451,7 @@
     "library.uploads.empty": "Rien ici pour le moment",
     "library.uploads.upload": "Téléverser des fichiers",
     "library.uploads.deleteConfirm": "Supprimer définitivement la sélection avec tous ses fichiers ? Les copies dans Vault seront supprimées aussi.",
+    "library.uploads.gone": "Supprimé du stockage",
     "library.files": "fichiers",
     "library.addToLibrary": "Ajouter à la bibliothèque",
     "library.removeFromLibrary": "Retirer de la bibliothèque",

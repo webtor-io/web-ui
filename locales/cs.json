@@ -451,6 +451,7 @@
     "library.uploads.empty": "Zatím tu nic není",
     "library.uploads.upload": "Nahrát soubory",
     "library.uploads.deleteConfirm": "Smazat vybrané se všemi soubory natrvalo? Smažou se i kopie ve Vaultu.",
+    "library.uploads.gone": "Odstraněno z úložiště",
     "library.files": "soubory",
     "library.addToLibrary": "Přidat do knihovny",
     "library.removeFromLibrary": "Odebrat z knihovny",

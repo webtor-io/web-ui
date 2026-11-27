@@ -242,7 +242,11 @@ func (s *Handler) getLibraryList(ctx context.Context, u *auth.User, args *shared
 	case shared.SectionTypeTorrents:
 		return s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryTorrents)
 	case shared.SectionTypeUploads:
-		return s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryUploads)
+		items, err = s.getTorrentList(ctx, u.ID, db, args.Sort, models.LibraryUploads)
+		if err == nil {
+			annotateGone(ctx, db, u.ID, items)
+		}
+		return
 	case shared.SectionTypeMovies:
 		return s.getMovieList(ctx, u.ID, db, args.Sort, libraryFilter(args))
 	case shared.SectionTypeSeries:
@@ -289,6 +293,20 @@ func (s *Handler) getSeriesList(ctx context.Context, id uuid.UUID, db *pg.DB, so
 		items[i] = v
 	}
 	return
+}
+
+// annotateGone marks the uploads in items whose files storage removed. A
+// failed read marks none: the rows look as they did before the mark.
+func annotateGone(ctx context.Context, db *pg.DB, userID uuid.UUID, items []any) {
+	ids, err := models.UploadGoneIDs(ctx, db, userID)
+	if err != nil {
+		return
+	}
+	for _, it := range items {
+		if l, ok := it.(*models.Library); ok && slices.Contains(ids, l.ResourceID) {
+			l.Gone = true
+		}
+	}
 }
 
 // annotateWatched sets the transient UserWatched flag on each Movie/Series in

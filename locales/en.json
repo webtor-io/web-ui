@@ -507,6 +507,8 @@
     "library.uploads.empty": "Nothing here yet",
     "library.uploads.upload": "Upload files",
     "library.uploads.deleteConfirm": "Delete the selection with all its files for good? Vault copies will be deleted too.",
+    "library.uploads.gone": "Removed from storage",
+    "@library.uploads.gone": "In My files, in place of the size on the row of the user's own files that storage removed (unsaved files are deleted when not opened for a while): the files are no longer stored. The row then leads nowhere. Short, no full stop.",
     "library.files": "files",
     "library.addToLibrary": "Add to library",
     "library.removeFromLibrary": "Remove from library",

@@ -451,6 +451,7 @@
     "library.uploads.empty": "Здесь пока пусто",
     "library.uploads.upload": "Загрузить файлы",
     "library.uploads.deleteConfirm": "Удалить выбранное со всеми файлами навсегда? Копии в Vault тоже удалятся",
+    "library.uploads.gone": "Удалено из хранилища",
     "library.files": "файлов",
     "library.addToLibrary": "В библиотеку",
     "library.removeFromLibrary": "Убрать из библиотеки",

@@ -451,6 +451,7 @@
     "library.uploads.empty": "Hier staat nog niets",
     "library.uploads.upload": "Bestanden uploaden",
     "library.uploads.deleteConfirm": "De selectie met alle bestanden definitief verwijderen? De kopieën in Vault worden ook verwijderd.",
+    "library.uploads.gone": "Verwijderd uit de opslag",
     "library.files": "bestanden",
     "library.addToLibrary": "Toevoegen aan bibliotheek",
     "library.removeFromLibrary": "Verwijderen uit bibliotheek",

@@ -265,6 +265,17 @@ data export list them with the rest (`models.LibraryAll`, `docs/api.md`,
 (`torrent_resource.updated_at`, which moves when the size or the file count
 changes) and by name.
 
+An upload marked gone (`upload_reserve.gone_at`, `models.UploadGoneIDs`) is
+dimmed, says "Removed from storage" (`library.uploads.gone`) where its size
+was, and has no link: its page would only say the files are gone. Select mode
+still deletes it. The mark is written only by a token request's live check
+(above), so a row goes dim at its owner's next upload, "Add files" or file
+delete after the cleaner removed the files, not when they went; until then it
+looks live and opens the `upload.gone` page. Nor is the mark ever taken back
+but by the upload's page answering again (`AddUploadToLibrary`) or a new token
+for it, and a dimmed row links to neither: a gone wrongly inferred while the
+upload's home node was away stays dim.
+
 "Remove from library" does not take an upload out: it is deleted as a whole,
 or its files, Vault copy and quota would be left with no link to them. The site
 removes the rest and says so as a success, not an error: nothing failed

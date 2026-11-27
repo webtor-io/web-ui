@@ -120,6 +120,20 @@ func UploadReserveIDs(ctx context.Context, db pg.DBI, userID uuid.UUID) ([]strin
 	return ids, nil
 }
 
+// UploadGoneIDs are the account's uploads marked gone: a quota check found
+// rest-api without them, or their owner deleted them.
+func UploadGoneIDs(ctx context.Context, db pg.DBI, userID uuid.UUID) ([]string, error) {
+	var ids []string
+	err := db.ModelContext(ctx, (*UploadReserve)(nil)).
+		Column("resource_id").
+		Where("user_id = ? AND gone_at IS NOT NULL", userID).
+		Select(&ids)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list the account's gone uploads")
+	}
+	return ids, nil
+}
+
 // UpsertUploadReserve records a token for id with limit lim until exp. A live
 // reserve is never lowered and a token end never moved back.
 func UpsertUploadReserve(ctx context.Context, db pg.DBI, userID uuid.UUID, id string, lim int64, exp time.Time) error {

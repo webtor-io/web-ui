@@ -451,6 +451,7 @@
     "library.uploads.empty": "Burada henüz bir şey yok",
     "library.uploads.upload": "Dosya yükle",
     "library.uploads.deleteConfirm": "Seçilenler tüm dosyalarıyla kalıcı olarak silinsin mi? Vault içindeki kopyaları da silinir.",
+    "library.uploads.gone": "Depolama alanından kaldırıldı",
     "library.files": "dosya",
     "library.addToLibrary": "Kütüphaneye ekle",
     "library.removeFromLibrary": "Kütüphaneden kaldır",

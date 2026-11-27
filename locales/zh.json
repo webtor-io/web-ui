@@ -451,6 +451,7 @@
     "library.uploads.empty": "这里还什么都没有",
     "library.uploads.upload": "上传文件",
     "library.uploads.deleteConfirm": "永久删除所选内容及其中所有文件？它们在 Vault 中的副本也会一并删除。",
+    "library.uploads.gone": "已从存储中移除",
     "library.files": "文件",
     "library.addToLibrary": "加入媒体库",
     "library.removeFromLibrary": "从媒体库移除",

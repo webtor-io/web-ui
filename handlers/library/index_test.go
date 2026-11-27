@@ -2,6 +2,7 @@ package library
 
 import (
 	"bytes"
+	"context"
 	"html/template"
 	"net/http/httptest"
 	"os"
@@ -15,9 +16,13 @@ import (
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-pg/pg/v10"
+	uuid "github.com/satori/go.uuid"
 	"github.com/webtor-io/web-ui/handlers/library/helpers"
 	"github.com/webtor-io/web-ui/handlers/library/shared"
 	"github.com/webtor-io/web-ui/models"
+	"github.com/webtor-io/web-ui/models/pgtest"
+	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/web"
 )
@@ -395,6 +400,28 @@ func TestUploadsSectionRenders(t *testing.T) {
 		}
 	})
 
+	// Files storage removed: the row is dimmed, says so where the size was
+	// and leads nowhere -- its page would only say they are gone. Select
+	// mode still deletes it.
+	t.Run("gone", func(t *testing.T) {
+		gone := *row
+		gone.Gone = true
+		out := page(t, shared.SectionTypeUploads, true, &gone)
+		for _, want := range []string{`opacity-60`, `Removed from storage · 2 files`, `class="js-bulk-box checkbox checkbox-sm" value="` + testUpload + `"`} {
+			if !strings.Contains(out, want) {
+				t.Errorf("no %s", want)
+			}
+		}
+		for _, bad := range []string{`href="/` + testUpload + `"`, h.BitsForHumans(1 << 20)} {
+			if strings.Contains(out, bad) {
+				t.Errorf("has %s", bad)
+			}
+		}
+		if live := page(t, shared.SectionTypeUploads, true, row); strings.Contains(live, `opacity-60`) || strings.Contains(live, `Removed from storage`) {
+			t.Error("a live row is dimmed")
+		}
+	})
+
 	t.Run("empty", func(t *testing.T) {
 		out := page(t, shared.SectionTypeUploads, true)
 		for _, want := range []string{"Nothing here yet", `href="/" data-async-target="main">Upload files</a>`} {
@@ -429,8 +456,58 @@ func TestUploadsMenuItem(t *testing.T) {
 		if got := strings.Contains(out, `href="/lib/uploads"`); got != c.want {
 			t.Errorf("uploads on %v, %d uploads: item shown %v, want %v", c.on, c.count, got, c.want)
 		}
-		if c.want && !regexp.MustCompile(`href="/lib/uploads"[^>]*>[^<]*<span[^>]*>` + strconv.Itoa(c.count) + `</span>`).MatchString(out) {
+		if c.want && !regexp.MustCompile(`href="/lib/uploads"[^>]*>[^<]*<span[^>]*>`+strconv.Itoa(c.count)+`</span>`).MatchString(out) {
 			t.Errorf("uploads on %v, %d uploads: the item does not count %d", c.on, c.count, c.count)
 		}
+	}
+}
+
+// My files marks the uploads whose files storage removed: those whose
+// reserve has gone_at. Another account's mark and an upload without a
+// reserve row leave a row as it is.
+func TestUploadsGoneRows(t *testing.T) {
+	const (
+		gone = "9c5db5752b7c0a23456789abcdef0123456789ab"
+		live = "9c5db5752b7c0b23456789abcdef0123456789ab"
+		bare = "9c5db5752b7c0c23456789abcdef0123456789ab"
+	)
+	db := pgtest.Start(t)
+	h := &Handler{pg: pgtest.CS(t, db)}
+	user := func() uuid.UUID {
+		var id uuid.UUID
+		if _, err := db.QueryOne(pg.Scan(&id), `INSERT INTO "user" (email) VALUES (?) RETURNING user_id`, uuid.NewV4().String()+"@example.com"); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	u, other := user(), user()
+	for _, id := range []string{gone, live, bare} {
+		if _, err := db.Exec(`INSERT INTO torrent_resource (resource_id, name, file_count, size_bytes) VALUES (?, ?, 1, 1)`, id, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO library (user_id, resource_id, name) VALUES (?, ?, 'n')`, u, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, r := range []struct {
+		user uuid.UUID
+		id   string
+		gone bool
+	}{{u, gone, true}, {u, live, false}, {other, live, true}} {
+		if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id, reserved_bytes, gone_at) VALUES (?, ?, 1, CASE WHEN ? THEN now() END)`, r.user, r.id, r.gone); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := h.getLibraryList(context.Background(), &auth.User{ID: u}, &shared.IndexArgs{Section: shared.SectionTypeUploads, Sort: models.SortTypeName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, it := range items {
+		l := it.(*models.Library)
+		got[l.ResourceID] = l.Gone
+	}
+	if want := map[string]bool{gone: true, live: false, bare: false}; !reflect.DeepEqual(got, want) {
+		t.Errorf("gone: %v, want %v", got, want)
 	}
 }

@@ -64,6 +64,9 @@ type Library struct {
 	Torrent   *TorrentResource `pg:"rel:has-one,fk:resource_id"`
 	MediaInfo *MediaInfo       `pg:"rel:has-one,fk:resource_id"`
 	Name      string
+	// Gone: an upload whose files storage removed (UploadGoneIDs), set by
+	// My files.
+	Gone bool `pg:"-"`
 }
 
 func IsInLibrary(ctx context.Context, db *pg.DB, uID uuid.UUID, resourceID string) (bool, error) {

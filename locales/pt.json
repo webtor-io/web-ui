@@ -451,6 +451,7 @@
     "library.uploads.empty": "Nada aqui ainda",
     "library.uploads.upload": "Enviar arquivos",
     "library.uploads.deleteConfirm": "Excluir a seleção com todos os arquivos definitivamente? As cópias no Vault também serão excluídas.",
+    "library.uploads.gone": "Removido do armazenamento",
     "library.files": "arquivos",
     "library.addToLibrary": "Adicionar à biblioteca",
     "library.removeFromLibrary": "Remover da biblioteca",
