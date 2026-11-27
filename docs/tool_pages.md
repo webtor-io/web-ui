@@ -347,6 +347,7 @@ CTA у шагов нет: CTA — дропзона в hero. Чисел в коп
 | `handlers/resource.TestNavOnUploadsPagePointsHome` | «Возможности» и «FAQ» навбара на странице загрузок ведут на якоря, которых на ней нет, или на других страницах перестали вести на свои |
 | `handlers/resource.TestDropzoneUploads` (`uploads page`) | то же с настоящими английскими строками: текст зоны, бейдж с U+00A0, карточка входа для гостя с возвратом на страницу |
 | `services/i18n.TestPrivateCloudMediaServerSaysNoTorrent`, `TestOwnFilesFrameSaysNoTorrent` | текст страницы или рамки говорит «torrent / торрент / 种子» в какой-то локали |
+| `services/i18n.TestOwnFilesPageSpeaksTurkishInOneVoice` | в tr текст страницы или рамки снова на «siz» (`yükleyin`, `dosyalarınız`), а рамка — в повелительном наклонении (`bırak`, `hazır mısın?`): docs/i18n.md просит повелительное |
 
 Снапшоты, которыми обложен рефакторинг 2026-08-15, сняты **до** него: все 18
 страниц после перехода на секции рендерятся байт-в-байт (с точностью до
