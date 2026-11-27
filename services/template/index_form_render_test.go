@@ -316,63 +316,69 @@ func TestIndexErrorQuotesItsNumbers(t *testing.T) {
 	}
 }
 
-// The size badge under the drop zone: torrents have no size limit, own files
-// have the account's upload cap. It names the cap only where uploads are on
-// and there is a cap to name; a viewer without a paid plan reads the upsell.
-// On the page about uploading one's own files (Tool.Uploads) it is the own
-// files half alone, and with no cap to name there is no badge: "no size
-// limit" would be said of the user's own files there.
+// The size badge under the drop zone is the page about uploading one's own
+// files' (Tool.Uploads) alone: there it names the account's upload cap, or
+// the upsell to a viewer without a paid plan, and with no cap to name (no
+// claims) there is none. The home page and the other tool pages have no badge
+// at all, whatever the plan, the claims or the uploads: "no size limit" for
+// torrents went with it, by the owner's decision.
 func TestIndexBadgeSaysTheUploadCap(t *testing.T) {
-	// It wraps on a phone: the upload texts run to 90 characters, and a badge
+	// It wraps on a phone: its texts run to about 60 characters, and a badge
 	// is one line high.
 	const open = `<span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">`
-	other := hc.ToolByURL("magnet-to-torrent")
-	own := hc.ToolByURL("private-cloud-media-server")
-	if other == nil || own == nil || other.Uploads || !own.Uploads {
-		t.Fatalf("the pages this test needs moved: %v, %v", other, own)
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
 	}
-	for _, tc := range []struct {
-		name    string
-		tool    *hc.Tool
-		enabled bool
-		cap     string
-		paid    bool
-		want    string // "" is no badge
-	}{
-		{"paid", nil, true, "50\u00a0GB", true, "home.sizeLimitUploads"},
-		{"free", nil, true, "10\u00a0GB", false, "home.sizeLimitUploadsUpsell"},
-		{"no claims", nil, true, "", true, "home.noSizeLimit"},
-		{"uploads off", nil, false, "50\u00a0GB", true, "home.noSizeLimit"},
-		{"tool page, paid", other, true, "50\u00a0GB", true, "home.sizeLimitUploads"},
-		{"tool page, free", other, true, "10\u00a0GB", false, "home.sizeLimitUploadsUpsell"},
-		{"tool page, no claims", other, true, "", true, "home.noSizeLimit"},
-		{"uploads page, paid", own, true, "50\u00a0GB", true, "home.sizeLimitOwnFiles"},
-		{"uploads page, free", own, true, "10\u00a0GB", false, "home.sizeLimitOwnFilesUpsell"},
-		{"uploads page, no claims", own, true, "", true, ""},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			page := renderIndexMainWith(t, tc.tool, template.FuncMap{
-				"uploadsEnabled": func() bool { return tc.enabled },
-				"uploadCap":      func(any) string { return tc.cap },
-				"isPaid":         func(any) bool { return tc.paid },
-				// Signed in: the guest's sign-in card is TestDropzoneUploads' subject.
-				"hasAuth": func(any) bool { return true },
-			})
-			i := strings.Index(page, open)
-			if tc.want == "" {
-				if i >= 0 {
-					t.Errorf("a badge with nothing to say: %s", page[i:i+strings.Index(page[i:], "</span>")])
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		for _, tc := range []struct {
+			name    string
+			enabled bool
+			cap     string
+			paid    bool
+			want    string // on the uploads page; "" is no badge
+		}{
+			{"paid", true, "50\u00a0GB", true, "home.sizeLimitOwnFiles"},
+			{"free", true, "10\u00a0GB", false, "home.sizeLimitOwnFilesUpsell"},
+			{"no claims", true, "", true, ""},
+			{"uploads off", false, "50\u00a0GB", true, ""},
+		} {
+			t.Run(name+", "+tc.name, func(t *testing.T) {
+				page := renderIndexMainWith(t, tool, template.FuncMap{
+					"uploadsEnabled": func() bool { return tc.enabled },
+					"uploadCap":      func(any) string { return tc.cap },
+					"isPaid":         func(any) bool { return tc.paid },
+					// Signed in: the guest's sign-in card is TestDropzoneUploads' subject.
+					"hasAuth": func(any) bool { return true },
+				})
+				want := ""
+				if uploads {
+					want = tc.want
 				}
-				return
-			}
-			if i < 0 {
-				t.Fatal("no size badge under the drop zone")
-			}
-			i += len(open)
-			if got := page[i : i+strings.Index(page[i:], "</span>")]; got != tc.want {
-				t.Errorf("badge says %q, want %q", got, tc.want)
-			}
-		})
+				i := strings.Index(page, "badge-sm")
+				if want == "" {
+					if i >= 0 {
+						t.Errorf("a badge under the zone: %s", page[i:i+strings.Index(page[i:], "</span>")])
+					}
+					return
+				}
+				if i = strings.Index(page, open); i < 0 {
+					t.Fatal("no size badge under the drop zone")
+				}
+				i += len(open)
+				if got := page[i : i+strings.Index(page[i:], "</span>")]; got != want {
+					t.Errorf("badge says %q, want %q", got, want)
+				}
+			})
+		}
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads \u2014 the test ran against nothing")
 	}
 }
 

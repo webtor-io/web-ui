@@ -29,7 +29,7 @@ With uploads off `uploads.New` returns nil and nothing of them is served:
 `/upload/*` is not mounted, the drop zone takes `.torrent` files only (no
 `multiple`, no sign-in card), the tool page `/private-cloud-media-server` is
 dropped from routes, sitemap and footer (`DropUploadPages`,
-`docs/tool_pages.md`), and the home badge says "no size limit". "My uploads"
+`docs/tool_pages.md`), and "Upload a folder" is not offered. "My uploads"
 stays in the library menu while it has rows, to list and open them; its bulk
 delete is not offered.
 
@@ -108,11 +108,12 @@ data export (`docs/data_export.md`).
   and forgets the upload (below, `certain` false). Any other answer writes
   nothing: the row keeps its last known reserve.
 
-The profile shows used of cap (`profile/uploads_quota.html`, no live check);
-the drop zone's badge says the cap, or the free tier's upsell. On the tool
-page about uploads (`Tool.Uploads`) it is the own-files half alone, and
-there is no badge without claims; that page also has no magnet field, demo
-or torrent blocks around the zone (`docs/tool_pages.md`).
+The profile shows used of cap (`profile/uploads_quota.html`, no live check).
+Only the tool page about uploads (`Tool.Uploads`) states the cap, in the
+badge under its drop zone, or the free tier's upsell; there is no badge
+without claims. The home page and the other tool pages have no badge under
+the zone at all (the owner's decision, 2026-11-27). That page also has no
+magnet field, demo or torrent blocks around the zone (`docs/tool_pages.md`).
 
 ## The browser's way
 

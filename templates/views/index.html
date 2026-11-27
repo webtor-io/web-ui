@@ -194,13 +194,12 @@
         <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main"{{ if uploadsEnabled }} data-uploads data-upload-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Vault }} data-upload-vault{{ end }}{{ end }}>
             <div class="upload-dashed rounded-2xl py-6 px-6 text-center cursor-pointer">
                 <p class="text-[0.95rem] text-w-sub">{{ if uploadsEnabled }}<span class="text-w-pinkL font-semibold">{{ if $ownFiles }}{{ t $.Lang "home.dropzoneOwnFiles" }}{{ else }}{{ t $.Lang "home.dropzoneUploads" }}{{ end }}</span> {{ t $.Lang "home.dropzoneUploadsHint" }}{{ else }}<span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}{{ end }}</p>
-                {{/* On the own-files page there is no badge without a cap: "no
-                     size limit" would be said of the user's own files. */}}
+                {{/* The size badge is the own-files page's alone, and there
+                     only with a cap to name: "no size limit" would be said of
+                     the user's own files. Elsewhere the zone has none. */}}
                 {{ if $ownFiles }}{{ with and uploadsEnabled (uploadCap $.Claims) }}
                 <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">{{ if $.Claims | isPaid }}{{ tp $.Lang "home.sizeLimitOwnFiles" "Cap" . }}{{ else }}{{ t $.Lang "home.sizeLimitOwnFilesUpsell" }}{{ end }}</span>
-                {{ end }}{{ else }}
-                <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">{{ with and uploadsEnabled (uploadCap $.Claims) }}{{ if $.Claims | isPaid }}{{ tp $.Lang "home.sizeLimitUploads" "Cap" . }}{{ else }}{{ t $.Lang "home.sizeLimitUploadsUpsell" }}{{ end }}{{ else }}{{ t $.Lang "home.noSizeLimit" }}{{ end }}</span>
-                {{ end }}
+                {{ end }}{{ end }}
             </div>
             <input class="dropzone-input hidden" name="resource" type="file"{{ if uploadsEnabled }} multiple{{ end }} />
             <input name="instruction" value="{{ .Instruction }}" type="hidden" />
