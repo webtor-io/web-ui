@@ -82,15 +82,15 @@ function fakeLoad() {
 }
 
 // home mounts the drop zone in the shared document and takes it out after
-// the test: a form left behind would keep its document listener alive.
+// the test: a form left behind would keep its document listener alive. As
+// views/index.html has it, a signed-in user's upload log, or a guest's
+// sign-in slot, is above the input area, outside the zone's parent.
 function home(t, { guest = false, vault = false } = {}) {
     const root = document.createElement('div');
-    root.innerHTML = `${guest ? '<template id="upload-sign-in"><div data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in"><script src="/assets/private_refusal.js"></script></div></template>' : ''}
-<div data-upload-log></div>
-<div class="upload-sign-in-slot"></div>
-<form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><div><p>zone</p></div><input class="dropzone-input" type="file" multiple></form>
+    root.innerHTML = `${guest ? '<div class="upload-sign-in-slot"></div><template id="upload-sign-in"><div data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in"><p>Sign in to upload your own files</p></div></template>' : '<div data-upload-log></div>'}
+<div><form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><div><p>zone</p></div><input class="dropzone-input" type="file" multiple></form>
 <input type="file" class="dropzone-dir hidden" webkitdirectory multiple>
-<div><button type="button" class="dropzone-folder"><svg><path/></svg>folder</button></div>`;
+<div><button type="button" class="dropzone-folder"><svg><path/></svg>folder</button></div></div>`;
     document.body.append(root);
     const said = [];
     window.toast = { error: (m) => said.push(m) };
@@ -164,18 +164,25 @@ test('a dropped folder is read while the event lasts', async (t) => {
     assert.equal(load.calls[0].host, h.root.querySelector('[data-upload-log]'));
 });
 
-test('a guest: two drops, one event, no script', async (t) => {
+// The prompt is above the search field, out of sight of a drop on a phone:
+// every drop brings it into view, one card and one event for all of them.
+test('a guest: two drops, one card in view, one event', async (t) => {
     const h = home(t, { guest: true });
     const tracked = [];
     window.umami = { track: (name, data) => tracked.push([name, data]) };
-    t.after(() => { delete window.umami; });
+    const scrolled = [];
+    window.HTMLElement.prototype.scrollIntoView = function () { scrolled.push(this); };
+    t.after(() => {
+        delete window.umami;
+        delete window.HTMLElement.prototype.scrollIntoView;
+    });
     const load = fakeLoad();
     initDrop(h.form, load);
     dropOn(document.body, dataTransfer(dropped('a.mkv')));
     dropOn(document.body, dataTransfer(dropped('b.mkv')));
     await tick();
     assert.equal(h.slot.querySelectorAll('[data-umami-impression]').length, 1);
-    assert.equal(h.slot.querySelector('script'), null);
+    assert.deepEqual(scrolled, [h.slot.firstElementChild, h.slot.firstElementChild]);
     assert.deepEqual(tracked, [['private-refused-shown', { code: 'upload', reason: 'sign_in' }]]);
     assert.equal(h.net(), 0);
     assert.equal(load.count, 0);

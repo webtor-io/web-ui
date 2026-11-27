@@ -95,10 +95,12 @@ data and no tracker:
   it. Like every impression (`lib/impression.js`) it is sent once per page
   load per `{code, reason}`: a re-render is not a second refusal, another
   refusal is. `{code: upload, reason: sign_in}` is not rest-api's: it is the
-  sign-in card `lib/drop.js` shows a guest who dropped their own files (or
+  sign-in prompt `lib/drop.js` shows a guest who dropped their own files (or
   pressed "Upload a folder") on the home page or a tool page, where uploads
-  need an account. The card waits in a `<template>` and is counted when it is
-  shown, once per page load.
+  need an account: one line and a "Sign in" button where a signed-in user's
+  upload shows its progress, not the refusal card. The prompt waits in a
+  `<template>` and `lib/drop.js` counts it when it is shown, once per page
+  load; it carries no script.
 - `private-reupload-upload`: a `.torrent` file picked in the refusal's upload
   (a signed-in user without a record, or a tracker that refused or names
   nothing usable). A click that ends in "cancel" is not counted.

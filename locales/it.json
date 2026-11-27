@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Salvalo nel Vault.",
     "upload.state.frozen": "Salvato nel Vault: non puoi più aggiungere o eliminare file.",
     "upload.state.unsaved": "Non salvato nel Vault: i file possono essere eliminati. Non puoi più aggiungere file qui.",
-    "upload.signIn": "Il caricamento dei tuoi file è riservato agli utenti registrati: solo tu puoi vederli. Accedi.",
+    "upload.signIn": "Accedi per caricare i tuoi file: li vedrai solo tu.",
     "upload.folder": "Carica una cartella",
     "upload.open": "Apri",
     "upload.uploading": "Caricamento dei tuoi file",

@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Enregistrez-le dans Vault.",
     "upload.state.frozen": "Enregistré dans Vault — on ne peut plus ajouter ni supprimer de fichiers.",
     "upload.state.unsaved": "Non enregistré dans Vault : les fichiers peuvent être supprimés. Vous ne pouvez plus ajouter de fichiers ici.",
-    "upload.signIn": "Le téléversement de vos propres fichiers est réservé aux utilisateurs connectés : vous seul les voyez. Connectez-vous.",
+    "upload.signIn": "Connectez-vous pour téléverser vos propres fichiers — vous seul les verrez.",
     "upload.folder": "Téléverser un dossier",
     "upload.open": "Ouvrir",
     "upload.uploading": "Téléversement de vos fichiers",

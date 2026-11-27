@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Salve-o no Vault.",
     "upload.state.frozen": "Salvo no Vault — não dá mais pra adicionar nem excluir arquivos.",
     "upload.state.unsaved": "Não salvo no Vault: os arquivos podem ser excluídos. Não é mais possível adicionar arquivos aqui.",
-    "upload.signIn": "O envio dos seus próprios arquivos é só para usuários conectados: só você pode vê-los. Entre.",
+    "upload.signIn": "Entre na sua conta pra enviar seus próprios arquivos — só você vai ver.",
     "upload.folder": "Enviar uma pasta",
     "upload.open": "Abrir",
     "upload.uploading": "Enviando seus arquivos",

@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Speichere ihn im Vault.",
     "upload.state.frozen": "Im Vault gespeichert – Dateien lassen sich nicht mehr hinzufügen oder löschen.",
     "upload.state.unsaved": "Nicht im Vault gespeichert: Die Dateien können gelöscht werden. Hier lassen sich keine Dateien mehr hinzufügen.",
-    "upload.signIn": "Eigene Dateien hochladen können nur angemeldete Nutzer: Nur du siehst sie. Melde dich an.",
+    "upload.signIn": "Melde dich an, um eigene Dateien hochzuladen – nur du siehst sie.",
     "upload.folder": "Ordner hochladen",
     "upload.open": "Öffnen",
     "upload.uploading": "Deine Dateien werden hochgeladen",

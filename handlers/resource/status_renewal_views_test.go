@@ -76,7 +76,7 @@ func TestStatusRenewalOnAnotherView(t *testing.T) {
 			// Parsed, never run by the status slot.
 			"canonicalURL": stub, "demoMagnet": stub, "domain": stub, "has": stub,
 			"isPaid": stub, "promoOffer": stub, "seoFriendly": stub, "withContext": stub,
-			"bitsForHumans": stub, "hasAuth": stub, "uploadCap": stub, "uploadSignIn": stub,
+			"bitsForHumans": stub, "hasAuth": stub, "uploadCap": stub,
 		})
 	tm.MustRegisterViews("*")
 	tm.MustRegisterViews("resource/*")

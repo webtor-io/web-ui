@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Zapisz je w Vault.",
     "upload.state.frozen": "Zapisane w Vault — nie można już dodawać ani usuwać plików.",
     "upload.state.unsaved": "Niezapisane w Vault: pliki mogą zostać usunięte. Nie można już tu dodawać plików.",
-    "upload.signIn": "Przesyłanie własnych plików jest tylko dla zalogowanych: widzisz je tylko ty. Zaloguj się.",
+    "upload.signIn": "Zaloguj się, żeby przesyłać własne pliki — zobaczysz je tylko ty.",
     "upload.folder": "Prześlij folder",
     "upload.open": "Otwórz",
     "upload.uploading": "Przesyłamy twoje pliki",

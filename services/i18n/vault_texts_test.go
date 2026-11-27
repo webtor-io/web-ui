@@ -56,11 +56,11 @@ func TestPrivateCloudMediaServerSaysNoTorrent(t *testing.T) {
 
 // Around that copy the page renders these in place of the home page's torrent
 // texts (views/index.html, partials/about.html under Tool.Uploads): the drop
-// zone, its badge, the folder link under it, the heading over the related
-// pages, the closing CTA, and the home texts it shares. None of them says
-// torrent either.
+// zone, its badge, the folder link under it, a guest's sign-in prompt, the
+// heading over the related pages, the closing CTA, and the home texts it
+// shares. None of them says torrent either.
 var ownFilesFrame = []string{"home.toolBadge", "home.dropzoneOwnFiles", "home.dropzoneUploadsHint",
-	"home.sizeLimitOwnFiles", "home.sizeLimitOwnFilesUpsell", "upload.folder", "tool.related.more",
+	"home.sizeLimitOwnFiles", "home.sizeLimitOwnFilesUpsell", "upload.folder", "upload.signIn", "tool.related.more",
 	"about.cta.title", "about.cta.ownFiles", "about.cta.dropFiles", "about.cta.button"}
 
 func TestOwnFilesFrameSaysNoTorrent(t *testing.T) {

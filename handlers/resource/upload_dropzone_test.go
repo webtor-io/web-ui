@@ -22,6 +22,8 @@ func dropzoneCtx(t *testing.T, ctx *w.Context, enabled bool) string {
 	t.Helper()
 	funcs := intentFuncs(t)
 	funcs["uploadsEnabled"] = func() bool { return enabled }
+	// A script a template brings is visible, not dropped.
+	funcs["asset"] = func(n string) template.HTML { return template.HTML("[asset " + n + "]") }
 	tpl, err := template.New("index.html").Funcs(funcs).ParseFiles(
 		"../../templates/views/index.html",
 		"../../templates/partials/load/progress.html",
@@ -54,9 +56,12 @@ func zone(t *testing.T, main string) string {
 	return main[i : i+strings.Index(main[i:], "</form>")+len("</form>")]
 }
 
-// The drop zone takes a guest's own files only to show the sign-in card, and
-// that card is declared inside a <template>: its impression goes out when
-// the card is shown, not when the page loads.
+// The drop zone takes a guest's own files only to show the sign-in prompt,
+// and that prompt is declared inside a <template>: its impression goes out
+// when it is shown, not when the page loads. It shows where a signed-in
+// user's upload shows its progress, above the search field: one line and a
+// button, like "My subtitles", not the refusal card with a lock that someone
+// opening another account's files gets.
 func TestDropzoneUploads(t *testing.T) {
 	const (
 		tplOpen   = `<template id="upload-sign-in">`
@@ -81,10 +86,24 @@ func TestDropzoneUploads(t *testing.T) {
 			`data-umami-impression-code="upload"`,
 			`data-umami-impression-reason="sign_in"`,
 			`/login?return-url=%2f"`,
+			`>Sign in to upload your own files — only you will see them.</p>`,
+			`>Sign in</a>`,
 		} {
 			if !strings.Contains(card, want) {
 				t.Errorf("the card lacks %q:\n%s", want, card)
 			}
+		}
+		// No lock, no "Private files" heading: those are the refusal's. No
+		// script either: drop.js counts the prompt when it shows it, and a
+		// script in the clone would run and count it again.
+		for _, s := range []string{"Private ", "<svg", "<h3", "[asset "} {
+			if strings.Contains(card, s) {
+				t.Errorf("the card has %q:\n%s", s, card)
+			}
+		}
+		slot := strings.Index(main, `class="upload-sign-in-slot`)
+		if slot < 0 || slot > i || slot > strings.Index(main, `class="join w-full"`) {
+			t.Errorf("the slot at %d, the template at %d, the search field at %d: want the slot and its template above the field", slot, i, strings.Index(main, `class="join w-full"`))
 		}
 		for _, want := range []string{"data-uploads", dropText, folder, busy} {
 			if !strings.Contains(main, want) {
@@ -162,13 +181,17 @@ func TestDropzoneUploads(t *testing.T) {
 			if !u.HasAuth() && !strings.Contains(main, `return-url=%2fprivate-cloud-media-server"`) {
 				t.Error("the sign-in link does not come back to the page")
 			}
+			// No search field here: the prompt, like the log, is above the zone.
+			if !u.HasAuth() && strings.Index(main, "upload-sign-in-slot") > strings.Index(main, `class="dropzone"`) {
+				t.Error("the sign-in slot is under the drop zone")
+			}
 		}
 	})
 
 	t.Run("signed in", func(t *testing.T) {
 		main := dropzone(t, signedIn, &index.Data{}, "/", true)
-		if strings.Contains(main, tplOpen) {
-			t.Error("a signed-in user got the sign-in template")
+		if strings.Contains(main, tplOpen) || strings.Contains(main, "upload-sign-in-slot") {
+			t.Error("a signed-in user got the sign-in template or its slot")
 		}
 		// The upload's log: where a torrent's load shows its log, above
 		// the search field, hidden until a drop.
@@ -213,7 +236,7 @@ func TestDropzoneUploads(t *testing.T) {
 
 	t.Run("uploads off", func(t *testing.T) {
 		main := dropzone(t, guest, &index.Data{}, "/", false)
-		for _, s := range []string{tplOpen, "data-uploads", "data-upload-busy", "data-upload-vault", "dropzone-folder", "data-upload-log"} {
+		for _, s := range []string{tplOpen, "upload-sign-in-slot", "data-uploads", "data-upload-busy", "data-upload-vault", "dropzone-folder", "data-upload-log"} {
 			if strings.Contains(main, s) {
 				t.Errorf("uploads are off, yet %q is there", s)
 			}

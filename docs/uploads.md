@@ -27,7 +27,7 @@ the process says at start which (`uploads: on`, or `uploads: off, <why>`):
 
 With uploads off `uploads.New` returns nil and nothing of them is served:
 `/upload/*` is not mounted, the drop zone takes `.torrent` files only (no
-`multiple`, no sign-in card), the tool page `/private-cloud-media-server` is
+`multiple`, no sign-in prompt), the tool page `/private-cloud-media-server` is
 dropped from routes, sitemap and footer (`DropUploadPages`,
 `docs/tool_pages.md`), and "Upload a folder" is not offered. "My uploads"
 stays in the library menu while it has rows, to list and open them; its bulk
@@ -123,7 +123,10 @@ files only opens them, as before; anything else loads `lib/upload.js` (a lazy
 chunk). "Upload a folder" leads the row of links under the zone (before "Try
 the demo" and "Speed test", alone on the own-files page); its picker sits
 outside the zone's form, so a click on it opens the folder picker only. A
-guest gets the sign-in card instead, from a drop and from that button alike.
+guest gets a sign-in prompt instead, from a drop and from that button alike:
+"Sign in to upload your own files — only you will see them." and a button,
+shown where a signed-in user's upload shows its progress (below), and
+scrolled into view.
 
 `lib/upload.js` asks a token for the drop's total size and PUTs every file in
 16 MiB parts, two files at once, to

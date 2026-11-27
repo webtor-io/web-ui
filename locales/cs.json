@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Ulož ji do Vaultu.",
     "upload.state.frozen": "Uloženo ve Vaultu — soubory už nejde přidávat ani mazat.",
     "upload.state.unsaved": "Neuloženo ve Vaultu: soubory mohou být smazány. Přidávat sem soubory už nejde.",
-    "upload.signIn": "Nahrávání vlastních souborů je jen pro přihlášené: vidíš je jen ty. Přihlas se.",
+    "upload.signIn": "Přihlas se a nahrávej vlastní soubory — uvidíš je jen ty.",
     "upload.folder": "Nahrát složku",
     "upload.open": "Otevřít",
     "upload.uploading": "Nahráváme tvé soubory",

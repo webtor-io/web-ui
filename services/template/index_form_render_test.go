@@ -60,7 +60,6 @@ func renderIndexMainWith(t *testing.T, tool *hc.Tool, over template.FuncMap, ext
 		},
 		// Uploads are off here: their markup is TestDropzoneUploads' subject.
 		"uploadsEnabled": func() bool { return false },
-		"uploadSignIn":   func() any { return nil },
 		"hasAuth":        func(any) bool { return false },
 		"tp":             func(lang, key string, args ...interface{}) string { return key },
 		"uploadCap":      func(any) string { return "" },

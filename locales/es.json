@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Guárdala en Vault.",
     "upload.state.frozen": "Guardado en Vault: ya no se pueden añadir ni eliminar archivos.",
     "upload.state.unsaved": "No está guardada en Vault: los archivos pueden eliminarse. Ya no puedes añadir archivos aquí.",
-    "upload.signIn": "Subir tus propios archivos es solo para usuarios registrados: solo tú puedes verlos. Inicia sesión.",
+    "upload.signIn": "Inicia sesión para subir tus propios archivos: solo tú podrás verlos.",
     "upload.folder": "Subir una carpeta",
     "upload.open": "Abrir",
     "upload.uploading": "Subiendo tus archivos",

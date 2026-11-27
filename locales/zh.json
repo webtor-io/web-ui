@@ -405,7 +405,7 @@
     "upload.state.saveHint": "请保存到 Vault。",
     "upload.state.frozen": "已保存到 Vault，不能再添加或删除文件。",
     "upload.state.unsaved": "未保存到 Vault：文件可能会被删除。已无法再向此处添加文件。",
-    "upload.signIn": "上传自己的文件仅限已登录用户：只有你能看到它们。请登录。",
+    "upload.signIn": "登录后即可上传你自己的文件——只有你能看到。",
     "upload.folder": "上传文件夹",
     "upload.open": "打开",
     "upload.uploading": "正在上传你的文件",

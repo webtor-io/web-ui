@@ -136,9 +136,17 @@
     </div>
     {{ end }}
     {{/* The upload of a signed-in user's own files shows its progress where a
-         load shows its log (lib/upload.js); a guest's drop shows the sign-in
-         card instead. */}}
-    {{ if and uploadsEnabled ($.User | hasAuth) }}{{ template "upload/log" (withContext $ "mb-10 max-w-[680px]") }}{{ end }}
+         load shows its log (lib/upload.js). A guest's drop, or the folder
+         button, shows the sign-in prompt in the same place: one line and a
+         button, as "My subtitles" asks a guest, not the refusal card with a
+         lock. It is kept in a <template> so its impression is sent when it
+         is shown, not on page load; drop.js counts it, so it carries no
+         script. */}}
+    {{ if uploadsEnabled }}{{ if $.User | hasAuth }}{{ template "upload/log" (withContext $ "mb-10 max-w-[680px]") }}{{ else }}<div class="upload-sign-in-slot relative z-10 w-full max-w-[680px]"></div>
+    <template id="upload-sign-in"><div class="mb-10 p-4 rounded-xl bg-base-300/20 border border-w-line/40 text-center" data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in">
+        <p class="mb-4 text-w-sub">{{ t $.Lang "upload.signIn" }}</p>
+        <a href="{{ langPath $.Lang "/login" }}?return-url={{ langPath $.Lang $.Path }}" class="btn btn-soft" data-async-target="main">{{ t $.Lang "private.page.signIn" }}</a>
+    </div></template>{{ end }}{{ end }}
 
     {{ if $.ErrKey }}
     {{/* "This upload is gone", shown to its owner, is counted: no properties
@@ -185,12 +193,7 @@
         {{/* With uploads on, the zone also takes the user's own files and
              folders (lib/drop.js), and "Upload a folder" leads the row under
              it. The folder picker stays outside the form: its click would
-             bubble up to the zone and open the file picker too. A guest's
-             drop, or the folder button, shows the sign-in card, kept in a
-             <template> so its impression is sent when it is shown, not on
-             page load. */}}
-        {{ if uploadsEnabled }}<div class="upload-sign-in-slot"></div>{{ end }}
-        {{ if and uploadsEnabled (not ($.User | hasAuth)) }}<template id="upload-sign-in">{{ template "private/refusal" ($.WithData uploadSignIn) }}</template>{{ end }}
+             bubble up to the zone and open the file picker too. */}}
         <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main"{{ if uploadsEnabled }} data-uploads data-upload-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Vault }} data-upload-vault{{ end }}{{ end }}>
             <div class="upload-dashed rounded-2xl py-6 px-6 text-center cursor-pointer">
                 <p class="text-[0.95rem] text-w-sub">{{ if uploadsEnabled }}<span class="text-w-pinkL font-semibold">{{ if $ownFiles }}{{ t $.Lang "home.dropzoneOwnFiles" }}{{ else }}{{ t $.Lang "home.dropzoneUploads" }}{{ end }}</span> {{ t $.Lang "home.dropzoneUploadsHint" }}{{ else }}<span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}{{ end }}</p>

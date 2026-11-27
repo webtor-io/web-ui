@@ -22,16 +22,17 @@ export function torrentsOnly(items) {
 
 const picked = (input) => [...(input.files || [])].map((file) => ({ entry: null, file }));
 
-// showSignIn puts the guest's sign-in card in the slot once. Its <script>s are
-// cut from the clone: a script in the document would run and count the card
-// again from another bundle, whose dedup this one does not see.
-function showSignIn(host, tpl) {
-    const slot = host.querySelector('.upload-sign-in-slot');
-    if (!slot || slot.firstElementChild) return;
-    const card = tpl.content.cloneNode(true);
-    card.querySelectorAll('script').forEach((s) => s.remove());
-    slot.append(card);
-    trackImpressions(slot);
+// showSignIn puts the guest's sign-in prompt in its slot once, where a
+// signed-in user's upload shows its progress, and brings it into view: on the
+// home page that is above the search field, out of sight of a drop on a phone.
+function showSignIn(doc, tpl) {
+    const slot = doc.querySelector('.upload-sign-in-slot');
+    if (!slot) return;
+    if (!slot.firstElementChild) {
+        slot.append(tpl.content.cloneNode(true));
+        trackImpressions(slot);
+    }
+    slot.firstElementChild.scrollIntoView?.({ block: 'nearest' });
 }
 
 export function initDrop(dropzone, load = () => import('./upload')) {
@@ -55,7 +56,7 @@ export function initDrop(dropzone, load = () => import('./upload')) {
 
     const signIn = () => {
         const tpl = document.getElementById('upload-sign-in');
-        if (tpl) showSignIn(host, tpl);
+        if (tpl) showSignIn(dropzone.ownerDocument, tpl);
         return !!tpl;
     };
     const busy = () => {

@@ -405,7 +405,7 @@
     "upload.state.saveHint": "Vault'a kaydedin.",
     "upload.state.frozen": "Vault'a kaydedildi — artık dosya eklenemez ve silinemez.",
     "upload.state.unsaved": "Vault'a kaydedilmedi: dosyalar silinebilir. Buraya artık dosya ekleyemezsiniz.",
-    "upload.signIn": "Kendi dosyalarınızı yüklemek yalnızca giriş yapmış kullanıcılar içindir: onları yalnızca siz görebilirsiniz. Giriş yapın.",
+    "upload.signIn": "Kendi dosyalarını yüklemek için giriş yap — onları yalnızca sen göreceksin.",
     "upload.folder": "Klasör yükle",
     "upload.open": "Aç",
     "upload.uploading": "Dosyaların yükleniyor",
