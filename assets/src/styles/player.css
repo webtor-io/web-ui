@@ -103,6 +103,7 @@ body:not([data-iframe-height]) .wt-preview-mount {
 
     body:not([data-iframe-height]) .wt-player-stage:has(.wt-player--video) .wt-player--video {
         width: 100%;
+        max-width: none;
         height: 100%;
         border-radius: 0;
         box-shadow: none;
@@ -131,6 +132,21 @@ body:not([data-iframe-height]) .wt-preview-mount {
 .wt-player--video {
     cursor: pointer;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* The whole picture fits the window under the navbar (72 px, style.css) and
+   the mount's margin: a tall one narrows the player to the width that keeps
+   its ratio, in the middle of the column. Full width, a portrait clip was
+   ~1500 px tall in the 850 px column, its controls far below the window
+   (owner, 2026-11-27). --wt-ratio is the video's own (Player.jsx); without
+   it -- before the first frame -- no cap, as before. svh: the size does not
+   follow a phone's browser bars in and out on every scroll. Not in the
+   embed: its iframe grows to fit the player, and a cap from the iframe's
+   own height would shrink both in turn. Fullscreen and a phone on its side
+   (the focus rule above) fill the window instead. */
+body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen) {
+    max-width: calc((100svh - 72px - 1.5rem) * (var(--wt-ratio)));
+    margin-inline: auto;
 }
 
 /* Idle pointer follows the controls: once they auto-hide (playing, no

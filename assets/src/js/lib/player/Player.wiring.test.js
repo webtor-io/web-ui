@@ -28,6 +28,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { cssRules, findRule } from '../../test/css.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIALOG = readFileSync(path.join(HERE, '__fixtures__/subtitles-dialog.html'), 'utf8');
@@ -117,6 +118,7 @@ Object.defineProperty(dom.window.HTMLMediaElement.prototype, 'paused', {
 const {
     initPlayer,
     destroyPlayer,
+    currentAspectRatio,
     wireTrackHandlers,
     syncUploadMarks,
     markTrack,
@@ -8308,4 +8310,49 @@ test('a position save refused for a stale CSRF token: the token the 400 hands ba
     const puts = positionPuts(p);
     assert.equal(puts.length, 2, 'the hidden tab\'s save');
     assert.equal(puts[1].params.headers['X-CSRF-TOKEN'], 'fresh-token', 'carries the token the 400 handed back');
+});
+
+// The picture's ratio twice: the player's aspect-ratio, and --wt-ratio, from
+// which player.css caps the width so a tall picture fits the window. Both
+// from the video at canplay, and both from the shape of the player this one
+// replaces (next-item-go.js) before that; none before either, so no cap.
+const playerBox = (p) => p.container.querySelector('.wt-player');
+const ratioVar = (p) => playerBox(p).style.getPropertyValue('--wt-ratio');
+const videoSize = (p, w, h) => {
+    Object.defineProperty(p.video, 'videoWidth', { value: w, configurable: true });
+    Object.defineProperty(p.video, 'videoHeight', { value: h, configurable: true });
+};
+
+test('canplay gives the player the video\'s ratio, as aspect-ratio and as --wt-ratio for the width cap', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    assert.equal(ratioVar(p), '', 'no ratio before the first frame: no cap');
+    assert.equal(currentAspectRatio(), '');
+    videoSize(p, 1080, 1920);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    assert.equal(playerBox(p).style.aspectRatio, '1080 / 1920');
+    assert.equal(ratioVar(p), '1080 / 1920');
+    assert.equal(currentAspectRatio(), '1080 / 1920', 'what the next player is handed, as before');
+});
+
+test('the shape handed over by the last player is the cap\'s too, until canplay says otherwise', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount();
+    await initPlayer(p.container, { aspectRatio: '1080 / 1920' });
+    await settle();
+    assert.equal(playerBox(p).style.aspectRatio, '1080 / 1920');
+    assert.equal(ratioVar(p), '1080 / 1920');
+    assert.equal(currentAspectRatio(), '1080 / 1920');
+    videoSize(p, 1920, 1080);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    assert.equal(ratioVar(p), '1920 / 1080');
+    assert.equal(currentAspectRatio(), '1920 / 1080');
+});
+
+test('player.css caps the width from the very variable the player sets, outside the embed and fullscreen', () => {
+    const rules = cssRules(new URL('../../../styles/player.css', import.meta.url));
+    const cap = findRule(rules, 'body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen)');
+    assert.ok(cap, 'the cap rule, the embed and fullscreen left out');
+    assert.match(cap['max-width'], /var\(--wt-ratio\)/);
+    assert.equal(cap['margin-inline'], 'auto', 'narrowed, it stands in the middle of the column');
 });
