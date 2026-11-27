@@ -120,8 +120,11 @@ module.exports = async (env, options) => {
             watchFiles: ['templates/**/*.html', 'assets/src/**/*'],
         },
         optimization: {
-            // splitChunks disabled: entry points are loaded independently via Go
-            // template helpers, which don't support automatic chunk dependencies.
+            // Entry points are loaded independently via Go template helpers,
+            // which know nothing about chunk dependencies, so each entry has
+            // its own runtime and carries its static imports inline.
+            // splitChunks is left at webpack's default: only lazy import()
+            // chunks are split off.
             //
             // The standing cost, and it has bitten twice (2026-09-20): a module
             // imported by two entries, or by an entry and a lazy chunk, is
@@ -130,6 +133,15 @@ module.exports = async (env, options) => {
             // must agree on belongs in the DOM or on `window`, never in a
             // module-level Map/let. See lib/actionBusy.js (the job-start
             // spinner that no job ever stopped) and lib/turnstileAction.js.
+            //
+            // The copies must also export the same names. Every runtime
+            // installs each factory pushed to the shared webpackChunkweb_ui
+            // over its own copy of that module, and with per-runtime
+            // usedExports a lazy chunk's copy keeps only what its own entry
+            // imports ("initDrop is not a function" in index.js once a
+            // resource page chunk had loaded). 'global' gives every copy one
+            // export set; the cost is a few KB gzip.
+            usedExports: 'global',
             minimize: true,
             minimizer: [
                 new TerserPlugin({ parallel: true }),
