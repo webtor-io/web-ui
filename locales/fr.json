@@ -399,6 +399,7 @@
     "upload.deleteFile": "Supprimer le fichier",
     "upload.deleteFolder": "Supprimer le dossier",
     "upload.deleteFolderConfirm": "Supprimer le dossier « {{.Name}} » et tous ses fichiers ? Cette action est irréversible.",
+    "upload.deleteFileConfirm": "Supprimer le fichier « {{.Name}} » ? Cette action est irréversible.",
     "upload.deleteBusy": "Attendez la fin du téléversement de vos fichiers",
     "upload.gone": "Ces fichiers n'existent plus : les fichiers temporaires sont supprimés s'ils restent un moment sans être ouverts. Enregistrez-les dans Vault pour les garder.",
     "upload.state.incomplete": "Tous les fichiers ne sont pas encore téléversés. Pour continuer, déposez ici les mêmes fichiers ou le même dossier.",

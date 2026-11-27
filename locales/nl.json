@@ -399,6 +399,7 @@
     "upload.deleteFile": "Bestand verwijderen",
     "upload.deleteFolder": "Map verwijderen",
     "upload.deleteFolderConfirm": "De map ‘{{.Name}}’ met alle bestanden erin verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "upload.deleteFileConfirm": "Het bestand ‘{{.Name}}’ verwijderen? Dit kan niet ongedaan worden gemaakt.",
     "upload.deleteBusy": "Wacht tot je bestanden klaar zijn met uploaden",
     "upload.gone": "Deze bestanden zijn er niet meer: tijdelijke bestanden worden verwijderd als ze een tijd niet worden geopend. Sla ze op in Vault om ze te bewaren.",
     "upload.state.incomplete": "Nog niet alle bestanden zijn geüpload. Sleep dezelfde bestanden of map hierheen om verder te gaan.",

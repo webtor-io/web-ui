@@ -399,6 +399,7 @@
     "upload.deleteFile": "Excluir arquivo",
     "upload.deleteFolder": "Excluir pasta",
     "upload.deleteFolderConfirm": "Excluir a pasta “{{.Name}}” com todos os arquivos? Essa ação não pode ser desfeita.",
+    "upload.deleteFileConfirm": "Excluir o arquivo “{{.Name}}”? Essa ação não pode ser desfeita.",
     "upload.deleteBusy": "Aguarde seus arquivos terminarem de ser enviados",
     "upload.gone": "Esses arquivos não existem mais: arquivos temporários são excluídos quando ficam um tempo sem ser abertos. Salve no Vault pra não perder.",
     "upload.state.incomplete": "Nem todos os arquivos foram enviados. Para continuar, solte aqui os mesmos arquivos ou a mesma pasta.",

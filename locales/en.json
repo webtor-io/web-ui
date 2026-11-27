@@ -442,6 +442,8 @@
     "upload.deleteFolder": "Delete folder",
     "upload.deleteFolderConfirm": "Delete the folder “{{.Name}}” and every file in it? This cannot be undone.",
     "@upload.deleteFolderConfirm": "Confirm dialog before deleting a folder of the user's own upload with every file in it. Name is the folder name.",
+    "upload.deleteFileConfirm": "Delete the file “{{.Name}}”? This cannot be undone.",
+    "@upload.deleteFileConfirm": "Confirm dialog before deleting one file of the user's own files on their page (the bin button on the file's row). Name is the file name.",
     "upload.deleteBusy": "Wait until your files finish uploading",
     "upload.gone": "These files are gone: temporary files are deleted when not opened for a while. Save to Vault to keep them.",
     "upload.state.incomplete": "Not every file has finished uploading. To continue, drop the same files or folder here.",

@@ -33,6 +33,25 @@ func openTag(t *testing.T, html, marker string) string {
 	return html[strings.LastIndex(html[:i], "<") : i+strings.Index(html[i:], ">")+1]
 }
 
+// binPath is the start of the bin icon's path, the one of the bulk bar's
+// delete (partials/bulk_select.html); crossPath is a close icon's.
+const (
+	binPath   = `d="m14.74 9-.346 9`
+	crossPath = `d="M6 18 18 6M6 6l12 12"`
+)
+
+// element is html from the tag that holds marker to the first end after it.
+func element(t *testing.T, html, marker, end string) string {
+	t.Helper()
+	tag := openTag(t, html, marker)
+	i := strings.Index(html, tag)
+	j := strings.Index(html[i:], end)
+	if j < 0 {
+		t.Fatalf("no %q after %q", end, marker)
+	}
+	return html[i : i+j+len(end)]
+}
+
 // uploadTemplates are the resource templates with uploads on or off: the
 // zero web.Helper has them off.
 func uploadTemplates(t *testing.T, enabled bool) *template.Template {
@@ -105,6 +124,18 @@ func TestUploadView(t *testing.T) {
 		}
 		if tag := openTag(t, html, confirmPart); !strings.HasPrefix(tag, `<button type="submit"`) {
 			t.Errorf("the dialog is not on the submit button: %s", tag)
+		}
+	})
+
+	// Deleting a file is a bin, as everywhere else on the site, and asks
+	// first, as a folder does: a cross reads as "close", and a tap on the
+	// row next to it opens the file.
+	t.Run("delete a file", func(t *testing.T) {
+		gd := uploadPageData(writable())
+		html := render(t, true, gd, nil)
+		for _, it := range gd.List.Items {
+			btn := element(t, html, `data-upload-delete="`+it.PathStr+`"`, "</button>")
+			checkPage(t, btn, []string{`data-confirm="Delete the file “` + it.Name + `”? This cannot be undone."`, binPath}, []string{crossPath})
 		}
 	})
 
@@ -183,6 +214,7 @@ func TestUploadView(t *testing.T) {
 			if tag := openTag(t, html, `data-upload-delete="`+dir+`/"`); !strings.Contains(tag, busy) {
 				t.Errorf("a file open %v: delete folder: %s", open, tag)
 			}
+			checkPage(t, element(t, html, `data-upload-delete="`+dir+`/"`, "</button>"), []string{binPath}, []string{crossPath})
 		}
 
 		gd, _ := withDir(false)

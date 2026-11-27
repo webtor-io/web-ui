@@ -188,8 +188,10 @@ mark in `localStorage` (`upload-busy:<id>`). "Save to Vault" is held in all of
 them while the run lasts: a pledge closes the upload for writing.
 
 Deleting a file or a folder on the page (`lib/uploadFile.js`, only while the
-upload is not saved): a token (`want` 1), then a DELETE straight to the
-seeder.
+upload is not saved): a bin on its row, the bulk bar's icon, as everywhere
+a thing is deleted; it asks first, naming the file or the folder
+(`upload.deleteFileConfirm`, `upload.deleteFolderConfirm`). Then a token
+(`want` 1), and a DELETE straight to the seeder.
 
 ## The upload's page
 

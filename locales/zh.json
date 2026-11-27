@@ -399,6 +399,7 @@
     "upload.deleteFile": "删除文件",
     "upload.deleteFolder": "删除文件夹",
     "upload.deleteFolderConfirm": "删除文件夹“{{.Name}}”及其中所有文件？此操作无法撤销。",
+    "upload.deleteFileConfirm": "删除文件“{{.Name}}”？此操作无法撤销。",
     "upload.deleteBusy": "请等待文件上传完成",
     "upload.gone": "这些文件已不存在：临时文件一段时间未打开就会被删除。想保留的话，请保存到 Vault。",
     "upload.state.incomplete": "还有文件没有上传完。如需继续，请把相同的文件或文件夹拖到这里。",

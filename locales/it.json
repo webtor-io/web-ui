@@ -399,6 +399,7 @@
     "upload.deleteFile": "Elimina file",
     "upload.deleteFolder": "Elimina cartella",
     "upload.deleteFolderConfirm": "Eliminare la cartella «{{.Name}}» con tutti i file? L'operazione è irreversibile.",
+    "upload.deleteFileConfirm": "Eliminare il file «{{.Name}}»? L'operazione è irreversibile.",
     "upload.deleteBusy": "Attendi che i tuoi file finiscano di caricarsi",
     "upload.gone": "Questi file non ci sono più: i file temporanei vengono eliminati se non vengono aperti per un po'. Salvali nel Vault per conservarli.",
     "upload.state.incomplete": "Non tutti i file sono stati caricati. Per continuare, trascina qui gli stessi file o la stessa cartella.",

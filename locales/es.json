@@ -399,6 +399,7 @@
     "upload.deleteFile": "Eliminar archivo",
     "upload.deleteFolder": "Eliminar carpeta",
     "upload.deleteFolderConfirm": "¿Eliminar la carpeta «{{.Name}}» con todos sus archivos? No se puede deshacer.",
+    "upload.deleteFileConfirm": "¿Eliminar el archivo «{{.Name}}»? No se puede deshacer.",
     "upload.deleteBusy": "Espera a que terminen de subirse tus archivos",
     "upload.gone": "Estos archivos ya no están: los archivos temporales se eliminan si pasan un tiempo sin abrirse. Guárdalos en Vault para conservarlos.",
     "upload.state.incomplete": "Aún no se han subido todos los archivos. Para continuar, arrastra aquí los mismos archivos o la misma carpeta.",

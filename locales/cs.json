@@ -399,6 +399,7 @@
     "upload.deleteFile": "Smazat soubor",
     "upload.deleteFolder": "Smazat složku",
     "upload.deleteFolderConfirm": "Smazat složku „{{.Name}}“ se všemi soubory? Tuto akci nelze vrátit.",
+    "upload.deleteFileConfirm": "Smazat soubor „{{.Name}}“? Tuto akci nelze vrátit.",
     "upload.deleteBusy": "Počkej, až se soubory nahrají",
     "upload.gone": "Tyto soubory už tu nejsou: dočasné soubory se mažou, když se delší dobu neotevřou. Aby nezmizely, ulož je do Vaultu.",
     "upload.state.incomplete": "Ještě nejsou nahrané všechny soubory. Chceš-li pokračovat, přetáhni sem stejné soubory nebo složku.",

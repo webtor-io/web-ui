@@ -399,6 +399,7 @@
     "upload.deleteFile": "Usuń plik",
     "upload.deleteFolder": "Usuń folder",
     "upload.deleteFolderConfirm": "Usunąć folder „{{.Name}}” ze wszystkimi plikami? Tej akcji nie można cofnąć.",
+    "upload.deleteFileConfirm": "Usunąć plik „{{.Name}}”? Tej akcji nie można cofnąć.",
     "upload.deleteBusy": "Poczekaj, aż pliki się prześlą",
     "upload.gone": "Tych plików już nie ma: pliki tymczasowe są usuwane, jeśli długo nikt ich nie otwiera. Zapisz je w Vault, żeby je zachować.",
     "upload.state.incomplete": "Nie wszystkie pliki zostały przesłane. Aby kontynuować, upuść tutaj te same pliki lub folder.",

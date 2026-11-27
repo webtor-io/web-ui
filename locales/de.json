@@ -399,6 +399,7 @@
     "upload.deleteFile": "Datei löschen",
     "upload.deleteFolder": "Ordner löschen",
     "upload.deleteFolderConfirm": "Ordner „{{.Name}}“ mit allen Dateien darin löschen? Das lässt sich nicht rückgängig machen.",
+    "upload.deleteFileConfirm": "Datei „{{.Name}}“ löschen? Das lässt sich nicht rückgängig machen.",
     "upload.deleteBusy": "Warte, bis deine Dateien hochgeladen sind",
     "upload.gone": "Diese Dateien gibt es nicht mehr: Temporäre Dateien werden gelöscht, wenn sie eine Weile nicht geöffnet werden. Speichere sie im Vault, um sie zu behalten.",
     "upload.state.incomplete": "Noch sind nicht alle Dateien hochgeladen. Um fortzufahren, zieh dieselben Dateien oder denselben Ordner hierher.",

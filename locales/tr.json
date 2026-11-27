@@ -399,6 +399,7 @@
     "upload.deleteFile": "Dosyayı sil",
     "upload.deleteFolder": "Klasörü sil",
     "upload.deleteFolderConfirm": "“{{.Name}}” klasörü tüm dosyalarıyla silinsin mi? Bu işlem geri alınamaz.",
+    "upload.deleteFileConfirm": "“{{.Name}}” dosyası silinsin mi? Bu işlem geri alınamaz.",
     "upload.deleteBusy": "Dosyaların yüklenene kadar bekle",
     "upload.gone": "Bu dosyalar artık yok: geçici dosyalar bir süre açılmazsa silinir. Saklamak için Vault'a kaydet.",
     "upload.state.incomplete": "Dosyaların hepsi henüz yüklenmedi. Devam etmek için aynı dosyaları veya klasörü buraya bırak.",
