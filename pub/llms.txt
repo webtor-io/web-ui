@@ -16,12 +16,13 @@ Playback starts once enough of the file has arrived from the swarm. How long tha
 ## What Webtor is not
 
 - Not a torrent index or search engine: Webtor keeps no index or catalogue of torrents of its own. It plays the torrents and magnet links its users bring, including those from sources a user connects to their account (their own Stremio addons or Torznab indexers).
-- Not a content host: nothing is published on Webtor. Torrent data is fetched from the BitTorrent network when a user opens a torrent and cached only temporarily, unless a paying user saves the torrent to Vault.
+- Not a content host: nothing is published on Webtor. Torrent data is fetched from the BitTorrent network when a user opens a torrent and cached only temporarily, unless a paying user saves the torrent to Vault. Files a signed-in user uploads open only for that user, are kept only temporarily and may be deleted once they have not been opened for a while, unless the user saves them to Vault (paid plans).
 - Not an anonymity service. Connections to Webtor use HTTPS, and the user's IP address does not join the swarm, because Webtor's servers do the downloading. Webtor itself sees which torrents and files a user requests.
 
 ## With an account
 
 - [Library](https://webtor.io/lib/): torrents the user has saved, with playback progress.
+- My files: the user's own uploaded files and folders, played and downloaded file by file (no folder archive); only the user who uploaded them can open them; up to 10 GB on the free plan and 50 GB on paid plans across the files not saved to Vault.
 - [Discover](https://webtor.io/discover): a catalogue of movie and series metadata. The streams listed for a title come from the Stremio addons and Torznab indexers the user has connected; Webtor does not supply them.
 - [Stremio addon](https://webtor.io/webtor-stremio-addon) (paid plans): the user's library in Stremio, plus the user's own Stremio addons played through Webtor. The torrent downloads on Webtor's servers, so the user's device never joins the swarm.
 - [WebDAV](https://webtor.io/instructions/webdav) and [S3](https://webtor.io/instructions/s3) access to the library, for players such as VLC, Infuse or Kodi and for file managers (paid plans).
@@ -63,6 +64,7 @@ As of September 2026, the site shows no third-party ads.
 - [Webtor Stremio addon](https://webtor.io/webtor-stremio-addon): the user's own torrents and magnet links in Stremio on a TV, phone or tablet (paid plans).
 - [Debrid alternative for Stremio](https://webtor.io/debrid-alternative): the Webtor Stremio addon in place of or alongside a debrid service; with the user's own Real-Debrid or TorBox connected, the files it has cached play through it at no charge from Webtor, and Webtor's servers play the rest (paid plans).
 - [Torrent RSS alternative](https://webtor.io/torrent-rss-alternative): email alerts for new releases found on the user's own indexers and Stremio addons.
+- [Private cloud media server](https://webtor.io/private-cloud-media-server): the user's own files played in the browser next to torrents; uploading needs an account.
 
 ## Developers
 
