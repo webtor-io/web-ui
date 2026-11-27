@@ -32,15 +32,17 @@ func (s *Handler) remove(c *gin.Context) {
 		web.RedirectWithError(c, errors.Wrap(err, "failed to remove from library"))
 		return
 	}
+	// Nothing failed when an upload stayed: the rest is removed, and the
+	// toast adds where the own files are.
+	msg := "toast.removedFromLibrary"
 	if kept > 0 {
-		web.RedirectWithError(c, web.NewUserError("library.uploadKept", errors.New("uploads are not removed from the library")))
-		return
+		msg = "library.uploadKept"
 	}
-	web.RedirectWithSuccessAndMessage(c, "toast.removedFromLibrary")
+	web.RedirectWithSuccessAndMessage(c, msg)
 }
 
 // removeFromLibrary removes the rows of rIDs but an upload's, and says how many
-// uploads it kept. An upload is deleted as a whole, by "Delete upload": taking
+// uploads it kept. An upload is deleted as a whole, by "Delete all": taking
 // only its library row away would leave its files, its Vault copy and its
 // quota with no link to them.
 func (s *Handler) removeFromLibrary(ctx context.Context, u *auth.User, rIDs []string) (kept int, err error) {

@@ -17,10 +17,11 @@ import (
 )
 
 // "Remove" in the library takes no upload's row away: an upload is deleted as
-// a whole on its page or in My uploads, or its files, its Vault copy and its
+// a whole on its page or in My files, or its files, its Vault copy and its
 // quota would stay with no row to reach them. The rest of the selection goes,
-// and the page says why the uploads stayed. Kinds other than 0 are no one's
-// own upload and go like torrents.
+// and the page says so as a success, adding that the own files stay in My
+// files: nothing failed. Kinds other than 0 are no one's own upload and go
+// like torrents.
 func TestRemoveKeepsUploads(t *testing.T) {
 	const (
 		torrent = "0123456789abcdef0123456789abcdef01234567"
@@ -40,12 +41,12 @@ func TestRemoveKeepsUploads(t *testing.T) {
 		ids     []string
 		gone    []string
 		kept    []string
-		wantErr bool
+		message string
 	}{
-		{"torrent", []string{torrent}, []string{torrent}, []string{upload, kind1}, false},
-		{"upload", []string{upload}, nil, []string{torrent, upload, kind1}, true},
-		{"mixed", []string{torrent, upload}, []string{torrent}, []string{upload, kind1}, true},
-		{"kind 1", []string{kind1}, []string{kind1}, []string{torrent, upload}, false},
+		{"torrent", []string{torrent}, []string{torrent}, []string{upload, kind1}, "toast.removedFromLibrary"},
+		{"upload", []string{upload}, nil, []string{torrent, upload, kind1}, "library.uploadKept"},
+		{"mixed", []string{torrent, upload}, []string{torrent}, []string{upload, kind1}, "library.uploadKept"},
+		{"kind 1", []string{kind1}, []string{kind1}, []string{torrent, upload}, "toast.removedFromLibrary"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			var uid uuid.UUID
@@ -80,12 +81,8 @@ func TestRemoveKeepsUploads(t *testing.T) {
 				t.Fatal(err)
 			}
 			q := loc.Query()
-			if c.wantErr {
-				if q.Get("status") != "error" || q.Get("err") != "library.uploadKept" {
-					t.Errorf("redirect %s, want err=library.uploadKept", loc)
-				}
-			} else if q.Get("status") != "success" || q.Get("message") != "toast.removedFromLibrary" {
-				t.Errorf("redirect %s, want success with toast.removedFromLibrary", loc)
+			if q.Get("status") != "success" || q.Get("message") != c.message || q.Has("err") {
+				t.Errorf("redirect %s, want success with %s", loc, c.message)
 			}
 			for _, id := range c.gone {
 				if l, err := models.GetLibraryByResourceID(context.Background(), db, uid, id); err != nil || l != nil {

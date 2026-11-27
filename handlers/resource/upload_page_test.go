@@ -837,7 +837,7 @@ func TestUploadGoneImpression(t *testing.T) {
 	if strings.Contains(tag, "data-umami-impression-") {
 		t.Errorf("the impression has properties: %s", tag)
 	}
-	if !strings.Contains(b, "This upload is gone.") {
+	if !strings.Contains(b, "These files are gone:") {
 		t.Errorf("no text in the block:\n%s", b)
 	}
 	if n := strings.Count(b, script); n != 1 {
@@ -920,7 +920,7 @@ func TestUploadPageTemplate(t *testing.T) {
 
 	t.Run("states", func(t *testing.T) {
 		var (
-			frozen     = html.EscapeString("Saved to Vault and can't be changed")
+			frozen     = html.EscapeString("Saved to Vault — files can no longer be added or deleted.")
 			unsaved    = html.EscapeString("Not saved to Vault: the files may be deleted. You can't add files here any more.")
 			temporary  = html.EscapeString("Temporary: files that are not played or downloaded may be deleted within hours.")
 			hint       = html.EscapeString("Save it to Vault.")
@@ -999,7 +999,7 @@ func TestUploadPageTemplate(t *testing.T) {
 func TestUploadPledgeSuccessUpdatesThePage(t *testing.T) {
 	tpl := vaultModal(t)
 	out := renderModal(t, tpl, "en", &GetData{VaultPledgeAddForm: &VaultPledgeAddForm{Status: "success", ResourceID: uploadU, FreezePeriod: freezePeriod}})
-	checkPage(t, out, []string{`[data-upload-add], [data-upload-add] + input, [data-upload-delete]`, `[data-upload-state]`, `Saved to Vault and can`}, nil)
+	checkPage(t, out, []string{`[data-upload-add], [data-upload-add] + input, [data-upload-delete]`, `[data-upload-state]`, `Saved to Vault — files can no longer`}, nil)
 	if i := strings.Index(out, "[data-upload-state]"); i >= 0 {
 		script := between(out[strings.LastIndex(out[:i], "<script>"):], "<script>", "</script>")
 		checkPage(t, script, nil, []string{"const ", "let "})

@@ -246,8 +246,9 @@ changes) and by name.
 
 "Remove from library" does not take an upload out: it is deleted as a whole,
 or its files, Vault copy and quota would be left with no link to them. The site
-says so (`library.uploadKept`), the JSON API's `DELETE /library/{id}` answers
-409 `conflict`.
+removes the rest and says so as a success, not an error: nothing failed
+(`library.uploadKept`, "Removed. Your own files stay in My files"). The JSON
+API's `DELETE /library/{id}` answers 409 `conflict`.
 
 ## Analytics
 
