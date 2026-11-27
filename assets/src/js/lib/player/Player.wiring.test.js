@@ -28,6 +28,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { cssRules, findRule } from '../../test/css.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIALOG = readFileSync(path.join(HERE, '__fixtures__/subtitles-dialog.html'), 'utf8');
@@ -117,6 +118,7 @@ Object.defineProperty(dom.window.HTMLMediaElement.prototype, 'paused', {
 const {
     initPlayer,
     destroyPlayer,
+    currentAspectRatio,
     wireTrackHandlers,
     syncUploadMarks,
     markTrack,
@@ -8323,4 +8325,90 @@ test('a position save refused for a stale CSRF token: the token the 400 hands ba
     const puts = positionPuts(p);
     assert.equal(puts.length, 2, 'the hidden tab\'s save');
     assert.equal(puts[1].params.headers['X-CSRF-TOKEN'], 'fresh-token', 'carries the token the 400 handed back');
+});
+
+// The picture's ratio twice: the player's aspect-ratio, and --wt-ratio, from
+// which player.css caps the width so a tall picture fits the window. Both
+// from the video at canplay, and both from the shape of the player this one
+// replaces (next-item-go.js) before that; none before either, so no cap.
+const playerBox = (p) => p.container.querySelector('.wt-player');
+const ratioVar = (p) => playerBox(p).style.getPropertyValue('--wt-ratio');
+const videoSize = (p, w, h) => {
+    Object.defineProperty(p.video, 'videoWidth', { value: w, configurable: true });
+    Object.defineProperty(p.video, 'videoHeight', { value: h, configurable: true });
+};
+
+test('canplay gives the player the video\'s ratio, as aspect-ratio and as --wt-ratio for the width cap', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer();
+    assert.equal(ratioVar(p), '', 'no ratio before the first frame: no cap');
+    assert.equal(currentAspectRatio(), '');
+    videoSize(p, 1080, 1920);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    assert.equal(playerBox(p).style.aspectRatio, '1080 / 1920');
+    assert.equal(ratioVar(p), '1080 / 1920');
+    assert.equal(currentAspectRatio(), '1080 / 1920', 'what the next player is handed, as before');
+});
+
+test('the shape handed over by the last player is the cap\'s too, until canplay says otherwise', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = mount();
+    await initPlayer(p.container, { aspectRatio: '1080 / 1920' });
+    await settle();
+    assert.equal(playerBox(p).style.aspectRatio, '1080 / 1920');
+    assert.equal(ratioVar(p), '1080 / 1920');
+    assert.equal(currentAspectRatio(), '1080 / 1920');
+    videoSize(p, 1920, 1080);
+    p.video.dispatchEvent(new dom.window.Event('canplay'));
+    assert.equal(ratioVar(p), '1920 / 1080');
+    assert.equal(currentAspectRatio(), '1920 / 1080');
+});
+
+test('player.css caps the width from the very variable the player sets, outside the embed and fullscreen', () => {
+    const rules = cssRules(new URL('../../../styles/player.css', import.meta.url));
+    const cap = findRule(rules, 'body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen)');
+    assert.ok(cap, 'the cap rule, the embed and fullscreen left out');
+    assert.match(cap['max-width'], /var\(--wt-ratio\)/);
+    assert.equal(cap['margin-inline'], 'auto', 'narrowed, it stands in the middle of the column');
+});
+
+// A narrowed player is narrower than the controls row once Next, the three
+// dots or the opened volume slider are in it. The row gives way by the time
+// and then the slider -- never a button, which the player's overflow:hidden
+// cut off at the row's end -- and the cap stops at the row with nothing
+// left to give (measured in Chrome: 282 px with Next and the dots, 287 on a
+// phone).
+test('player.css: a row too wide for the player gives way by the time, then the volume slider, never a button', () => {
+    const rules = cssRules(new URL('../../../styles/player.css', import.meta.url));
+    const cap = findRule(rules, 'body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen)');
+    assert.match(cap['max-width'], /^max\(18rem, /, 'never narrower than every button');
+    const left = findRule(rules, '.wt-player-controls-left');
+    assert.equal(left['flex-shrink'], '0', 'not below its buttons');
+    assert.equal(left['flex-grow'], '1', 'the room left over is the time\'s');
+    const time = findRule(rules, '.wt-player-time');
+    assert.deepEqual([time.width, time['flex-grow'], time['max-width']], ['0', '1', 'max-content'], 'the room left over, up to its own width');
+    assert.deepEqual([time['flex-wrap'], time.height, time.overflow], ['wrap', '1em', 'hidden'], 'a piece that does not fit wraps out of sight');
+    assert.notEqual(findRule(rules, '.wt-player-time::before').content, '""', 'a first item Chrome lays out, so the current time can wrap too');
+    assert.equal(findRule(rules, '.wt-player-time-sep')['white-space'], 'pre', '" / " keeps its leading space as a piece of its own');
+    assert.equal(findRule(rules, '.wt-player-controls-right')['min-width'], '0');
+    assert.equal(findRule(rules, '.wt-player-volume')['min-width'], '0', 'the slider opens only as far as there is room');
+    assert.equal(findRule(rules, '.wt-player-volume-slider')['max-width'], 'calc(100% - 0.5rem)', 'and its track is as long as that');
+});
+
+test('the time is two pieces, the current time and " / duration", so a narrow row drops the duration whole', async (t) => {
+    t.after(() => destroyPlayer());
+    const p = await mountPlayer((page) => { page.video.setAttribute('controls', ''); page.video.dataset.duration = '45'; });
+    const time = p.container.querySelector('.wt-player-time');
+    assert.deepEqual([...time.children].map((c) => c.textContent), ['0:00', ' / 0:45']);
+});
+
+// Between two players (next-item-go.js, background-restart.js) the stage
+// holds the old height until the next one is ready. Black while it is empty;
+// once the next player is in it, the page shows round it: a tall one stands
+// narrowed in the column, as the one before it did, not in a black box the
+// column's width.
+test('player.css: the stage between two players is black only while it is empty', () => {
+    const rules = cssRules(new URL('../../../styles/player.css', import.meta.url));
+    assert.equal(findRule(rules, '.wt-player-stage--switching').background, undefined);
+    assert.equal(findRule(rules, '.wt-player-stage--empty').background, '#000');
 });
