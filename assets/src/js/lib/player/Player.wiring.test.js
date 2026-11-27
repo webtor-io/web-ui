@@ -8372,6 +8372,20 @@ test('player.css caps the width from the very variable the player sets, outside 
     assert.equal(cap['margin-inline'], 'auto', 'narrowed, it stands in the middle of the column');
 });
 
+// The height the cap allows: the window under the navbar (72) and the sticky
+// status bar -- reserved whether it is up or not, so the player does not
+// resize as it comes and goes: a desktop's 67 px (measured in Chrome) and
+// 2rem of margin and air, which a taller bar eats into first, or the bar
+// with the plan box up, at its tallest on this page view, when that is more
+// (lib/stickyStatus.js measures it; a hint line is not reserved) -- and
+// never more than 640 px, where a low-resolution portrait clip already looks
+// blown up (owner, 2026-11-27).
+test('player.css: a tall player stops under the sticky status bar, and at 640 px on any window', () => {
+    const rules = cssRules(new URL('../../../styles/player.css', import.meta.url));
+    const cap = findRule(rules, 'body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen)');
+    assert.equal(cap['max-width'], 'max(18rem, calc(min(100svh - 72px - max(67px + 2rem, var(--wt-sticky-h, 0px)), 640px) * (var(--wt-ratio))))');
+});
+
 // A narrowed player is narrower than the controls row once Next, the three
 // dots or the opened volume slider are in it. The row gives way by the time
 // and then the slider -- never a button, which the player's overflow:hidden

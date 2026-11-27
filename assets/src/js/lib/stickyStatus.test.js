@@ -256,6 +256,62 @@ test('stickyBottom: the navbar, plus the bar when something moves', async () => 
     p.stop();
 });
 
+// The room a video player leaves above itself for the bar (player.css
+// --wt-sticky-h): the bar with the plan box up, at its tallest on this page
+// view, measured whether it is up or not, without its hint line (left as
+// the status set it), and kept to the end of the page view -- the player
+// resizes once as the box comes up in the bar, never as the bar comes and
+// goes or gets lower, and never for a hint, which comes and goes with a stall.
+test('the bar with the plan box up, at its tallest, is the room a player leaves for it', async () => {
+    const html = document.documentElement;
+    const room = () => html.style.getPropertyValue('--wt-sticky-h');
+    const p = page();
+    p.bar.querySelector('[data-status-mirror-for]').innerHTML =
+        '<div class="tx"><p data-tx-hint hidden></p><div data-tx-pbox hidden></div><div data-tx-details><div data-tx-pbox hidden></div></div></div>';
+    const hint = p.bar.querySelector('[data-tx-hint]');
+    const box = p.bar.querySelector('[data-tx-pbox]');
+    let hintH = 46; // two lines
+    let boxH = 89;
+    Object.defineProperty(p.bar, 'offsetHeight', {
+        configurable: true,
+        get: () => (p.bar.hidden ? 0 : 67 + (hint.hidden ? 0 : hintH) + (box.hidden ? 0 : boxH)),
+    });
+    assert.equal(room(), '', 'before the first message: player.css\'s own');
+    hint.hidden = false; // the swarm stalls: 113 px of bar
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    p.io.fire(false, -120);
+    await settle();
+    assert.equal(p.bar.hidden, false, 'fixture: up');
+    assert.equal(room(), '', 'a hint: none');
+    p.io.fire(true, 100);
+    await settle();
+    assert.equal(p.bar.hidden, true, 'fixture: down');
+    box.hidden = false; // the plan box came up under the hint: 202 px
+    status({ resourceId: 'res', state: 'tier', moving: true });
+    await settle();
+    assert.equal(room(), '156px', 'the box, measured while hidden, the hint taken out');
+    assert.equal(p.bar.hidden, true, 'and left hidden');
+    assert.equal(hint.hidden, false, 'and the hint left up');
+    hintH = 68; // a longer hint under the box
+    status({ resourceId: 'res', state: 'tier', moving: true });
+    await settle();
+    assert.equal(room(), '156px', 'a hint with the box: still none');
+    hint.hidden = true; // the swarm back, the box still up
+    status({ resourceId: 'res', state: 'tier', moving: true });
+    await settle();
+    assert.equal(hint.hidden, true, 'the measure leaves a hidden hint hidden');
+    boxH = 60; // shorter words in the box
+    status({ resourceId: 'res', state: 'tier', moving: true });
+    await settle();
+    assert.equal(room(), '156px', 'a lower bar with the box: the tallest kept');
+    box.hidden = true; // closed
+    status({ resourceId: 'res', state: 'caching', moving: true });
+    await settle();
+    assert.equal(room(), '156px', 'not given back');
+    p.stop();
+    assert.equal(room(), '', 'stopped: none of its own');
+});
+
 // Keyboard focus and anchors stop below what is fixed at the top: the
 // navbar's 72 px are style.css's html scroll-padding-top, and while the bar
 // is up its height joins them -- measured on every message, for the box in
