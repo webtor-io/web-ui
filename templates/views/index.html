@@ -207,12 +207,15 @@
         {{ if uploadsEnabled }}<input type="file" class="dropzone-dir hidden" webkitdirectory multiple>{{ end }}
 
         {{/* The row wraps centred on a phone: three links do not fit its
-             width. The page about own files keeps the folder link alone. */}}
+             width. The page about own files keeps the folder link alone.
+             The links take no fill on hover or keyboard focus (btn-ghost's
+             reads as a grey box): the text brightens, focus keeps its
+             outline. */}}
         {{ if or uploadsEnabled (not $ownFiles) }}
         <!-- folder, demo & speedtest links -->
         <div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 mt-4">
             {{ if uploadsEnabled }}
-            <button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium">
+            <button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
                 {{ t $.Lang "upload.folder" }}
             </button>
@@ -221,12 +224,12 @@
             <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" data-async-target="main">
                 <input type="hidden" name="resource" value="{{ demoMagnet }}" />
                 <input name="instruction" value="{{ .Instruction }}" type="hidden" />
-                <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="try-demo">
+                <button type="submit" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent" data-umami-event="try-demo">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     {{ t $.Lang "home.tryDemo" }}
                 </button>
             </form>
-            <a href="{{ langPath $.Lang "/speedtest" }}" data-async-target="main" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium" data-umami-event="speedtest-hero">
+            <a href="{{ langPath $.Lang "/speedtest" }}" data-async-target="main" class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent" data-umami-event="speedtest-hero">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 {{ t $.Lang "home.speedTest" }}
             </a>

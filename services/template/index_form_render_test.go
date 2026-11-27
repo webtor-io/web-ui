@@ -196,15 +196,18 @@ func TestUploadsPageHeroIsAboutOwnFiles(t *testing.T) {
 	}
 }
 
-// "Upload a folder" sat inside the drop zone, where its hover fill read as a
-// grey box on the dashed field. It is the first link of the row under the
-// zone, dressed as the demo and speed test links beside it; on the page about
-// one's own files, which has neither, the row keeps it alone. The row wraps
-// centred: three links do not fit a phone's width. Where uploads are off
-// there is no link, and the page about own files no row at all.
+// "Upload a folder" is the first link of the row under the drop zone, dressed
+// as the demo and speed test links beside it; on the page about one's own
+// files, which has neither, the row keeps it alone. None of the three fills
+// on hover or keyboard focus: btn-ghost's fill read as a grey box, in the
+// zone and in the row alike. The text brightens on hover and focus keeps its
+// outline. The row wraps centred: three links do not fit a phone's width.
+// Where uploads are off there is no link, and the page about own files no
+// row at all.
 func TestFolderLinkLeadsTheRowUnderTheZone(t *testing.T) {
-	const link = `class="btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium"`
-	const folder = `<button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium">`
+	const dress = `btn btn-ghost btn-sm text-w-muted gap-1.5 normal-case font-medium hover:bg-transparent hover:border-transparent focus-visible:bg-transparent focus-visible:border-transparent`
+	const link = `class="` + dress + `"`
+	const folder = `<button type="button" class="dropzone-folder ` + dress + `">`
 	pages := map[string]*hc.Tool{"home": nil}
 	for i := range hc.Tools {
 		pages[hc.Tools[i].Url] = &hc.Tools[i]
