@@ -169,29 +169,30 @@
 
         <!-- upload zone -->
         {{/* With uploads on, the zone also takes the user's own files and
-             folders (lib/drop.js). A guest's drop shows the sign-in card,
-             kept in a <template> so its impression is sent when it is shown,
-             not on page load. */}}
+             folders (lib/drop.js), and "Upload a folder" sits inside it. Its
+             picker stays outside the form: the picker's click would bubble
+             up to the zone and open the file picker too. A guest's drop, or
+             the folder button, shows the sign-in card, kept in a <template>
+             so its impression is sent when it is shown, not on page load. */}}
         {{ if uploadsEnabled }}<div class="upload-sign-in-slot"></div>{{ end }}
         {{ if and uploadsEnabled (not ($.User | hasAuth)) }}<template id="upload-sign-in">{{ template "private/refusal" ($.WithData uploadSignIn) }}</template>{{ end }}
         <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main"{{ if uploadsEnabled }} data-uploads data-upload-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Vault }} data-upload-vault{{ end }}{{ end }}>
-            <label for="dropzone-input" class="upload-dashed rounded-2xl py-6 px-6 text-center cursor-pointer block">
-                {{ if uploadsEnabled }}
-                <p class="text-[0.95rem] text-w-sub">{{ t $.Lang "home.dropzoneUploads" }}</p>
-                {{ else }}
-                <p class="text-[0.95rem] text-w-sub"><span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}</p>
-                {{ end }}
+            <div class="upload-dashed rounded-2xl py-6 px-6 text-center cursor-pointer">
+                <p class="text-[0.95rem] text-w-sub">{{ if uploadsEnabled }}<span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzoneUploads" }}</span> {{ t $.Lang "home.dropzoneUploadsHint" }}{{ else }}<span class="text-w-pinkL font-semibold">{{ t $.Lang "home.dropzone" }}</span> {{ t $.Lang "home.dropzoneHint" }}{{ end }}</p>
                 <span class="badge badge-sm bg-white/5 border-0 text-w-muted mt-3 max-sm:h-auto max-sm:whitespace-normal max-sm:py-1">{{ with and uploadsEnabled (uploadCap $.Claims) }}{{ if $.Claims | isPaid }}{{ tp $.Lang "home.sizeLimitUploads" "Cap" . }}{{ else }}{{ t $.Lang "home.sizeLimitUploadsUpsell" }}{{ end }}{{ else }}{{ t $.Lang "home.noSizeLimit" }}{{ end }}</span>
-            </label>
+                {{ if uploadsEnabled }}
+                <div class="mt-2">
+                    <button type="button" class="dropzone-folder btn btn-ghost btn-sm gap-1.5 text-w-muted hover:text-w-pinkL normal-case font-medium">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                        {{ t $.Lang "upload.folder" }}
+                    </button>
+                </div>
+                {{ end }}
+            </div>
             <input class="dropzone-input hidden" name="resource" type="file"{{ if uploadsEnabled }} multiple{{ end }} />
             <input name="instruction" value="{{ .Instruction }}" type="hidden" />
         </form>
-        {{ if uploadsEnabled }}
-        <div class="flex flex-col items-center gap-1 mt-3 text-center">
-            <button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted normal-case font-medium">{{ t $.Lang "upload.folder" }}</button>
-            <input type="file" class="dropzone-dir hidden" webkitdirectory multiple>
-        </div>
-        {{ end }}
+        {{ if uploadsEnabled }}<input type="file" class="dropzone-dir hidden" webkitdirectory multiple>{{ end }}
 
         <!-- demo & speedtest links -->
         <div class="flex justify-center items-center gap-4 mt-4">

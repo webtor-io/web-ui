@@ -87,8 +87,7 @@ function home(t, { guest = false, vault = false } = {}) {
     const root = document.createElement('div');
     root.innerHTML = `${guest ? '<template id="upload-sign-in"><div data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in"><script src="/assets/private_refusal.js"></script></div></template>' : ''}
 <div class="upload-sign-in-slot"></div>
-<form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><input class="dropzone-input" type="file" multiple></form>
-<button type="button" class="dropzone-folder">folder</button>
+<form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><div><p>zone</p><button type="button" class="dropzone-folder"><svg><path/></svg>folder</button></div><input class="dropzone-input" type="file" multiple></form>
 <input type="file" class="dropzone-dir hidden" webkitdirectory multiple>`;
     document.body.append(root);
     const said = [];
@@ -107,6 +106,8 @@ function home(t, { guest = false, vault = false } = {}) {
     const dir = root.querySelector('.dropzone-dir');
     let dirClicks = 0;
     dir.click = () => { dirClicks++; };
+    let fileClicks = 0;
+    form.querySelector('.dropzone-input').click = () => { fileClicks++; };
     return {
         root, form, said, dir,
         slot: root.querySelector('.upload-sign-in-slot'),
@@ -115,6 +116,7 @@ function home(t, { guest = false, vault = false } = {}) {
         pickDir: withFiles(dir),
         submits: () => submits,
         dirClicks: () => dirClicks,
+        fileClicks: () => fileClicks,
         net: () => net,
     };
 }
@@ -184,7 +186,23 @@ test('a guest: Upload a folder shows the card and opens no picker', async (t) =>
     h.folder.click();
     assert.equal(h.slot.querySelectorAll('[data-umami-impression]').length, 1);
     assert.equal(h.dirClicks(), 0);
+    assert.equal(h.fileClicks(), 0);
     assert.equal(load.count, 0);
+});
+
+test('Upload a folder sits in the zone and opens the folder picker only', async (t) => {
+    const h = home(t);
+    initDrop(h.form, fakeLoad());
+    assert.ok(h.form.contains(h.folder));
+    h.folder.click();
+    // A click lands on the icon as often as on the text.
+    h.folder.querySelector('path').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    assert.equal(h.dirClicks(), 2);
+    assert.equal(h.fileClicks(), 0);
+    // The rest of the zone still opens the file picker.
+    h.form.querySelector('p').click();
+    assert.equal(h.fileClicks(), 1);
+    assert.equal(h.dirClicks(), 2);
 });
 
 test('the markup says whether Vault is set up', async (t) => {

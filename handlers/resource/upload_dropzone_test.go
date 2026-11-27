@@ -40,6 +40,17 @@ func dropzone(t *testing.T, user *auth.User, data any, path string, enabled bool
 	return dropzoneCtx(t, &w.Context{Lang: "en", Path: path, User: user, Data: data, Vault: true}, enabled)
 }
 
+// zone is the drop zone's form, from its opening tag to its </form>.
+func zone(t *testing.T, main string) string {
+	t.Helper()
+	i := strings.Index(main, `class="dropzone"`)
+	if i < 0 {
+		t.Fatalf("no drop zone:\n%s", main)
+	}
+	i = strings.LastIndex(main[:i], "<form")
+	return main[i : i+strings.Index(main[i:], "</form>")+len("</form>")]
+}
+
 // The drop zone takes a guest's own files only to show the sign-in card, and
 // that card is declared inside a <template>: its impression goes out when
 // the card is shown, not when the page loads.
@@ -49,7 +60,7 @@ func TestDropzoneUploads(t *testing.T) {
 		busy      = `data-upload-busy="Wait until the upload finishes"`
 		form      = `class="dropzone"`
 		folder    = `Upload a folder`
-		dropText  = `Drop a .torrent or your own files and folders, or click to choose.`
+		dropText  = `<span class="text-w-pinkL font-semibold">Drop a .torrent or your own files</span> — or click to choose.`
 		quotaHint = `Space from deleted files and folders is freed within 20 minutes.`
 	)
 	guest := &auth.User{}
@@ -82,6 +93,18 @@ func TestDropzoneUploads(t *testing.T) {
 		}
 		if strings.Contains(main, "Your files:") || strings.Contains(main, quotaHint) {
 			t.Error("a guest has a quota line")
+		}
+		if strings.Contains(main, "Magnet links go in the field above") {
+			t.Error("the zone still points at the field above")
+		}
+		// "Upload a folder" is a button inside the zone; its picker is not:
+		// a click on it would bubble up to the zone and open the file picker.
+		z := zone(t, main)
+		if !strings.Contains(z, folder) || !strings.Contains(openTag(t, z, "dropzone-folder"), `type="button"`) {
+			t.Errorf("no folder button inside the zone:\n%s", z)
+		}
+		if strings.Contains(z, "dropzone-dir") || !strings.Contains(main, "dropzone-dir") {
+			t.Errorf("the folder picker is not next to the zone:\n%s", main)
 		}
 		const event = `data-umami-impression="private-refused-shown"`
 		if n := strings.Count(main, event); n != 1 {
@@ -136,8 +159,8 @@ func TestDropzoneUploads(t *testing.T) {
 				t.Errorf("uploads are off, yet %q is there", s)
 			}
 		}
-		if !strings.Contains(main, "Drop torrent file here") {
-			t.Error("the torrent drop zone lost its text")
+		if want := `<span class="text-w-pinkL font-semibold">Drop torrent file here</span> or click to browse`; !strings.Contains(main, want) {
+			t.Errorf("the torrent drop zone lost its text, want %q:\n%s", want, main)
 		}
 	})
 
