@@ -280,9 +280,9 @@ changes) and by name.
 Its bulk bar deletes (`/upload/delete`) and says so, "Delete"
 (`bulk.delete`); the other sections' bar says "Remove".
 
-An upload marked gone (`upload_reserve.gone_at`, `models.UploadGoneIDs`) is
-dimmed, says "Removed from storage" (`library.uploads.gone`) where its size
-was, and has no link: its page would only say the files are gone. Select mode
+An upload marked gone (`upload_reserve.gone_at`, `models.UploadGoneIDs`) has
+its name and icon dimmed, says "Removed from storage" (`library.uploads.gone`)
+where its size was, in the meta line every row has, and has no link: its page would only say the files are gone. Select mode
 still deletes it. Three things write the mark, each only on a row a quota
 check would ask about (its token over plus the grace, not pledged in Vault):
 

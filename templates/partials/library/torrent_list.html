@@ -3,15 +3,17 @@
     {{ range $.Data }}
     <div class="relative">
     {{/* An upload whose files storage removed (handlers/library annotateGone):
-         dimmed, and no link -- its page would only say the files are gone. */}}
-    {{ if .Gone }}<div class="flex items-center gap-4 p-4 opacity-60">{{ else }}
+         its name and icon dimmed, and no link -- its page would only say the
+         files are gone. The line saying so is not dimmed: text-w-muted under
+         opacity-60 read 2.2:1, and alone it reads as every row's, 3.9:1. */}}
+    {{ if .Gone }}<div class="flex items-center gap-4 p-4">{{ else }}
     <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}" data-async-target="main"
        class="flex items-center gap-4 p-4 hover:bg-base-300/30 transition-colors group">{{ end }}
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-w-purpleL shrink-0 group-data-[bulk-on]/bulk:invisible">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-w-purpleL shrink-0 group-data-[bulk-on]/bulk:invisible{{ if .Gone }} opacity-60{{ end }}">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
         </svg>
         <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm line-clamp-2 group-hover:text-w-purpleL transition-colors">{{ .Torrent.Name }}</div>
+            <div class="font-medium text-sm line-clamp-2 group-hover:text-w-purpleL transition-colors{{ if .Gone }} opacity-60{{ end }}">{{ .Torrent.Name }}</div>
             <div class="text-xs text-w-muted mt-0.5">{{ if .Gone }}{{ t $.Ctx.Lang "library.uploads.gone" }}{{ else }}{{ .Torrent.SizeBytes | bitsForHumans }}{{ end }}{{ if .Torrent.FileCount }} · {{ .Torrent.FileCount }} {{ t $.Ctx.Lang "library.files" }}{{ end }} · {{/* An upload's last change; nil for torrents. */}}{{ $row := . }}{{ with .Torrent.UpdatedAt }}{{ timeAgoLang $.Ctx.Lang . }}{{ else }}{{ timeAgoLang $.Ctx.Lang $row.CreatedAt }}{{ end }}</div>
         </div>
         {{ if .Gone }}</div>{{ else }}

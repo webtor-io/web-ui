@@ -445,14 +445,21 @@ func TestUploadsSectionRenders(t *testing.T) {
 		}
 	})
 
-	// Files storage removed: the row is dimmed, says so where the size was
-	// and leads nowhere -- its page would only say they are gone. Select
-	// mode still deletes it.
+	// Files storage removed: the name and the icon are dimmed, the line
+	// under them says so where the size was, as readable as any row's, and
+	// the row leads nowhere -- its page would only say they are gone.
+	// Select mode still deletes it.
 	t.Run("gone", func(t *testing.T) {
 		gone := *row
 		gone.Gone = true
 		out := page(t, shared.SectionTypeUploads, true, &gone)
-		for _, want := range []string{`opacity-60`, `Removed from storage · 2 files`, `class="js-bulk-box checkbox checkbox-sm" value="` + testUpload + `"`} {
+		for _, want := range []string{
+			`<div class="flex items-center gap-4 p-4">`,
+			`bulk:invisible opacity-60">`,
+			`transition-colors opacity-60">Photos</div>`,
+			`<div class="text-xs text-w-muted mt-0.5">Removed from storage · 2 files`,
+			`class="js-bulk-box checkbox checkbox-sm" value="` + testUpload + `"`,
+		} {
 			if !strings.Contains(out, want) {
 				t.Errorf("no %s", want)
 			}
