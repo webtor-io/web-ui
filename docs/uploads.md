@@ -175,7 +175,7 @@ or under the header where an upload of one file has no such card): the same
 log as a torrent's load (`lib/progressLog.js`), fed by the uploader instead
 of a job's stream. One line, "Uploading your files", with files stored of
 files dropped and the percent of the bytes sent, which fills the bar; a pause
-(offline, node full) takes the line's numbers.
+(offline, node full) takes the line's numbers and is said to a screen reader.
 Under it, the note that the upload is temporary, but not on `/<id>`, whose
 state line under the header says it. A stop is the run's verdict, with the
 subscription upsell under a quota stop. When the space runs out during the
@@ -183,11 +183,11 @@ run, or on a 413 `files`, no new file starts but the ones in flight finish:
 the line goes on with them, and the verdict comes when they are done. The
 files that failed are named in a warning at the end, ten at most. "Open" (the upload's page, a new tab) shows
 once the first file is stored, except on `/<id>`, which is that page; "Sign
-in" after a 401.
+in" after a 401. Both are the run's own: the next run starts without them.
 
 Done, it opens the upload's page (`/<id>`, `?pwd=` when it went into a
 subfolder) the way a load does, with the log's redirect (an async link into
-"main"), after waiting at most a second for its two Umami events
+"main"; to the URL already shown it makes no history entry), after waiting at most a second for its two Umami events
 (`docs/analytics.md`, "Uploads"). When an async navigation took the log away,
 the outcome is a 10 s toast instead; on `/<id>` picking a file or another
 page of the listing does too, the card being re-rendered. One run per tab

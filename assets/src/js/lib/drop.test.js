@@ -399,7 +399,6 @@ test('busy mark helpers', async (t) => {
 
 test('the drop zone while an upload runs in the tab', async (t) => {
     const h = home(t);
-    h.root.insertAdjacentHTML('afterbegin', '<section data-upload-running></section>');
     const load = fakeLoad();
     initDrop(h.form, load);
     window.__uploadBusy = false;

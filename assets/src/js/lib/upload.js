@@ -266,8 +266,8 @@ export async function startUpload(log, items, opts = {}) {
         const open = log.querySelector('[data-upload-open]');
         const signIn = log.querySelector('[data-upload-sign-in]');
         const gotIt = log.querySelector('.closeable-close');
+        const announce = log.querySelector('[data-job-announce]');
         open.hidden = signIn.hidden = true;
-        gotIt.hidden = false;
         run = pl.inProgress('upload', t('upload.uploading'));
         if (!opts.id) pl.info(t('upload.state.temporary') + (opts.vault ? ' ' + t('upload.state.saveHint') : ''));
         // On the home page the log is above the search field, out of sight
@@ -310,9 +310,12 @@ export async function startUpload(log, items, opts = {}) {
             verdict ??= more ? text + '\n' + more : text;
             if (stopped) run.error(verdict);
         };
+        // A pause is said to a screen reader: the line's numbers are not, and
+        // without it a lost connection is minutes of silence.
         const pause = (key) => {
             paused = true;
             run.updateStatus(t(key));
+            announce.textContent = t(key);
         };
         const resume = () => {
             if (!paused) return;

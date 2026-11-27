@@ -587,7 +587,7 @@ test('409 deleted twice, then 201', async (t) => {
     await r.run([item(folder('a', { 'x.mkv': 10 }))], { id: U0, name: 'Name' });
     const under = r.calls.put.filter((p) => p.path.startsWith('Name/a/'));
     assert.deepEqual(under.map((p) => [p.path, p.offset]), [['Name/a/x.mkv', 0], ['Name/a/x (2).mkv', 0], ['Name/a/x (3).mkv', 0]]);
-    assert.equal(r.host.querySelectorAll('[aria-invalid="true"]').length, 0);
+    assert.equal(r.host.querySelector('pre.warn-summary[task-summary="failed"]'), null, 'no file failed');
     assert.equal(r.assigned.length, 1);
 });
 
@@ -751,7 +751,7 @@ test('413 size asks for a token once', async (t) => {
     assert.deepEqual(r.calls.put.filter((p) => last(p) === 'b').map((p) => [p.token, p.offset]), [['t1', 0], ['t2', 0]]);
     assert.doesNotMatch(r.status(), /upload\.quotaOut/);
     assert.equal(r.assigned.length, 1);
-    assert.equal(r.host.querySelectorAll('[aria-invalid="true"]').length, 0);
+    assert.equal(r.host.querySelector('pre.warn-summary[task-summary="failed"]'), null, 'no file failed');
 });
 
 test('a second 413 size is final', async (t) => {
@@ -915,6 +915,7 @@ test('pauses: 507, 429 and the network', async (t) => {
         const held = defer();
         let r;
         let during;
+        let spoken;
         r = rig(t, {
             put: (p, onProgress, n) => {
                 if (last(p) === 'a' && n === 1) return { status: 507, text: '' };
@@ -923,6 +924,7 @@ test('pauses: 507, 429 and the network', async (t) => {
                     await tick();
                     onProgress(5);
                     during = r.meta();
+                    spoken = r.host.querySelector('[data-job-announce]').textContent;
                     held.resolve();
                     return ok201;
                 })();
@@ -932,6 +934,8 @@ test('pauses: 507, 429 and the network', async (t) => {
         await r.run([asFile('a', 10), asFile('b', 20)]);
         assert.equal(during, 'upload.nodeFull');
         assert.equal(r.meta(), '2 / 2 · 100%');
+        // Said to a screen reader too: the line's numbers are not.
+        assert.equal(spoken, 'upload.nodeFull');
     });
     await t.test('429 waits its constant, not what the answer says', async (t) => {
         const r = rig(t, { put: (p, _, n) => (n === 1 ? { status: 429, text: '', retryAfter: '30' } : ok201) });
@@ -942,10 +946,12 @@ test('pauses: 507, 429 and the network', async (t) => {
     await t.test('three drops', async (t) => {
         let r;
         const texts = [];
-        r = rig(t, { put: (p, _, n) => { texts.push(r.meta()); return n <= 3 ? { status: 0 } : ok201; } });
+        const said = [];
+        r = rig(t, { put: (p, _, n) => { texts.push(r.meta()); said.push(r.host.querySelector('[data-job-announce]').textContent); return n <= 3 ? { status: 0 } : ok201; } });
         await r.run([asFile('a')]);
         assert.deepEqual(r.calls.wait, [1000, 2000, 4000]);
         assert.deepEqual(texts, ['0%', 'upload.offline', 'upload.offline', 'upload.offline']);
+        assert.deepEqual(said, ['upload.state.temporary', 'upload.offline', 'upload.offline', 'upload.offline']);
         // The connection came back: the numbers are back in place of the
         // pause.
         assert.equal(r.meta(), '100%');
@@ -1163,6 +1169,34 @@ test("on the upload's page nothing opens it again", async (t) => {
     assert.equal(g.host.querySelector('[data-upload-open]').hidden, true);
     assert.equal(g.host.querySelector('.closeable-close').hidden, false);
     assert.equal(g.host.querySelector('.alert-close-wrapper').classList.contains('hidden'), false);
+});
+
+// The links of the footer are the last run's: a run stopped before its
+// first file shows neither the last one's "Open" nor its "Sign in".
+test("the next run's footer starts over", async (t) => {
+    const quota = async () => ({ status: 413, json: { code: 'quota', used: 9 << 30, cap: 10 << 30 } });
+    const footer = (r) => ({
+        open: r.host.querySelector('[data-upload-open]').hidden,
+        signIn: r.host.querySelector('[data-upload-sign-in]').hidden,
+        gotIt: r.host.querySelector('.closeable-close').hidden,
+    });
+    await t.test('after a stop with a file stored', async (t) => {
+        const r = launch(t, gone410());
+        await r.promise;
+        assert.equal(footer(r).open, false);
+        r.tr.token = quota;
+        await r.run([asFile('z')]);
+        assert.match(r.status(), /upload\.quotaFull/);
+        assert.deepEqual(footer(r), { open: true, signIn: true, gotIt: false });
+    });
+    await t.test('after a lost session', async (t) => {
+        const r = launch(t, auth401());
+        await r.promise;
+        assert.equal(footer(r).signIn, false);
+        r.tr.token = quota;
+        await r.run([asFile('z')]);
+        assert.deepEqual(footer(r), { open: true, signIn: true, gotIt: false });
+    });
 });
 
 test('the progress is the line of the log it is given', async (t) => {

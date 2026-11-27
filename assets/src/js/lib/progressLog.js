@@ -357,6 +357,12 @@ class Renderer {
                 const a = document.createElement('a');
                 a.href = u.toString();
                 a.setAttribute('data-async-target', target);
+                // To the page already shown ("Add files" on an upload's own
+                // page) no new entry, or Back lands on the same page: a
+                // browser's own navigation to the URL it shows replaces too.
+                if (u.pathname + u.search === window.location.pathname + window.location.search) {
+                    a.setAttribute('data-async-push-state', 'false');
+                }
                 a.classList.add('hidden');
                 this.el.appendChild(a);
                 rebindAsync(this.el);
