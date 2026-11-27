@@ -141,21 +141,28 @@ func GetStremioAddonUrlByID(ctx context.Context, db *pg.DB, addonID uuid.UUID) (
 // the UI can render addon name/capabilities without waiting on a fresh
 // client-side manifest fetch.
 func CreateStremioAddonUrl(ctx context.Context, db *pg.DB, userID uuid.UUID, url string, snapshot *ManifestSnapshot) error {
-	// Get current addon count to set priority (new addons get lowest priority)
-	count, err := CountUserStremioAddonUrls(ctx, db, userID)
-	if err != nil {
+	// Lists are ordered by priority DESC (largest number first), so a new
+	// addon goes to the end of the list by taking a priority below every
+	// existing one. The next save of the list renumbers the rows from 1.
+	var minPriority *int16
+	if _, err := db.QueryOneContext(ctx, pg.Scan(&minPriority),
+		`SELECT MIN(priority) FROM stremio_addon_url WHERE user_id = ?`, userID); err != nil {
 		return err
+	}
+	priority := int16(0)
+	if minPriority != nil {
+		priority = *minPriority - 1
 	}
 
 	stremioAddonUrl := &StremioAddonUrl{
 		Url:      url,
 		UserID:   userID,
-		Priority: int16(count + 1), // New addon gets lowest priority
+		Priority: priority,
 		Enabled:  true,
 	}
 	stremioAddonUrl.ApplyManifestSnapshot(snapshot)
 
-	_, err = db.Model(stremioAddonUrl).
+	_, err := db.Model(stremioAddonUrl).
 		Context(ctx).
 		Insert()
 	return err

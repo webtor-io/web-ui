@@ -51,6 +51,7 @@ type Source struct {
 
 // Resolve picks the best available source for a resource_id. Order:
 //
+//  0. poster stored from Discover (models.ResourcePoster)
 //  1. movie metadata → IMDb poster URL
 //  2. series metadata → IMDb poster URL
 //  3. per-resource thumbnail (image_file / ffmpeg_frame / audio_art)
@@ -62,6 +63,11 @@ type Source struct {
 // return rows with nil metadata. See handlers/resource/get.go for the
 // same pattern.
 func Resolve(ctx context.Context, db *pg.DB, thumb *thumbnail.Service, cl *http.Client, resourceID string) (*Source, error) {
+	// The poster the user saw in Discover wins over provider artwork: it is
+	// what they recognise, and it exists without any TMDB/OMDB key.
+	if p, err := models.GetResourcePoster(ctx, db, resourceID); err == nil && p != nil && p.PosterURL != "" {
+		return storedPosterSource(p.PosterURL, cl), nil
+	}
 	if movie, err := models.GetMovieWithMetadataByResourceID(ctx, db, resourceID); err == nil && movie != nil {
 		md := movie.GetMetadata()
 		if md != nil && md.PosterURL != "" && md.VideoID != "" {

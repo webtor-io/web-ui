@@ -141,6 +141,7 @@ func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.P
 	r.POST("/discover/credits", auth.HasAuth, h.credits)
 	r.POST("/discover/torznab/streams", auth.HasAuth, h.torznabStreams)
 	r.POST("/discover/availability", auth.HasAuth, h.availability)
+	r.POST("/discover/poster", auth.HasAuth, h.savePoster)
 }
 
 func (h *Handler) index(c *gin.Context) {
