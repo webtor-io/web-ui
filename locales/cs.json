@@ -405,6 +405,7 @@
     "upload.signIn": "Nahrávání vlastních souborů je jen pro přihlášené: vidíš je jen ty. Přihlas se.",
     "upload.folder": "Nahrát složku",
     "upload.open": "Otevřít",
+    "upload.uploading": "Nahráváme tvé soubory",
     "upload.offline": "Bez připojení, zkoušíme znovu…",
     "upload.unavailable": "Tato nahrávka už není dostupná. Vytvoř novou.",
     "upload.nodeFull": "Úložiště uzlu je plné. Zkusíme to znovu za minutu.",

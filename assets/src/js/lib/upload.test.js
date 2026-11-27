@@ -1,10 +1,11 @@
 // The uploader: paths, tokens and parts, every answer of the token request
-// and of the seeder's PUT, the panel, the busy flag and mark, the outcome
-// toast and the two Umami events. The transport is a fake that answers by
-// script; its wait resolves at once, so a loop that should have ended makes
-// the fake throw instead of hanging the run.
+// and of the seeder's PUT, the progress log, the busy flag and mark, the
+// outcome toast and the two Umami events. The transport is a fake that
+// answers by script; its wait resolves at once, so a loop that should have
+// ended makes the fake throw instead of hanging the run.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 const U0 = '9c5db5752b7c0123456789abcdef0123456789ab';
@@ -15,14 +16,43 @@ const BUSY = 'Wait until the upload finishes';
 
 // lib/i18n.js reads this webpack constant on import.
 globalThis.__SUPPORTED_LOCALES__ = ['en'];
-const dom = new JSDOM('<!doctype html><body></body>');
-global.window = dom.window;
-global.document = dom.window.document;
+
+// newWindow is a page's window. jsdom has no innerText, which the log writes
+// its verdicts with: here it is the text, as a browser shows it.
+function newWindow(url = 'https://webtor.io/') {
+    const w = new JSDOM('<!doctype html><body></body>', { url }).window;
+    Object.defineProperty(w.HTMLElement.prototype, 'innerText', {
+        configurable: true,
+        get() { return this.textContent; },
+        set(v) { this.textContent = v; },
+    });
+    return w;
+}
+// useWindow puts w in place of the page's window; lib/async.js, which the
+// log's redirect goes through, reads its event classes as globals.
+function useWindow(w) {
+    global.window = w;
+    global.document = w.document;
+    global.CustomEvent = w.CustomEvent;
+    global.HTMLElement = w.HTMLElement;
+}
+useWindow(newWindow());
 
 const { fill, safeSegment, rootName, nextName, sizeBucket, startUpload } = await import('./upload.js');
-// The uploader's locale chunk, loaded once here: no test's first run waits
-// for the loader.
-await import('../../../../locales/en.json?prefix=upload,private.page');
+// The uploader's chunks, loaded once here: no test's first run waits for the
+// loader.
+await import('../../../../locales/en.json?prefix=upload');
+await import('./progressLog.js');
+
+// The log as partials/upload/log.html draws it, the job log inside, the
+// template actions resolved: a text is its key, as t() answers here.
+const partial = (p) => readFileSync(new URL('../../../../templates/partials/' + p, import.meta.url), 'utf8');
+const jobLog = partial('job_log.html').replace(/\{\{[\s\S]*?\}\}/g, (a) => (a.includes('showSteps') ? 'action.showSteps' : ''));
+const uploadLog = partial('upload/log.html').replace(/\{\{[\s\S]*?\}\}/g, (a) => {
+    if (a.includes('"job/log"')) return jobLog;
+    const key = /^\{\{-?\s*t\s+\S+\s+"([^"]+)"/.exec(a);
+    return key ? key[1] : '';
+});
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 // until takes ticks until cond holds, and fails if it does not within two
@@ -42,11 +72,10 @@ function defer() {
 }
 
 function ownWindow(t, url) {
-    const prev = [global.window, global.document];
-    const w = (url ? new JSDOM('<!doctype html><body></body>', { url }) : new JSDOM('<!doctype html><body></body>')).window;
-    global.window = w;
-    global.document = w.document;
-    t.after(() => { [global.window, global.document] = prev; });
+    const prev = global.window;
+    const w = newWindow(url);
+    useWindow(w);
+    t.after(() => useWindow(prev));
     return w;
 }
 
@@ -97,10 +126,10 @@ function parsePut(url) {
 }
 const last = (p) => p.path.split('/').pop();
 
-// rig is one run's world: a host in the document, a fake transport that
-// answers by token(body, n) and put(p, onProgress, n), and location.assign
-// written down. Everything goes into one log, in order.
-function rig(t, { token, put, wait, onAssign, host: makeHost } = {}) {
+// rig is one run's world: the upload log in the document, a fake transport
+// that answers by token(body, n) and put(p, onProgress, n), and the log's
+// redirect written down. Everything goes into one log, in order.
+function rig(t, { token, put, wait, onAssign } = {}) {
     const log = [];
     const calls = { token: [], put: [], wait: [] };
     const tr = {
@@ -121,19 +150,32 @@ function rig(t, { token, put, wait, onAssign, host: makeHost } = {}) {
             if (wait) return wait(ms);
         },
     };
+    const page = document.createElement('div');
+    page.innerHTML = uploadLog;
+    const host = page.querySelector('[data-upload-log]');
+    // The redirect is a click on a link into "main", which lib/async.js
+    // takes on a page.
     const assigned = [];
-    const prevLocation = global.location;
-    global.location = { assign: (u) => { assigned.push(u); log.push(['assign', u]); onAssign?.(u); } };
-    const host = makeHost ? makeHost() : document.createElement('div');
-    document.body.append(host);
+    host.addEventListener('click', (e) => {
+        const a = e.target.closest('a[data-async-target]');
+        if (!a) return;
+        e.preventDefault();
+        const u = new URL(a.href);
+        assigned.push(u.pathname + u.search);
+        log.push(['assign', u.pathname + u.search]);
+        onAssign?.();
+    });
+    document.body.append(page);
     t.after(() => {
-        host.remove();
-        global.location = prevLocation;
+        page.remove();
         delete window.__uploadBusy;
     });
-    const status = () => host.querySelector('[role="status"]')?.textContent ?? '';
+    // status: the verdicts and notes under the line; meta: the line's
+    // numbers or pause.
+    const status = () => host.querySelector('.job-results').textContent;
+    const meta = () => host.querySelector('.job-stage-meta').textContent;
     const run = (items, opts = {}) => startUpload(host, items, { ...opts, transport: tr });
-    return { tr, calls, log, assigned, host, status, run };
+    return { tr, calls, log, assigned, host, status, meta, run };
 }
 
 // umami puts a fake tracker on the window for one test; answer(name) is
@@ -335,7 +377,7 @@ test('an empty folder asks for nothing', async (t) => {
     assert.equal(r.calls.put.length, 0);
     assert.equal(r.log.filter(([k]) => k.startsWith('track:')).length, 0);
     assert.equal(r.assigned.length, 0);
-    assert.equal(r.host.querySelector('[data-upload-running]'), null);
+    assert.ok(r.host.classList.contains('hidden'), 'the log is not shown');
     assert.equal(window.__uploadBusy, false);
 });
 
@@ -401,7 +443,7 @@ test('the network drops three times', async (t) => {
         let r;
         r = rig(t, {
             token: (body, n) => {
-                if (n === 2) assert.match(r.status(), /upload\.offline/);
+                if (n === 2) assert.equal(r.meta(), 'upload.offline');
                 return n <= 3 ? { status: 0 } : grant(n);
             },
         });
@@ -433,11 +475,10 @@ test('parts of 16 MiB, one at a time per file, two files at once', async (t) => 
     let most = 0;
     let overlap = false;
     let r;
-    const rowBar = (rel) => [...r.host.querySelectorAll('[data-upload-running] span')].find((s) => s.textContent === rel)?.nextElementSibling;
-    let barAtThird;
+    let lineAtThird;
     r = rig(t, {
         put: async (p) => {
-            if (p.path === 'Photos/big' && p.offset === 2 * PART) barAtThird = rowBar('Photos/big')?.value;
+            if (p.path === 'Photos/big' && p.offset === 2 * PART) lineAtThird = r.meta();
             if (flying.has(p.path)) overlap = true;
             flying.set(p.path, true);
             most = Math.max(most, flying.size);
@@ -456,8 +497,9 @@ test('parts of 16 MiB, one at a time per file, two files at once', async (t) => 
     assert.equal(overlap, false);
     assert.equal(r.calls.put.length, 6);
     assert.ok(r.calls.put.every((p) => p.token === 't1' && p.apiKey === 'k'));
-    // The file's own bar shows the parts it has sent.
-    assert.equal(barAtThird, 2 * PART);
+    // The line counts the parts sent: big's two are 80% of the drop, less
+    // the small files not stored yet.
+    assert.match(lineAtThird, /^\d \/ 4 · (79|80)%$/);
 });
 
 test('a throwing transport rejects the run', async (t) => {
@@ -498,13 +540,10 @@ test('409 deleted renames up to 5 times', async (t) => {
         ['Name/a/x.mkv', 'Name/a/x (2).mkv', 'Name/a/x (3).mkv', 'Name/a/x (4).mkv', 'Name/a/x (5).mkv', 'Name/a/x (6).mkv']);
     assert.ok(r.calls.put.some((p) => p.path === 'Name/b.mkv'));
     assert.equal(window.__uploadBusy, false);
-    const bad = r.host.querySelectorAll('[aria-invalid="true"]');
-    assert.equal(bad.length, 1);
-    assert.match(bad[0].textContent, /x\.mkv/);
-    assert.doesNotMatch(bad[0].textContent, /\(6\)/);
-    assert.ok(bad[0].classList.contains('text-error'));
-    assert.equal(bad[0].querySelector('progress'), null);
-    assert.doesNotMatch(r.host.querySelector('[data-upload-running]').textContent, /b\.mkv/);
+    // Named as it was dropped, not under the last name it tried.
+    const failed = r.host.querySelector('pre.warn-summary[task-summary="failed"]').textContent;
+    assert.match(failed, /\na\/x\.mkv$/);
+    assert.doesNotMatch(failed, /\(6\)|b\.mkv/);
 });
 
 test('409 deleted twice, then 201', async (t) => {
@@ -585,7 +624,8 @@ test('busy mark', async (t) => {
     });
 
     await t.test('no storage', async (t) => {
-        ownWindow(t);
+        const w = ownWindow(t);
+        Object.defineProperty(w, 'localStorage', { get() { throw new Error('denied'); } });
         const busy = [];
         const r = rig(t, { put: () => { busy.push(window.__uploadBusy); return ok201; } });
         await r.run([asFile('a'), asFile('b'), asFile('c')], { id: U0, name: 'Photos' });
@@ -837,6 +877,28 @@ test('pauses: 507, 429 and the network', async (t) => {
         assert.deepEqual(r.calls.wait, [60000]);
         assert.deepEqual(r.calls.put.map((p) => p.offset), [0, 0]);
     });
+    await t.test('a pause keeps the line while another file goes on', async (t) => {
+        const held = defer();
+        let r;
+        let during;
+        r = rig(t, {
+            put: (p, onProgress, n) => {
+                if (last(p) === 'a' && n === 1) return { status: 507, text: '' };
+                if (last(p) !== 'b') return ok201;
+                return (async () => {
+                    await tick();
+                    onProgress(5);
+                    during = r.meta();
+                    held.resolve();
+                    return ok201;
+                })();
+            },
+            wait: () => held.promise,
+        });
+        await r.run([asFile('a', 10), asFile('b', 20)]);
+        assert.equal(during, 'upload.nodeFull');
+        assert.equal(r.meta(), '2 / 2 · 100%');
+    });
     await t.test('429 waits its constant, not what the answer says', async (t) => {
         const r = rig(t, { put: (p, _, n) => (n === 1 ? { status: 429, text: '', retryAfter: '30' } : ok201) });
         await r.run([asFile('a')]);
@@ -846,12 +908,13 @@ test('pauses: 507, 429 and the network', async (t) => {
     await t.test('three drops', async (t) => {
         let r;
         const texts = [];
-        r = rig(t, { put: (p, _, n) => { texts.push(r.status()); return n <= 3 ? { status: 0 } : ok201; } });
+        r = rig(t, { put: (p, _, n) => { texts.push(r.meta()); return n <= 3 ? { status: 0 } : ok201; } });
         await r.run([asFile('a')]);
         assert.deepEqual(r.calls.wait, [1000, 2000, 4000]);
-        assert.match(texts[3], /upload\.offline/);
-        // The connection came back: the pause text goes.
-        assert.equal(r.status(), '');
+        assert.deepEqual(texts, ['0%', 'upload.offline', 'upload.offline', 'upload.offline']);
+        // The connection came back: the numbers are back in place of the
+        // pause.
+        assert.equal(r.meta(), '100%');
     });
 });
 
@@ -859,7 +922,10 @@ test('401 on the token asks to sign in again', async (t) => {
     const r = launch(t, auth401());
     await r.promise;
     assert.match(r.status(), /upload\.signInAgain/);
-    assert.ok(r.host.querySelector('[role="status"] a[href^="/login?return-url="]'));
+    const signIn = r.host.querySelector('[data-upload-sign-in]');
+    assert.equal(signIn.getAttribute('href'), '/login?return-url=%2F');
+    assert.equal(signIn.hidden, false);
+    assert.equal(r.host.querySelector('.alert-close-wrapper').classList.contains('hidden'), false);
     assert.equal(r.calls.put.length, 0);
 });
 
@@ -1017,39 +1083,60 @@ test('upload events', async (t) => {
     });
 });
 
-test('a stored file links to the upload, all stored go there', async (t) => {
-    const r = rig(t);
+test('a stored file opens the upload, all stored go there', async (t) => {
+    let r;
+    const footer = () => r.host.querySelector('.alert-close-wrapper');
+    const open = () => r.host.querySelector('[data-upload-open]');
+    const gotIt = () => r.host.querySelector('.closeable-close');
+    const seen = [];
+    r = rig(t, { put: () => { seen.push(footer().classList.contains('hidden'), open().hidden); return ok201; } });
     await r.run([asFile('a')]);
-    const link = r.host.querySelector(`a[href="/${U0}"]`);
-    assert.ok(link, 'no link after the 201');
-    assert.equal(link.textContent, 'upload.open');
-    assert.equal(link.target, '_blank');
-    assert.equal(link.rel, 'noopener');
+    assert.deepEqual(seen, [true, true], 'nothing to open before the first file is stored');
+    assert.equal(open().getAttribute('href'), `/${U0}`);
+    assert.equal(open().hidden, false);
+    assert.equal(open().target, '_blank');
+    assert.equal(open().rel, 'noopener');
+    assert.equal(footer().classList.contains('hidden'), false);
+    assert.equal(gotIt().hidden, true, 'no "got it" while the files go on');
+    assert.match(r.status(), /upload\.done/);
     assert.deepEqual(r.assigned, [`/${U0}`]);
+
+    // A stop after a stored file: the link stays, "got it" is back.
+    const g = launch(t, gone410());
+    await g.promise;
+    assert.equal(g.host.querySelector('[data-upload-open]').hidden, false);
+    assert.equal(g.host.querySelector('.closeable-close').hidden, false);
+    assert.equal(g.host.querySelector('.alert-close-wrapper').classList.contains('hidden'), false);
+    assert.ok(g.host.querySelector('.job-stage').classList.contains('job-stage-done'));
+    assert.equal(g.assigned.length, 0);
 });
 
-test('the panel finds its place', async (t) => {
-    const home = rig(t, {
-        host: () => {
-            const h = document.createElement('div');
-            h.innerHTML = '<form class="dropzone"></form>';
-            return h;
+test('the progress is the line of the log it is given', async (t) => {
+    let r;
+    const seen = [];
+    const scrolled = [];
+    r = rig(t, {
+        put: (p, onProgress) => {
+            if (last(p) === 'a') {
+                seen.push(r.meta());
+                onProgress(5);
+                seen.push(r.meta());
+            }
+            return ok201;
         },
-        put: () => ({ status: 400, text: '' }),
     });
-    await home.run([asFile('a')]);
-    assert.ok(home.host.querySelector('[data-upload-running]').nextElementSibling.classList.contains('dropzone'));
-
-    const page = rig(t, {
-        host: () => {
-            const h = document.createElement('div');
-            h.innerHTML = `<button data-upload-add data-upload-id="${U0}"></button><input type="file" multiple hidden>`;
-            return h;
-        },
-        put: () => ({ status: 400, text: '' }),
-    });
-    await page.run([asFile('a')], { id: U0, name: 'Photos', dir: ['Photos'] });
-    assert.ok(page.host.firstElementChild.matches('[data-upload-running].basis-full'));
+    r.host.scrollIntoView = (o) => scrolled.push(o);
+    assert.ok(r.host.classList.contains('hidden'));
+    await r.run([asFile('a', 10), asFile('b', 20)]);
+    assert.equal(r.host.classList.contains('hidden'), false);
+    assert.deepEqual(scrolled, [{ block: 'nearest' }]);
+    assert.equal(r.host.querySelector('.job-stage-title').textContent, 'upload.uploading');
+    // Files stored of files dropped, and the bytes sent as a percent.
+    assert.deepEqual(seen, ['0 / 2 · 0%', '0 / 2 · 16%']);
+    assert.equal(r.meta(), '2 / 2 · 100%');
+    assert.equal(document.querySelectorAll('.job-stage').length, 1);
+    // The verdict is the answer: the line goes.
+    assert.equal(r.host.querySelector('.job-stage').hidden, true);
 });
 
 // toasts writes the outcome toasts down for one test: kind and text, and
@@ -1065,12 +1152,13 @@ function toasts(t) {
     return { said, held };
 }
 
-test('the panel is gone', async (t) => {
+
+test('the log is gone', async (t) => {
     for (const [name, sc, check, opts] of [
         ['all stored', allDone, (s) => { assert.equal(s, 'ok:upload.done'); assert.doesNotMatch(s, /upload\.state\./); }],
         ['413 quota', quotaFull, (s) => { assert.match(s, /^err:.*upload\.quotaFull/); assert.doesNotMatch(s, /upload\.upsell/); }, { upsell: true }],
         ['a second 413 size is final', sizeFinal, (s) => { assert.match(s, /^err:.*upload\.quotaOut/); }],
-        ['token 401', auth401, (s, r) => { assert.match(s, /^err:.*upload\.signInAgain/); assert.equal(r.host.querySelector('a[href*="/login"]'), null); }],
+        ['token 401', auth401, (s) => { assert.match(s, /^err:.*upload\.signInAgain/); }],
         ['410 stops the upload', gone410, (s) => { assert.match(s, /^err:.*upload\.unavailable/); }],
         ['409 frozen stops the upload', frozen409, (s) => { assert.match(s, /^err:.*upload\.state\.frozen/); assert.doesNotMatch(s, /upload\.unavailable/); }],
         ['413 files on the first PUT', files413, (s) => { assert.match(s, /^err:.*upload\.tooManyFiles/); }],
@@ -1078,7 +1166,7 @@ test('the panel is gone', async (t) => {
     ]) {
         await t.test(name, async (t) => {
             const { said, held } = toasts(t);
-            // The transport takes the panel out of the document in its first
+            // The transport takes the log out of the document in its first
             // token call, before it answers, as an async navigation would.
             const s = sc();
             const token = s.token || ((b, n) => grant(n));
@@ -1089,7 +1177,6 @@ test('the panel is gone', async (t) => {
             assert.equal(said.length, 1, String(said));
             assert.deepEqual(held, [10000]);
             check(said[0], r);
-            assert.equal(r.status(), '');
             assert.equal(window.__uploadBusy, false);
         });
     }
@@ -1114,14 +1201,12 @@ test('the panel is gone', async (t) => {
     });
     await t.test('a pause is not an outcome', async (t) => {
         const { said } = toasts(t);
-        const texts = [];
         let r;
         r = rig(t, {
             token: (body, n) => { r.host.remove(); return grant(n); },
-            put: (p, _, n) => { texts.push(r.status()); return n <= 3 ? { status: 503, text: '' } : ok201; },
+            put: (p, _, n) => (n <= 3 ? { status: 503, text: '' } : ok201),
         });
         await r.run([asFile('a')]);
-        assert.deepEqual(texts, ['', '', '', '']);
         assert.deepEqual(r.calls.wait, [1000, 2000, 4000]);
         assert.deepEqual(said, ['ok:upload.done']);
         assert.equal(r.assigned.length, 0);
@@ -1146,7 +1231,7 @@ test('the panel is gone', async (t) => {
     });
 });
 
-test('the panel is there: no toast', async (t) => {
+test('the log is there: no toast', async (t) => {
     const { said } = toasts(t);
     const r = rig(t);
     await r.run([asFile('a'), asFile('b')]);
@@ -1157,42 +1242,46 @@ test('the panel is there: no toast', async (t) => {
     assert.equal(said.length, 0);
 });
 
-test('a failed file stays in the panel', async (t) => {
+test('a failed file is named in the verdict', async (t) => {
+    // failed: the warning at the end of a run, the files under its words.
+    const failed = (r) => r.host.querySelector('pre.warn-summary[task-summary="failed"]')?.textContent.split('\n');
     const r = launch(t, bad400());
     await r.promise;
-    const bad = r.host.querySelectorAll('[aria-invalid="true"]');
-    assert.equal(bad.length, 1);
-    assert.match(bad[0].textContent, /x\.mkv/);
-    assert.ok(bad[0].classList.contains('text-error'));
-    assert.equal(bad[0].querySelector('progress'), null);
-    const panel = r.host.querySelector('[data-upload-running]').textContent;
-    assert.doesNotMatch(panel, /b\.mkv|c\.mkv/);
-    assert.equal(r.status(), '');
+    assert.deepEqual(failed(r), ['upload.someFailed', 'a/x.mkv']);
+    assert.equal(r.host.querySelector('[task-summary="upload"]'), null, 'the others went on: no stop');
+    assert.equal(r.host.querySelector('.closeable-close').hidden, false);
+    assert.equal(r.host.querySelector('.alert-close-wrapper').classList.contains('hidden'), false);
     assert.equal(r.assigned.length, 0);
 
     const w = rig(t);
     await w.run([item(fileEntry('/a', 10)), item(fileEntry('/unreadable', 20, { fail: true })), item(fileEntry('/c', 30))]);
-    const walk = w.host.querySelectorAll('[aria-invalid="true"]');
-    assert.equal(walk.length, 1);
-    assert.match(walk[0].textContent, /unreadable/);
+    assert.deepEqual(failed(w), ['upload.someFailed', 'unreadable']);
 
     // Nothing readable: no upload is made for it.
     const none = rig(t);
     await none.run([item(fileEntry('/unreadable', 20, { fail: true }))]);
     assert.equal(none.calls.token.length, 0);
-    assert.equal(none.host.querySelectorAll('[aria-invalid="true"]').length, 1);
+    assert.deepEqual(failed(none), ['upload.someFailed', 'unreadable']);
     assert.equal(window.__uploadBusy, false);
+
+    // Ten names at most.
+    const many = rig(t);
+    await many.run(Array.from({ length: 12 }, (_, i) => item(fileEntry(`/f${i}`, 1, { fail: true }))));
+    const names = failed(many);
+    assert.equal(names.length, 12);
+    assert.deepEqual(names.slice(1, 3), ['f0', 'f1']);
+    assert.equal(names[11], '…');
 });
 
-test('the panel says it is temporary from the start', async (t) => {
+test('the log says it is temporary from the start', async (t) => {
     const base = 'upload.state.temporary';
     const withHint = 'upload.state.temporary upload.state.saveHint';
     // watch records the note at the first token and at every PUT.
     const watch = (t, sc = {}) => {
         const seen = [];
         let r;
-        const note = () => r.host.querySelector('[data-upload-running] [data-upload-note]')?.textContent ?? null;
-        const count = () => r.host.querySelectorAll('[data-upload-note]').length;
+        const note = () => r.host.querySelector('pre.info-summary')?.textContent ?? null;
+        const count = () => r.host.querySelectorAll('pre.info-summary').length;
         const token = sc.token || ((b, n) => grant(n));
         const put = sc.put || (() => ok201);
         r = rig(t, {
@@ -1205,7 +1294,9 @@ test('the panel says it is temporary from the start', async (t) => {
         const w = watch(t);
         await w.r.run([asFile('a')]);
         assert.deepEqual(w.seen, [base, base]);
-        assert.equal(w.count(), 1);
+        // The verdict takes its place.
+        assert.equal(w.count(), 0);
+        assert.match(w.r.status(), /upload\.done/);
     });
     await t.test('Vault set up', async (t) => {
         const w = watch(t);
@@ -1217,25 +1308,24 @@ test('the panel says it is temporary from the start', async (t) => {
         await w.r.run([asFile('a')], { id: U0, name: 'Photos', dir: ['Photos'], vault: true });
         assert.deepEqual(w.seen, [withHint, withHint]);
     });
-    await t.test('the panel stays, and the next run replaces it', async (t) => {
-        const sc = bad400();
-        const w = watch(t, sc);
-        await w.r.run(sc.items, { ...sc.opts, vault: true });
-        assert.equal(w.note(), withHint);
-        assert.equal(w.count(), 1);
-        const panel = w.r.host.querySelector('[data-upload-running]');
-        const noteEl = panel.querySelector('[data-upload-note]');
-        assert.ok(panel.querySelector('progress').compareDocumentPosition(noteEl) & window.Node.DOCUMENT_POSITION_FOLLOWING);
-        assert.ok(noteEl.compareDocumentPosition(panel.querySelector('[role="status"]')) & window.Node.DOCUMENT_POSITION_FOLLOWING);
-        await w.r.run([asFile('a')], { vault: true });
-        assert.equal(w.r.host.querySelectorAll('[data-upload-running]').length, 1);
-        assert.equal(w.count(), 1);
-    });
-    await t.test('a stop leaves it', async (t) => {
+    await t.test('a stop takes its place', async (t) => {
         const sc = gone410();
         const w = watch(t, sc);
         await w.r.run(sc.items, { vault: true });
+        assert.deepEqual(w.seen, [withHint, withHint, withHint]);
         assert.match(w.r.status(), /upload\.unavailable/);
-        assert.equal(w.note(), withHint);
+        assert.equal(w.note(), null);
+    });
+    await t.test('the next run starts over', async (t) => {
+        const sc = bad400();
+        const w = watch(t, sc);
+        await w.r.run(sc.items, { ...sc.opts, vault: true });
+        assert.equal(w.count(), 0);
+        assert.match(w.r.status(), /upload\.someFailed/);
+        const verdicts = [];
+        w.r.tr.put = async () => { verdicts.push(w.r.host.querySelectorAll('pre[task-summary]').length, w.count()); return ok201; };
+        await w.r.run([asFile('a')], { vault: true });
+        assert.deepEqual(verdicts, [0, 1]);
+        assert.equal(w.r.host.querySelectorAll('.job-stage').length, 1);
     });
 });

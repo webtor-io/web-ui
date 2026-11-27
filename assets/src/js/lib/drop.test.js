@@ -86,6 +86,7 @@ function fakeLoad() {
 function home(t, { guest = false, vault = false } = {}) {
     const root = document.createElement('div');
     root.innerHTML = `${guest ? '<template id="upload-sign-in"><div data-umami-impression="private-refused-shown" data-umami-impression-code="upload" data-umami-impression-reason="sign_in"><script src="/assets/private_refusal.js"></script></div></template>' : ''}
+<div data-upload-log></div>
 <div class="upload-sign-in-slot"></div>
 <form class="dropzone" data-uploads data-upload-busy="${BUSY}"${vault ? ' data-upload-vault' : ''}><div><p>zone</p><button type="button" class="dropzone-folder"><svg><path/></svg>folder</button></div><input class="dropzone-input" type="file" multiple></form>
 <input type="file" class="dropzone-dir hidden" webkitdirectory multiple>`;
@@ -159,7 +160,7 @@ test('a dropped folder is read while the event lasts', async (t) => {
     await tick();
     assert.equal(load.count, 1);
     assert.equal(load.calls[0].items[0].entry.isDirectory, true);
-    assert.equal(load.calls[0].host, h.root);
+    assert.equal(load.calls[0].host, h.root.querySelector('[data-upload-log]'));
 });
 
 test('a guest: two drops, one event, no script', async (t) => {
@@ -240,6 +241,7 @@ test('the markup says whether Vault is set up', async (t) => {
 function addPage(t, { dir = null, cardID = U0, buttonDir, busy = false } = {}) {
     const w = ownWindow(t);
     w.document.body.innerHTML = `<button data-upload-add data-upload-id="${U0}" data-upload-name="Photos" data-upload-upsell${buttonDir !== undefined ? ` data-upload-dir="${buttonDir}"` : ''}${busy ? ` data-busy="${BUSY}"` : ''}></button><input type="file" multiple hidden>
+<div data-upload-log></div>
 ${dir !== null ? `<div id="list"><div class="js-list-card" data-resource-id="${cardID}" data-dir="${dir}"></div></div>` : ''}<p id="elsewhere"></p>`;
     const btn = w.document.querySelector('[data-upload-add]');
     const input = btn.nextElementSibling;
@@ -258,7 +260,7 @@ test('add files: the button opens the picker, the files go to this upload', asyn
     await tick();
     assert.equal(load.count, 1);
     assert.deepEqual(load.calls[0].opts, { id: U0, name: 'Photos', upsell: true, vault: false, dir: ['Photos'] });
-    assert.equal(load.calls[0].host, p.btn.parentElement);
+    assert.equal(load.calls[0].host, p.w.document.querySelector('[data-upload-log]'));
 });
 
 test('add files into the open folder', async (t) => {

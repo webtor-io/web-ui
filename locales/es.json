@@ -405,6 +405,7 @@
     "upload.signIn": "Subir tus propios archivos es solo para usuarios registrados: solo tú puedes verlos. Inicia sesión.",
     "upload.folder": "Subir una carpeta",
     "upload.open": "Abrir",
+    "upload.uploading": "Subiendo tus archivos",
     "upload.offline": "Sin conexión, reintentando…",
     "upload.unavailable": "Esta subida ya no está disponible. Crea una nueva.",
     "upload.nodeFull": "El almacenamiento del nodo está lleno. Reintentaremos en un minuto.",

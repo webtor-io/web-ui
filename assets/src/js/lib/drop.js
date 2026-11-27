@@ -3,7 +3,8 @@ import { trackImpressions } from './impression';
 // The drop zone of the home page and the tool pages, and the "Add files"
 // button of an upload's page. A drop of .torrent files only opens them, as it
 // always did; anything else is the user's own files and goes to the uploader
-// (lib/upload.js), which is loaded only then. The state shared with the
+// (lib/upload.js), which is loaded only then and shows its progress in the
+// page's upload log (partials/upload/log.html). The state shared with the
 // uploader lives on window and in the DOM: this module is bundled twice.
 
 // collect reads a drop's items while the event lasts: the browser empties
@@ -65,7 +66,7 @@ export function initDrop(dropzone, load = () => import('./upload')) {
     };
     const own = (items) => {
         if (signIn() || busy()) return;
-        load().then((m) => m.startUpload(host, items, {
+        load().then((m) => m.startUpload(dropzone.ownerDocument.querySelector('[data-upload-log]'), items, {
             upsell: dropzone.hasAttribute('data-upload-upsell'),
             vault: dropzone.hasAttribute('data-upload-vault'),
         }));
@@ -128,7 +129,7 @@ function destination(raw, root) {
 function addFiles(el, items, load) {
     const card = el.ownerDocument.querySelector('.js-list-card[data-resource-id="' + el.dataset.uploadId + '"]');
     const raw = card ? card.dataset.dir ?? '' : el.dataset.uploadDir ?? '';
-    load().then((m) => m.startUpload(el.parentElement, items, {
+    load().then((m) => m.startUpload(el.ownerDocument.querySelector('[data-upload-log]'), items, {
         id: el.dataset.uploadId,
         name: el.dataset.uploadName,
         upsell: el.hasAttribute('data-upload-upsell'),

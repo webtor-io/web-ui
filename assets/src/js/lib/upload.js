@@ -21,6 +21,8 @@ const retry429 = 5000;
 const NODE_FULL_MS = 60000;
 // How long a finished upload waits for its two events before it leaves.
 const EVENTS_WAIT_MS = 1000;
+// The failed files the verdict names; the rest is an ellipsis.
+const FAILED_NAMED = 10;
 // The busy mark is written at most this often: progress events come many
 // times a second, and every write reaches every tab of the site.
 const BUSY_WRITE_MS = 5000;
@@ -141,7 +143,7 @@ async function walk(entry, out) {
 function locale() {
     return import(
         /* webpackChunkName: "locale-upload-[request]" */
-        `../../../../locales/${getLang()}.json?prefix=upload,private.page`
+        `../../../../locales/${getLang()}.json?prefix=upload`
     ).then((m) => makeI18n(m.default || m));
 }
 
@@ -191,13 +193,14 @@ function transport() {
 }
 
 // startUpload sends items into a new upload, or into opts.id ("Add files",
-// into the folder opts.dir), showing its progress in a panel in host.
-// opts: id, name (the upload's root), dir, upsell (say what a subscription
-// gives), vault (Vault is set up), transport (tests).
-export async function startUpload(host, items, opts = {}) {
+// into the folder opts.dir), showing its progress in log, the page's
+// [data-upload-log] (partials/upload/log.html): the log of a torrent's load,
+// fed from here. opts: id, name (the upload's root), dir, upsell (say what a
+// subscription gives), vault (Vault is set up), transport (tests).
+export async function startUpload(log, items, opts = {}) {
     // A second action while the uploader chunk was loading: one run a tab.
     if (window.__uploadBusy) return;
-    const doc = host.ownerDocument;
+    const doc = log.ownerDocument;
     holdVaultButton(doc);
     const tr = opts.transport || transport();
     const startedAt = Date.now();
@@ -221,6 +224,8 @@ export async function startUpload(host, items, opts = {}) {
     let total = 0;
     let said;
     let startSent = null;
+    let pl;
+    let run;
     const causes = new Set();
     window.__uploadBusy = true;
     touch();
@@ -230,88 +235,65 @@ export async function startUpload(host, items, opts = {}) {
         files = await listFiles(items);
         if (!files.length) return;
         ({ t } = await locale());
+        const { initProgressLog } = await import('./progressLog');
         const queue = files.filter((f) => !f.error);
         total = queue.reduce((n, f) => n + f.file.size, 0);
 
-        // The panel; one from an earlier run is replaced.
-        const el = (tag, attrs = {}, text) => {
-            const n = doc.createElement(tag);
-            for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-            if (text !== undefined) n.textContent = text;
-            return n;
-        };
-        host.querySelector('[data-upload-running]')?.remove();
-        const panel = el('section', { 'data-upload-running': '', class: 'w-full flex flex-col gap-2 mb-4 text-left' });
-        const bar = el('progress', { class: 'progress progress-primary w-full', max: String(total || 1), value: '0' });
-        const count = el('p', { class: 'text-sm text-w-sub' });
-        const counted = el('span');
-        count.append(counted);
-        const note = el('p', { 'data-upload-note': '', class: 'text-sm text-w-sub' },
-            t('upload.state.temporary') + (opts.vault ? ' ' + t('upload.state.saveHint') : ''));
-        const rows = el('div', { class: 'flex flex-col gap-1' });
-        const status = el('p', { role: 'status', class: 'text-sm' });
-        panel.append(bar, count, note, rows, status);
-        const dropzone = host.querySelector('.dropzone');
-        if (dropzone) {
-            dropzone.before(panel);
-        } else {
-            panel.classList.add('basis-full');
-            host.prepend(panel);
-        }
+        // The log, cleared of an earlier run: one line for the run, the
+        // note that it is temporary under it, then the verdicts. The links
+        // of its footer are this run's own.
+        pl = initProgressLog(log);
+        pl.clear();
+        const footer = log.querySelector('.alert-close-wrapper');
+        const open = log.querySelector('[data-upload-open]');
+        const signIn = log.querySelector('[data-upload-sign-in]');
+        const gotIt = log.querySelector('.closeable-close');
+        open.hidden = signIn.hidden = true;
+        gotIt.hidden = false;
+        run = pl.inProgress('upload', t('upload.uploading'));
+        pl.info(t('upload.state.temporary') + (opts.vault ? ' ' + t('upload.state.saveHint') : ''));
+        // On the home page the log is above the search field, out of sight
+        // of a drop on a phone.
+        log.scrollIntoView?.({ block: 'nearest' });
 
+        // The line: files stored of files dropped, and the bytes sent as a
+        // percent, which fills the bar. A pause has the line to itself until
+        // it is over, whatever another file sends meanwhile.
         let stored = 0;
+        let paused = false;
         const paint = () => {
+            if (paused) return;
             let sent = 0;
-            for (const f of queue) {
-                sent += f.sent || 0;
-                if (f.bar) f.bar.value = f.sent || 0;
-            }
-            bar.value = sent;
-            counted.textContent = `${stored} / ${files.length}`;
+            for (const f of queue) sent += f.sent || 0;
+            const pct = total ? Math.floor((100 * sent) / total) : 0;
+            run.updateStatus((files.length > 1 ? `${stored} / ${files.length} · ` : '') + pct + '%');
         };
-        const addRow = (f) => {
-            const row = el('div', { class: 'flex items-center gap-2 text-xs text-w-sub' });
-            f.bar = el('progress', { class: 'progress w-24 shrink-0', max: String(f.file?.size || 1), value: '0' });
-            row.append(el('span', { class: 'truncate' }, f.rel), f.bar);
-            rows.append(row);
-            return row;
-        };
-        // A file that ended in an error keeps its row, marked, under the name
+        // A file that ended in an error is named at the end, under the name
         // it was dropped with.
         const fail = (f) => {
             causes.add('errors');
             f.failed = true;
-            f.row.setAttribute('aria-invalid', 'true');
-            f.row.classList.add('text-error');
-            f.row.querySelector('progress')?.remove();
         };
-        for (const f of files) {
-            if (!f.error) continue;
-            f.row = addRow(f);
-            fail(f);
-        }
+        for (const f of files) if (f.error) fail(f);
         paint();
 
-        // Texts. A stop's text is remembered, the first of the run, for the
-        // toast when the panel has left the document; it is written only
-        // while the panel is there. A pause is not an outcome.
-        let paused = false;
-        const stop = (text, tail) => {
+        // A stop's text is the run's verdict, the first one; it is also
+        // remembered for the toast when the log has left the document. A
+        // pause is not an outcome.
+        const stop = (text, more) => {
             said ??= text;
-            if (!host.isConnected) return;
-            status.replaceChildren(text);
-            if (tail) status.append(tail);
+            run.error(more ? text + '\n' + more : text);
         };
         const pause = (key) => {
             paused = true;
-            if (host.isConnected) status.textContent = t(key);
+            run.updateStatus(t(key));
         };
         const resume = () => {
             if (!paused) return;
             paused = false;
-            if (said === undefined && host.isConnected) status.textContent = '';
+            paint();
         };
-        const upsell = () => (opts.upsell ? el('span', { class: 'block' }, t('upload.upsell')) : null);
+        const upsell = () => (opts.upsell ? t('upload.upsell') : '');
 
         // stopped: nothing more goes to this upload, no PUT, no token.
         // closed: no new file starts; the files in flight finish.
@@ -341,8 +323,9 @@ export async function startUpload(host, items, opts = {}) {
             if (res.status === 401) {
                 causes.add('auth');
                 stopped = true;
-                const link = el('a', { class: 'link block', href: langPath('/login') + '?return-url=' + encodeURIComponent(window.location.pathname) }, t('private.page.signIn'));
-                return stop(t('upload.signInAgain'), link);
+                signIn.href = langPath('/login') + '?return-url=' + encodeURIComponent(window.location.pathname);
+                signIn.hidden = false;
+                return stop(t('upload.signInAgain'));
             }
             if (res.status === 409 && j.code === 'frozen') return gone(t('upload.state.frozen'));
             if (res.status === 404 || res.status === 410) return gone(t('upload.unavailable'));
@@ -414,8 +397,13 @@ export async function startUpload(host, items, opts = {}) {
             f.done = true;
             f.sent = f.file.size;
             stored++;
+            // The files stored so far open in a new tab while the rest go
+            // on; "got it" waits for the end.
             if (stored === 1) {
-                count.append(el('a', { class: 'link ml-2', href: langPath('/' + id), target: '_blank', rel: 'noopener' }, t('upload.open')));
+                open.href = langPath('/' + id);
+                open.hidden = false;
+                gotIt.hidden = true;
+                footer.classList.remove('hidden');
             }
             paint();
         };
@@ -451,7 +439,6 @@ export async function startUpload(host, items, opts = {}) {
         };
 
         const send = async (f) => {
-            f.row = addRow(f);
             let offset = 0;
             let renames = 0;
             let renewed = false;
@@ -504,7 +491,6 @@ export async function startUpload(host, items, opts = {}) {
                 }
             } finally {
                 f.over = true;
-                if (!f.failed) f.row.remove();
             }
         };
 
@@ -533,16 +519,32 @@ export async function startUpload(host, items, opts = {}) {
     const allDone = files.every((f) => f.done);
     const result = allDone ? 'done' : RESULTS.find((c) => causes.has(c)) ?? 'errors';
     const endSent = track('upload-end', { result, sizeBucket: sizeBucket(total), minutes: Math.round((Date.now() - startedAt) / 60000), add });
+    if (allDone) {
+        run.done(t('upload.done'));
+    } else {
+        const failed = files.filter((f) => f.failed).map((f) => f.rel);
+        if (failed.length) {
+            const named = failed.slice(0, FAILED_NAMED);
+            if (failed.length > FAILED_NAMED) named.push('…');
+            pl.warn('failed', [t('upload.someFailed'), ...named].join('\n'));
+        }
+    }
     // Leaving would cut the events' requests: wait for them, a little.
-    if (allDone && host.isConnected && window.umami) {
+    if (allDone && log.isConnected && window.umami) {
         await Promise.race([Promise.allSettled([startSent, endSent]), tr.wait(EVENTS_WAIT_MS)]);
     }
-    // The panel is still there: show the files, or stay on the errors.
-    if (host.isConnected) {
-        if (allDone) location.assign(langPath('/' + id) + (opts.dir?.length > 1 ? '?pwd=' + encodeURIComponent('/' + opts.dir.join('/')) : ''));
+    // The log is still there: show the files, the way a torrent's load does,
+    // or stay on the verdicts.
+    if (log.isConnected) {
+        if (allDone) {
+            pl.push({ level: 'redirect', location: langPath('/' + id) + (opts.dir?.length > 1 ? '?pwd=' + encodeURIComponent('/' + opts.dir.join('/')) : '') });
+        } else {
+            log.querySelector('.closeable-close').hidden = false;
+            run.close();
+        }
         return;
     }
-    // An async navigation took the panel away: the outcome is a toast, once
+    // An async navigation took the log away: the outcome is a toast, once
     // the tab is seen (a hidden tab would fade it in and out unseen).
     const show = () => {
         if (said === undefined && allDone) window.toast?.success(t('upload.done'), OUTCOME_TOAST_MS);

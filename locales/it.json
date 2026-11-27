@@ -405,6 +405,7 @@
     "upload.signIn": "Il caricamento dei tuoi file è riservato agli utenti registrati: solo tu puoi vederli. Accedi.",
     "upload.folder": "Carica una cartella",
     "upload.open": "Apri",
+    "upload.uploading": "Caricamento dei tuoi file",
     "upload.offline": "Nessuna connessione, nuovo tentativo…",
     "upload.unavailable": "Questo caricamento non è più disponibile. Creane uno nuovo.",
     "upload.nodeFull": "Lo spazio del nodo è pieno. Nuovo tentativo tra un minuto.",

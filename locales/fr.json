@@ -405,6 +405,7 @@
     "upload.signIn": "Le téléversement de vos propres fichiers est réservé aux utilisateurs connectés : vous seul les voyez. Connectez-vous.",
     "upload.folder": "Téléverser un dossier",
     "upload.open": "Ouvrir",
+    "upload.uploading": "Téléversement de vos fichiers",
     "upload.offline": "Pas de connexion, nouvelle tentative…",
     "upload.unavailable": "Ce téléversement n'est plus disponible. Créez-en un nouveau.",
     "upload.nodeFull": "Le stockage du nœud est plein. Nouvelle tentative dans une minute.",

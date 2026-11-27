@@ -405,6 +405,7 @@
     "upload.signIn": "Eigene Dateien hochladen können nur angemeldete Nutzer: Nur du siehst sie. Melde dich an.",
     "upload.folder": "Ordner hochladen",
     "upload.open": "Öffnen",
+    "upload.uploading": "Deine Dateien werden hochgeladen",
     "upload.offline": "Keine Verbindung, neuer Versuch…",
     "upload.unavailable": "Dieser Upload ist nicht mehr verfügbar. Erstelle einen neuen.",
     "upload.nodeFull": "Der Speicherknoten ist voll. Neuer Versuch in einer Minute.",

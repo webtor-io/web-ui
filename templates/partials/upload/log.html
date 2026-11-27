@@ -1,0 +1,18 @@
+{{ define "upload/log" }}
+{{/* Host of the progress of an upload of the user's own files: the same log
+     as a torrent's load (partials/load/progress.html), fed by the browser
+     (lib/upload.js) instead of a job's stream. Called with withContext: the
+     view's context and the host's own spacing classes. The redirect at the
+     end goes through progressLog.js's div-host path, an async link into
+     "main". "Open" shows once the first file is stored, "Sign in" when the
+     session ended; both are hidden with the attribute, as
+     `.progress-alert .close` sets a display that beats the `hidden` class. */}}
+<div class="hidden progress-alert progress-alert-block closeable relative z-10 w-full text-left {{ .Data }}" data-upload-log data-async-target="main">
+    {{ template "job/log" .Ctx.Lang }}
+    <div class="pt-3 justify-end flex hidden alert-close-wrapper">
+        <a class="close" data-upload-open target="_blank" rel="noopener" hidden>{{ t .Ctx.Lang "upload.open" }}</a>
+        <a class="close" data-upload-sign-in hidden>{{ t .Ctx.Lang "private.page.signIn" }}</a>
+        <a class="closeable-close close">{{ t .Ctx.Lang "home.gotIt" }}</a>
+    </div>
+</div>
+{{ end }}

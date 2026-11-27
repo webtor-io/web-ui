@@ -405,6 +405,7 @@
     "upload.signIn": "上传自己的文件仅限已登录用户：只有你能看到它们。请登录。",
     "upload.folder": "上传文件夹",
     "upload.open": "打开",
+    "upload.uploading": "正在上传你的文件",
     "upload.offline": "网络已断开，正在重试…",
     "upload.unavailable": "此上传已不可用。请创建新的上传。",
     "upload.nodeFull": "节点存储已满，将在一分钟后重试。",

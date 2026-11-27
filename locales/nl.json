@@ -405,6 +405,7 @@
     "upload.signIn": "Eigen bestanden uploaden kan alleen als je bent ingelogd: alleen jij kunt ze zien. Log in.",
     "upload.folder": "Map uploaden",
     "upload.open": "Openen",
+    "upload.uploading": "Je bestanden worden geüpload",
     "upload.offline": "Geen verbinding, opnieuw proberen…",
     "upload.unavailable": "Deze upload is niet meer beschikbaar. Maak een nieuwe.",
     "upload.nodeFull": "De opslag van de node is vol. Over een minuut proberen we het opnieuw.",

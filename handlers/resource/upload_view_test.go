@@ -89,6 +89,14 @@ func TestUploadView(t *testing.T) {
 		if tag := openTag(t, html, `data-upload-add`); !strings.Contains(tag, busy) {
 			t.Errorf("add files: %s", tag)
 		}
+		// The log of what "Add files" sends, under the header, above the
+		// upload's state line.
+		if tag := openTag(t, html, `data-upload-log`); !strings.Contains(tag, `data-async-target="main"`) || !strings.Contains(tag, `class="hidden progress-alert`) {
+			t.Errorf("upload log: %s", tag)
+		}
+		if i, j := strings.Index(html, `data-upload-log`), strings.Index(html, `data-upload-state`); j < 0 || i > j {
+			t.Errorf("the upload log at %d, the state line at %d", i, j)
+		}
 		if tag := openTag(t, html, `data-upload-delete="`+file+`"`); !strings.Contains(tag, busy) {
 			t.Errorf("delete file: %s", tag)
 		}
@@ -119,10 +127,10 @@ func TestUploadView(t *testing.T) {
 		enabled bool
 		in, out []string
 	}{
-		{"saved to Vault", &UploadView{IsOwner: true}, true, []string{`Delete upload`, deleteForm, confirmPart}, []string{`data-upload-add`, `data-upload-delete`}},
-		{"saved and paid", &UploadView{IsOwner: true, Saved: true}, true, []string{`Delete upload`, deleteForm, confirmPart}, []string{`data-upload-add`}},
+		{"saved to Vault", &UploadView{IsOwner: true}, true, []string{`Delete upload`, deleteForm, confirmPart}, []string{`data-upload-add`, `data-upload-delete`, `data-upload-log`}},
+		{"saved and paid", &UploadView{IsOwner: true, Saved: true}, true, []string{`Delete upload`, deleteForm, confirmPart}, []string{`data-upload-add`, `data-upload-log`}},
 		{"not an upload", nil, true, nil, []string{`data-upload-`, `Delete upload`, `return confirm(`}},
-		{"uploads off", writable(), false, nil, []string{`data-upload-add`, `data-upload-delete`, deleteForm, `Delete upload`}},
+		{"uploads off", writable(), false, nil, []string{`data-upload-add`, `data-upload-delete`, deleteForm, `Delete upload`, `data-upload-log`}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			checkPage(t, render(t, c.enabled, uploadPageData(c.up), nil), c.in, c.out)

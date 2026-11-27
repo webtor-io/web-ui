@@ -468,6 +468,8 @@
     {{ end }}
 
     {{ if and .Resource.Private (not (uploadOwned .Resource.ID)) }}{{ template "resource/private_notice" $ }}{{ end }}
+    {{/* The progress of "Add files" (lib/upload.js), on the page that has it. */}}
+    {{ if uploadsEnabled }}{{ with .Upload }}{{ if .CanWrite }}{{ template "upload/log" (withContext $ "mb-4") }}{{ end }}{{ end }}{{ end }}
     {{/* The owner's upload: saved only by a funded pledge; nothing when Vault
          could not be read -- which of the texts is true is unknown then. */}}
     {{ with .Upload }}{{ if not .VaultUnknown }}<p role="note" class="mb-4 text-sm text-w-sub" data-upload-state>{{ if .Saved }}{{ t $.Lang "upload.state.frozen" }}{{ else if not .CanWrite }}{{ t $.Lang "upload.state.unsaved" }}{{ if not .UnpaidPledge }} {{ t $.Lang "upload.state.saveHint" }}{{ end }}{{ else if .Incomplete }}{{ t $.Lang "upload.state.incomplete" }}{{ else }}{{ t $.Lang "upload.state.temporary" }}{{ if $.Data.Vault }} {{ t $.Lang "upload.state.saveHint" }}{{ end }}{{ end }}</p>{{ end }}{{ end }}

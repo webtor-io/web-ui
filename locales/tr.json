@@ -405,6 +405,7 @@
     "upload.signIn": "Kendi dosyalarınızı yüklemek yalnızca giriş yapmış kullanıcılar içindir: onları yalnızca siz görebilirsiniz. Giriş yapın.",
     "upload.folder": "Klasör yükle",
     "upload.open": "Aç",
+    "upload.uploading": "Dosyaların yükleniyor",
     "upload.offline": "Bağlantı yok, yeniden deneniyor…",
     "upload.unavailable": "Bu yükleme artık kullanılamıyor. Yeni bir yükleme oluşturun.",
     "upload.nodeFull": "Düğümün depolama alanı dolu. Bir dakika içinde yeniden denenecek.",

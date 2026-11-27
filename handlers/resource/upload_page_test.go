@@ -814,7 +814,7 @@ func TestUploadGoneImpression(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	stubTemplates(t, tpl, "hero_backdrop", "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about", "private/refusal")
+	stubTemplates(t, tpl, "hero_backdrop", "hero_wave", "onboarding_checklist", "continue_watching", "discover", "promo", "about", "private/refusal", "upload/log")
 	const (
 		event  = `upload-gone-shown`
 		script = `[asset private_refusal.js]`

@@ -405,6 +405,7 @@
     "upload.signIn": "Przesyłanie własnych plików jest tylko dla zalogowanych: widzisz je tylko ty. Zaloguj się.",
     "upload.folder": "Prześlij folder",
     "upload.open": "Otwórz",
+    "upload.uploading": "Przesyłamy twoje pliki",
     "upload.offline": "Brak połączenia, ponawiamy…",
     "upload.unavailable": "Te przesłane pliki nie są już dostępne. Prześlij pliki od nowa.",
     "upload.nodeFull": "Magazyn węzła jest pełny. Ponowimy próbę za minutę.",

@@ -26,6 +26,7 @@ func dropzoneCtx(t *testing.T, ctx *w.Context, enabled bool) string {
 		"../../templates/partials/job_log.html",
 		"../../templates/partials/about/heading.html",
 		"../../templates/partials/private/refusal.html",
+		"../../templates/partials/upload/log.html",
 	)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -94,6 +95,9 @@ func TestDropzoneUploads(t *testing.T) {
 		if strings.Contains(main, "Your files:") || strings.Contains(main, quotaHint) {
 			t.Error("a guest has a quota line")
 		}
+		if strings.Contains(main, "data-upload-log") {
+			t.Error("a guest has the upload log: a guest's drop shows the card")
+		}
 		if strings.Contains(main, "Magnet links go in the field above") {
 			t.Error("the zone still points at the field above")
 		}
@@ -127,6 +131,22 @@ func TestDropzoneUploads(t *testing.T) {
 		if strings.Contains(main, tplOpen) {
 			t.Error("a signed-in user got the sign-in template")
 		}
+		// The upload's log: where a torrent's load shows its log, above
+		// the search field, hidden until a drop.
+		tag := openTag(t, main, "data-upload-log")
+		for _, want := range []string{`class="hidden progress-alert progress-alert-block`, `data-async-target="main"`} {
+			if !strings.Contains(tag, want) {
+				t.Errorf("the log lacks %q: %s", want, tag)
+			}
+		}
+		if strings.Index(main, "data-upload-log") > strings.Index(main, `class="join w-full"`) {
+			t.Error("the log is under the search field")
+		}
+		for _, want := range []string{`class="job-stage"`, "data-upload-open", "data-upload-sign-in", "got it!"} {
+			if !strings.Contains(main, want) {
+				t.Errorf("the log lacks %q", want)
+			}
+		}
 		if !strings.Contains(main, busy) {
 			t.Error("the form has no busy text")
 		}
@@ -154,7 +174,7 @@ func TestDropzoneUploads(t *testing.T) {
 
 	t.Run("uploads off", func(t *testing.T) {
 		main := dropzone(t, guest, &index.Data{}, "/", false)
-		for _, s := range []string{tplOpen, "data-uploads", "data-upload-busy", "data-upload-vault", "dropzone-folder"} {
+		for _, s := range []string{tplOpen, "data-uploads", "data-upload-busy", "data-upload-vault", "dropzone-folder", "data-upload-log"} {
 			if strings.Contains(main, s) {
 				t.Errorf("uploads are off, yet %q is there", s)
 			}
@@ -173,6 +193,10 @@ func TestDropzoneUploads(t *testing.T) {
 			}
 			if strings.Contains(main, "Your files:") {
 				t.Errorf("signed in %v: a quota line on the submit's page", u.HasAuth())
+			}
+			// The load's log, then the upload's: both under the hero.
+			if i := strings.Index(main, "data-upload-log"); (i >= 0) != u.HasAuth() || (i >= 0 && i < strings.Index(main, `id="log-load"`)) {
+				t.Errorf("signed in %v: the upload log at %d, the load's at %d", u.HasAuth(), i, strings.Index(main, `id="log-load"`))
 			}
 		}
 	})

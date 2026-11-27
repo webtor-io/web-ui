@@ -127,6 +127,10 @@
         {{ template "load/progress" $ }}
     </div>
     {{ end }}
+    {{/* The upload of a signed-in user's own files shows its progress where a
+         load shows its log (lib/upload.js); a guest's drop shows the sign-in
+         card instead. */}}
+    {{ if and uploadsEnabled ($.User | hasAuth) }}{{ template "upload/log" (withContext $ "mb-10 max-w-[680px]") }}{{ end }}
 
     {{ if $.ErrKey }}
     {{/* "This upload is gone", shown to its owner, is counted: no properties

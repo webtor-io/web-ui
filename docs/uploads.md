@@ -140,12 +140,24 @@ folder dropped, the one file's name without its extension, or
 | 507 | the node is full: waits a minute |
 | 429 | waits 5 s |
 | 0, 502, 503, 504 | offline: retries with backoff up to 30 s |
-| anything else | that file fails and stays marked; the others go on |
+| anything else | that file fails; the others go on |
+
+The progress shows in the page's upload log (`partials/upload/log.html`,
+above the search field on the home and tool pages, under the header on
+`/<id>`): the same log as a torrent's load (`lib/progressLog.js`), fed by the
+uploader instead of a job's stream. One line, "Uploading your files", with
+files stored of files dropped and the percent of the bytes sent, which fills
+the bar; a pause (offline, node full) takes the line's numbers. Under it, the
+note that the upload is temporary. A stop is the run's verdict, with the
+subscription upsell under a quota stop; the files that failed are named in a
+warning at the end, ten at most. "Open" (the upload's page, a new tab) shows
+once the first file is stored, "Sign in" after a 401.
 
 Done, it opens the upload's page (`/<id>`, `?pwd=` when it went into a
-subfolder), after waiting at most a second for its two Umami events
-(`docs/analytics.md`, "Uploads"). When an async navigation took the panel
-away, the outcome is a 10 s toast instead. One run per tab
+subfolder) the way a load does, with the log's redirect (an async link into
+"main"), after waiting at most a second for its two Umami events
+(`docs/analytics.md`, "Uploads"). When an async navigation took the log away,
+the outcome is a 10 s toast instead. One run per tab
 (`window.__uploadBusy`); other tabs of the browser see the run through a
 mark in `localStorage` (`upload-busy:<id>`). "Save to Vault" is held in all of
 them while the run lasts: a pledge closes the upload for writing.
