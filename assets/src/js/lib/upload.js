@@ -210,7 +210,8 @@ function transport() {
 // file picked or another page or folder of the listing renders anew with an
 // empty log, and the run's own takes its place, as a job's log does
 // (loadAsyncView.js keepJobs). Its verdict too, until the next run, the
-// redirect or the outcome toast.
+// redirect, the outcome toast or a page without the upload after the end:
+// a verdict left behind is not brought back with the page.
 let keep = null;
 
 // startUpload sends items into a new upload, or into opts.id ("Add files",
@@ -247,6 +248,7 @@ export async function startUpload(log, items, opts = {}) {
     let startSent = null;
     let pl;
     let run;
+    let over = false;
     const causes = new Set();
     window.__uploadBusy = true;
     touch();
@@ -271,10 +273,15 @@ export async function startUpload(log, items, opts = {}) {
         pl = initProgressLog(log);
         pl.clear();
         window.removeEventListener('async', keep);
-        keep = opts.id ? (e) => {
+        const own = opts.id ? (e) => {
+            if (!doc.querySelector(`[data-upload-add][data-upload-id="${opts.id}"]`)) {
+                if (over) window.removeEventListener('async', own);
+                return;
+            }
             const slot = e.detail?.target?.querySelector?.('[data-upload-log]');
-            if (slot && !log.isConnected && doc.querySelector(`[data-upload-add][data-upload-id="${opts.id}"]`)) slot.replaceWith(log);
+            if (slot && !log.isConnected) slot.replaceWith(log);
         } : null;
+        keep = own;
         if (keep) window.addEventListener('async', keep);
         const footer = log.querySelector('.alert-close-wrapper');
         const open = log.querySelector('[data-upload-open]');
@@ -552,6 +559,7 @@ export async function startUpload(log, items, opts = {}) {
             if (closed) run.error(verdict);
         }
     } finally {
+        over = true;
         window.removeEventListener('beforeunload', onLeave);
         window.__uploadBusy = false;
         if (id) clearBusy(id);

@@ -1301,6 +1301,37 @@ test('the log goes on in the card rendered anew', async (t) => {
         assert.ok(content.contains(r.host));
         assert.match(r.status(), /upload\.unavailable/);
     });
+    // Left after the end, by an async link or Back: the verdict stays
+    // behind, and the page come back to shows its own log.
+    await t.test('the verdict is not brought back to the page', async (t) => {
+        const s = gone410();
+        const r = rig(t, { put: s.put });
+        const { page, swap } = stage(t, r);
+        const add = page.querySelector('[data-upload-add]');
+        await r.run(s.items, opts);
+        add.remove();
+        swap();
+        page.prepend(add);
+        swap();
+        assert.equal(r.host.isConnected, false);
+    });
+    // Left while the files go, the run's log comes back with them.
+    await t.test('left and back while the files go', async (t) => {
+        const h = held();
+        const r = rig(t, { put: h.put });
+        const { page, content, swap } = stage(t, r);
+        const add = page.querySelector('[data-upload-add]');
+        const p = r.run([asFile('a'), asFile('b')], opts);
+        await until(() => r.calls.put.length === 2, 'both files sent');
+        add.remove();
+        swap();
+        page.prepend(add);
+        swap();
+        assert.ok(content.contains(r.host), "the run's log is in the new card");
+        h.a.resolve(ok201);
+        await p;
+        assert.equal(r.assigned.length, 1);
+    });
     await t.test('the redirect renders the page anew', async (t) => {
         const r = rig(t);
         const { swap } = stage(t, r);
