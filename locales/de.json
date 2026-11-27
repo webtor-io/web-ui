@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Eigene Dateien",
     "profile.vault.torrents": "Torrents",
     "profile.uploadsQuota": "Temporäre Uploads: {{.Used}} von {{.Cap}} belegt",
-    "upload.quota.used": "Eigene Dateien: {{.Used}} von {{.Cap}} belegt",
     "upload.quota.hint": "Der Platz gelöschter Dateien und Ordner wird innerhalb von 20 Minuten frei.",
     "upload.addFiles": "Dateien hinzufügen",
     "upload.delete": "Upload löschen",

@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Vos fichiers",
     "profile.vault.torrents": "Torrents",
     "profile.uploadsQuota": "Téléversements temporaires : {{.Used}} utilisés sur {{.Cap}}",
-    "upload.quota.used": "Vos fichiers : {{.Used}} utilisés sur {{.Cap}}",
     "upload.quota.hint": "L'espace des fichiers et dossiers supprimés est libéré sous 20 minutes.",
     "upload.addFiles": "Ajouter des fichiers",
     "upload.delete": "Supprimer le téléversement",

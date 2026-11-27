@@ -171,8 +171,7 @@
         {{/* With uploads on, the zone also takes the user's own files and
              folders (lib/drop.js). A guest's drop shows the sign-in card,
              kept in a <template> so its impression is sent when it is shown,
-             not on page load. The quota line is read through `has`: the
-             submit's page renders this view with resource.PostData. */}}
+             not on page load. */}}
         {{ if uploadsEnabled }}<div class="upload-sign-in-slot"></div>{{ end }}
         {{ if and uploadsEnabled (not ($.User | hasAuth)) }}<template id="upload-sign-in">{{ template "private/refusal" ($.WithData uploadSignIn) }}</template>{{ end }}
         <form action="{{ langPath $.Lang "/" }}" method="post" enctype="multipart/form-data" class="dropzone" data-async-target="main"{{ if uploadsEnabled }} data-uploads data-upload-busy="{{ t $.Lang "upload.deleteBusy" }}"{{ if not ($.Claims | isPaid) }} data-upload-upsell{{ end }}{{ if $.Vault }} data-upload-vault{{ end }}{{ end }}>
@@ -191,10 +190,6 @@
         <div class="flex flex-col items-center gap-1 mt-3 text-center">
             <button type="button" class="dropzone-folder btn btn-ghost btn-sm text-w-muted normal-case font-medium">{{ t $.Lang "upload.folder" }}</button>
             <input type="file" class="dropzone-dir hidden" webkitdirectory multiple>
-            {{ if has . "UploadQuota" }}{{ with .UploadQuota }}
-            <p class="text-sm text-w-sub">{{ tp $.Lang "upload.quota.used" "Used" (bitsForHumans .Used) "Cap" (bitsForHumans .Cap) }}</p>
-            <p class="text-xs text-w-muted">{{ t $.Lang "upload.quota.hint" }}</p>
-            {{ end }}{{ end }}
         </div>
         {{ end }}
 

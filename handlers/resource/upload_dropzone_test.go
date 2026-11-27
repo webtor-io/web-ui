@@ -11,7 +11,6 @@ import (
 	"github.com/webtor-io/web-ui/handlers/index"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/job"
-	"github.com/webtor-io/web-ui/services/uploads"
 	w "github.com/webtor-io/web-ui/services/web"
 )
 
@@ -101,18 +100,16 @@ func TestDropzoneUploads(t *testing.T) {
 	})
 
 	t.Run("signed in", func(t *testing.T) {
-		main := dropzone(t, signedIn, &index.Data{UploadQuota: &uploads.Usage{Used: 3 << 30, Cap: 10 << 30}}, "/", true)
+		main := dropzone(t, signedIn, &index.Data{}, "/", true)
 		if strings.Contains(main, tplOpen) {
 			t.Error("a signed-in user got the sign-in template")
 		}
 		if !strings.Contains(main, busy) {
 			t.Error("the form has no busy text")
 		}
-		if want := "Your files: 3.0\u00a0GB of 10\u00a0GB used"; !strings.Contains(main, want) {
-			t.Errorf("no %q:\n%s", want, main)
-		}
-		if !strings.Contains(main, quotaHint) {
-			t.Error("no quota hint")
+		// The quota is the profile's line, not the drop zone's.
+		if strings.Contains(main, "Your files:") || strings.Contains(main, quotaHint) {
+			t.Error("a quota line under the drop zone")
 		}
 		if !strings.Contains(openTag(t, main, form), "data-upload-vault") {
 			t.Errorf("the form does not say Vault is set up: %s", openTag(t, main, form))
@@ -121,7 +118,7 @@ func TestDropzoneUploads(t *testing.T) {
 
 	t.Run("signed in, no Vault", func(t *testing.T) {
 		main := dropzoneCtx(t, &w.Context{Lang: "en", Path: "/", User: signedIn,
-			Data: &index.Data{UploadQuota: &uploads.Usage{Used: 3 << 30, Cap: 10 << 30}}}, true)
+			Data: &index.Data{}}, true)
 		for _, want := range []string{"data-uploads", busy} {
 			if !strings.Contains(main, want) {
 				t.Errorf("no %q", want)

@@ -63,7 +63,6 @@ func renderIndexMainWith(t *testing.T, tool *hc.Tool, over template.FuncMap, ext
 		"uploadSignIn":   func() any { return nil },
 		"hasAuth":        func(any) bool { return false },
 		"tp":             func(lang, key string, args ...interface{}) string { return key },
-		"bitsForHumans":  func(int64) string { return "" },
 		"uploadCap":      func(any) string { return "" },
 	}
 	maps.Copy(funcs, over)

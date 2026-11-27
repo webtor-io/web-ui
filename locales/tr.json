@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Kendi dosyalarınız",
     "profile.vault.torrents": "Torrentler",
     "profile.uploadsQuota": "Geçici yüklemeler: {{.Cap}} alanın {{.Used}} kadarı dolu",
-    "upload.quota.used": "Kendi dosyalarınız: {{.Cap}} alanın {{.Used}} kadarı dolu",
     "upload.quota.hint": "Silinen dosya ve klasörlerin alanı 20 dakika içinde boşalır.",
     "upload.addFiles": "Dosya ekle",
     "upload.delete": "Yüklemeyi sil",

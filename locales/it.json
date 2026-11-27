@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "I tuoi file",
     "profile.vault.torrents": "Torrent",
     "profile.uploadsQuota": "Caricamenti temporanei: {{.Used}} di {{.Cap}} occupati",
-    "upload.quota.used": "I tuoi file: {{.Used}} di {{.Cap}} occupati",
     "upload.quota.hint": "Lo spazio dei file e delle cartelle eliminati si libera entro 20 minuti.",
     "upload.addFiles": "Aggiungi file",
     "upload.delete": "Elimina caricamento",

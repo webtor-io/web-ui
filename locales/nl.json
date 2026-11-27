@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Eigen bestanden",
     "profile.vault.torrents": "Torrents",
     "profile.uploadsQuota": "Tijdelijke uploads: {{.Used}} van {{.Cap}} gebruikt",
-    "upload.quota.used": "Eigen bestanden: {{.Used}} van {{.Cap}} gebruikt",
     "upload.quota.hint": "Ruimte van verwijderde bestanden en mappen komt binnen 20 minuten vrij.",
     "upload.addFiles": "Bestanden toevoegen",
     "upload.delete": "Upload verwijderen",

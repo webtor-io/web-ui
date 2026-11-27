@@ -10,12 +10,8 @@ import (
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/metrics"
-	"github.com/webtor-io/web-ui/services/uploads"
 	"github.com/webtor-io/web-ui/services/web"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
 	"github.com/webtor-io/web-ui/services/template"
@@ -26,22 +22,17 @@ type Data struct {
 	Tool             *common.Tool
 	ContinueWatching []*models.WatchHistory
 	Onboarding       *models.OnboardingChecklist
-	// UploadQuota is the line under the drop zone; nil for a guest, with
-	// uploads off, or when it could not be counted.
-	UploadQuota *uploads.Usage
 }
 
 type Handler struct {
 	tb template.Builder[*web.Context]
 	pg *cs.PG
-	up *uploads.Service // nil: uploads are off
 }
 
-func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG, up *uploads.Service) {
+func RegisterHandler(r *gin.Engine, tm *template.Manager[*web.Context], pg *cs.PG) {
 	h := &Handler{
 		tb: tm.MustRegisterViews("*").WithLayout("main"),
 		pg: pg,
-		up: up,
 	}
 	indexable := r.Group("", web.IndexFollow())
 	indexable.GET("/", h.index)
@@ -74,24 +65,7 @@ func (s *Handler) index(c *gin.Context) {
 	Render(c, s.tb, s.pg, http.StatusOK, &Data{
 		Instruction: instruction,
 		Tool:        currentTool,
-		UploadQuota: s.quota(c),
 	}, errKey, errArgs)
-}
-
-// quota is the signed-in user's upload quota use, from the reserves alone:
-// a page view does not ask rest-api about every upload. A failure hides the
-// line, not the page.
-func (s *Handler) quota(c *gin.Context) *uploads.Usage {
-	user := auth.GetUserFromContext(c)
-	if s.up == nil || !user.HasAuth() {
-		return nil
-	}
-	used, limit, err := s.up.Quota(c.Request.Context(), user, claims.GetFromContext(c), nil, "", false)
-	if err != nil {
-		log.WithError(err).WithField("user_hash", auth.LogHash(user.ID)).Warn("failed to get upload quota")
-		return nil
-	}
-	return &uploads.Usage{Used: used, Cap: limit}
 }
 
 // Render answers with the home page (or a tool page, when data.Tool is set)

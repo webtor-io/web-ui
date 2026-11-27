@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Własne pliki",
     "profile.vault.torrents": "Torrenty",
     "profile.uploadsQuota": "Tymczasowe przesłane pliki: zajęte {{.Used}} z {{.Cap}}",
-    "upload.quota.used": "Własne pliki: zajęte {{.Used}} z {{.Cap}}",
     "upload.quota.hint": "Miejsce po usuniętych plikach i folderach zwalnia się w ciągu 20 minut.",
     "upload.addFiles": "Dodaj pliki",
     "upload.delete": "Usuń przesłane pliki",

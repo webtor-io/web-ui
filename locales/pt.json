@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Seus arquivos",
     "profile.vault.torrents": "Torrents",
     "profile.uploadsQuota": "Envios temporários: {{.Used}} de {{.Cap}} usados",
-    "upload.quota.used": "Seus arquivos: {{.Used}} de {{.Cap}} usados",
     "upload.quota.hint": "O espaço de arquivos e pastas excluídos é liberado em até 20 minutos.",
     "upload.addFiles": "Adicionar arquivos",
     "upload.delete": "Excluir envio",

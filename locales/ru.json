@@ -387,7 +387,6 @@
     "profile.vault.ownFiles": "Свои файлы",
     "profile.vault.torrents": "Торренты",
     "profile.uploadsQuota": "Временные загрузки: занято {{.Used}} из {{.Cap}}",
-    "upload.quota.used": "Свои файлы: занято {{.Used}} из {{.Cap}}",
     "upload.quota.hint": "Место удалённых файлов и папок освобождается в течение 20 минут",
     "upload.addFiles": "Добавить файлы",
     "upload.delete": "Удалить загрузку",
