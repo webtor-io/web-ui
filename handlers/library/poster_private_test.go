@@ -26,7 +26,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/poster_resolver"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail/thumbtest"
 )
 
@@ -48,8 +47,6 @@ func TestPosterHeaders(t *testing.T) {
 	db := pgtest.Start(t)
 	pg := pgtest.CS(t, db)
 	s3, store := thumbtest.Start(t)
-	private_torrent.SetEnforce(true)
-	t.Cleanup(func() { private_torrent.SetEnforce(false) })
 	ctx := context.Background()
 
 	for i, h := range []string{hp, hq, hu} {

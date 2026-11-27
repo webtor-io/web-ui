@@ -13,7 +13,6 @@ import (
 	"github.com/webtor-io/web-ui/models/pgtest"
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 // Every pledge asks rest-api first, with the user's claims: a private torrent
@@ -57,25 +56,19 @@ func TestPledgeCheckRunsBeforeTheEarlyReturn(t *testing.T) {
 	}
 }
 
-func TestPrivatePledgeClosedBeforeEnforce(t *testing.T) {
+// A private torrent rest-api serves to the pledger is theirs to pay for: the
+// pledge goes on to the database step, with no switch in the way.
+func TestPrivatePledgeGoesOn(t *testing.T) {
 	s := newTestVault(t, answering(http.StatusOK, fmt.Sprintf(`{"id":%q,"name":"n","size":1,"private":true}`, privateHash)))
 	s.pg = &cs.PG{} // no database: the open path ends there
-	t.Cleanup(func() { private_torrent.SetEnforce(false) })
 
-	private_torrent.SetEnforce(false)
 	_, err := s.GetOrCreateResource(context.Background(), pledgerClaims, privateHash)
 	var pe *api.PrivateError
-	if !errors.As(err, &pe) || pe.Status != http.StatusUnprocessableEntity || pe.Code != api.CodePrivateUnavailable {
-		t.Fatalf("before enforce: err = %v, want *api.PrivateError 422 private_unavailable", err)
-	}
-
-	private_torrent.SetEnforce(true)
-	_, err = s.GetOrCreateResource(context.Background(), pledgerClaims, privateHash)
 	if errors.As(err, &pe) {
-		t.Fatalf("enforced: err = %v, want the pledge to go on", err)
+		t.Fatalf("err = %v, want the pledge to go on", err)
 	}
 	if err == nil || !strings.Contains(err.Error(), "database connection is not available") {
-		t.Fatalf("enforced: err = %v, want the path to reach the database", err)
+		t.Fatalf("err = %v, want the path to reach the database", err)
 	}
 }
 

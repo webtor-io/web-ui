@@ -1,3 +1,14 @@
+{{/* The transfer status renews itself by fetching its page again with
+     X-Layout: template "resource/status_inner" (lib/statusStream.js). When
+     access is gone by then, the answer is this view: the redirect to / or to
+     /?err= (a ban, a failure), or the 404 of a resource that names nothing.
+     The status slot gets the reason, or "Status unavailable" -- without this
+     define the renewal was a 500, "no such template". */}}
+{{ define "resource/status_inner" }}
+<div class="progress-alert progress-alert-oneline" role="alert">
+    <pre class="error">{{ if .ErrKey }}{{ with .ErrArgs }}{{ tn $.Lang $.ErrKey .Count "Full" .Full }}{{ else }}{{ t $.Lang $.ErrKey }}{{ end }}{{ else }}{{ t $.Lang "resource.status.unknown" }}{{ end }}</pre>
+</div>
+{{ end }}
 {{ define "title" }}{{ with .Data }}{{ if .Tool }}{{ t $.Lang .Tool.Title | seoFriendly }} – {{ t $.Lang .Tool.Benefit }}{{ else }}{{ t $.Lang "home.title" }}{{ end }}{{ end }}{{ end }}
 {{ define "description" }}
     <meta name="description" content="{{ with .Data }}{{ if .Tool }}{{ t $.Lang .Tool.Description }}{{ else }}{{ t $.Lang "home.description" }}{{ end }}{{ end }}">

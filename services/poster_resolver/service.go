@@ -23,7 +23,6 @@ import (
 	"github.com/webtor-io/lazymap"
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 )
 
@@ -156,8 +155,8 @@ func (s *Service) admit(ctx context.Context, viewer *api.Claims, resourceID stri
 // S3 put. Called from lazymap on cache miss; also called directly on
 // force=true.
 //
-// A private resource has a source only where its viewers are checked, and
-// its picture is marked Private: Get then asks rest-api about every viewer,
+// A private resource's share card is the brand banner, and its other
+// pictures are marked Private: Get then asks rest-api about every viewer,
 // and the handler keeps it out of every cache. A resource rest-api does not
 // know gets no frame of its own, and its picture is marked Unknown: served to
 // everyone, cached by no one. A failed lookup is an error, never the default.
@@ -171,10 +170,9 @@ func (s *Service) miss(ctx context.Context, resourceID string, mode Mode) (*Resu
 		db  *pg.DB
 		src *Source
 	)
-	// A private resource has a source only where its viewers are checked: Get asks rest-api, and
-	// rest-api refuses nobody unless private access is enforced. Its share card never has one —
-	// crawlers fetch it without a session and get the banner.
-	if !private || (private_torrent.Enforce() && !mode.OG) {
+	// A private resource's share card never has a source: crawlers fetch it without a session and
+	// get the banner.
+	if !private || !mode.OG {
 		db = s.pg.Get()
 		if db == nil {
 			return nil, errors.New("no db")

@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -116,7 +117,7 @@ func (s *Handler) post(c *gin.Context) {
 		return
 	}
 
-	loadJob, err := s.jobs.Load(web.NewContext(c), &scripts.LoadArgs{
+	loadJob, err := s.jobs.Load(c.Request.Context(), web.NewContext(c), &scripts.LoadArgs{
 		Query:       args.Query,
 		File:        args.File,
 		HintVideoID: args.HintVideoID,
@@ -124,6 +125,12 @@ func (s *Handler) post(c *gin.Context) {
 		Debug:       args.Debug,
 		Source:      "site",
 	})
+	if errors.Is(err, context.Canceled) {
+		// The client left before its job was queued: nobody to answer.
+		// web.ErrorHandler records it as 499.
+		_ = c.Error(err)
+		return
+	}
 	if err != nil {
 		web.RedirectWithError(c, errors.Wrap(err, "failed to load resource"))
 		return

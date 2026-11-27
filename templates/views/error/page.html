@@ -8,3 +8,10 @@
     </div>
 </section>
 {{ end }}
+{{/* A status renewal (resource/get.html, status_inner) that a middleware
+     failed: the reason in the status's slot, under the page's status. */}}
+{{ define "resource/status_inner" }}
+<div class="progress-alert progress-alert-oneline" role="alert">
+    <pre class="error">{{ t $.Lang $.ErrKey }}</pre>
+</div>
+{{ end }}

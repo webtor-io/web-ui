@@ -106,16 +106,9 @@ without a session — gets 404. A failure to ask is a 500, never the picture.
   304.
 - **Share card.** `og.jpg` of a private resource is the brand banner for every
   caller: crawlers fetch it without a session.
-- **The switch.** Where private access is not enforced
-  (`PRIVATE_ACCESS_ENFORCE` off) a private resource has no picture at all, and
-  no frame of it is made.
 - **Frames.** A frame or a cover of a private resource is made when a viewer
   starts a stream or a download, with that viewer's claims — rest-api refuses
   the listing and the export to anyone without a right to the resource.
-- **Order of the two switches.** web-ui's `PRIVATE_ACCESS_ENFORCE` must never
-  be on while rest-api's is off: rest-api then refuses nobody, and the picture
-  of a private resource would go to anyone who knows its ID. web-ui's switch
-  is turned on last and off first.
 - **A resource rest-api does not know** (404) gets no frame, and the artwork of
   the title it was matched to is served with `private, no-store`: a 404 is no
   proof the resource is public.

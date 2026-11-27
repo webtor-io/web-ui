@@ -10,17 +10,13 @@ import (
 
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/job"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	tpl "github.com/webtor-io/web-ui/services/template"
 	"github.com/webtor-io/web-ui/services/web"
 )
 
 // The run itself fills Own from the seeder's reason and the user's claims
-// (Р14): a refused key after enforce, for a user with a uid, draws the
-// own-key card.
+// (Р14): a refused key, for a user with a uid, draws the own-key card.
 func TestNoPeersOwnKeyFromTheRun(t *testing.T) {
-	private_torrent.SetEnforce(true)
-	t.Cleanup(func() { private_torrent.SetEnforce(false) })
 	dir := t.TempDir()
 	p := filepath.Join(dir, "templates/views/action/errors/no_peers.html")
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

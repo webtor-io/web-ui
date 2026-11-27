@@ -54,7 +54,8 @@ function renderTurnstile(container) {
 av(async function() {
     const form = this.querySelector('form');
     const select = form.querySelector('select');
-    const inputs = form.querySelectorAll('input, textarea');
+    // [data-select]: also the labels that wrap the statement checkboxes.
+    const inputs = form.querySelectorAll('input, textarea, [data-select]');
     const actions = form.querySelector('[data-support-actions]');
     updateForm(select, inputs, actions);
     select.addEventListener('change', () => {

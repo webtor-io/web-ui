@@ -2,6 +2,7 @@ package resource
 
 import (
 	"bytes"
+	"context"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	j "github.com/webtor-io/web-ui/jobs"
+	"github.com/webtor-io/web-ui/services/web"
 )
 
 // A magnet's tr= and as= values are tracker and download URLs, and a private
@@ -57,5 +61,22 @@ func TestBindArgs_RefusedQueryKeepsNoTracker(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A client gone before its job is queued gets neither a job nor a redirect:
+// web.ErrorHandler records the request as 499.
+func TestPostClientGone(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(web.ErrorHandler(nil)) // renders nothing for a client that left
+	// Load returns before it touches the queue, so an empty Jobs does.
+	r.GET("/*path", (&Handler{jobs: &j.Jobs{}}).post)
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/magnet:?xt=urn:btih:"+strings.Repeat("a", 40), nil).WithContext(gone))
+	if rec.Code != web.StatusClientClosedRequest || rec.Header().Get("Location") != "" {
+		t.Errorf("got %d, Location %q; want 499 and no redirect", rec.Code, rec.Header().Get("Location"))
 	}
 }
