@@ -21,7 +21,7 @@ func TestMakeSortDoesNotShareSelection(t *testing.T) {
 	}
 }
 
-// My uploads also sorts by the last change; Torrents keeps its two sorts.
+// My files also sorts by the last change; Torrents keeps its two sorts.
 func TestMakeSortUploads(t *testing.T) {
 	h := NewSortHelper()
 	for section, want := range map[shared.SectionType][]models.SortType{

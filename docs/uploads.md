@@ -6,8 +6,16 @@ that took it (its home node). Only its owner sees it. It is temporary — the
 cleaner may evict it when its files have not been opened for a while and the
 space is needed — unless it is saved to Vault.
 
+The interface never calls an upload "an upload": what the user sees is their
+files, under one name, "My files" (the library tab, the badge over the title
+on the page of their files, the profile's line, the Vault row), the way "My
+subtitles" names its content. In Russian "загрузки" reads as downloads, in
+Czech "nahrávky" as recordings. URLs and code keep "upload" (`/lib/uploads`,
+the `upload.*` keys). `services/i18n` `TestOwnFilesGoByOneName` and
+`TestOwnFilesTextsSayFilesNotUploads` hold it.
+
 web-ui's part: the IDs, the on/off gate, write tokens and the per-user quota,
-the upload's page, "My uploads" in the library, deleting, and erasing what
+the upload's page, "My files" in the library, deleting, and erasing what
 web-ui derived from an upload once it is gone. The seeder enforces the write
 limit and keeps tombstones, its cleaner evicts; rest-api decides who may read
 an upload.
@@ -29,7 +37,7 @@ With uploads off `uploads.New` returns nil and nothing of them is served:
 `/upload/*` is not mounted, the drop zone takes `.torrent` files only (no
 `multiple`, no sign-in prompt), the tool page `/private-cloud-media-server` is
 dropped from routes, sitemap and footer (`DropUploadPages`,
-`docs/tool_pages.md`), and "Upload a folder" is not offered. "My uploads"
+`docs/tool_pages.md`), and "Upload a folder" is not offered. "My files"
 stays in the library menu while it has rows, to list and open them; its bulk
 delete is not offered.
 
@@ -184,8 +192,10 @@ library row is kept with the upload's size and file count and its gone mark
 cleared (`models.AddUploadToLibrary`); when the files changed since the last
 enrichment (`torrent_resource.updated_at`), the stale enrichment and the
 pictures are dropped and the upload is enriched again (the page waits up to
-3 s). "Add files" while it is not in Vault, "Delete upload" for the owner; no
-Share, no folder archive.
+3 s). "Add files" while it is not in Vault, "Delete all" for the owner; no
+Share, no folder archive. "Delete all" asks first, naming the upload's root
+folder, and adds that the Vault copy goes too when the upload is not writable
+(saved, or Vault not answering).
 
 Anyone else gets the 403 card (`error.upload_private_sign_in`,
 `error.upload_private_no_record`); the owner of an upload that is gone,
@@ -197,7 +207,7 @@ removed, only the upload deleted (`docs/vault.md`, "An upload's pledge").
 ## Deleting: `POST /upload/delete`
 
 Signed-in only. A form with `resource_id` or `resource_ids` (comma-separated)
-— the page's "Delete upload" (it asks first) and the bulk bar of "My uploads".
+— the page's "Delete all" (it asks first) and the bulk bar of "My files".
 Each ID (`deleteUpload`):
 
 1. Not an upload ID → error. Kind other than 0 → only the viewer's library row.
@@ -237,13 +247,13 @@ while the upload's home node is away. Pictures (`thumbnail.Service.Erase`) are
 keyed by content: a blob goes once no other resource's row names it
 (`docs/share_previews.md`).
 
-## The library: "My uploads"
+## The library: "My files"
 
 `/lib/uploads` lists the account's uploads; the Torrents section and WebDAV
 `torrents/` no longer do (`models.LibraryTorrents`), Movies and Series count
 them like torrents, and the JSON API's `GET /library`, WebDAV `all/` and the
 data export list them with the rest (`models.LibraryAll`, `docs/api.md`,
-`docs/webdav.md`). "My uploads" sorts by date added, by last update
+`docs/webdav.md`). "My files" sorts by date added, by last update
 (`torrent_resource.updated_at`, which moves when the size or the file count
 changes) and by name.
 

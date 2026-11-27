@@ -46,7 +46,7 @@ func TestUploadsQuotaPartialRenders(t *testing.T) {
 	t.Run("usage", func(t *testing.T) {
 		out := render(t, &uploads.Usage{Used: 3 << 30, Cap: 10 << 30})
 		for _, want := range []string{
-			"Temporary uploads: 3.0\u00a0GB of 10\u00a0GB used",
+			"My files: 3.0\u00a0GB of 10\u00a0GB used",
 			"Space from deleted files and folders is freed within 20 minutes.",
 		} {
 			if !strings.Contains(out, want) {

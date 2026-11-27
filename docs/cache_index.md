@@ -68,7 +68,7 @@ history and the user subtitle bindings too (`uploads.Forget` with `certain`
 true; an upload saved to Vault is left alone). Best effort: it is logged and
 the event is acknowledged whatever happens, so cache events never wait for
 S3. What it misses, a quota check and the owner's gone page erase later
-(without the user's own rows), and "Delete upload" erases the rest. See
+(without the user's own rows), and "Delete all" erases the rest. See
 `docs/uploads.md`.
 
 Unlike the other subscriptions these two **may fail to bind** without taking

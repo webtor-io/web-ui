@@ -65,7 +65,7 @@ func zone(t *testing.T, main string) string {
 func TestDropzoneUploads(t *testing.T) {
 	const (
 		tplOpen   = `<template id="upload-sign-in">`
-		busy      = `data-upload-busy="Wait until the upload finishes"`
+		busy      = `data-upload-busy="Wait until your files finish uploading"`
 		form      = `class="dropzone"`
 		folder    = `Upload a folder`
 		dropText  = `<span class="text-w-pinkL font-semibold">Drop a .torrent or your own files</span> — or click to choose.`

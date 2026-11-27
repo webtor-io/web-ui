@@ -43,7 +43,7 @@
             {{ template "library/sort" (withContext $ .Data.Args) }}
           </form>
           {{/* With uploads off /upload/delete is not served, and /lib/remove
-               would leave an upload's files with no row: My uploads then
+               would leave an upload's files with no row: My files then
                only lists and opens. */}}
           {{ $bulk := "/lib/remove" }}{{ if $uploads }}{{ $bulk = "/upload/delete" }}{{ end }}
           {{ if and .Data.Items (or (not $uploads) uploadsEnabled) }}{{ template "bulk_select/bar" (withContext $ $bulk) }}{{ end }}

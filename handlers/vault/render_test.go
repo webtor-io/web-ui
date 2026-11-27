@@ -480,7 +480,7 @@ func TestVaultFrozenRowSaysTimeLeft(t *testing.T) {
 // torrent's row is as before.
 func TestVaultUploadRowIsNotRemovable(t *testing.T) {
 	const upload = "9c5db5752b7c0123456789abcdef0123456789ab"
-	notice := html.EscapeString("Once saved, an upload can't be changed: you can't add or delete files. To get the VP back, delete the upload.")
+	notice := html.EscapeString("Once saved, files can no longer be added or deleted. To get the VP back, delete them with “Delete all”.")
 	tpl := parseVault(t)
 	render := func(frozen bool, withTorrent bool) string {
 		t.Helper()

@@ -152,8 +152,10 @@
                     <form method="post" enctype="multipart/form-data" action="{{ langPath $.Lang "/upload/delete" }}" data-async-target="main" class="shrink-0">
                         <input type="hidden" name="resource_id" value="{{ $.Data.Resource.ID }}" />
                         {{/* On the submit button, not the form: async.js sends the
-                             form on submit without asking whether it was cancelled. */}}
-                        <button type="submit" class="btn btn-ghost btn-sm text-w-muted hover:text-error whitespace-nowrap" onclick="return confirm('{{ t $.Lang "upload.deleteConfirm" }}')">
+                             form on submit without asking whether it was cancelled.
+                             The dialog names what goes, and says the Vault copy goes
+                             too where one may be kept: the upload is not writable. */}}
+                        <button type="submit" class="btn btn-ghost btn-sm text-w-muted hover:text-error whitespace-nowrap" onclick="return confirm('{{ tp $.Lang "upload.deleteConfirm" "Name" .Name }}{{ if not .CanWrite }} {{ t $.Lang "upload.deleteConfirmVault" }}{{ end }}')">
                             {{ t $.Lang "upload.delete" }}
                         </button>
                     </form>

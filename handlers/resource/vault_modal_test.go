@@ -240,7 +240,7 @@ func TestPledgeModalPrivate(t *testing.T) {
 const pledgeUpload = "9c5db5752b7c0123456789abcdef0123456789ab"
 
 // uploadNotice is vault.uploadNotice in English, as the page escapes it.
-var uploadNotice = html.EscapeString("Once saved, an upload can't be changed: you can't add or delete files. To get the VP back, delete the upload.")
+var uploadNotice = html.EscapeString("Once saved, files can no longer be added or deleted. To get the VP back, delete them with “Delete all”.")
 
 func uploadAddForm(available *float64) *VaultPledgeAddForm {
 	f := addForm(available)
@@ -313,8 +313,8 @@ func TestUploadPledgeModalHasNoRemove(t *testing.T) {
 // button is. A torrent never gets either.
 func TestUploadPledgeModalUnfinished(t *testing.T) {
 	const (
-		empty      = "This upload has no finished files yet: there is nothing to save."
-		unfinished = "This upload is not finished. Only the finished files will be saved"
+		empty      = "No file has finished uploading yet: there is nothing to save."
+		unfinished = "Not every file has finished uploading. Only the finished files will be saved"
 	)
 	withState := func(f *VaultPledgeAddForm, empty, incomplete bool) *VaultPledgeAddForm {
 		f.UploadEmpty, f.UploadIncomplete = empty, incomplete

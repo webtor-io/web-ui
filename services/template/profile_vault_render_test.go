@@ -52,13 +52,13 @@ func TestProfileVaultSplitRenders(t *testing.T) {
 	}
 
 	out := render(t, &vault.UserStats{FundedOwnFiles: 9, FundedTorrents: 2})
-	for label, want := range map[string]string{"Your files": "9.00", "Torrents": "2.00"} {
+	for label, want := range map[string]string{"My files": "9.00", "Torrents": "2.00"} {
 		if r := row(out, label); !strings.Contains(r, ">"+want+"<") {
 			t.Errorf("no row %q with %s:\n%s", label, want, out)
 		}
 	}
 
-	if out := render(t, &vault.UserStats{FundedTorrents: 2}); strings.Contains(out, "Your files") {
+	if out := render(t, &vault.UserStats{FundedTorrents: 2}); strings.Contains(out, "My files") {
 		t.Errorf("no own files funded, but the split is there:\n%s", out)
 	}
 }

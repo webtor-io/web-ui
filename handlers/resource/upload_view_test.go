@@ -64,10 +64,13 @@ func checkPage(t *testing.T, html string, in, out []string) {
 
 func TestUploadView(t *testing.T) {
 	const (
-		busy        = `data-busy="Wait until the upload finishes"`
-		deleteForm  = `action="/upload/delete"`
-		confirmFull = `onclick="return confirm('Delete this upload for good? If it is saved to Vault, the copy will be deleted too.')"`
-		confirmPart = `return confirm('Delete this upload for good?`
+		busy       = `data-busy="Wait until your files finish uploading"`
+		deleteForm = `action="/upload/delete"`
+		// "Delete all" names what goes; the Vault sentence only where a copy
+		// may be kept: the upload is not writable.
+		confirmFull  = `onclick="return confirm('Delete “Name” and all its files for good?')"`
+		confirmVault = `onclick="return confirm('Delete “Name” and all its files for good? Its Vault copy will be deleted too.')"`
+		confirmPart  = `return confirm('Delete “`
 	)
 	writable := func() *UploadView { return &UploadView{IsOwner: true, CanWrite: true, Name: "Name"} }
 	render := func(t *testing.T, enabled bool, gd *GetData, edit func(*GetData)) string {
@@ -84,8 +87,8 @@ func TestUploadView(t *testing.T) {
 		file := gd.List.Items[1].PathStr
 		html := render(t, true, gd, nil)
 		checkPage(t, html, []string{`data-upload-add`, `data-upload-id="` + uploadU + `"`, `data-upload-name="Name"`, `data-upload-dir="/Name/sub"`,
-			`</button><input type="file" multiple hidden>`, `Delete upload`, confirmFull, `data-upload-delete="` + file + `"`},
-			[]string{`data-upload-upsell`, `data-upload-root`})
+			`</button><input type="file" multiple hidden>`, `Delete all`, confirmFull, `data-upload-delete="` + file + `"`},
+			[]string{`data-upload-upsell`, `data-upload-root`, `Its Vault copy`})
 		if tag := openTag(t, html, `data-upload-add`); !strings.Contains(tag, busy) {
 			t.Errorf("add files: %s", tag)
 		}
@@ -100,7 +103,7 @@ func TestUploadView(t *testing.T) {
 		if tag := openTag(t, html, `data-upload-delete="`+file+`"`); !strings.Contains(tag, busy) {
 			t.Errorf("delete file: %s", tag)
 		}
-		if tag := openTag(t, html, `return confirm('Delete this upload`); !strings.HasPrefix(tag, `<button type="submit"`) {
+		if tag := openTag(t, html, confirmPart); !strings.HasPrefix(tag, `<button type="submit"`) {
 			t.Errorf("the dialog is not on the submit button: %s", tag)
 		}
 	})
@@ -127,10 +130,10 @@ func TestUploadView(t *testing.T) {
 		enabled bool
 		in, out []string
 	}{
-		{"saved to Vault", &UploadView{IsOwner: true}, true, []string{`Delete upload`, deleteForm, confirmPart}, []string{`data-upload-add`, `data-upload-delete`, `data-upload-log`}},
-		{"saved and paid", &UploadView{IsOwner: true, Saved: true}, true, []string{`Delete upload`, deleteForm, confirmPart}, []string{`data-upload-add`, `data-upload-log`}},
-		{"not an upload", nil, true, nil, []string{`data-upload-`, `Delete upload`, `return confirm(`}},
-		{"uploads off", writable(), false, nil, []string{`data-upload-add`, `data-upload-delete`, deleteForm, `Delete upload`, `data-upload-log`}},
+		{"saved to Vault", &UploadView{IsOwner: true, Name: "Name"}, true, []string{`Delete all`, deleteForm, confirmVault}, []string{`data-upload-add`, `data-upload-delete`, `data-upload-log`}},
+		{"saved and paid", &UploadView{IsOwner: true, Saved: true, Name: "Name"}, true, []string{`Delete all`, deleteForm, confirmVault}, []string{`data-upload-add`, `data-upload-log`}},
+		{"not an upload", nil, true, nil, []string{`data-upload-`, `Delete all`, `return confirm(`}},
+		{"uploads off", writable(), false, nil, []string{`data-upload-add`, `data-upload-delete`, deleteForm, `Delete all`, `data-upload-log`}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			checkPage(t, render(t, c.enabled, uploadPageData(c.up), nil), c.in, c.out)
@@ -144,7 +147,7 @@ func TestUploadView(t *testing.T) {
 				MovieMetadata: &models.MovieMetadata{VideoMetadata: &models.VideoMetadata{VideoID: "tt0000001", Title: "Sample Movie"}},
 			}
 		})
-		checkPage(t, html, []string{`Delete upload`, confirmPart}, nil)
+		checkPage(t, html, []string{`Delete all`, confirmPart}, nil)
 		for _, s := range []string{`data-upload-add`, deleteForm} {
 			if n := strings.Count(html, s); n != 1 {
 				t.Errorf("%q %d times, want once", s, n)

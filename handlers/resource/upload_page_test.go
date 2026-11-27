@@ -648,12 +648,12 @@ func TestUploadRefusalPage(t *testing.T) {
 		r := w.NewPrivateRefusal(&api.PrivateError{Status: 403, Code: api.CodePrivateTorrent, Reason: api.ReasonNoRecord}, true, uploadU)
 		r.Target = "main"
 		ctx := &w.Context{Lang: "en", Path: "/" + uploadU, Data: r}
-		if title := strings.TrimSpace(execute(t, tpl, "title", ctx)); title != "Private upload" {
-			t.Errorf("title %q, want Private upload", title)
+		if title := strings.TrimSpace(execute(t, tpl, "title", ctx)); title != "Private files" {
+			t.Errorf("title %q, want Private files", title)
 		}
 		out := execute(t, tpl, "main", ctx)
-		if !strings.Contains(out, ">Private upload</h3>") {
-			t.Errorf("no Private upload heading:\n%s", out)
+		if !strings.Contains(out, ">Private files</h3>") {
+			t.Errorf("no Private files heading:\n%s", out)
 		}
 		// rest-api's code rides along as the event's property; the words
 		// say upload.
@@ -910,8 +910,8 @@ func TestUploadPageTemplate(t *testing.T) {
 	t.Run("an upload", func(t *testing.T) {
 		page := render(t, upload(false, owner()))
 		badge := between(page, "badge badge-lg", "</div>")
-		if !strings.Contains(badge, "Upload") || strings.Contains(badge, "Torrent") {
-			t.Errorf("badge %q, want Upload", badge)
+		if !strings.Contains(badge, "My files") || strings.Contains(badge, "Torrent") {
+			t.Errorf("badge %q, want My files", badge)
 		}
 		checkPage(t, page, nil, []string{`data-magnet-hash`, `download-torrent`, "Webtor uses your tracker account"})
 		checkPage(t, render(t, upload(true, owner())), nil, []string{`js-archive-form`, `data-magnet-hash`})
@@ -923,8 +923,8 @@ func TestUploadPageTemplate(t *testing.T) {
 			frozen     = html.EscapeString("Saved to Vault — files can no longer be added or deleted.")
 			unsaved    = html.EscapeString("Not saved to Vault: the files may be deleted. You can't add files here any more.")
 			temporary  = html.EscapeString("Temporary: files that are not played or downloaded may be deleted within hours.")
-			hint       = html.EscapeString("Save it to Vault.")
-			incomplete = html.EscapeString("This upload is not finished yet.")
+			hint       = html.EscapeString("Save them to Vault.")
+			incomplete = html.EscapeString("Not every file has finished uploading.")
 		)
 		for _, c := range []struct {
 			name    string
@@ -965,7 +965,7 @@ func TestUploadPageTemplate(t *testing.T) {
 		gd := upload(true, &UploadView{IsOwner: true, CanWrite: true, Incomplete: true})
 		gd.Resource.FilesCount, gd.List, gd.Item = 0, nil, nil
 		page := render(t, gd)
-		checkPage(t, between(page, "data-upload-state", "</p>"), []string{html.EscapeString("This upload is not finished yet.")}, nil)
+		checkPage(t, between(page, "data-upload-state", "</p>"), []string{html.EscapeString("Not every file has finished uploading.")}, nil)
 		checkPage(t, page, nil, []string{html.EscapeString("Temporary:"), `js-archive-form`, `data-magnet-hash`})
 	})
 
@@ -1024,7 +1024,7 @@ func TestTrackerPrivate(t *testing.T) {
 	}
 }
 
-// An upload is in My uploads from the start and leaves the library only as a
+// An upload is in My files from the start and leaves the library only as a
 // whole: its page has no library button.
 func TestLibraryButtonHiddenForAnUpload(t *testing.T) {
 	tpl, err := template.New("button.html").Funcs(intentFuncs(t)).ParseFiles("../../templates/partials/library/button.html")

@@ -2,16 +2,20 @@
 <div class="flex flex-wrap gap-1.5 sm:gap-2">
     {{ $d := .Data }}
     {{ range $d.Args | makeMenu }}
-        {{/* My uploads stays while it has rows, also with uploads turned off. */}}
+        {{/* My files stays while it has rows, also with uploads turned off. */}}
         {{ if or (ne .Title "uploads") uploadsEnabled (gt $d.UploadCount 0) }}
         {{ $titleKey := printf "library.%s" .Title }}
+        {{/* The one-word tabs are lower case in the locales and capitalised
+             here; "My files" is a phrase in sentence case, which capitalize
+             would turn into "My Files" ("Мои Файлы"). */}}
+        {{ $case := " capitalize" }}{{ if eq .Title "uploads" }}{{ $case = "" }}{{ end }}
         {{ if .Active }}
-            <a class="btn btn-sm bg-w-purple/15 border-w-purple/30 text-w-purpleL capitalize" href="{{ langPath $.Lang .TargetURL }}" data-async-target="main">
+            <a class="btn btn-sm bg-w-purple/15 border-w-purple/30 text-w-purpleL{{ $case }}" href="{{ langPath $.Lang .TargetURL }}" data-async-target="main">
                 {{ t $.Lang $titleKey }}
                 <span class="ml-0.5 text-[10px] opacity-70">{{ if eq .Title "torrents" }}{{ $d.TorrentCount }}{{ else if eq .Title "movies" }}{{ $d.MovieCount }}{{ else if eq .Title "uploads" }}{{ $d.UploadCount }}{{ else }}{{ $d.SeriesCount }}{{ end }}</span>
             </a>
         {{ else }}
-            <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-purple/30 hover:text-w-purpleL capitalize" href="{{ langPath $.Lang .TargetURL }}" data-async-target="main">
+            <a class="btn btn-sm btn-ghost border border-w-line text-w-sub hover:border-w-purple/30 hover:text-w-purpleL{{ $case }}" href="{{ langPath $.Lang .TargetURL }}" data-async-target="main">
                 {{ t $.Lang $titleKey }}
                 <span class="ml-0.5 text-[10px] opacity-50">{{ if eq .Title "torrents" }}{{ $d.TorrentCount }}{{ else if eq .Title "movies" }}{{ $d.MovieCount }}{{ else if eq .Title "uploads" }}{{ $d.UploadCount }}{{ else }}{{ $d.SeriesCount }}{{ end }}</span>
             </a>

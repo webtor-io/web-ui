@@ -22,7 +22,7 @@ is wrong while the upload's home node is away) — and the error block carries
 the Umami impression `upload-gone-shown` (`docs/analytics.md`, "Uploads").
 Anyone else, the owner without a library row included, gets
 `error.not_found` or rest-api's refusal. A deleted upload has no library row
-left: "Delete upload" on its own page returns to `/lib/uploads` instead of
+left: "Delete all" on its own page returns to `/lib/uploads` instead of
 this page (`docs/uploads.md`).
 
 The body is `index.Render` with an empty `index.Data` — the same page the

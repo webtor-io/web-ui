@@ -119,7 +119,7 @@ without a session — gets 404. A failure to ask is a 500, never the picture.
   picture at all (404): its enrichment rows can outlive its files.
 - **Erasing.** An upload's pictures go with it: its thumbnail rows, and the
   blob and renders no other resource's row names (`thumbnail.Service.Erase`;
-  objects are keyed by content). Callers: "Delete upload", a DMCA ban of the
+  objects are keyed by content). Callers: "Delete all", a DMCA ban of the
   upload, and — for an upload not saved to Vault — the cleaner's eviction, a
   quota check that finds it gone and the owner's gone page (`uploads.Forget`),
   a change of the upload's files (the page drops the stale enrichment and its

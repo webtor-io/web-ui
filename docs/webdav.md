@@ -71,7 +71,7 @@ round-trippable paths. Below `PrefixDirectory` (all in `services/libfs`):
   `all`, those with a recognized film or show in `movies`/`series`.
 - `TorrentLibraryDirectory` — the `torrents` view. It hides uploads
   (`models.LibraryTorrents`; a name lookup there never finds one), as the
-  site's Torrents section does since "My uploads" has its own.
+  site's Torrents section does since "My files" has its own.
 - `DebugDirectory` — wraps everything and logs every `Stat`/`ReadDir`/`Open`
   (`path=…`, `files=…`). This is how to see what a client actually requested in
   prod: `kubectl logs` and grep `msg="read dir"`.

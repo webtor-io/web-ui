@@ -316,7 +316,7 @@ func withUploads(tpl *template.Template, on bool) *template.Template {
 	return tpl.Funcs(template.FuncMap{"uploadsEnabled": func() bool { return on }})
 }
 
-// My uploads: its select bar deletes uploads, and asks about deleting them;
+// My files: its select bar deletes uploads, and asks about deleting them;
 // a row says when the upload last changed, not when it was added.
 func TestUploadsSectionRenders(t *testing.T) {
 	now := time.Now()
@@ -335,7 +335,7 @@ func TestUploadsSectionRenders(t *testing.T) {
 		for _, want := range []string{
 			`<form id="bulk-remove"`,
 			`action="/upload/delete"`,
-			`data-bulk-confirm="Delete the selected uploads for good? Their Vault copies will be deleted too."`,
+			`data-bulk-confirm="Delete the selection with all its files for good? Vault copies will be deleted too."`,
 			`href="/` + testUpload + `"`,
 			h.TimeAgoLang("en", updated),
 			`class="flex flex-wrap gap-1.5 sm:gap-2"`,
@@ -347,8 +347,21 @@ func TestUploadsSectionRenders(t *testing.T) {
 		if strings.Contains(out, h.TimeAgoLang("en", added)) {
 			t.Errorf("the row says when the upload was added (%s), not when it changed", h.TimeAgoLang("en", added))
 		}
-		if !regexp.MustCompile(`href="/lib/uploads"[^>]*>[^<]*<span[^>]*>1</span>`).MatchString(out) {
-			t.Error("the menu has no My uploads item counting 1")
+		if !regexp.MustCompile(`href="/lib/uploads"[^>]*>\s*My files\s*<span[^>]*>1</span>`).MatchString(out) {
+			t.Error("the menu has no My files item counting 1")
+		}
+		// The one-word tabs are capitalised by CSS; "My files" is a phrase in
+		// sentence case, which capitalize would turn into "My Files" ("Мои
+		// Файлы", "I Miei File").
+		class := func(section string) string {
+			m := regexp.MustCompile(`<a class="([^"]*)" href="/lib/` + section + `"`).FindStringSubmatch(out)
+			if m == nil {
+				t.Fatalf("no %s tab", section)
+			}
+			return m[1]
+		}
+		if strings.Contains(class("uploads"), "capitalize") || !strings.Contains(class("movies"), "capitalize") {
+			t.Errorf("tabs: uploads %q, movies %q; want only the one-word tab capitalised", class("uploads"), class("movies"))
 		}
 	})
 
@@ -384,7 +397,7 @@ func TestUploadsSectionRenders(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		out := page(t, shared.SectionTypeUploads, true)
-		for _, want := range []string{"No uploads yet", `href="/" data-async-target="main">Upload files</a>`} {
+		for _, want := range []string{"Nothing here yet", `href="/" data-async-target="main">Upload files</a>`} {
 			if !strings.Contains(out, want) {
 				t.Errorf("no %s", want)
 			}
@@ -392,13 +405,13 @@ func TestUploadsSectionRenders(t *testing.T) {
 		if strings.Contains(out, "No torrents yet") {
 			t.Error("says there are no torrents")
 		}
-		if off := page(t, shared.SectionTypeUploads, false); !strings.Contains(off, "No uploads yet") || strings.Contains(off, "Upload files") {
+		if off := page(t, shared.SectionTypeUploads, false); !strings.Contains(off, "Nothing here yet") || strings.Contains(off, "Upload files") {
 			t.Error("uploads off: want the empty state without the upload button")
 		}
 	})
 }
 
-// My uploads is in the menu while uploads are on, and while there are any
+// My files is in the menu while uploads are on, and while there are any
 // to see after they were turned off.
 func TestUploadsMenuItem(t *testing.T) {
 	for _, c := range []struct {
