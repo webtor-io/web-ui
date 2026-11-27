@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Niezapisane w Vault: pliki mogą zostać usunięte. Nie można już tu dodawać plików.",
     "upload.signIn": "Zaloguj się, żeby przesyłać własne pliki — zobaczysz je tylko ty.",
     "upload.folder": "Prześlij folder",
+    "upload.defaultName": "Pliki {{.Date}}",
     "upload.open": "Otwórz",
     "upload.uploading": "Przesyłamy twoje pliki",
     "upload.offline": "Brak połączenia, ponawiamy…",

@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Non enregistré dans Vault : les fichiers peuvent être supprimés. Vous ne pouvez plus ajouter de fichiers ici.",
     "upload.signIn": "Connectez-vous pour téléverser vos propres fichiers — vous seul les verrez.",
     "upload.folder": "Téléverser un dossier",
+    "upload.defaultName": "Fichiers {{.Date}}",
     "upload.open": "Ouvrir",
     "upload.uploading": "Téléversement de vos fichiers",
     "upload.offline": "Pas de connexion, nouvelle tentative…",

@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Niet opgeslagen in Vault: de bestanden kunnen worden verwijderd. Je kunt hier geen bestanden meer toevoegen.",
     "upload.signIn": "Log in om je eigen bestanden te uploaden — alleen jij ziet ze.",
     "upload.folder": "Map uploaden",
+    "upload.defaultName": "Bestanden {{.Date}}",
     "upload.open": "Openen",
     "upload.uploading": "Je bestanden worden geüpload",
     "upload.offline": "Geen verbinding, opnieuw proberen…",

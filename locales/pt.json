@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Não salvo no Vault: os arquivos podem ser excluídos. Não é mais possível adicionar arquivos aqui.",
     "upload.signIn": "Entre na sua conta pra enviar seus próprios arquivos — só você vai ver.",
     "upload.folder": "Enviar uma pasta",
+    "upload.defaultName": "Arquivos {{.Date}}",
     "upload.open": "Abrir",
     "upload.uploading": "Enviando seus arquivos",
     "upload.offline": "Sem conexão, tentando novamente…",

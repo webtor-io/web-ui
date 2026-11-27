@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Non salvato nel Vault: i file possono essere eliminati. Non puoi più aggiungere file qui.",
     "upload.signIn": "Accedi per caricare i tuoi file: li vedrai solo tu.",
     "upload.folder": "Carica una cartella",
+    "upload.defaultName": "File {{.Date}}",
     "upload.open": "Apri",
     "upload.uploading": "Caricamento dei tuoi file",
     "upload.offline": "Nessuna connessione, nuovo tentativo…",

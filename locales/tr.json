@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Vault'a kaydedilmedi: dosyalar silinebilir. Buraya artık dosya eklenemez.",
     "upload.signIn": "Kendi dosyalarını yüklemek için giriş yap — onları yalnızca sen göreceksin.",
     "upload.folder": "Klasör yükle",
+    "upload.defaultName": "Dosyalar {{.Date}}",
     "upload.open": "Aç",
     "upload.uploading": "Dosyaların yükleniyor",
     "upload.offline": "Bağlantı yok, yeniden deneniyor…",

@@ -454,6 +454,8 @@
     "@upload.signIn": "One line over a 'Sign in' button (private.page.signIn), shown to a guest who drops their own files on the drop zone or presses 'Upload a folder': an invitation, not a refusal. Says what signing in gives — uploading one's own files, which only that user will see — and does not repeat 'Sign in' at the end.",
     "upload.folder": "Upload a folder",
     "@upload.folder": "Link in the row under the upload drop zone, first, before 'Try the demo' and 'Speed test': opens a folder picker to upload a whole folder of the user's own files. A verb phrase, about as short as its neighbours.",
+    "upload.defaultName": "Files {{.Date}}",
+    "@upload.defaultName": "The name given to a drop of several loose files (not one folder): the root folder of those files for good, the title of their page and their row in My files. Date is the date and time of the drop, already written the way your language writes them ('27.11.2026 14.05'). A plain noun for 'files' and the date, no other punctuation: it becomes a folder name.",
     "upload.open": "Open",
     "@upload.open": "Button in the upload's progress log to the upload's own page, opened in a new tab once its first file is stored. A verb: open the upload.",
     "upload.uploading": "Uploading your files",

@@ -141,8 +141,14 @@ scrolled into view.
 `<url>/<path>?token=…&api-key=…&offset=…&size=…` — browser →
 torrent-http-proxy → seeder. Path segments are NFC, `~` (the proxy's chain
 separator) becomes `～`, at most 255 bytes. A new upload's root is the one
-folder dropped, the one file's name without its extension, or
-`Upload <date> <time>`. What the seeder, or the proxy in front of it, answers:
+folder dropped, the one file's name without its extension, or, for loose
+files, `upload.defaultName` in the page's language: "Files 2026-11-27 14.05",
+"Файлы 27.11.2026 14.05" (`defaultName`). The date is the locale's
+(`Intl.DateTimeFormat`) with `-` for `/`, which would split the name into
+folders; English goes year first. The time has no `:`, which Windows refuses
+in a folder name. The name is taken once per drop: the token's `name` and the
+files' folder are the same. Uploads named before keep their names. What the
+seeder, or the proxy in front of it, answers:
 
 | Answer | The uploader |
 |---|---|

@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Nicht im Vault gespeichert: Die Dateien können gelöscht werden. Hier lassen sich keine Dateien mehr hinzufügen.",
     "upload.signIn": "Melde dich an, um eigene Dateien hochzuladen – nur du siehst sie.",
     "upload.folder": "Ordner hochladen",
+    "upload.defaultName": "Dateien {{.Date}}",
     "upload.open": "Öffnen",
     "upload.uploading": "Deine Dateien werden hochgeladen",
     "upload.offline": "Keine Verbindung, neuer Versuch…",

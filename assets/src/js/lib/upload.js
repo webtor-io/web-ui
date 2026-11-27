@@ -69,9 +69,22 @@ function pickedFolder(items) {
 
 const pad = (n) => String(n).padStart(2, '0');
 
+// defaultName names a drop of loose files in the page's language, "Files
+// 27.11.2026 14.05": the upload's root folder for good, its title and its
+// folder in WebDAV. The date is the locale's, with '-' for the '/' some
+// locales write, which would split the name into folders; English goes year
+// first, as month first reads wrong outside the US. No ':' in the time:
+// Windows refuses it in a folder name.
+export function defaultName(t, lang, now = new Date()) {
+    const date = lang === 'en'
+        ? `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+        : new Intl.DateTimeFormat(lang, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now).replaceAll('/', '-');
+    return fill(t('upload.defaultName'), { Date: `${date} ${pad(now.getHours())}.${pad(now.getMinutes())}` });
+}
+
 // rootName names a new upload: the folder dropped or picked, the one file
-// without its extension, or the time of the drop.
-export function rootName(items, now = new Date()) {
+// without its extension, or loose, the name of a drop of loose files.
+export function rootName(items, loose) {
     const folder = pickedFolder(items);
     if (folder) return folder;
     if (items.length === 1) {
@@ -80,7 +93,7 @@ export function rootName(items, now = new Date()) {
         const dot = name.lastIndexOf('.');
         return entry?.isDirectory || dot <= 0 ? name : name.slice(0, dot);
     }
-    return `Upload ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    return loose;
 }
 
 // nextName is the path with " (n)" added to, or counted up in, its last
@@ -235,6 +248,9 @@ export async function startUpload(log, items, opts = {}) {
         files = await listFiles(items);
         if (!files.length) return;
         ({ t } = await locale());
+        // Once: the token's name and the files' folder must not differ by
+        // a minute that turned meanwhile.
+        const root = rootName(items, defaultName(t, getLang()));
         const { initProgressLog } = await import('./progressLog');
         const queue = files.filter((f) => !f.error);
         total = queue.reduce((n, f) => n + f.file.size, 0);
@@ -388,7 +404,7 @@ export async function startUpload(log, items, opts = {}) {
         let prefix;
         if ((!opts.id && oneFolder) || resumes) prefix = '';
         else if (opts.dir) prefix = opts.dir.join('/');
-        else prefix = opts.id ? opts.name || rootName(items) : rootName(items);
+        else prefix = opts.id ? opts.name || root : root;
         for (const f of queue) f.path = (prefix ? prefix + '/' + f.rel : f.rel).split('/').map(safeSegment).join('/');
 
         let startTracked = false;
@@ -499,7 +515,7 @@ export async function startUpload(log, items, opts = {}) {
         };
 
         if (queue.length) {
-            const first = await ask(opts.id ? { id: opts.id, want: Math.max(1, total) } : { name: rootName(items), want: Math.max(1, total) });
+            const first = await ask(opts.id ? { id: opts.id, want: Math.max(1, total) } : { name: root, want: Math.max(1, total) });
             if (first.status === 200) tok = { ...first.json, sized: false };
             else refused(first, false);
             let next = 0;

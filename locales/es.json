@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Sin guardar en Vault: los archivos pueden eliminarse. Ya no puedes añadir archivos aquí.",
     "upload.signIn": "Inicia sesión para subir tus propios archivos: solo tú podrás verlos.",
     "upload.folder": "Subir una carpeta",
+    "upload.defaultName": "Archivos {{.Date}}",
     "upload.open": "Abrir",
     "upload.uploading": "Subiendo tus archivos",
     "upload.offline": "Sin conexión, reintentando…",

@@ -38,7 +38,8 @@ function useWindow(w) {
 }
 useWindow(newWindow());
 
-const { fill, safeSegment, rootName, nextName, sizeBucket, startUpload } = await import('./upload.js');
+const { fill, safeSegment, rootName, defaultName, nextName, sizeBucket, startUpload } = await import('./upload.js');
+const { makeI18n } = await import('./i18n.js');
 // The uploader's chunks, loaded once here: no test's first run waits for the
 // loader.
 await import('../../../../locales/en.json?prefix=upload');
@@ -334,14 +335,47 @@ test('safeSegment', () => {
 });
 
 test('rootName', () => {
-    const at = new Date(2026, 10, 18, 9, 5);
-    assert.equal(rootName([item(folder('Photos', { a: 1 }))], at), 'Photos');
-    assert.equal(rootName([item(fileEntry('/IMG_0001.JPG'))], at), 'IMG_0001');
-    assert.equal(rootName([item(fileEntry('/a')), item(fileEntry('/b'))], at), 'Upload 2026-11-18 09:05');
+    const loose = 'Files 2026-11-18 09.05';
+    assert.equal(rootName([item(folder('Photos', { a: 1 }))], loose), 'Photos');
+    assert.equal(rootName([item(fileEntry('/IMG_0001.JPG'))], loose), 'IMG_0001');
+    assert.equal(rootName([item(fileEntry('/a')), item(fileEntry('/b'))], loose), loose);
     // Upload a folder: files without entries, by their relative paths.
-    assert.equal(rootName([picked('Photos/a'), picked('Photos/s/b'), picked('Photos/c')], at), 'Photos');
-    assert.equal(rootName([picked('Photos/IMG.JPG')], at), 'Photos');
-    assert.equal(rootName([picked('Photos/a'), picked('Other/b')], at), 'Upload 2026-11-18 09:05');
+    assert.equal(rootName([picked('Photos/a'), picked('Photos/s/b'), picked('Photos/c')], loose), 'Photos');
+    assert.equal(rootName([picked('Photos/IMG.JPG')], loose), 'Photos');
+    assert.equal(rootName([picked('Photos/a'), picked('Other/b')], loose), loose);
+});
+
+// A drop of loose files is named in the page's language, by the locale's
+// date. It is the upload's root folder for good: no '/' (es, fr, it, pt and
+// zh write dates with one, and it would split the name into folders), no ':'
+// (Windows refuses it in a folder name), nothing left of the template.
+test('defaultName: the drop\'s time in the page\'s language, as a folder can be named', () => {
+    const at = new Date(2026, 10, 27, 14, 5);
+    const name = (lang) => {
+        const msgs = JSON.parse(readFileSync(new URL(`../../../../locales/${lang}.json`, import.meta.url), 'utf8'));
+        return defaultName(makeI18n(msgs).t, lang, at);
+    };
+    assert.equal(name('en'), 'Files 2026-11-27 14.05');
+    assert.equal(name('ru'), 'Файлы 27.11.2026 14.05');
+    for (const lang of ['en', 'ru', 'de', 'es', 'fr', 'it', 'nl', 'pl', 'pt', 'tr', 'cs', 'zh']) {
+        const n = name(lang);
+        assert.doesNotMatch(n, /[/\\:{}]/, `${lang}: ${n}`);
+        assert.match(n, /2026/, `${lang}: ${n}`);
+        assert.match(n, /\b27\b/, `${lang}: ${n}`);
+        assert.match(n, /14\.05$/, `${lang}: ${n}`);
+        assert.notEqual(n.trim().replace(/[\d. -]/g, ''), '', `${lang}: ${n} has no word`);
+    }
+});
+
+// Loose files go into one folder, the new upload's, named by defaultName;
+// the token asks for that same name. (Here t() answers with the key: no
+// locale bundle is loaded in a test.)
+test('loose files go into one folder named by defaultName', async (t) => {
+    const r = rig(t);
+    await r.run([asFile('a', 1), asFile('b', 2)]);
+    const name = defaultName((k) => k, 'en');
+    assert.deepEqual(r.calls.token[0], { name, want: 3 });
+    assert.deepEqual(r.calls.put.map((p) => p.path).sort(), [`${name}/a`, `${name}/b`]);
 });
 
 test('a picked folder keeps its name', async (t) => {

@@ -408,6 +408,7 @@
     "upload.state.unsaved": "Neuloženo ve Vaultu: soubory mohou být smazány. Přidávat sem soubory už nejde.",
     "upload.signIn": "Přihlas se a nahrávej vlastní soubory — uvidíš je jen ty.",
     "upload.folder": "Nahrát složku",
+    "upload.defaultName": "Soubory {{.Date}}",
     "upload.open": "Otevřít",
     "upload.uploading": "Nahráváme tvé soubory",
     "upload.offline": "Bez připojení, zkoušíme znovu…",
