@@ -5,11 +5,12 @@ export function TimeDisplay({ currentTime, duration }) {
     return (
         <div class="wt-player-time">
             <span>{formatTime(currentTime)}</span>
+            {/* One piece, so a narrow player drops it whole (player.css). */}
             {duration > 0 && (
-                <>
+                <span>
                     <span class="wt-player-time-sep"> / </span>
                     <span>{formatTime(duration)}</span>
-                </>
+                </span>
             )}
         </div>
     );
