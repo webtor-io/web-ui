@@ -1869,7 +1869,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Melde dich an",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Eigene Dateien hochladen geht nur mit Konto: Ein Upload öffnet sich nur für das Konto, das ihn hochgeladen hat.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Dateien oder Ordner hineinziehen",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Zieh sie in das Feld oben oder wähle sie aus. Wie viel Platz du für Uploads hast, steht unter dem Feld.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Zieh sie in das Feld oben oder wähle sie aus. Das Limit für Uploads steht im Feld, den belegten Platz siehst du im Profil.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Abspielen und herunterladen",
     "tool.privateCloudMediaServer.about.steps.step3.text": "Videos laufen im Browser, Dateien werden über HTTPS heruntergeladen – wie bei einem Torrent. Uploads sind temporär: Speichere einen im Vault, um ihn zu behalten.",
     "tool.privateCloudMediaServer.about.explained.title": "Was ist ein privater Cloud-Mediaserver?",

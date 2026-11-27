@@ -2014,7 +2014,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Sign in",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Uploading your own files needs an account: an upload opens only for the account that uploaded it.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Drop files or a folder",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Drop them on the field above or pick them. How much upload space you have is shown under the field.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Drop them on the field above or pick them. Your upload limit is shown in the field; the space you have used, in your profile.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Play and download",
     "tool.privateCloudMediaServer.about.steps.step3.text": "Video plays in the browser and files download over HTTPS, as with a torrent. Uploads are temporary: save one to Vault to keep it.",
     "tool.privateCloudMediaServer.about.explained.title": "What is a private cloud media server?",

@@ -1869,7 +1869,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Log in",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Voor het uploaden van eigen bestanden heb je een account nodig: een upload opent alleen voor het account dat hem heeft geüpload.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Sleep bestanden of een map",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Sleep ze naar het veld hierboven of kies ze. Hoeveel ruimte je voor uploads hebt, staat onder het veld.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Sleep ze naar het veld hierboven of kies ze. De limiet voor uploads staat in het veld, de gebruikte ruimte in je profiel.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Afspelen en downloaden",
     "tool.privateCloudMediaServer.about.steps.step3.text": "Video speelt af in de browser en bestanden download je via HTTPS, net als bij een torrent. Uploads zijn tijdelijk: sla er een op in Vault om hem te bewaren.",
     "tool.privateCloudMediaServer.about.explained.title": "Wat is een privé-mediaserver in de cloud?",

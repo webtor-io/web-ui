@@ -1873,7 +1873,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Connectez-vous",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Téléverser vos propres fichiers nécessite un compte : un téléversement ne s'ouvre que pour le compte qui l'a téléversé.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Déposez des fichiers ou un dossier",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Déposez-les dans le champ ci-dessus ou choisissez-les. L'espace dont vous disposez pour vos téléversements est indiqué sous le champ.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Déposez-les dans le champ ci-dessus ou choisissez-les. La limite de vos téléversements est indiquée dans le champ, l'espace utilisé dans votre profil.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Lisez et téléchargez",
     "tool.privateCloudMediaServer.about.steps.step3.text": "La vidéo se lit dans le navigateur et les fichiers se téléchargent en HTTPS, comme pour un torrent. Les téléversements sont temporaires : enregistrez-en un dans Vault pour le garder.",
     "tool.privateCloudMediaServer.about.explained.title": "Qu'est-ce qu'un serveur multimédia privé dans le cloud ?",

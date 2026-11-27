@@ -1869,7 +1869,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Giriş yapın",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Kendi dosyalarınızı yüklemek için bir hesap gerekir: bir yüklemeyi yalnızca onu yükleyen hesap açabilir.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Dosyaları veya bir klasörü bırakın",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Onları yukarıdaki alana bırakın veya seçin. Yüklemeler için ne kadar alanınız olduğu alanın altında yazar.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Onları yukarıdaki alana bırakın veya seçin. Yükleme sınırı alanda, kullandığınız alan ise profilinizde yazar.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Oynatın ve indirin",
     "tool.privateCloudMediaServer.about.steps.step3.text": "Video tarayıcıda oynar, dosyalar HTTPS üzerinden iner — tıpkı bir torrentte olduğu gibi. Yüklemeler geçicidir: saklamak için bir yüklemeyi Vault'a kaydedin.",
     "tool.privateCloudMediaServer.about.explained.title": "Özel bulut medya sunucusu nedir?",

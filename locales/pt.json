@@ -1873,7 +1873,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Entre",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Enviar seus próprios arquivos exige uma conta: um envio só abre para a conta que o enviou.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Solte arquivos ou uma pasta",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Solte-os no campo acima ou escolha-os. O espaço que você tem para envios aparece abaixo do campo.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Solte-os no campo acima ou escolha-os. O limite para envios aparece no campo; o espaço usado, no seu perfil.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Reproduza e baixe",
     "tool.privateCloudMediaServer.about.steps.step3.text": "O vídeo é reproduzido no navegador e os arquivos são baixados por HTTPS, como em um torrent. Os envios são temporários: salve um no Vault para guardá-lo.",
     "tool.privateCloudMediaServer.about.explained.title": "O que é um servidor de mídia privado na nuvem?",

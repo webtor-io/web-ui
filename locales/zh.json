@@ -1854,7 +1854,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "登录",
     "tool.privateCloudMediaServer.about.steps.step1.text": "上传自己的文件需要账号：上传内容只对上传它的账号开放。",
     "tool.privateCloudMediaServer.about.steps.step2.title": "拖入文件或文件夹",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "把它们拖到上方的区域，或点击选择。你有多少上传空间，显示在该区域下方。",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "把它们拖到上方的区域，或点击选择。上传上限显示在该区域内，已用空间显示在个人设置中。",
     "tool.privateCloudMediaServer.about.steps.step3.title": "播放和下载",
     "tool.privateCloudMediaServer.about.steps.step3.text": "视频在浏览器中播放，文件通过 HTTPS 下载，和种子一样。上传是临时的：想保留就把它保存到 Vault。",
     "tool.privateCloudMediaServer.about.explained.title": "什么是私人云媒体服务器？",

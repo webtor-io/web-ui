@@ -299,7 +299,7 @@ var Tools = []Tool{
 	// Uploading one's own files. No CTA under the steps: the drop zone in the
 	// hero is the call to action. No numbers in the copy: the cap depends on
 	// the plan (and is the same for everyone without a claims provider), so
-	// the size badge and the "used" line under the drop zone state it.
+	// the size badge in the drop zone states it, and the profile the space used.
 	{Url: "private-cloud-media-server", Title: "tool.privateCloudMediaServer.title", Benefit: "tool.privateCloudMediaServer.benefit",
 		Description: "tool.privateCloudMediaServer.description", Uploads: true, Sections: []AboutSection{
 			{Kind: AboutSteps, Key: "steps", Badge: "howItWorks", Accent: "pink"},

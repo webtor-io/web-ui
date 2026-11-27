@@ -1899,7 +1899,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Zaloguj się",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Przesyłanie własnych plików wymaga konta: przesłane pliki otwiera tylko konto, które je przesłało.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Upuść pliki lub folder",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Upuść je w polu powyżej albo je wybierz. Ile miejsca na przesłane pliki masz, widać pod polem.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Upuść je w polu powyżej albo je wybierz. Limit przesyłania widać w polu, a zajęte miejsce — w profilu.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Odtwarzaj i pobieraj",
     "tool.privateCloudMediaServer.about.steps.step3.text": "Wideo odtwarza się w przeglądarce, a pliki pobierasz przez HTTPS — tak jak z torrenta. Przesłane pliki są tymczasowe: aby je zachować, zapisz je w Vault.",
     "tool.privateCloudMediaServer.about.explained.title": "Czym jest prywatny serwer multimediów w chmurze?",

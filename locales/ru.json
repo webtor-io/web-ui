@@ -1899,7 +1899,7 @@
     "tool.privateCloudMediaServer.about.steps.step1.title": "Войдите",
     "tool.privateCloudMediaServer.about.steps.step1.text": "Загружать свои файлы могут только вошедшие: загрузку открывает только аккаунт, который её загрузил.",
     "tool.privateCloudMediaServer.about.steps.step2.title": "Перетащите файлы или папку",
-    "tool.privateCloudMediaServer.about.steps.step2.text": "Перетащите их в поле выше или выберите. Сколько места для загрузок у вас есть, написано под полем.",
+    "tool.privateCloudMediaServer.about.steps.step2.text": "Перетащите их в поле выше или выберите. Лимит для загрузок указан в поле, занятое место — в профиле.",
     "tool.privateCloudMediaServer.about.steps.step3.title": "Смотрите и скачивайте",
     "tool.privateCloudMediaServer.about.steps.step3.text": "Видео играет в браузере, файлы скачиваются по HTTPS — как у торрента. Загрузки временные: чтобы оставить загрузку, сохраните её в Vault.",
     "tool.privateCloudMediaServer.about.explained.title": "Что такое личный облачный медиасервер?",
