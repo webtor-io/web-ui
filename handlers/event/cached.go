@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/services/uploads"
 )
 
@@ -92,22 +93,31 @@ func (h *Handler) uncached(ci cacheIndexer, msg []byte) error {
 	return nil
 }
 
-// uploadEvicted: the cleaner dropped a whole directory. If it was an unsaved
-// upload's, what web-ui derived from its files goes with it (uploads.Forget) —
-// the watch history and the user subtitle bindings too: the cleaner removed
-// the directory itself, so this "gone" is certain, unlike one inferred from a
-// rest-api answer. Best effort: the event is acknowledged whatever happens
-// here, so that cache events never wait for S3; a quota check and the owner's
-// page erase the enrichment rows and the pictures this missed, "Delete
-// upload" — the rest.
+// uploadEvicted: the cleaner dropped a whole directory. If it was an upload's,
+// its row in My files is marked gone now rather than at its owner's next
+// token (models.MarkUploadEvicted), and, if it was unsaved, what web-ui
+// derived from its files goes with it (uploads.Forget) — the watch history
+// and the user subtitle bindings too: the cleaner removed the directory
+// itself, so this "gone" is certain, unlike one inferred from a rest-api
+// answer. Best effort: the event is acknowledged whatever happens here, so
+// that cache events never wait for S3; a quota check and the owner's page
+// write the mark and erase the enrichment rows and the pictures this missed,
+// "Delete upload" — the rest.
 func (h *Handler) uploadEvicted(msg []byte) {
 	m, ok := parseResourceCacheMsg(msg)
-	if !ok || m.FileIdx != nil {
+	// Owned first: most evictions are torrents', and those ask nothing.
+	if !ok || m.FileIdx != nil || !uploads.Owned(m.ResourceID) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cacheEventTimeout)
 	defer cancel()
-	if err := uploads.Forget(ctx, h.pg.Get(), h.thumb, m.ResourceID, true); err != nil {
+	db := h.pg.Get()
+	if db != nil {
+		if err := models.MarkUploadEvicted(ctx, db, m.ResourceID); err != nil {
+			log.WithError(err).WithField("infohash", m.ResourceID).Warn("failed to mark an evicted upload gone")
+		}
+	}
+	if err := uploads.Forget(ctx, db, h.thumb, m.ResourceID, true); err != nil {
 		log.WithError(err).WithField("infohash", m.ResourceID).Warn("failed to forget an evicted upload")
 	}
 }

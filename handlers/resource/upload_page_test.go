@@ -698,12 +698,17 @@ func rowsOf(t *testing.T, db *pg.DB, id string, tables ...string) map[string]int
 // home page's 404, and the page erases what can come back -- its enrichment
 // and pictures -- but not the owner's watch history or subtitle bindings:
 // rest-api's 404 or no_record may be wrong while the upload's home node is
-// away. Nobody else sets that off.
+// away. It marks the upload gone too, as a quota check would on the same
+// answer, so that its row in My files no longer looks live. Nobody else sets
+// that off.
 func TestUploadGonePage(t *testing.T) {
 	db := pgtest.Start(t)
 	pgCS := pgtest.CS(t, db)
 	ctx := context.Background()
 	owner, stranger := newUploadPageUser(t, db), newUploadPageUser(t, db)
+	if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id) VALUES (?, ?)`, owner, uploadU); err != nil {
+		t.Fatal(err)
+	}
 	for _, id := range []string{uploadU, torrentT} {
 		if err := models.CreateUpload(ctx, db, owner, id, "n"); err != nil {
 			t.Fatal(err)
@@ -753,6 +758,9 @@ func TestUploadGonePage(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			seedTraces(t, db, c.id)
+			if _, err := db.Exec(`UPDATE upload_reserve SET gone_at = NULL`); err != nil {
+				t.Fatal(err)
+			}
 			srv, answer := privateRestAPI(t, c.id)
 			answer(c.status, c.body)
 			var user *models.User
@@ -780,6 +788,13 @@ func TestUploadGonePage(t *testing.T) {
 						t.Errorf("%s: no rows, want the owner's kept", table)
 					}
 				}
+			}
+			var gone bool
+			if _, err := db.QueryOne(pg.Scan(&gone), `SELECT gone_at IS NOT NULL FROM upload_reserve WHERE user_id = ? AND resource_id = ?`, owner, uploadU); err != nil {
+				t.Fatal(err)
+			}
+			if gone != c.erased {
+				t.Errorf("the owner's upload marked gone %v, want %v", gone, c.erased)
 			}
 			var wantCalls []string
 			if c.erased {

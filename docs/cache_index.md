@@ -62,13 +62,15 @@ a database error is returned, so the message is NAKed and comes again.
 
 `resource.uncached` without `file_idx` for an upload's ID is also the cleaner
 evicting the upload's whole directory. After the index rows, the handler
-erases what web-ui derived from the upload's files — enrichment rows,
+marks the upload gone, so its row in My files dims at once
+(`models.MarkUploadEvicted`: not while its write token lives, not when
+pledged in Vault), and erases what web-ui derived from the upload's files — enrichment rows,
 pictures, and, since the cleaner removed the directory itself, the watch
 history and the user subtitle bindings too (`uploads.Forget` with `certain`
 true; an upload saved to Vault is left alone). Best effort: it is logged and
 the event is acknowledged whatever happens, so cache events never wait for
-S3. What it misses, a quota check and the owner's gone page erase later
-(without the user's own rows), and "Delete all" erases the rest. See
+S3. What it misses, a quota check and the owner's gone page mark and erase
+later (without the user's own rows), and "Delete all" erases the rest. See
 `docs/uploads.md`.
 
 Unlike the other subscriptions these two **may fail to bind** without taking

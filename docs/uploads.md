@@ -253,8 +253,8 @@ reads. On success the viewer goes back to the page the form was on with
 |---|---|---|
 | the owner deletes it | `POST /upload/delete` | its Vault copy, its files, its pictures, every row (`PurgeResourceByID`); `upload_reserve` stays, marked gone |
 | a DMCA ban | NATS `resource.banned` (`handlers/event/banned.go`) | its files, its pictures, every row; retried every 30 s until all succeed (`docs/adult_classification.md`) |
-| the cleaner evicts it | NATS `resource.uncached` without `file_idx` (`docs/cache_index.md`) | `uploads.Forget`, `certain` true: enrichment rows, pictures, watch history, user subtitle bindings |
-| a quota check or the owner's page finds it gone | `Service.Quota`, `handlers/resource/get.go` `forgetGone` | `uploads.Forget`, `certain` false: enrichment rows and pictures only |
+| the cleaner evicts it | NATS `resource.uncached` without `file_idx` (`docs/cache_index.md`) | marks it gone (`models.MarkUploadEvicted`); `uploads.Forget`, `certain` true: enrichment rows, pictures, watch history, user subtitle bindings |
+| a quota check or the owner's page finds it gone | `Service.Quota`, `handlers/resource/get.go` `forgetGone` | marks it gone; `uploads.Forget`, `certain` false: enrichment rows and pictures only |
 | its files changed | the owner's page | the stale enrichment and the pictures |
 | the account is deleted | `handlers/profile` (`Service.ForgetUser`), before the account row | all of the `certain` set, for every upload the account was ever given a token for, saved or not |
 
@@ -283,13 +283,21 @@ Its bulk bar deletes (`/upload/delete`) and says so, "Delete"
 An upload marked gone (`upload_reserve.gone_at`, `models.UploadGoneIDs`) is
 dimmed, says "Removed from storage" (`library.uploads.gone`) where its size
 was, and has no link: its page would only say the files are gone. Select mode
-still deletes it. The mark is written only by a token request's live check
-(above), so a row goes dim at its owner's next upload, "Add files" or file
-delete after the cleaner removed the files, not when they went; until then it
-looks live and opens the `upload.gone` page. Nor is the mark ever taken back
-but by the upload's page answering again (`AddUploadToLibrary`) or a new token
-for it, and a dimmed row links to neither: a gone wrongly inferred while the
-upload's home node was away stays dim.
+still deletes it. Three things write the mark, each only on a row a quota
+check would ask about (its token over plus the grace, not pledged in Vault):
+
+- the cleaner's event about the upload's directory, seconds after it removed
+  it (`docs/cache_index.md`) — the usual way, and a certain one;
+- the owner's page answering `upload.gone`, on rest-api's 404 or `no_record`;
+- a token request's live check (above), on the same answers.
+
+The last two catch what the event missed: an event lost on the way (the
+cleaner publishes it once, without JetStream's acknowledgement), a home node
+that died with its disk and said nothing, an eviction while the token still
+lived. The mark is taken back only by the upload's page answering again
+(`AddUploadToLibrary`) or a new token for it, and a dimmed row links to
+neither: a gone wrongly inferred while the upload's home node was away stays
+dim until the page is opened by its URL.
 
 "Remove from library" does not take an upload out: it is deleted as a whole,
 or its files, Vault copy and quota would be left with no link to them. The site

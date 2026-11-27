@@ -479,7 +479,7 @@ func (s *Handler) get(c *gin.Context) {
 	var pe *api.PrivateError
 	if errors.As(err, &pe) && pe.Status == http.StatusForbidden {
 		if pe.Reason == api.ReasonNoRecord && s.uploadGone(ctx, args) {
-			s.forgetGone(ctx, args.ID)
+			s.forgetGone(ctx, args)
 			s.notFound(c, web.NewUserError("upload.gone", pe))
 			return
 		}
@@ -493,7 +493,7 @@ func (s *Handler) get(c *gin.Context) {
 	}
 	if d == nil {
 		if s.uploadGone(ctx, args) {
-			s.forgetGone(ctx, args.ID)
+			s.forgetGone(ctx, args)
 			s.notFound(c, web.NewUserError("upload.gone", errors.New("upload gone")))
 			return
 		}
@@ -632,14 +632,23 @@ func (s *Handler) uploadGone(ctx context.Context, args *GetArgs) bool {
 	return lib != nil
 }
 
-// forgetGone erases what web-ui derived from the owner's upload that is gone:
-// its enrichment and pictures, which the next page view brings back if the
-// upload is there after all. Not the watch history or the subtitle bindings:
-// rest-api's 404 or no_record is wrong while the upload's home node is away.
+// forgetGone marks the owner's upload that is gone as gone, so that its row
+// in My files dims as the page says, and erases what web-ui derived from it:
+// its enrichment and pictures. The next page view that rest-api answers
+// clears the mark and brings those back if the upload is there after all.
+// Not the watch history or the subtitle bindings: rest-api's 404 or
+// no_record is wrong while the upload's home node is away. The mark is the
+// one a quota check writes on the same answers (models.MarkOwnUploadGone).
 // The page renders whatever this does.
-func (s *Handler) forgetGone(ctx context.Context, id string) {
-	if err := uploads.Forget(ctx, s.pg.Get(), s.pics, id, false); err != nil {
-		log.WithError(err).WithField("resource_id", id).Warn("failed to forget an upload that is gone")
+func (s *Handler) forgetGone(ctx context.Context, args *GetArgs) {
+	db := s.pg.Get()
+	if db != nil {
+		if err := models.MarkOwnUploadGone(ctx, db, args.User.ID, args.ID); err != nil {
+			log.WithError(err).WithField("resource_id", args.ID).Warn("failed to mark an upload gone")
+		}
+	}
+	if err := uploads.Forget(ctx, db, s.pics, args.ID, false); err != nil {
+		log.WithError(err).WithField("resource_id", args.ID).Warn("failed to forget an upload that is gone")
 	}
 }
 

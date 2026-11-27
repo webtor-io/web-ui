@@ -22,10 +22,17 @@ type UploadReserve struct {
 	GoneAt        *time.Time `pg:"gone_at"`
 }
 
+// uploadReserveUnpledged: the upload is not pledged in Vault, which VP pay
+// for and which keeps it past its directory.
+const uploadReserveUnpledged = `NOT EXISTS (SELECT 1 FROM vault.pledge p WHERE p.resource_id = r.resource_id AND p.user_id = r.user_id)`
+
 // uploadReserveCounted is the account's rows its quota may count: all but
-// the excepted ID and the uploads pledged in Vault, which VP pay for.
-const uploadReserveCounted = `r.user_id = ? AND r.resource_id <> ?
-  AND NOT EXISTS (SELECT 1 FROM vault.pledge p WHERE p.resource_id = r.resource_id AND p.user_id = r.user_id)`
+// the excepted ID and the uploads pledged in Vault.
+const uploadReserveCounted = `r.user_id = ? AND r.resource_id <> ? AND ` + uploadReserveUnpledged
+
+// uploadReserveIdle: the row's token is over, or it never had one, so no
+// write can bring the upload's files back.
+const uploadReserveIdle = `(r.write_until IS NULL OR r.write_until + interval '5 minutes' <= now())`
 
 // UploadUsed is the account's quota use without exceptID. A row weighs its
 // reserved_bytes while its token is alive (write_until plus five minutes)
@@ -61,7 +68,7 @@ func UploadCheckCandidates(ctx context.Context, db pg.DBI, userID uuid.UUID, exc
 	_, err := db.QueryContext(ctx, &rows, `SELECT r.* FROM upload_reserve r
 WHERE `+uploadReserveCounted+`
   AND r.gone_at IS NULL
-  AND (r.write_until IS NULL OR r.write_until + interval '5 minutes' <= now())
+  AND `+uploadReserveIdle+`
 ORDER BY random()`, userID, exceptID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list upload reserves to check")
@@ -82,6 +89,27 @@ WHERE user_id = ? AND resource_id = ? AND write_until IS NOT DISTINCT FROM ?`, r
 func MarkUploadGone(ctx context.Context, db pg.DBI, r *UploadReserve) error {
 	_, err := db.ExecContext(ctx, `UPDATE upload_reserve SET gone_at = now()
 WHERE user_id = ? AND resource_id = ? AND write_until IS NOT DISTINCT FROM ?`, r.UserID, r.ResourceID, r.WriteUntil)
+	return errors.Wrap(err, "failed to mark upload gone")
+}
+
+// MarkUploadEvicted marks id gone once the cleaner removed its directory:
+// the rows a quota check would ask about, of any account (only the owner
+// ever holds one).
+//
+// ponytail: it scans upload_reserve, whose key leads with user_id; an index
+// on resource_id when the table outgrows a scan.
+func MarkUploadEvicted(ctx context.Context, db pg.DBI, id string) error {
+	_, err := db.ExecContext(ctx, `UPDATE upload_reserve r SET gone_at = now()
+WHERE r.resource_id = ? AND r.gone_at IS NULL AND `+uploadReserveUnpledged+` AND `+uploadReserveIdle, id)
+	return errors.Wrap(err, "failed to mark an evicted upload gone")
+}
+
+// MarkOwnUploadGone marks the account's upload id gone once rest-api answered
+// its page that it does not have it: the inference a quota check makes, on
+// the rows it would ask about.
+func MarkOwnUploadGone(ctx context.Context, db pg.DBI, userID uuid.UUID, id string) error {
+	_, err := db.ExecContext(ctx, `UPDATE upload_reserve r SET gone_at = now()
+WHERE r.user_id = ? AND r.resource_id = ? AND r.gone_at IS NULL AND `+uploadReserveUnpledged+` AND `+uploadReserveIdle, userID, id)
 	return errors.Wrap(err, "failed to mark upload gone")
 }
 
@@ -120,8 +148,9 @@ func UploadReserveIDs(ctx context.Context, db pg.DBI, userID uuid.UUID) ([]strin
 	return ids, nil
 }
 
-// UploadGoneIDs are the account's uploads marked gone: a quota check found
-// rest-api without them, or their owner deleted them.
+// UploadGoneIDs are the account's uploads marked gone: the cleaner removed
+// them, a quota check or their page found rest-api without them, or their
+// owner deleted them.
 func UploadGoneIDs(ctx context.Context, db pg.DBI, userID uuid.UUID) ([]string, error) {
 	var ids []string
 	err := db.ModelContext(ctx, (*UploadReserve)(nil)).

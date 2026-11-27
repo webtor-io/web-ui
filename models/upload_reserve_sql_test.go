@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -152,4 +153,100 @@ func TestAdvisoryXactLockSerializes(t *testing.T) {
 			t.Errorf("the second took its lock at %v, after the first released another at %v", t2, t1)
 		}
 	})
+}
+
+// An upload the cleaner removed, or the owner's page found gone, is marked
+// gone the way a quota check would mark it: only while its token can bring
+// no files back (over, plus the grace) and only when Vault does not keep it.
+func TestMarkUploadGoneLikeACheck(t *testing.T) {
+	db := pgtest.Start(t)
+	ctx := context.Background()
+	u, other := createUploadTestUser(t, db), createUploadTestUser(t, db)
+	id := func(i int) string { return UploadPrefix + fmt.Sprintf("0%027x", i) }
+	marked := func(t *testing.T, user uuid.UUID, id string) bool {
+		t.Helper()
+		var gone *time.Time
+		if _, err := db.QueryOne(pg.Scan(&gone), `SELECT gone_at FROM upload_reserve WHERE user_id = ? AND resource_id = ?`, user, id); err != nil {
+			t.Fatal(err)
+		}
+		return gone != nil
+	}
+	for i, c := range []struct {
+		name       string
+		writeUntil string
+		pledged    bool
+		want       bool
+	}{
+		{"no token", "NULL", false, true},
+		{"token over", "now() - interval '6 minutes'", false, true},
+		{"token in its grace", "now() - interval '4 minutes'", false, false},
+		{"token alive", "now() + interval '10 minutes'", false, false},
+		{"pledged", "NULL", true, false},
+	} {
+		for j, by := range []string{"evicted", "own"} {
+			t.Run(c.name+", "+by, func(t *testing.T) {
+				id := id(2*i + j)
+				if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id, write_until) VALUES (?, ?, `+c.writeUntil+`)`, u, id); err != nil {
+					t.Fatal(err)
+				}
+				if c.pledged {
+					for _, q := range []string{
+						`INSERT INTO vault.resource (resource_id, required_vp, funded_vp, name) VALUES (?0, 1, 1, 'n')`,
+						`INSERT INTO vault.pledge (resource_id, user_id, amount) VALUES (?0, ?1, 1)`,
+					} {
+						if _, err := db.Exec(q, id, u); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				var err error
+				if by == "evicted" {
+					err = MarkUploadEvicted(ctx, db, id)
+				} else {
+					err = MarkOwnUploadGone(ctx, db, u, id)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := marked(t, u, id); got != c.want {
+					t.Errorf("marked %v, want %v", got, c.want)
+				}
+			})
+		}
+	}
+
+	// A mark already there keeps its time: the export shows when it went.
+	for j, mark := range []func(string) error{
+		func(id string) error { return MarkUploadEvicted(ctx, db, id) },
+		func(id string) error { return MarkOwnUploadGone(ctx, db, u, id) },
+	} {
+		id := id(100 + j)
+		if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id, gone_at) VALUES (?, ?, '2020-01-01Z')`, u, id); err != nil {
+			t.Fatal(err)
+		}
+		if err := mark(id); err != nil {
+			t.Fatal(err)
+		}
+		var moved bool
+		if _, err := db.QueryOne(pg.Scan(&moved), `SELECT gone_at <> '2020-01-01Z' FROM upload_reserve WHERE user_id = ? AND resource_id = ?`, u, id); err != nil {
+			t.Fatal(err)
+		}
+		if moved {
+			t.Errorf("mark %d moved an earlier gone_at", j)
+		}
+	}
+
+	// The page knows only its viewer: another account's row of the ID stays.
+	const shared = testUploadID
+	for _, user := range []uuid.UUID{u, other} {
+		if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id) VALUES (?, ?)`, user, shared); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := MarkOwnUploadGone(ctx, db, u, shared); err != nil {
+		t.Fatal(err)
+	}
+	if !marked(t, u, shared) || marked(t, other, shared) {
+		t.Errorf("marked the viewer's %v and the other account's %v, want only the viewer's", marked(t, u, shared), marked(t, other, shared))
+	}
 }

@@ -156,3 +156,42 @@ func TestUploadEvicted(t *testing.T) {
 }
 
 func ptr(b bool) *bool { return &b }
+
+// The cleaner's event about a whole directory is the certain "gone": the
+// upload's row in My files dims at once, not at its owner's next token. The
+// rows a quota check would not ask about are models'; here only who sends it.
+func TestUploadEvictedMarksGone(t *testing.T) {
+	db := pgtest.Start(t)
+	h := &Handler{pg: pgtest.CS(t, db)}
+	var u uuid.UUID
+	if _, err := db.QueryOne(pg.Scan(&u), `INSERT INTO "user" (email) VALUES (?) RETURNING user_id`, uuid.NewV4().String()+"@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name, id, msg string
+		want          bool
+	}{
+		{"evicted", upload0, `{"resource_id":"` + upload0 + `"}`, true},
+		{"one file", upload0, `{"resource_id":"` + upload0 + `","file_idx":3}`, false},
+		// No reserve row ever names a torrent; one does here, so that a
+		// torrent's eviction, the cleaner's everyday, is seen to ask nothing.
+		{"torrent", torrent, `{"resource_id":"` + torrent + `"}`, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id) VALUES (?, ?)
+ON CONFLICT (user_id, resource_id) DO UPDATE SET gone_at = NULL`, u, c.id); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.uncached(&fakeIndex{}, []byte(c.msg)); err != nil {
+				t.Fatal(err)
+			}
+			var gone bool
+			if _, err := db.QueryOne(pg.Scan(&gone), `SELECT gone_at IS NOT NULL FROM upload_reserve WHERE user_id = ? AND resource_id = ?`, u, c.id); err != nil {
+				t.Fatal(err)
+			}
+			if gone != c.want {
+				t.Errorf("marked gone %v, want %v", gone, c.want)
+			}
+		})
+	}
+}
