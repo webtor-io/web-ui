@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	uuid "github.com/satori/go.uuid"
+
 	hc "github.com/webtor-io/web-ui/handlers/common"
+	"github.com/webtor-io/web-ui/services/auth"
 )
 
 func renderHeading(t *testing.T, tpl *template.Template, tool *hc.Tool) string {
@@ -129,6 +132,8 @@ func aboutPageFuncs() template.FuncMap {
 	funcs["blogLang"] = func(lang string) string { return lang }
 	funcs["tools"] = func() []hc.Tool { return hc.Tools }
 	funcs["apiDocsURL"] = func() string { return "" }
+	// web.Helper.HasAuth; a context without a user is a guest's here.
+	funcs["hasAuth"] = func(u *auth.User) bool { return u != nil && u.HasAuth() }
 	return funcs
 }
 
@@ -354,5 +359,50 @@ func TestUploadsPageHasNoTorrentBlocks(t *testing.T) {
 	}
 	if own == 0 {
 		t.Fatal("no tool is marked Uploads — the test ran against nothing")
+	}
+}
+
+// The closing line on the page about one's own files asks a guest to sign in
+// and drop files; a signed-in user is only told where to drop them. The other
+// pages say the same to both.
+func TestOwnFilesCTATellsOnlyAGuestToSignIn(t *testing.T) {
+	tpl := aboutPageTemplates(t)
+	for _, tc := range []struct {
+		page     string
+		signedIn bool
+		want     string
+	}{
+		{"private-cloud-media-server", false, "about.cta.ownFiles"},
+		{"private-cloud-media-server", true, "about.cta.dropFiles"},
+		{"magnet-to-torrent", false, "about.cta.subtitle"},
+		{"magnet-to-torrent", true, "about.cta.subtitle"},
+	} {
+		t.Run(fmt.Sprintf("%s, signed in %v", tc.page, tc.signedIn), func(t *testing.T) {
+			tool := hc.ToolByURL(tc.page)
+			if tool == nil {
+				t.Fatalf("no page %s", tc.page)
+			}
+			user := &auth.User{}
+			if tc.signedIn {
+				user.ID = uuid.NewV4()
+			}
+			var buf bytes.Buffer
+			if err := tpl.ExecuteTemplate(&buf, "about", map[string]interface{}{
+				"Lang": "en", "User": user,
+				"Data": map[string]interface{}{"Tool": tool, "Instruction": tool.Url},
+			}); err != nil {
+				t.Fatalf("render about: %v", err)
+			}
+			i := strings.Index(buf.String(), "about.cta.title")
+			if i < 0 {
+				t.Fatal("no CTA")
+			}
+			cta := buf.String()[i:]
+			for _, k := range []string{"about.cta.ownFiles", "about.cta.dropFiles", "about.cta.subtitle"} {
+				if got := strings.Contains(cta, k); got != (k == tc.want) {
+					t.Errorf("%s rendered: %v, want %v", k, got, k == tc.want)
+				}
+			}
+		})
 	}
 }

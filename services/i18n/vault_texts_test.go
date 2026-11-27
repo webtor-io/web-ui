@@ -62,7 +62,7 @@ func TestPrivateCloudMediaServerSaysNoTorrent(t *testing.T) {
 func TestOwnFilesFrameSaysNoTorrent(t *testing.T) {
 	keys := []string{"home.dropzoneOwnFiles", "home.dropzoneUploadsHint", "home.sizeLimitOwnFiles",
 		"home.sizeLimitOwnFilesUpsell", "upload.folder", "tool.related.more",
-		"about.cta.title", "about.cta.ownFiles", "about.cta.button"}
+		"about.cta.title", "about.cta.ownFiles", "about.cta.dropFiles", "about.cta.button"}
 	torrent := regexp.MustCompile(`(?i)torrent|торрент|种子`)
 	locales := localeFiles(t)
 	if len(locales) != 12 {

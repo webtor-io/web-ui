@@ -508,7 +508,8 @@
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] cta-glow pointer-events-none"></div>
     <h2 class="relative z-10 text-[clamp(2rem,4vw,2.8rem)] font-extrabold tracking-tight mb-4">{{ t $.Lang "about.cta.title" }}</h2>
     {{ if $ownFiles }}
-    <p class="relative z-10 text-w-sub max-w-[500px] mx-auto mb-9">{{ t $.Lang "about.cta.ownFiles" }}</p>
+    {{/* Uploading takes an account: a guest is asked to sign in first. */}}
+    <p class="relative z-10 text-w-sub max-w-[500px] mx-auto mb-9">{{ if $.User | hasAuth }}{{ t $.Lang "about.cta.dropFiles" }}{{ else }}{{ t $.Lang "about.cta.ownFiles" }}{{ end }}</p>
     <a href="#" onclick="document.querySelector('.dropzone').scrollIntoView({behavior:'smooth',block:'center'});return false;" class="btn btn-lg btn-pink relative z-10 gap-2 px-9">
     {{ else }}
     <p class="relative z-10 text-w-sub max-w-[500px] mx-auto mb-9">{{ t $.Lang "about.cta.subtitle" }}</p>

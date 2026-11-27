@@ -155,6 +155,7 @@
     "about.cta.title": "Pronto a provare?",
     "about.cta.subtitle": "Nessuna registrazione. Incolla un link magnet e inizia lo streaming in pochi secondi.",
     "about.cta.ownFiles": "Accedi e trascina i tuoi file nel campo in cima alla pagina.",
+    "about.cta.dropFiles": "Trascina i tuoi file nel campo in cima alla pagina.",
     "about.cta.button": "Avvia Webtor",
     "auth.login.title": "Accedi",
     "auth.login.subtitle": "Scegli un metodo per accedere al tuo account",
