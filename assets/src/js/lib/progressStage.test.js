@@ -216,7 +216,12 @@ test('a redirect to the page itself makes no history entry', () => {
     };
     assert.equal(go('/ru/9c5db5752b7c0123456789abcdef0123456789ab', '/ru/9c5db5752b7c0123456789abcdef0123456789ab').getAttribute('data-async-push-state'), 'false');
     assert.equal(go('/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2FA', '/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2FA').getAttribute('data-async-push-state'), 'false');
-    assert.equal(go('/ru/', '/ru/9c5db5752b7c0123456789abcdef0123456789ab').hasAttribute('data-async-push-state'), false);
+    // A folder's link and crumb, as html/template writes them, escape in
+    // lower case; the uploader's redirect (encodeURIComponent) in upper.
+    assert.equal(go('/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2fA%2fB', '/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2FA%2FB').getAttribute('data-async-push-state'), 'false');
+    assert.equal(go('/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2f%d0%a4', '/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=' + encodeURIComponent('/Ф')).getAttribute('data-async-push-state'), 'false');
+    assert.equal(go('/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2fA%2fB', '/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2FA%2FC').hasAttribute('data-async-push-state'), false);
+    assert.equal(go('/ru/','/ru/9c5db5752b7c0123456789abcdef0123456789ab').hasAttribute('data-async-push-state'), false);
     assert.equal(go('/ru/9c5db5752b7c0123456789abcdef0123456789ab', '/ru/9c5db5752b7c0123456789abcdef0123456789ab?pwd=%2FA%2FB').hasAttribute('data-async-push-state'), false);
     dom.reconfigure({ url: 'https://webtor.io/' });
 });

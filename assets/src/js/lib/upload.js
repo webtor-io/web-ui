@@ -563,7 +563,12 @@ export async function startUpload(log, items, opts = {}) {
     // or stay on the verdicts.
     if (log.isConnected) {
         if (allDone) {
-            pl.push({ level: 'redirect', location: langPath('/' + id) + (opts.dir?.length > 1 ? '?pwd=' + encodeURIComponent('/' + opts.dir.join('/')) : '') });
+            // To the folder the files went into. The root needs no ?pwd=,
+            // but its crumb has one: kept when the page shows the root so,
+            // the redirect is then to the page shown (no history entry).
+            const pwd = opts.dir && '/' + opts.dir.join('/');
+            const withPwd = opts.dir?.length > 1 || (pwd && new URLSearchParams(window.location.search).get('pwd') === pwd);
+            pl.push({ level: 'redirect', location: langPath('/' + id) + (withPwd ? '?pwd=' + encodeURIComponent(pwd) : '') });
         } else {
             log.querySelector('.closeable-close').hidden = false;
             run.close();

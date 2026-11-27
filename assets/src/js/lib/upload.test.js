@@ -994,6 +994,28 @@ test('add files into the open folder', async (t) => {
     assert.deepEqual(root.assigned, [`/${U0}`]);
 });
 
+// Done, the redirect goes to the folder the files went into. When the page
+// shows that folder already it makes no history entry (progressLog.js), as
+// html/template wrote the URL: a folder's link, the root's crumb.
+test('done on the page it went into: no history entry', async (t) => {
+    for (const [path, dir] of [
+        [`/${U0}`, ['Photos']],
+        [`/${U0}?pwd=%2fPhotos`, ['Photos']],
+        [`/${U0}?pwd=%2fPhotos%2fsub`, ['Photos', 'sub']],
+        [`/${U0}?pwd=%2fPhotos%2f%d0%a4`, ['Photos', 'Ф']],
+    ]) {
+        await t.test(path, async (t) => {
+            ownWindow(t, 'https://webtor.io' + path);
+            const r = rig(t);
+            let push;
+            r.host.addEventListener('click', (e) => { push = e.target.getAttribute('data-async-push-state'); });
+            await r.run([asFile('a')], { id: U0, name: 'Photos', dir });
+            assert.equal(r.assigned.length, 1);
+            assert.equal(push, 'false', r.assigned[0]);
+        });
+    }
+});
+
 test('the same folder resumes', async (t) => {
     const photos = () => item(folder('Photos', { a: 1, s: { b: 6 } }));
     for (const [name, opts, items, want] of [
