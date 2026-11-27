@@ -1,6 +1,7 @@
 package j
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -67,7 +68,7 @@ func TestCodedMagnetRefusalIsNotTheDeadCard(t *testing.T) {
 			wc := &web.Context{Lang: "en", ApiClaims: &api.Claims{Uid: uidA}, User: &auth.User{ID: uuid.NewV4()}}
 			args := &scripts.LoadArgs{Query: c.query, Source: "site"}
 			counted := loadOutcome(t, c.outcome)
-			run, err := jobs.Load(wc, args)
+			run, err := jobs.Load(context.Background(), wc, args)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -116,7 +117,7 @@ func TestAnonUploadNeedsAccountCard(t *testing.T) {
 	anon := &web.Context{Lang: "en", ApiClaims: &api.Claims{}}
 	args := &scripts.LoadArgs{File: torrent, Source: "site"}
 	counted := loadOutcome(t, metrics.JobRejected)
-	if _, err := jobs.Load(anon, args); err != nil {
+	if _, err := jobs.Load(context.Background(), anon, args); err != nil {
 		t.Fatal(err)
 	}
 	id := st.waitClosed(t, "the upload")

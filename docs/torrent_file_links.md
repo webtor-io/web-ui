@@ -55,6 +55,16 @@ with no message after them and the view gives up: "Status unavailable"
 lock withdrawn, the sticky bar down. A person's edge challenge clearance lets
 the fetch through; a client that never loaded the page cannot renew.
 
+A renewal can land on another view when access is gone by then: the private
+refusal (`resource/private`, 403), the home page (the redirect to `/` or
+`/?err=`, or the 404 of a resource that names nothing) or the error page of a
+middleware that failed (`error/page`). Each defines `resource/status_inner`
+too — the refusal, the reason or "Status unavailable" in the status's slot,
+under that view's own status; with no status block in it, `status.js` does not
+start again. Until 2026-11 none of them had it, and such a renewal was a 500
+("no such template"). A new view a renewal can reach goes into
+`handlers/resource/status_renewal_views_test.go`.
+
 A tab hidden for a minute closes its streams (the server keeps a stream's loop,
 its Vault polling and its seeder and proxy subscriptions while it is open:
 streams of an hour or more were 73% of all stream time on 2026-10-03);

@@ -22,7 +22,6 @@ import (
 	"github.com/webtor-io/web-ui/services/enrich"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/metrics"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/statusview"
 	"github.com/webtor-io/web-ui/services/streamprefs"
 	thumb "github.com/webtor-io/web-ui/services/thumbnail"
@@ -1906,12 +1905,10 @@ func (s *ErrorWrapperScript) Run(ctx context.Context, j *job.Job) (err error) {
 }
 
 // ownKeyRefused says the refusal answered the user's own key (Р14): the
-// tracker refused, access is enforced, so the seeder announced with the
-// record of the user asking, and the user has a uid. In observation the
-// seeder announces with the key of whoever added the torrent first, and the
-// card must not call that key the user's.
+// tracker refused, and the user has a uid, so the seeder announced with the
+// record of the user asking.
 func ownKeyRefused(reason string, cl *api.Claims) bool {
-	return reason == "refused" && private_torrent.Enforce() && cl != nil && cl.Uid != ""
+	return reason == "refused" && cl != nil && cl.Uid != ""
 }
 
 // actionClock is the clock of the job keys' time bucket (Action, Embed); a

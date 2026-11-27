@@ -1139,7 +1139,7 @@ const docTemplatelibraryapi = `{
                         }
                     },
                     "403": {
-                        "description": "Not enough Vault Points",
+                        "description": "Not enough Vault Points, or ` + "`" + `private_unavailable` + "`" + ` (this deployment does not serve private torrents)",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }
@@ -1157,7 +1157,7 @@ const docTemplatelibraryapi = `{
                         }
                     },
                     "422": {
-                        "description": "A private torrent refused: code ` + "`" + `private_torrent` + "`" + ` with ` + "`" + `reason` + "`" + ` ` + "`" + `no_record` + "`" + ` (store its .torrent file with your own tracker first) or ` + "`" + `private_unavailable` + "`" + ` (private pledges are not open on this deployment)",
+                        "description": "A private torrent refused: code ` + "`" + `private_torrent` + "`" + ` with ` + "`" + `reason` + "`" + ` ` + "`" + `no_record` + "`" + ` (store its .torrent file with your own tracker first)",
                         "schema": {
                             "$ref": "#/definitions/libapi.ErrorResponse"
                         }

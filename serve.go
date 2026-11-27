@@ -67,7 +67,6 @@ import (
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/onboarding"
 	npg "github.com/webtor-io/web-ui/services/payments"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	rec "github.com/webtor-io/web-ui/services/recommendations"
 	rss "github.com/webtor-io/web-ui/services/release_subscription"
 	rum "github.com/webtor-io/web-ui/services/request_url_mapper"
@@ -120,7 +119,6 @@ func configureServe(c *cli.Command) {
 	c.Flags = cs.RegisterPromFlags(c.Flags)
 	c.Flags = cs.RegisterS3ClientFlags(c.Flags)
 	c.Flags = api.RegisterFlags(c.Flags)
-	c.Flags = private_torrent.RegisterFlags(c.Flags)
 	c.Flags = w.RegisterFlags(c.Flags)
 	c.Flags = common.RegisterFlags(c.Flags)
 	c.Flags = libapi.RegisterRateLimitFlags(c.Flags)
@@ -157,7 +155,6 @@ func configureServe(c *cli.Command) {
 }
 
 func serve(c *cli.Context) error {
-	private_torrent.Configure(c)
 	if !uploads.Enabled(c) {
 		hc.DropUploadPages()
 	}

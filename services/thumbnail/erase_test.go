@@ -20,7 +20,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/models/pgtest"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/thumbnail/thumbtest"
 )
@@ -214,8 +213,6 @@ func TestEraseWaitsForAStoreOfTheSameBytes(t *testing.T) {
 	})
 
 	t.Run("the store is Generate's own", func(t *testing.T) {
-		private_torrent.SetEnforce(true)
-		t.Cleanup(func() { private_torrent.SetEnforce(false) })
 		f := startDeletable(t, img, func(int, bool) int { return http.StatusOK }, nil)
 		s3, store := thumbtest.Start(t)
 		s := thumbtest.Service(t, s3, pgCS, f.api(t))
@@ -321,8 +318,6 @@ func TestGenerateOfADeletedUpload(t *testing.T) {
 	ctx := context.Background()
 	db := pgtest.Start(t)
 	pgCS := pgtest.CS(t, db)
-	private_torrent.SetEnforce(true)
-	t.Cleanup(func() { private_torrent.SetEnforce(false) })
 	img := jpegOf(t)
 	afterExport := func(status int) func(int, bool) int {
 		return func(_ int, exported bool) int {
@@ -339,18 +334,13 @@ func TestGenerateOfADeletedUpload(t *testing.T) {
 		purge    bool // the lookup after the export finds the row purged
 		existing bool // the resource has its row and object already
 		kept     bool
-		lookups  int // 0: not checked
+		lookups  int
 	}{
-		{"deleted meanwhile", eraseU, afterExport(http.StatusNotFound), false, false, false, 0},
-		{"lookup fails", eraseU, afterExport(http.StatusInternalServerError), false, false, false, 0},
-		{"purged meanwhile", eraseU, afterExport(http.StatusNotFound), true, false, false, 0},
-		{"existing row, lookup fails", eraseU, func(n int, _ bool) int {
-			if n == 1 {
-				return http.StatusOK
-			}
-			return http.StatusInternalServerError
-		}, false, true, true, 1},
-		{"still there", eraseU, afterExport(http.StatusOK), false, false, true, 0},
+		{"deleted meanwhile", eraseU, afterExport(http.StatusNotFound), false, false, false, 1},
+		{"lookup fails", eraseU, afterExport(http.StatusInternalServerError), false, false, false, 1},
+		{"purged meanwhile", eraseU, afterExport(http.StatusNotFound), true, false, false, 1},
+		{"existing row, lookup fails", eraseU, func(int, bool) int { return http.StatusInternalServerError }, false, true, true, 0},
+		{"still there", eraseU, afterExport(http.StatusOK), false, false, true, 1},
 		{"torrent", eraseT, afterExport(http.StatusNotFound), false, false, true, 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -389,7 +379,7 @@ func TestGenerateOfADeletedUpload(t *testing.T) {
 					t.Errorf("rows %v, objects %v; want none", rows, store.Keys("thumbs"))
 				}
 			}
-			if n := f.count(); c.lookups != 0 && n != c.lookups {
+			if n := f.count(); n != c.lookups {
 				t.Errorf("%d lookups, want %d", n, c.lookups)
 			}
 		})

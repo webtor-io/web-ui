@@ -53,13 +53,14 @@ export function init(window, config) {
     // private tracker's passkey is part of a tracker URL: GET /magnet:?…,
     // the same through the browser's magnet: handler (manifest "/%s", the
     // whole magnet encoded into the path) and the extension's
-    // /ext/magnet?url=<magnet>. Umami gets such a page as its bare path;
+    // /ext/magnet?url=<magnet>. The report confirmation page is one more:
+    // its t= confirms the report. Umami gets such a page as its bare path;
     // every other page keeps its query (UTM and the like).
-    const magnetPage = /^((?:\/[a-z]{2})?\/)(magnet(?::|%3a)|ext\/magnet(?=[?#]|$))/i;
+    const magnetPage = /^((?:\/[a-z]{2})?\/)(magnet(?::|%3a)|(?:ext\/magnet|support\/confirm)(?=[?#]|$))/i;
     const dropMagnet = path => {
         const m = magnetPage.exec(path);
         if (!m) return path;
-        return m[1] + (/^ext/i.test(m[2]) ? 'ext/magnet' : 'magnet:');
+        return m[1] + (/^magnet/i.test(m[2]) ? 'magnet:' : m[2].toLowerCase());
     };
     // The same for a whole URL: the referrer.
     const dropMagnetHref = href => {

@@ -13,11 +13,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
-	proto "github.com/webtor-io/claims-provider/proto"
 	ra "github.com/webtor-io/rest-api/services"
 	"github.com/webtor-io/web-ui/handlers/common"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/claims"
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/job"
 	w "github.com/webtor-io/web-ui/services/web"
@@ -60,7 +58,6 @@ func intentFuncs(t *testing.T) template.FuncMap {
 	// Beside the point here, and the zero web.Helper has no asset map.
 	funcs["asset"] = func(string) template.HTML { return "" }
 	funcs["promoOffer"] = func() any { return nil }
-	funcs["useUmami"] = func() bool { return true }
 	return funcs
 }
 
@@ -361,99 +358,6 @@ func TestPrivateResourceHasNoTorrentLink(t *testing.T) {
 	}
 	if strings.Contains(pub, notice) {
 		t.Error("the private notice on a public torrent's page")
-	}
-}
-
-// The seed-after-watching fake door under the private notice (until
-// 2026-11-30, docs/analytics.md): the days the viewer's tier would get, or
-// "on paid plans" with a way to the plans for a free one; a show, an opening
-// and a plans click for Umami, with the tier. Not on a public torrent's page,
-// and not where nothing counts it.
-func TestPrivateNoticeSeedDoor(t *testing.T) {
-	tr := intentFuncs(t)["t"].(func(string, string) string)
-	esc := template.HTMLEscapeString
-	page := func(tpl *template.Template, lang, tier string, private bool) string {
-		gd := intentPage("", true)
-		gd.Resource.Private = private
-		ctx := pageContext(lang, gd)
-		if tier != "" {
-			id := map[string]uint32{"free": 0, "bronze": 1, "silver": 2, "gold": 3, "sparkling": 6}[tier]
-			ctx.Claims = &claims.Data{
-				Context: &proto.Context{Tier: &proto.Tier{Id: id, Name: tier}},
-				Claims:  &proto.Claims{Site: &proto.Site{NoAds: true}},
-			}
-		}
-		return execute(t, tpl, "main", ctx)
-	}
-	tpl := resourceTemplates(t)
-	has := func(t *testing.T, out string, want ...string) {
-		t.Helper()
-		for _, w := range want {
-			if !strings.Contains(out, w) {
-				t.Errorf("missing %q", w)
-			}
-		}
-	}
-	hasNot := func(t *testing.T, out string, banned ...string) {
-		t.Helper()
-		for _, b := range banned {
-			if strings.Contains(out, b) {
-				t.Errorf("unexpected %q", b)
-			}
-		}
-	}
-	tiers := esc(tr("en", "private.seedDoor.tiers"))
-	tiersLink := `data-umami-event="seed-door-tiers-click"`
-
-	for _, tier := range []string{"", "free"} { // no claims, and the free tier
-		free := page(tpl, "en", tier, true)
-		has(t, free,
-			"Webtor can keep seeding with your key after you finish watching — on paid plans.",
-			">Keep seeding after watching</summary>", tiers,
-			esc(tr("en", "private.seedDoor.thanksFree")),
-			`data-umami-impression="seed-door-shown" data-umami-impression-tier="free"`,
-			`data-umami-event="seed-door-click" data-umami-event-tier="free"`,
-			`href="/donate" data-async-target="main"`, tiersLink+` data-umami-event-tier="free"`)
-		hasNot(t, free, "plan includes", esc(tr("en", "private.seedDoor.thanksPaid")))
-	}
-
-	for tier, want := range map[string][]string{
-		"bronze":    {"Your Bronze plan includes 3 days.", ">Seed for 3 days</summary>"},
-		"silver":    {"Your Silver plan includes 7 days.", ">Seed for 7 days</summary>"},
-		"gold":      {"Your Gold plan includes 14 days.", ">Seed for 14 days</summary>"},
-		"sparkling": {"Your Gold plan includes 14 days.", ">Seed for 14 days</summary>"},
-	} {
-		t.Run(tier, func(t *testing.T) {
-			out := page(tpl, "en", tier, true)
-			has(t, out, append(want, tiers,
-				esc(tr("en", "private.seedDoor.thanksPaid")),
-				`data-umami-impression="seed-door-shown" data-umami-impression-tier="`+tier+`"`,
-				`data-umami-event="seed-door-click" data-umami-event-tier="`+tier+`"`)...)
-			hasNot(t, out, "on paid plans", tiersLink, esc(tr("en", "private.seedDoor.thanksFree")))
-		})
-	}
-
-	ru := page(tpl, "ru", "silver", true)
-	has(t, ru, "В вашем тарифе Silver — 7 дней.", ">Раздавать 7 дней</summary>")
-	has(t, page(tpl, "ru", "bronze", true), "В вашем тарифе Bronze — 3 дня.")
-	has(t, page(tpl, "ru", "free", true), "после просмотра — в платных тарифах.", "Bronze — 3 дня · Silver — 7 дней · Gold — 14 дней", ">Смотреть тарифы</a>")
-
-	for _, lang := range allLangs {
-		for _, tier := range []string{"free", "bronze", "silver", "gold", "sparkling"} {
-			out := page(tpl, lang, tier, true)
-			if strings.Contains(out, "private.seedDoor") || strings.Contains(out, "<no value>") {
-				t.Errorf("%s/%s: an untranslated key or a missing value reached the page", lang, tier)
-			}
-		}
-	}
-
-	if out := page(tpl, "en", "silver", false); strings.Contains(out, "seed-door") {
-		t.Error("the door on a public torrent's page")
-	}
-	quiet := resourceTemplates(t).Funcs(template.FuncMap{"useUmami": func() bool { return false }})
-	out := page(quiet, "en", "silver", true)
-	if strings.Contains(out, "seed-door") || !strings.Contains(out, esc(tr("en", "private.notice.body"))) {
-		t.Error("without Umami: the notice without the door expected")
 	}
 }
 

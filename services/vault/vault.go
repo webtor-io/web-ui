@@ -16,7 +16,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/uploads"
 )
 
@@ -554,12 +553,11 @@ var errNoReserved = errors.New("rest-api gave no reserved for an upload")
 // GetOrCreateResource retrieves an existing resource or creates a new one if
 // it doesn't exist. Every pledge asks rest-api first, with the pledger's
 // claims, before the early return below: every private resource pledged so
-// far already has its row. A private torrent without the pledger's record, a
-// private one before enforce, and rest-api's failure all refuse the pledge.
-// The owner's upload is checked on that answer too, before the early return:
-// a row left by a pledge refused for VP is not returned for an upload that is
-// gone or has nothing finished. Without a row the upload is sealed first
-// (createUpload).
+// far already has its row. A private torrent without the pledger's record and
+// rest-api's failure refuse the pledge. The owner's upload is checked on that
+// answer too, before the early return: a row left by a pledge refused for VP
+// is not returned for an upload that is gone or has nothing finished. Without
+// a row the upload is sealed first (createUpload).
 func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, resourceID string) (*vaultModels.Resource, error) {
 	// An upload's ID is lower case. rest-api takes one in any case and would
 	// answer its owner, and the ID would go the torrent's way below: no seal,
@@ -585,10 +583,6 @@ func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, res
 		case r.FilesCount == 0:
 			return nil, ErrUploadEmpty
 		}
-	}
-	if r != nil && r.Private && !owned && !private_torrent.Enforce() {
-		return nil, &api.PrivateError{Status: http.StatusUnprocessableEntity, Code: api.CodePrivateUnavailable,
-			Message: "private torrents are not available for Vault on this server yet"}
 	}
 
 	db := s.pg.Get()

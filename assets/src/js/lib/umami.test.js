@@ -115,6 +115,21 @@ test('a magnet page reaches Umami without its magnet', async () => {
     }
 });
 
+test('the report confirmation page reaches Umami without its token', async () => {
+    const TOKEN = 'q5Xh2wJ0-ZbLrT9e_KdM3pVn8sYa1cFgUoIiE7lN4Ow';
+    for (const [page, want] of [
+        [`https://webtor.io/support/confirm?t=${TOKEN}`, '/support/confirm'],
+        [`https://webtor.io/ru/support/confirm?t=${TOKEN}`, '/ru/support/confirm'],
+    ]) {
+        const { umami, sent } = setup({ url: page });
+        await umami.track('x');
+        assert.equal(sent.at(-1).payload.url, want, page);
+    }
+    const { umami, sent } = setup({ url: 'https://webtor.io/', referrer: `https://webtor.io/support/confirm?t=${TOKEN}` });
+    await umami.track('x');
+    assert.equal(sent.at(-1).payload.referrer, 'https://webtor.io/support/confirm');
+});
+
 test('the page after a magnet page gets it as a bare referrer', async () => {
     const { umami, sent } = setup({ url: `https://webtor.io/${HASH}`, referrer: `https://webtor.io/ext/magnet?${new URLSearchParams({ url: MAGNET })}` });
     await umami.track('x');
@@ -130,6 +145,7 @@ test('every other page keeps its query', async () => {
         [`https://webtor.io/${HASH}?file=/a.mkv`, `/${HASH}?file=/a.mkv`],
         ['https://webtor.io/magnet-to-torrent?utm_source=x', '/magnet-to-torrent?utm_source=x'],
         ['https://webtor.io/ext/magnetic?x=1', '/ext/magnetic?x=1'],
+        ['https://webtor.io/support?cause=2', '/support?cause=2'],
     ]) {
         const { umami, sent } = setup({ url: page });
         await umami.track('x');
@@ -140,17 +156,16 @@ test('every other page keeps its query', async () => {
     assert.equal(sent.at(-1).payload.referrer, 'https://search.example/?q=sintel');
 });
 
-// The seed-after-watching door (views/resource/get.html resource/seed_door)
-// is a <details>: its button is the <summary>, which is neither a button nor
-// a link, and Umami counts a click on such an element only when the click
-// lands on the element itself.
+// A <summary> used as a button is neither a button nor a link, and Umami
+// counts a click on such an element only when the click lands on the element
+// itself.
 test('a click on a text-only <summary> is counted with its props', async () => {
     const { sent, window } = setup({ autoTrack: true });
     await settle();
-    window.document.body.innerHTML = '<div><details><summary data-umami-event="seed-door-click" data-umami-event-tier="free">Keep seeding</summary><p>Thanks</p></details></div>';
+    window.document.body.innerHTML = '<div><details><summary data-umami-event="summary-click" data-umami-event-tier="free">Open</summary><p>Body</p></details></div>';
     window.document.querySelector('summary').click();
     await settle();
     const ev = sent.at(-1).payload;
-    assert.equal(ev.name, 'seed-door-click');
+    assert.equal(ev.name, 'summary-click');
     assert.equal(ev.data.tier, 'free');
 });

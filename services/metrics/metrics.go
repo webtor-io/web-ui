@@ -78,7 +78,6 @@ type set struct {
 	vodRoute   *prometheus.CounterVec
 	statusView *prometheus.CounterVec
 	dlReady    *prometheus.CounterVec
-	enforce    prometheus.Gauge
 }
 
 func newSet(r prometheus.Registerer) *set {
@@ -141,10 +140,6 @@ func newSet(r prometheus.Registerer) *set {
 			Namespace: namespace, Name: "download_ready_total",
 			Help: "Download jobs that ended in the card with the download link, by kind (file; dir = a TAR/ZIP archive) and whether the content was cached. The denominator of the Umami download-start click. A replay of a finished job is not counted.",
 		}, []string{"kind", "cached"}),
-		enforce: f.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace, Name: "private_enforce",
-			Help: "1 when PRIVATE_ACCESS_ENFORCE is on (private Vault pledges and pictures of private torrents open), 0 when off. services/private_torrent.",
-		}),
 	}
 	for _, k := range []string{"file", "dir"} {
 		for _, c := range []string{"true", "false"} {
@@ -456,15 +451,6 @@ func (s *set) downloadReady(dir, cached bool) {
 		kind = "dir"
 	}
 	s.dlReady.WithLabelValues(kind, strconv.FormatBool(cached)).Inc()
-}
-
-// PrivateEnforce puts the private access switch's gauge at 1 (on) or 0.
-func PrivateEnforce(on bool) {
-	v := 0.0
-	if on {
-		v = 1
-	}
-	std.enforce.Set(v)
 }
 
 func campaignLabel(c string) string {

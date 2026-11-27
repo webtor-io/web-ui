@@ -26,7 +26,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/models/pgtest"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail/thumbtest"
 )
 
@@ -139,11 +138,6 @@ func (f *restAPI) api(t *testing.T) *api.Api {
 	return api.New(cli.NewContext(cli.NewApp(), fs, nil), f.srv.Client())
 }
 
-func setEnforce(t *testing.T, on bool) {
-	private_torrent.SetEnforce(on)
-	t.Cleanup(func() { private_torrent.SetEnforce(false) })
-}
-
 func wantJPEG(t *testing.T, res *Result, err error) {
 	t.Helper()
 	if err != nil {
@@ -188,10 +182,10 @@ func jpegOf(t *testing.T, shade uint8) []byte {
 	return buf.Bytes()
 }
 
-// Which source a private resource gets, decided before any database: where
-// viewers are not checked it has none, and its share card is the banner for
-// everyone. The service has no database, so reaching Resolve fails with "no
-// db"; a failed lookup is an error, never the default.
+// Which source a private resource gets, decided before any database: its
+// share card is the banner for everyone. The service has no database, so
+// reaching Resolve fails with "no db"; a failed lookup is an error, never the
+// default.
 func TestPrivatePosterGate(t *testing.T) {
 	t.Chdir("../..") // the banner is read from ./pub
 	ctx := context.Background()
@@ -205,26 +199,20 @@ func TestPrivatePosterGate(t *testing.T) {
 		}
 	}
 	for _, c := range []struct {
-		name    string
-		enforce bool
-		down    bool
-		file    string
-		check   func(t *testing.T, f *restAPI, res *Result, err error)
+		name  string
+		down  bool
+		file  string
+		check func(t *testing.T, f *restAPI, res *Result, err error)
 	}{
-		{"observe, width", false, false, "300.jpg", func(t *testing.T, _ *restAPI, res *Result, err error) {
-			wantNotFound(t, res, err)
-		}},
-		{"enforce, width", true, false, "300.jpg", func(t *testing.T, _ *restAPI, res *Result, err error) {
+		{"width", false, "300.jpg", func(t *testing.T, _ *restAPI, res *Result, err error) {
 			wantFailure(t, res, err, "no db")
 		}},
-		{"enforce, og", true, false, "og.jpg", banner},
-		{"observe, og", false, false, "og.jpg", banner},
-		{"rest-api down", true, true, "300.jpg", func(t *testing.T, _ *restAPI, res *Result, err error) {
+		{"og", false, "og.jpg", banner},
+		{"rest-api down", true, "300.jpg", func(t *testing.T, _ *restAPI, res *Result, err error) {
 			wantFailure(t, res, err, "rest-api down")
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			setEnforce(t, c.enforce)
 			f := startRestAPI(t, true)
 			if c.down {
 				f.all = downReply
@@ -284,7 +272,6 @@ func TestPrivatePosterGoesToItsViewer(t *testing.T) {
 	db := pgtest.Start(t)
 	pg := pgtest.CS(t, db)
 	s3, store := thumbtest.Start(t)
-	setEnforce(t, true)
 	ctx := context.Background()
 
 	// seed leaves for resource n what enrichment leaves for a torrent with an
@@ -420,17 +407,6 @@ func TestPrivatePosterGoesToItsViewer(t *testing.T) {
 		}
 		if n := f.hits(); n != 0 {
 			t.Errorf("rest-api asked %d times with the viewer's claims, want 0", n)
-		}
-	})
-	t.Run("observe", func(t *testing.T) {
-		private_torrent.SetEnforce(false)
-		defer private_torrent.SetEnforce(true)
-		h, _ := seed(t, 8)
-		before := store.Hits(http.MethodGet)
-		res, err := get(pod(t, startRestAPI(t, true), nil), &api.Claims{Uid: uidA}, h, false)
-		wantNotFound(t, res, err)
-		if n := store.Hits(http.MethodGet) - before; n != 0 {
-			t.Errorf("S3 read %d times, want 0: no source where viewers are not checked", n)
 		}
 	})
 }

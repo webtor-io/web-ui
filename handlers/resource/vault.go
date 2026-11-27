@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	ra "github.com/webtor-io/rest-api/services"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/uploads"
 )
 
@@ -26,11 +25,8 @@ type VaultPledgeAddForm struct {
 	// when it has none or it is over (Remove is offered only then).
 	FreezePeriod time.Duration
 	FrozenFor    time.Duration
-	// Private: a private torrent, whose Store button comes with a warning;
-	// PrivateClosed: private pledges are not open yet (before enforce), so
-	// there is no Store button at all.
-	Private       bool
-	PrivateClosed bool
+	// Private: a private torrent, whose Store button comes with a warning.
+	Private bool
 	// UploadEmpty: an upload with no finished file, nothing to save, so no
 	// Store button; UploadIncomplete: one with finished files and a part
 	// declared beyond them, which the pledge's seal drops -- said above the
@@ -89,7 +85,6 @@ func (s *Handler) prepareVaultPledgeAddForm(c *gin.Context, args *GetArgs, priva
 		ResourceID:    args.ID,
 		FreezePeriod:  s.vault.GetFreezePeriod(),
 		Private:       private,
-		PrivateClosed: private && !private_torrent.Enforce(),
 	}
 
 	// Check if user is supporting this torrent

@@ -51,8 +51,6 @@ upload from an infohash without asking anyone:
 - `uploads.Owned(id)` — kind 0, a user's upload: one owner, who alone writes
   and reads it. Private by its ID, whatever rest-api's `private` says
   (`docs/share_previews.md`).
-- `uploads.ViewerChecked(id)` — rest-api refuses a viewer without a right: an
-  upload always, a private torrent only where private access is enforced.
 
 The minute caches of rest-api answers (`GetResourceCached`,
 `ListResourceContentCached`) skip the whole prefix: an upload's files change,

@@ -271,10 +271,10 @@ func (s *Service) deleteObject(ctx context.Context, bucket, key string) error {
 // caller doesn't need to feed a probe in.
 //
 // A private torrent is listed and exported with the caller's claims:
-// rest-api refuses a caller without a right to it.
+// rest-api refuses a caller without a right to it, and its picture goes only
+// to a viewer rest-api admits (poster_resolver.Service.Get).
 //
-// Returns ErrNoSource when the torrent is private and its viewers are not
-// checked, has neither a usable image file
+// Returns ErrNoSource when the torrent has neither a usable image file
 // nor a video item, or its video's frames are over maxFramePixels — caller
 // logs this at info and proceeds with the
 // favicon fallback. Other errors are propagated so they show up in the
@@ -316,16 +316,6 @@ func (s *Service) Generate(ctx context.Context, claims *api.Claims, resourceID s
 func (s *Service) generate(ctx context.Context, claims *api.Claims, resourceID string) (*models.Thumbnail, error) {
 	if s == nil {
 		return nil, nil
-	}
-	r, err := s.api.LookupResource(ctx, api.InternalClaims(), resourceID)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to look up resource")
-	}
-	// A private resource's picture goes only to a viewer rest-api admits (poster_resolver.Service.Get).
-	// Where rest-api refuses nobody — a private torrent while private access is not enforced — the
-	// picture would be anyone's, and none is made. An upload's viewers are checked always.
-	if r != nil && r.Private && !uploads.ViewerChecked(resourceID) {
-		return nil, errors.Wrap(ErrNoSource, "private torrent, viewers are not checked")
 	}
 	db := s.pg.Get()
 	if db == nil {

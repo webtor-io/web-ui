@@ -1,0 +1,33 @@
+{{ define "title" }}{{ t $.Lang "support.confirm.title" }}{{ end }}
+{{ define "description" }}
+    <meta name="robots" content="noindex">
+{{ end }}
+{{ define "main" }}
+<section class="min-h-screen pt-24 sm:pt-[120px] pb-20 px-3 sm:px-6">
+    <div class="max-w-[480px] mx-auto">
+        <div class="bg-base-300/50 border border-w-line rounded-2xl p-8">
+            <h1 class="text-[1.4rem] font-bold tracking-tight mb-2">{{ t $.Lang "support.confirm.title" }}</h1>
+            {{ if .ErrKey }}
+                <div class="bg-error/10 border border-error/30 rounded-2xl p-4 my-4">
+                    <p class="text-sm text-error">{{ t $.Lang $.ErrKey }}</p>
+                </div>
+            {{ end }}
+            {{ with .Data }}
+                {{ if .Result }}
+                    <p class="text-sm text-w-sub leading-relaxed">{{ t $.Lang .Result }}</p>
+                {{ else }}
+                    <p class="text-sm text-w-sub leading-relaxed mb-6">{{ t $.Lang "support.confirm.text" }}</p>
+                    {{/* Confirm runs on this POST, never on the GET that
+                         rendered the page: mail scanners fetch every link in
+                         a letter, and they carry no CSRF token. */}}
+                    <form method="post" action="{{ langPath $.Lang "/support/confirm" }}">
+                        <input type="hidden" name="_csrf" value="{{ $.CSRF }}">
+                        <input type="hidden" name="t" value="{{ .Token }}">
+                        <button type="submit" class="btn btn-soft w-full">{{ t $.Lang "support.confirm.button" }}</button>
+                    </form>
+                {{ end }}
+            {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}

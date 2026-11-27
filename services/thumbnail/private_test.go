@@ -24,7 +24,6 @@ import (
 	"github.com/webtor-io/web-ui/models"
 	"github.com/webtor-io/web-ui/models/pgtest"
 	"github.com/webtor-io/web-ui/services/api"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/thumbnail"
 	"github.com/webtor-io/web-ui/services/thumbnail/thumbtest"
 )
@@ -46,17 +45,16 @@ type call struct {
 // private torrent of a single image. web-ui's own lookup gets the resource;
 // the listing and the export go to uidA only, and to no one else -- web-ui's
 // own claims included, so a listing made as web-ui instead of as the viewer
-// shows up as a refusal. down answers every lookup with 500.
+// shows up as a refusal.
 type privateTorrent struct {
 	srv   *httptest.Server
 	mu    sync.Mutex
 	calls []call
-	down  bool
 }
 
-func startPrivateTorrent(t *testing.T, img []byte, down bool) *privateTorrent {
+func startPrivateTorrent(t *testing.T, img []byte) *privateTorrent {
 	t.Helper()
-	f := &privateTorrent{down: down}
+	f := &privateTorrent{}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c := call{path: r.URL.Path}
 		if p, err := jwt.Parse(r.Header.Get("X-Token"), func(*jwt.Token) (any, error) { return []byte("test"), nil }); err == nil {
@@ -90,9 +88,6 @@ func startPrivateTorrent(t *testing.T, img []byte, down bool) *privateTorrent {
 				return
 			}
 			_, _ = fmt.Fprintf(w, `{"exports":{"download":{"url":%q}}}`, f.srv.URL+"/blob/poster.jpg")
-		case f.down:
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = io.WriteString(w, `{"error":"rest-api down"}`)
 		case c.internal:
 			_, _ = fmt.Fprintf(w, `{"id":%q,"private":true}`, rest)
 		default:
@@ -142,8 +137,7 @@ func jpegOf(t *testing.T) []byte {
 
 // A private torrent's picture is made as the viewer who plays it: the listing
 // and the export go with the viewer's claims, and rest-api refuses a viewer
-// without a right to it. Where viewers are not checked none is made, and a
-// failed lookup is an error, never "not private".
+// without a right to it.
 func TestGeneratePrivate(t *testing.T) {
 	ctx := context.Background()
 	db := pgtest.Start(t)
@@ -152,40 +146,14 @@ func TestGeneratePrivate(t *testing.T) {
 	sum := sha1.Sum(img)
 	key := hex.EncodeToString(sum[:]) + ".jpg"
 	h2 := testHash[:39] + "2"
-	h3 := testHash[:39] + "3"
-
-	nothingKept := func(t *testing.T, store *thumbtest.Store, h string) {
-		t.Helper()
-		if keys := store.Keys("thumbs"); len(keys) != 0 {
-			t.Errorf("objects %v, want none", keys)
-		}
-		th, err := models.GetThumbnailByResourceID(ctx, db, h)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if th != nil {
-			t.Errorf("thumbnail row %+v, want none", th)
-		}
-	}
 
 	for _, c := range []struct {
-		name    string
-		enforce bool
-		down    bool
-		uid     string
-		hash    string
-		check   func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error)
+		name  string
+		uid   string
+		hash  string
+		check func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error)
 	}{
-		{"observe", false, false, uidA, testHash, func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error) {
-			if !errors.Is(err, thumbnail.ErrNoSource) {
-				t.Errorf("err = %v, want ErrNoSource", err)
-			}
-			if n := len(f.requests("/list")) + len(f.requests("/export/i1")); n != 0 {
-				t.Errorf("%d listing and export requests, want none", n)
-			}
-			nothingKept(t, store, testHash)
-		}},
-		{"holder", true, false, uidA, testHash, func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error) {
+		{"holder", uidA, testHash, func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error) {
 			if err != nil {
 				t.Fatalf("err = %v, want a thumbnail", err)
 			}
@@ -211,29 +179,27 @@ func TestGeneratePrivate(t *testing.T) {
 				}
 			}
 		}},
-		{"stranger", true, false, uidB, h2, func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error) {
+		{"stranger", uidB, h2, func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error) {
 			if err == nil || errors.Is(err, thumbnail.ErrNoSource) {
 				t.Errorf("err = %v, want rest-api's refusal", err)
 			}
 			if n := len(f.requests("/export/i1")) + len(f.requests("/blob/poster.jpg")); n != 0 {
 				t.Errorf("%d export and image requests, want none", n)
 			}
-			nothingKept(t, store, h2)
-		}},
-		{"rest-api down", true, true, uidA, h3, func(t *testing.T, f *privateTorrent, store *thumbtest.Store, err error) {
-			if err == nil || !strings.Contains(err.Error(), "failed to look up resource") {
-				t.Errorf("err = %v, want a failed lookup", err)
+			if keys := store.Keys("thumbs"); len(keys) != 0 {
+				t.Errorf("objects %v, want none", keys)
 			}
-			if n := len(f.requests("/list")); n != 0 {
-				t.Errorf("%d listing requests, want none", n)
+			th, err := models.GetThumbnailByResourceID(ctx, db, h2)
+			if err != nil {
+				t.Fatal(err)
 			}
-			nothingKept(t, store, h3)
+			if th != nil {
+				t.Errorf("thumbnail row %+v, want none", th)
+			}
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			private_torrent.SetEnforce(c.enforce)
-			t.Cleanup(func() { private_torrent.SetEnforce(false) })
-			f := startPrivateTorrent(t, img, c.down)
+			f := startPrivateTorrent(t, img)
 			s3, store := thumbtest.Start(t)
 			s := thumbtest.Service(t, s3, pg, f.api(t))
 			_, err := s.Generate(ctx, &api.Claims{Uid: c.uid}, c.hash)

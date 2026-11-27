@@ -19,15 +19,14 @@ const (
 	upload1 = "9c5db5752b7c1123456789abcdef0123456789ab" // home-hosted, not a user's upload
 )
 
-// An upload's picture has a source where private access is only observed —
-// rest-api checks an upload's viewer either way — and none at all once
-// rest-api no longer knows the upload: its enrichment rows outlive its files.
+// An upload's picture has a source while rest-api knows the upload, and none
+// at all once rest-api no longer knows it: its enrichment rows outlive its
+// files.
 // Other IDs rest-api does not know are looked up as before. The service has
 // no database, so reaching Resolve fails with "no db"; a failed lookup is an
 // error, never "no source".
 func TestPosterSourceOfAnUpload(t *testing.T) {
 	t.Chdir("../..") // the banner is read from ./pub
-	setEnforce(t, false)
 	ctx := context.Background()
 	noDB := func(t *testing.T, res *Result, err error) { wantFailure(t, res, err, "no db") }
 	for _, c := range []struct {
@@ -47,7 +46,6 @@ func TestPosterSourceOfAnUpload(t *testing.T) {
 		{"upload, alive", upload0, nil, "300.jpg", noDB},
 		{"home-hosted, not an upload, unknown", upload1, notFoundReply, "300.jpg", noDB},
 		{"torrent, unknown", testHash, notFoundReply, "300.jpg", noDB},
-		{"private torrent, observed", testHash, nil, "300.jpg", wantNotFound},
 		{"upload, rest-api down", upload0, downReply, "300.jpg", func(t *testing.T, res *Result, err error) {
 			wantFailure(t, res, err, "rest-api down")
 		}},
@@ -62,14 +60,13 @@ func TestPosterSourceOfAnUpload(t *testing.T) {
 	}
 }
 
-// A live upload's picture goes to its owner and to nobody else, where private
-// access is only observed, and whether or not rest-api calls the upload
-// private. Once rest-api no longer knows it, a warm entry gives it to nobody.
+// A live upload's picture goes to its owner and to nobody else, whether or
+// not rest-api calls the upload private. Once rest-api no longer knows it, a
+// warm entry gives it to nobody.
 func TestUploadPosterGoesToItsOwner(t *testing.T) {
 	db := pgtest.Start(t)
 	pg := pgtest.CS(t, db)
 	s3, store := thumbtest.Start(t)
-	setEnforce(t, false)
 	ctx := context.Background()
 
 	// What enrichment leaves for an upload with an image file of its own.

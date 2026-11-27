@@ -15,7 +15,6 @@ import (
 	vaultModels "github.com/webtor-io/web-ui/models/vault"
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 	"github.com/webtor-io/web-ui/services/uploads"
 )
 
@@ -122,20 +121,6 @@ func (e *uidsEnv) gets() int {
 func (e *uidsEnv) pledgeUpload(t *testing.T) (*vaultModels.Resource, error) {
 	t.Helper()
 	return e.s.GetOrCreateResource(context.Background(), pledgerClaims, uploadHash)
-}
-
-// An upload's pledge does not wait for private pledges to open: its owner is
-// the only one who can read it, enforce or not.
-func TestUploadPledgeIgnoresEnforce(t *testing.T) {
-	e := newUIDsEnv(t)
-	was := private_torrent.Enforce()
-	t.Cleanup(func() { private_torrent.SetEnforce(was) })
-	private_torrent.SetEnforce(false)
-
-	res, err := e.pledgeUpload(t)
-	if err != nil || res == nil || res.RequiredVP != 1 {
-		t.Fatalf("GetOrCreateResource = %v, %v; want the resource at 1 VP", res, err)
-	}
 }
 
 // The pledge seals the upload while its write token is alive, reads rest-api

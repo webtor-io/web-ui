@@ -58,7 +58,7 @@ func (h *Handler) createPledge(ctx context.Context, resourceID string, user *aut
 
 // pledgeErr gives a pledge refused for want of the user's own record, and
 // an upload's with no finished file, its text. A *api.PrivateError reaches
-// ClassifyError as it is: private pledges not open yet read as
+// ClassifyError as it is: rest-api's private_unavailable reads as
 // error.private.unavailable.
 func pledgeErr(err error) error {
 	if errors.Is(err, vault.ErrPrivateNoRecord) {
