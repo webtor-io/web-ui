@@ -98,6 +98,30 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
         moving = now;
         bar.toggleAttribute('data-moving', now);
     };
+    // The room a video player leaves above itself for the bar past
+    // player.css's own reserve: the plan box's -- --wt-sticky-h, the bar at
+    // its tallest on this page view with the box up, measured up or not, so
+    // the player does not resize as the bar comes and goes. Kept to the end
+    // of the page view, through the box going, another file (only #content
+    // is swapped; this is not re-run) and the next episode: given back, it
+    // would resize a playing player under the viewer. stop() clears it when
+    // the whole <main> is swapped. Only the box: a hint line comes with a
+    // stall and goes (two lines and the Vault link: 135 px of bar on a
+    // desktop, up to 185 on a phone), and a player shrunk for it would stay
+    // shrunk -- so the hint is taken out of the measure, and nothing is
+    // measured without the box (no forced layout on every message until it
+    // comes up; nothing else that grows the bar claims room).
+    // ponytail: a box gone leaves the player as small as it made it; follow
+    // the bar down if that is missed.
+    let tallest = 0;
+    const reserve = () => {
+        const box = bar.querySelector('[data-tx-pbox]');
+        if (!box || box.hidden) return;
+        const h = barHeight(bar, bar.querySelector('[data-tx-hint]'));
+        if (h <= tallest) return;
+        tallest = h;
+        html.style.setProperty('--wt-sticky-h', `${h}px`);
+    };
 
     const io = new IntersectionObserver((entries) => {
         for (const e of entries) {
@@ -124,6 +148,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     const onStatus = (e) => {
         if (!e.detail || e.detail.resourceId !== real.dataset.resourceId) return;
         setMoving(!!e.detail.moving);
+        reserve();
         apply();
     };
     document.addEventListener('torrent-status', onStatus);
@@ -146,6 +171,7 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
     return () => {
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
         html.style.scrollPaddingTop = '';
+        html.style.removeProperty('--wt-sticky-h');
         io.disconnect();
         document.removeEventListener('torrent-status', onStatus);
         document.removeEventListener('landscape-focus', apply);
@@ -157,15 +183,24 @@ export function initStickyStatus(root = document, { slideMs = SLIDE_MS } = {}) {
 // status block has scrolled away: the navbar, and under it the sticky status
 // whenever something moves -- it will be up by the time a scroll lands. The
 // bar mirrors the whole block (plan box included), so its height is measured,
-// not assumed: unhidden and hidden again in the same task, nothing painted.
+// not assumed.
 export function stickyBottom(root = document) {
     const bar = root.querySelector('#torrent-status-sticky');
     if (!bar || !bar.hasAttribute('data-moving')) return NAVBAR_H;
+    return NAVBAR_H + barHeight(bar);
+}
+
+// barHeight is the bar's height, up or not, and with `without` (inside it)
+// taken out when given: both put back in the same task, nothing painted.
+function barHeight(bar, without = null) {
     const was = bar.hidden;
+    const had = without ? without.hidden : false;
     bar.hidden = false;
+    if (without) without.hidden = true;
     const h = bar.offsetHeight;
+    if (without) without.hidden = had;
     bar.hidden = was;
-    return NAVBAR_H + h;
+    return h;
 }
 
 // fixedBottom is where what is fixed at the top ends right now: the sticky

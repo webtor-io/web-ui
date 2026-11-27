@@ -43,9 +43,10 @@
      [data-status-mirror-for] once and updates both from the same stream.
      Hidden until the card's block scrolls out of view, and only while bytes
      move somewhere on the chain or the plan binds (view.sticky) -- see
-     stickyStatus.js. Its height, 67 px on a desktop, is reserved above a
-     tall player (player.css, the cap on .wt-player--video): taller padding
-     here moves that number. */}}
+     stickyStatus.js. Its height is reserved above a tall player (player.css,
+     the cap on .wt-player--video): 67 px, a desktop's, and 2rem, or the bar
+     as measured with the plan box up when that is taller (a hint line is
+     not reserved) -- taller padding here moves the 67. */}}
 {{ define "resource/status_sticky" }}
 <div id="torrent-status-sticky" hidden
      {{/* Same glass as the navbar above it (nav.html + .navbar-redesign:

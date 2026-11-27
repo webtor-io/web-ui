@@ -140,15 +140,26 @@ body:not([data-iframe-height]) .wt-preview-mount {
    was ~1500 px tall in the 850 px column, its controls far below the window
    (owner, 2026-11-27). The height it may take:
    - 72px: the navbar (style.css).
-   - 67px: the sticky status bar under it (views/resource/get.html,
-     #torrent-status-sticky), measured in Chrome: 67 px with the chain and
-     the piece bar on a desktop, 81 on a phone, 95 with a hint line. It is
-     up whenever the card's status is scrolled away and bytes move -- nearly
-     all the time a film plays -- so it is reserved always: a player that
-     resized as the bar came and went would jump under the viewer.
-   - 2rem: the mount's 1.5rem margin and 0.5rem of air under the player
-     scrolled to the bar. A taller bar (a phone's, a hint's) eats into it
-     and the player still fits; the plan box's (156 px) does not.
+   - max(67px + 2rem, --wt-sticky-h): the sticky status bar under it
+     (views/resource/get.html, #torrent-status-sticky). It is up whenever
+     the card's status is scrolled away and bytes move -- nearly all the
+     time a film plays -- so it is reserved always: a player that resized
+     as the bar came and went would jump under the viewer. 67 px is the bar
+     with the chain and the piece bar on a desktop, measured in Chrome; 2rem
+     the mount's 1.5rem margin and 0.5rem of air under the player scrolled
+     to the bar. A taller bar eats into the 2rem first -- a phone's (81), a
+     one-line hint's (95) -- and the player keeps its size. A two-line hint
+     (113 px, 135 with the Vault link; 163-185 on a phone) is not reserved
+     either: it comes with a stall and goes, and a player shrunk for it
+     would stay shrunk. While it is up, the last 14-36 px of a player the
+     window holds back run past it (31-53 on a phone; with the box up, the
+     hint's whole height). The plan box (156, 272 on a phone) gets its
+     whole height: --wt-sticky-h is the bar with the box up at its tallest
+     on this page view, measured up or not and without its hint
+     (lib/stickyStatus.js). The player shrinks once as the box comes up and
+     keeps that size to the end of the page view -- the box gone, another
+     file, the next episode: growing back would resize a playing player
+     under the viewer.
    - 640px: the most on any window (owner, 2026-11-27: portrait clips are
      mostly low-resolution and look poor blown up to the window's height).
      On a 2x screen 1280 device px, a 720x1280 clip pixel for pixel. The
@@ -165,7 +176,7 @@ body:not([data-iframe-height]) .wt-preview-mount {
    px of the picture, where a narrower player would cut off fullscreen.
    Another button in the row moves this floor. */
 body:not([data-iframe-height]) .wt-player--video:not(.wt-player--fullscreen) {
-    max-width: max(18rem, calc(min(100svh - 72px - 67px - 2rem, 640px) * (var(--wt-ratio))));
+    max-width: max(18rem, calc(min(100svh - 72px - max(67px + 2rem, var(--wt-sticky-h, 0px)), 640px) * (var(--wt-ratio))));
     margin-inline: auto;
 }
 
