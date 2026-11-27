@@ -81,8 +81,11 @@
      badge speak of own files only; a dropped .torrent still opens
      (lib/drop.js), the page just does not offer it. See docs/tool_pages.md. */}}
 {{ $ownFiles := and .Tool .Tool.Uploads }}
+{{/* Its hero has no bottom padding: elsewhere the stats and trust strips
+     stand between it and the first section's top padding, here the two
+     would stack into an empty band under the drop zone. */}}
 <!-- Hero Section -->
-<section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] pb-16 px-3 sm:px-6">
+<section class="flex flex-col items-center text-center relative overflow-hidden pt-[120px] {{ if not $ownFiles }}pb-16 {{ end }}px-3 sm:px-6">
     {{ template "hero_backdrop" }}
 
     <!-- big logo -->

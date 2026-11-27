@@ -204,6 +204,39 @@ func TestUploadsPageHeroIsAboutOwnFiles(t *testing.T) {
 	}
 }
 
+// Elsewhere the hero's bottom padding and the first section's top padding are
+// kept apart by the stats and trust strips. The page about one's own files has
+// neither (TestUploadsPageHasNoTorrentBlocks), and the two paddings stacked
+// into 152px of nothing under the drop zone, against 88px at most on a tool
+// page. Its hero has no bottom padding of its own; every other hero keeps it.
+func TestUploadsPageHeroLeavesNoGapToTheSteps(t *testing.T) {
+	pages := map[string]*hc.Tool{"home": nil}
+	for i := range hc.Tools {
+		pages[hc.Tools[i].Url] = &hc.Tools[i]
+	}
+	own := 0
+	for name, tool := range pages {
+		uploads := tool != nil && tool.Uploads
+		if uploads {
+			own++
+		}
+		t.Run(name, func(t *testing.T) {
+			page := renderIndexMain(t, tool)
+			i := strings.Index(page, "<section ")
+			if i < 0 {
+				t.Fatal("no hero section")
+			}
+			hero := page[i : i+strings.Index(page[i:], ">")]
+			if got := strings.Contains(hero, " pb-16 "); got == uploads {
+				t.Errorf("the hero's bottom padding rendered: %v, want %v: %s", got, !uploads, hero)
+			}
+		})
+	}
+	if own == 0 {
+		t.Fatal("no tool is marked Uploads — the test ran against nothing")
+	}
+}
+
 // The error above the form quotes its numbers when it has them
 // (error.hash_length: how many characters were pasted, how many a full
 // infohash has) and is a plain message otherwise.
