@@ -15,7 +15,6 @@ import (
 	"github.com/webtor-io/web-ui/services/api"
 	"github.com/webtor-io/web-ui/services/auth"
 	"github.com/webtor-io/web-ui/services/claims"
-	"github.com/webtor-io/web-ui/services/private_torrent"
 )
 
 const (
@@ -524,20 +523,16 @@ var ErrPrivateNoRecord = errors.New("private torrent: no tracker record for this
 // GetOrCreateResource retrieves an existing resource or creates a new one if
 // it doesn't exist. Every pledge asks rest-api first, with the pledger's
 // claims, before the early return below: every private resource pledged so
-// far already has its row. A private torrent without the pledger's record, a
-// private one before enforce, and rest-api's failure all refuse the pledge.
+// far already has its row. A private torrent without the pledger's record and
+// rest-api's failure refuse the pledge.
 func (s *Vault) GetOrCreateResource(ctx context.Context, claims *api.Claims, resourceID string) (*vaultModels.Resource, error) {
-	r, err := s.api.GetResource(ctx, claims, resourceID)
+	_, err := s.api.GetResource(ctx, claims, resourceID)
 	var pe *api.PrivateError
 	if errors.As(err, &pe) && pe.Code == api.CodePrivateTorrent {
 		return nil, errors.Wrap(ErrPrivateNoRecord, "pledge refused")
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check the resource")
-	}
-	if r != nil && r.Private && !private_torrent.Enforce() {
-		return nil, &api.PrivateError{Status: http.StatusUnprocessableEntity, Code: api.CodePrivateUnavailable,
-			Message: "private torrents are not available for Vault on this server yet"}
 	}
 
 	db := s.pg.Get()

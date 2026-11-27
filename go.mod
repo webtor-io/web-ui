@@ -41,7 +41,7 @@ require (
 	github.com/webtor-io/common-services v0.0.0-20260927094256-ddfbf24ea805
 	github.com/webtor-io/go-jackett v0.0.0-20260814082136-736779aad158
 	github.com/webtor-io/lazymap v0.0.0-20261021184726-55fd9cba3e7a
-	github.com/webtor-io/rest-api v1.0.1-0.20261114123910-13c535326915
+	github.com/webtor-io/rest-api v1.0.1-0.20261127004127-bb03d3ca7f28
 	github.com/yargevad/filepathx v1.0.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.45.0
@@ -147,7 +147,7 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	github.com/webtor-io/magnet2torrent v1.0.1-0.20261113103955-8de21226ede1 // indirect
+	github.com/webtor-io/magnet2torrent v1.0.1-0.20261114125219-733d1efe207c // indirect
 	github.com/webtor-io/torrent-store v1.1.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
