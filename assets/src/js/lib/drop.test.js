@@ -73,7 +73,6 @@ function fakeLoad() {
         load.count++;
         return Promise.resolve({
             startUpload: (host, items, opts) => load.calls.push({ host, items, opts }),
-            rootName: () => 'Root',
         });
     };
     load.count = 0;
@@ -233,9 +232,9 @@ test('the markup says whether Vault is set up', async (t) => {
 
 // addPage puts the add button on its own window, with the listing's card
 // when dir is given (null: no card).
-function addPage(t, { dir = null, cardID = U0, buttonDir, busy = false } = {}) {
+function addPage(t, { dir = null, cardID = U0, buttonDir, busy = false, name = 'Photos' } = {}) {
     const w = ownWindow(t);
-    w.document.body.innerHTML = `<button data-upload-add data-upload-id="${U0}" data-upload-name="Photos" data-upload-upsell${buttonDir !== undefined ? ` data-upload-dir="${buttonDir}"` : ''}${busy ? ` data-busy="${BUSY}"` : ''}></button><input type="file" multiple hidden>
+    w.document.body.innerHTML = `<button data-upload-add data-upload-id="${U0}" data-upload-name="${name}" data-upload-upsell${buttonDir !== undefined ? ` data-upload-dir="${buttonDir}"` : ''}${busy ? ` data-busy="${BUSY}"` : ''}></button><input type="file" multiple hidden>
 <div data-upload-log></div>
 ${dir !== null ? `<div id="list"><div class="js-list-card" data-resource-id="${cardID}" data-dir="${dir}"></div></div>` : ''}<p id="elsewhere"></p>`;
     const btn = w.document.querySelector('[data-upload-add]');
@@ -296,6 +295,29 @@ test('add files into the open folder', async (t) => {
         await tick();
         assert.deepEqual(load.calls[0].opts.dir, ['Photos', 'sub']);
     });
+});
+
+// The page may not know the upload's name (handlers/resource uploadView: it
+// could not be read). The uploader then names the root, as it names a new
+// upload's, and loose files go into one folder, not among the root's
+// (upload.test.js). The uploader here is the real one but for the run.
+test('add files to an upload whose name the page does not know', async (t) => {
+    globalThis.__SUPPORTED_LOCALES__ ??= ['en'];
+    const real = await import('./upload.js');
+    for (const [name, cfg, items] of [
+        ['loose files', { dir: '' }, [file('a.mkv'), file('b.mkv')]],
+        ['loose files in a folder shown', { dir: '/Photos/sub' }, [file('a.mkv'), file('b.mkv')]],
+        ['one file', {}, [file('a.mkv')]],
+    ]) {
+        await t.test(name, async (t) => {
+            const p = addPage(t, { ...cfg, name: '' });
+            const calls = [];
+            initAddFiles(p.btn, () => Promise.resolve({ ...real, startUpload: (host, it, opts) => calls.push(opts) }));
+            p.pick(items);
+            await tick();
+            assert.deepEqual(calls, [{ id: U0, name: '', upsell: true, dir: undefined }]);
+        });
+    }
 });
 
 test('add files while an upload runs in the tab: a toast, no second upload', async (t) => {

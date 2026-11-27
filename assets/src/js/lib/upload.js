@@ -416,14 +416,16 @@ export async function startUpload(log, items, opts = {}) {
 
         // Paths, safe segment by segment. A new upload's one folder is its
         // root. "Add files" go under the open folder, or under the root;
-        // the root folder itself dropped into the root resumes it.
+        // the root folder itself dropped into the root resumes it. A page
+        // that does not know the root gives no folder (lib/drop.js): the
+        // root is then named here, as a new upload's is.
+        const dir = opts.dir || (opts.id ? [opts.name || root] : null);
         const oneFolder = !!pickedFolder(items) || (items.length === 1 && !!items[0].entry?.isDirectory);
-        const resumes = opts.dir?.length === 1 && items.length === 1 && !!items[0].entry?.isDirectory
-            && safeSegment(items[0].entry.name) === safeSegment(opts.dir[0]);
+        const resumes = dir?.length === 1 && items.length === 1 && !!items[0].entry?.isDirectory
+            && safeSegment(items[0].entry.name) === safeSegment(dir[0]);
         let prefix;
         if ((!opts.id && oneFolder) || resumes) prefix = '';
-        else if (opts.dir) prefix = opts.dir.join('/');
-        else prefix = opts.id ? opts.name || root : root;
+        else prefix = dir ? dir.join('/') : root;
         for (const f of queue) f.path = (prefix ? prefix + '/' + f.rel : f.rel).split('/').map(safeSegment).join('/');
 
         let startTracked = false;

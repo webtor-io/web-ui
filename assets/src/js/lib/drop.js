@@ -115,8 +115,10 @@ export function initDrop(dropzone, load = () => import('./upload')) {
 
 // destination is the folder of the upload that files added on its page go
 // to: the open folder, given as "/<root>/<sub>…", when it is inside root;
-// root otherwise.
+// root otherwise. None when the page does not know root: the uploader
+// names it then.
 function destination(raw, root) {
+    if (!root) return undefined;
     const segs = raw.split('/').filter(Boolean);
     if (!segs.length || segs[0] !== root || segs.some((s) => s === '.' || s === '..')) return [root];
     return segs;
@@ -132,7 +134,7 @@ function addFiles(el, items, load) {
         id: el.dataset.uploadId,
         name: el.dataset.uploadName,
         upsell: el.hasAttribute('data-upload-upsell'),
-        dir: destination(raw, el.dataset.uploadName || m.rootName(items)),
+        dir: destination(raw, el.dataset.uploadName),
     }));
 }
 

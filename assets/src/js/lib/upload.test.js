@@ -977,6 +977,25 @@ test('add files', async (t) => {
     assert.deepEqual(r.calls.token[0], { id: U0, want: 3 });
 });
 
+// A page that does not know the upload's name gives no folder (lib/drop.js):
+// the root is named here, as a new upload's is, and a folder of that name
+// dropped resumes it.
+test('add files to an upload whose name the page does not know', async (t) => {
+    const loose = rig(t);
+    await loose.run([asFile('a', 1), asFile('b', 2)], { id: U0, name: '' });
+    const name = defaultName((k) => k, 'en');
+    assert.deepEqual(loose.calls.put.map((p) => p.path).sort(), [`${name}/a`, `${name}/b`]);
+    assert.deepEqual(loose.calls.token[0], { id: U0, want: 3 });
+
+    const one = rig(t);
+    await one.run([asFile('IMG.JPG')], { id: U0, name: '' });
+    assert.deepEqual(one.calls.put.map((p) => p.path), ['IMG/IMG.JPG']);
+
+    const folder1 = rig(t);
+    await folder1.run([item(folder('Photos', { a: 1, s: { b: 2 } }))], { id: U0, name: '' });
+    assert.deepEqual(folder1.calls.put.map((p) => p.path).sort(), ['Photos/a', 'Photos/s/b']);
+});
+
 test('add files into the open folder', async (t) => {
     const sub = { id: U0, name: 'Photos', dir: ['Photos', 'sub'] };
     const r = rig(t);
