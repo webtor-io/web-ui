@@ -83,19 +83,22 @@ func TestOwnFilesFrameSaysNoTorrent(t *testing.T) {
 	}
 }
 
-// In Turkish the frame around that page speaks as the rest of the interface
-// does, in the bare imperative ("bırak", "tıkla", "hazır mısın?"), and the
-// page's own copy followed with "siz" ("yükleyin", "dosyalarınız"): the
-// closing heading and the line under it, the zone and the copy above it each
-// read in two voices. docs/i18n.md asks for the imperative; nothing the page
-// renders is in "siz" any more.
+// docs/i18n.md asks Turkish for the bare imperative, without naming the
+// reader ("giriş yap", "dosyayı seç"). The page's own copy once followed
+// with "siz" ("yükleyin", "dosyalarınız") and then named the reader with
+// "sen" ("seni bekliyor", "yalnızca sen"). This reads the frame around the
+// page, the toast of its zone while files go (upload.deleteBusy) and the
+// page's tool.privateCloudMediaServer.* copy, and finds no "siz" form and
+// no "sen" or "kendin" by these patterns. Other texts the page renders, as
+// its header and footer, are not read here.
 func TestOwnFilesPageSpeaksTurkishInOneVoice(t *testing.T) {
 	siz := regexp.MustCompile(`[aeıioöuü]n[ıiuü]z|\bsiz|y[ıiuü]n\b|\b(?:yapın|bırakın|açın|seçin|indirin|kaydedin)\b`)
+	sen := regexp.MustCompile(`(?i)(?:^|\P{L})(sen|seni|sana|sende|senden|senin|kendin|kendine|kendini)(?:\P{L}|$)`)
 	msgs, ok := localeFiles(t)["tr"]
 	if !ok {
 		t.Fatal("no tr locale")
 	}
-	keys := append([]string{}, ownFilesFrame...)
+	keys := append([]string{"upload.deleteBusy"}, ownFilesFrame...)
 	for k := range msgs {
 		if strings.HasPrefix(k, "tool.privateCloudMediaServer.") {
 			keys = append(keys, k)
@@ -105,8 +108,15 @@ func TestOwnFilesPageSpeaksTurkishInOneVoice(t *testing.T) {
 		t.Fatal("no tool.privateCloudMediaServer.* keys")
 	}
 	for _, k := range keys {
-		if m := siz.FindString(msgs[k]); m != "" {
-			t.Errorf("%s says %q: %q", k, m, msgs[k])
+		v, ok := msgs[k]
+		if !ok {
+			t.Fatalf("no %s", k)
+		}
+		if m := siz.FindString(v); m != "" {
+			t.Errorf("%s says %q: %q", k, m, v)
+		}
+		if m := sen.FindStringSubmatch(v); m != nil {
+			t.Errorf("%s says %q: %q", k, m[1], v)
 		}
 	}
 }
