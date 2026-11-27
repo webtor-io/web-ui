@@ -236,6 +236,27 @@ func TestMarkUploadGoneLikeACheck(t *testing.T) {
 		}
 	}
 
+	// A mark touches its ID only: an idle row of another ID stays, another
+	// account's for the cleaner's mark, the viewer's own for the page's.
+	for j, c := range []struct {
+		bystander uuid.UUID
+		mark      func(string) error
+	}{
+		{other, func(id string) error { return MarkUploadEvicted(ctx, db, id) }},
+		{u, func(id string) error { return MarkOwnUploadGone(ctx, db, u, id) }},
+	} {
+		target, kept := id(200+j), id(210+j)
+		if _, err := db.Exec(`INSERT INTO upload_reserve (user_id, resource_id) VALUES (?, ?), (?, ?)`, u, target, c.bystander, kept); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.mark(target); err != nil {
+			t.Fatal(err)
+		}
+		if !marked(t, u, target) || marked(t, c.bystander, kept) {
+			t.Errorf("mark %d marked its ID %v and another %v, want only its own", j, marked(t, u, target), marked(t, c.bystander, kept))
+		}
+	}
+
 	// The page knows only its viewer: another account's row of the ID stays.
 	const shared = testUploadID
 	for _, user := range []uuid.UUID{u, other} {
