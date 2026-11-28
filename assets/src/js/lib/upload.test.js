@@ -131,7 +131,7 @@ const last = (p) => p.path.split('/').pop();
 // rig is one run's world: the upload log in the document, a fake transport
 // that answers by token(body, n) and put(p, onProgress, n), and the log's
 // redirect written down. Everything goes into one log, in order.
-function rig(t, { token, put, wait, onAssign } = {}) {
+function rig(t, { token, put, wait, onAssign, readable } = {}) {
     const log = [];
     const calls = { token: [], put: [], wait: [] };
     const tr = {
@@ -151,6 +151,7 @@ function rig(t, { token, put, wait, onAssign } = {}) {
             log.push(['wait', ms]);
             if (wait) return wait(ms);
         },
+        readable: readable && (async (blob) => readable(blob)),
     };
     const page = document.createElement('div');
     page.innerHTML = uploadLog;
@@ -1607,6 +1608,38 @@ test('a failed file is named in the verdict', async (t) => {
     assert.equal(names.length, 12);
     assert.deepEqual(names.slice(1, 3), ['f0', 'f1']);
     assert.equal(names[11], '…');
+});
+
+test('a part that cannot be read fails its file, not the network', async (t) => {
+    const failed = (r) => r.host.querySelector('pre.warn-summary[task-summary="failed"]')?.textContent.split('\n');
+    // The browser answers a changed file as it answers a dropped connection:
+    // no status. The second file was changed on disk after it was picked.
+    let sends = 0;
+    const r = rig(t, {
+        put: (p) => {
+            if (p.path !== 'x/b.tmp') return ok201;
+            if (++sends > 3) throw new Error('retried as offline');
+            return { status: 0, text: '' };
+        },
+        readable: async () => false,
+    });
+    await r.run([item(folder('x', { 'a.mkv': 10, 'b.tmp': 20 }))]);
+    assert.equal(sends, 1, 'not sent again');
+    assert.deepEqual(r.calls.wait, [], 'no offline pause');
+    assert.deepEqual(failed(r), ['upload.someFailed', 'x/b.tmp']);
+    assert.ok(r.calls.put.some((p) => p.path === 'x/a.mkv'), 'the others go on');
+    assert.equal(window.__uploadBusy, false);
+
+    // A readable part with no answer is the network: paused and sent again.
+    let n = 0;
+    const net = rig(t, {
+        put: () => (++n === 1 ? { status: 0, text: '' } : ok201),
+        readable: async () => true,
+    });
+    await net.run([asFile('a')]);
+    assert.equal(net.calls.put.length, 2);
+    assert.equal(net.calls.wait.length, 1);
+    assert.equal(failed(net), undefined);
 });
 
 test('the log says it is temporary from the start', async (t) => {

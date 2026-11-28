@@ -202,6 +202,10 @@ function transport() {
             });
         },
         wait: (ms) => new Promise((r) => setTimeout(r, ms)),
+        // readable: whether the part can still be read. A file changed or
+        // gone since it was picked fails every send the same way a dropped
+        // connection does -- the browser gives no status either way.
+        readable: (blob) => blob.arrayBuffer().then(() => true, () => false),
     };
 }
 
@@ -470,6 +474,14 @@ export async function startUpload(log, items, opts = {}) {
                     paint();
                 });
                 touch();
+                // No answer: the network, or a file that changed on disk
+                // (a download still being written, a cloud placeholder):
+                // read the part to tell them apart, or it is retried as
+                // "offline" for ever (prod 2026-11-28, a .tmp file).
+                if (res.status === 0 && tr.readable && !(await tr.readable(f.file.slice(offset, end)))) {
+                    resume();
+                    return [{ status: 'unreadable', text: '' }, tk];
+                }
                 if (NETWORK.has(res.status)) {
                     pause('upload.offline');
                     await tr.wait(backoff(n++));
