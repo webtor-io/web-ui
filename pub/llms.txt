@@ -64,7 +64,7 @@ As of September 2026, the site shows no third-party ads.
 - [Webtor Stremio addon](https://webtor.io/webtor-stremio-addon): the user's own torrents and magnet links in Stremio on a TV, phone or tablet (paid plans).
 - [Debrid alternative for Stremio](https://webtor.io/debrid-alternative): the Webtor Stremio addon in place of or alongside a debrid service; with the user's own Real-Debrid or TorBox connected, the files it has cached play through it at no charge from Webtor, and Webtor's servers play the rest (paid plans).
 - [Torrent RSS alternative](https://webtor.io/torrent-rss-alternative): email alerts for new releases found on the user's own indexers and Stremio addons.
-- [Private cloud media server](https://webtor.io/private-cloud-media-server): the user's own files played in the browser next to torrents; uploading needs an account.
+- [Private cloud media server](https://webtor.io/private-cloud-media-server): upload your own videos, music or a whole folder and play or download them in the browser on any device where you are signed in, with no server of your own; uploading needs an account.
 
 ## Developers
 
