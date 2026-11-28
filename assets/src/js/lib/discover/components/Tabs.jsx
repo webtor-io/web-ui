@@ -145,3 +145,29 @@ export function GenreSelector({ filter, value, onSelect }) {
         </div>
     );
 }
+
+// ExtraSelectors: one select per optional extra of the catalog (language,
+// sort, year, ...) next to the genre one. The first option is the extra's
+// own name and means "not set"; the values are sent as the addon lists them.
+const extraLabel = (name) => name.replace(/[-_]+/g, ' ').replace(/^./, c => c.toUpperCase());
+
+export function ExtraSelectors({ filters, values, onSelect }) {
+    if (!filters?.length) return null;
+    return (
+        <>
+            {filters.map(f => (
+                <div key={f.name}>
+                    <select
+                        class="select select-sm bg-w-surface border-w-line text-w-text w-full sm:w-auto"
+                        aria-label={extraLabel(f.name)}
+                        onChange={(e) => onSelect(f.name, e.target.value || null)}
+                        value={values?.[f.name] || ''}
+                    >
+                        <option value="">{extraLabel(f.name)}</option>
+                        {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                </div>
+            ))}
+        </>
+    );
+}

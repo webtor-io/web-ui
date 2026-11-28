@@ -43,6 +43,35 @@ Joins with `movie` + `movie_metadata` and `series` + `series_metadata` tables to
 
 When no poster is available, the template renders a gradient fallback.
 
+### Poster saved from Discover
+
+Enrichment needs a TMDB/OMDB key, so on an instance without one a card has no
+poster. To fix that, Discover remembers the poster the user was looking at:
+when they start a stream (`handleStreamClick`) the page posts
+`{resource_id, poster_url}` to `POST /discover/poster`
+(`handlers/discover/poster.go`), stored in `resource_poster` (migration 77),
+**first writer wins**. `poster_resolver.Resolve` checks that table first, ahead
+of the movie/series metadata and the thumbnail, so the card uses the artwork
+from the catalog. The image is fetched once and cached in the poster S3 bucket
+like any other source (`SourceDiscover`).
+
+The URL comes from the browser and is fetched by the server, so
+`ValidateStoredPosterURL` (`services/poster_resolver/stored.go`) accepts only
+public http(s) URLs: no credentials, no loopback/private/link-local/CGNAT
+addresses, after DNS resolution. It runs when the URL is stored and again before
+each fetch. Titles started before this existed have no stored poster until the
+user opens them from Discover again. Private torrents still get no poster
+(`miss()` checks that before resolving).
+
+### Removing a card (x button)
+
+The x on a card calls `POST /watch/dismiss {resource_id}`, which upserts a row in
+`continue_watching_dismissed` (migration 77). `GetRecentlyWatched` drops a
+resource whose `dismissed_at` is not older than its latest `watch_history`
+`updated_at`, so the title comes back by itself when the user watches it again
+and no watch progress is deleted. The filter runs before the ribbon limit.
+The click handler is in `assets/src/js/app/index.js`.
+
 ### Files
 
 - `models/watch_history.go` — model, queries, enrichment
@@ -50,7 +79,8 @@ When no poster is available, the template renders a gradient fallback.
 - `handlers/index/handler.go` — fetches `ContinueWatching` for homepage
 - `handlers/resource/post.go` — has `ContinueWatching` field (nil) to prevent template error
 - `templates/partials/continue_watching.html` — ribbon template with horizontal scroll
-- `handlers/watch/handler.go` — REST endpoints for position tracking
+- `handlers/watch_history/handler.go` — REST endpoints for position tracking and `POST /watch/dismiss`
+- `models/resource_poster.go`, `services/poster_resolver/stored.go` — poster saved from Discover
 
 ### Position Tracking Endpoints
 

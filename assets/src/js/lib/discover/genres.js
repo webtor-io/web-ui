@@ -103,6 +103,32 @@ export function catalogFilter(cat) {
     return null;
 }
 
+// catalogExtraFilters reads the manifest catalog's other optional extras that
+// carry a fixed list of options (a "language" or "sort" select, say) into the
+// selects Discover shows beside the genre one. `genre`, `search` and `skip`
+// are handled on their own; a required extra has no default to pick, so it is
+// left out as the genre filter does.
+export function catalogExtraFilters(cat) {
+    if (!Array.isArray(cat.extra)) return [];
+    const out = [];
+    for (const e of cat.extra) {
+        if (!e || typeof e.name !== 'string' || ['genre', 'search', 'skip'].includes(e.name) || e.isRequired) continue;
+        const options = [...new Set(names(e.options))];
+        if (options.length) out.push({ name: e.name, options });
+    }
+    return out;
+}
+
+// cleanExtras keeps only the values a catalog offers.
+export function cleanExtras(catalog, values) {
+    const out = {};
+    for (const f of catalog?.extraFilters || []) {
+        const v = values?.[f.name];
+        if (typeof v === 'string' && f.options.includes(v)) out[f.name] = v;
+    }
+    return out;
+}
+
 // genreFor: the value a catalog is shown with — `value` when the catalog
 // offers it, else its default (none for a genre filter, the first year for
 // a year filter). An unknown value from a link lands on the default.

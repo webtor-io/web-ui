@@ -92,9 +92,11 @@ const leaked = () => written.filter((u) => decodeURIComponent(u).includes('addon
 // Opens /discover?<query> as the app's bootstrap would: Cinemeta first,
 // with no row, then the user's addon with its row id. seeds overrides the
 // bootstrap seeds (an addon the wizard just installed has none).
+// A test that reopens the page as a returning visitor keeps what the page stored.
+let keepStorage = false;
 function open(query, seeds = [{ id: '', url: CINEMETA }, { id: ADDON_ID, url: `${ADDON}/manifest.json` }], addonUrls = [CINEMETA, ADDON]) {
     w.history.replaceState(null, '', `/discover?${query}`);
-    w.localStorage.clear();
+    if (!keepStorage) w.localStorage.clear();
     fetched = [];
     written = [];
     tracked = [];
@@ -265,6 +267,25 @@ test('another catalog drops the genre: a year catalog\'s newest year, none where
     choose(root.querySelector('select'), `${META}::top`);
     await until(() => genreSelect(root)?.value === '' && shows(root, 'Top 0'), 'Popular, all genres');
     assert.equal(urlParam('genre'), null);
+});
+
+test('the genre is remembered: opening Discover with no link restores it, a link overrides it', async () => {
+    let root = openMeta({ type: 'movie' });
+    await until(() => genreSelect(root) && shows(root, 'Top 0'), 'Popular');
+    choose(genreSelect(root), 'Action');
+    await until(() => shows(root, 'Act 0'), 'Action');
+
+    keepStorage = true;
+    try {
+        root = openMeta({ type: 'movie' });
+        await until(() => genreSelect(root)?.value === 'Action' && shows(root, 'Act 0'), 'Action restored');
+        assert.equal(urlParam('genre'), 'Action');
+
+        root = openMeta({ type: 'movie', genre: 'Drama' });
+        await until(() => genreSelect(root)?.value === 'Drama' && shows(root, 'Dra 0'), 'the link wins');
+    } finally {
+        keepStorage = false;
+    }
 });
 
 test('links: a genre, an unknown genre, a year, an unknown year', async () => {

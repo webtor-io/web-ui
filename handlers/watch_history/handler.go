@@ -36,6 +36,7 @@ func RegisterHandler(r *gin.Engine, pg *cs.PG, videoStatus *user_video_status.Se
 	h := &Handler{pg: pg, videoStatus: videoStatus}
 	r.PUT("/watch/position", h.updatePosition)
 	r.GET("/watch/position", h.getPosition)
+	r.POST("/watch/dismiss", h.dismiss)
 }
 
 func (h *Handler) updatePosition(c *gin.Context) {
@@ -148,4 +149,34 @@ func (h *Handler) getPosition(c *gin.Context) {
 		Duration: wh.Duration,
 		Watched:  wh.Watched,
 	})
+}
+
+type dismissRequest struct {
+	ResourceID string `json:"resource_id"`
+}
+
+// dismiss removes a title from the Continue Watching ribbon. Watch progress is
+// kept: the title comes back on its own once the user watches it again.
+func (h *Handler) dismiss(c *gin.Context) {
+	user := auth.GetUserFromContext(c)
+	if !user.HasAuth() {
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+	var req dismissRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.ResourceID == "" {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	db := h.pg.Get()
+	if db == nil {
+		c.Status(http.StatusServiceUnavailable)
+		return
+	}
+	if err := models.DismissContinueWatching(c.Request.Context(), db, user.ID, req.ResourceID); err != nil {
+		_ = c.Error(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

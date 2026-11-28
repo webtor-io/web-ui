@@ -27,6 +27,10 @@
                 <div class="text-sm text-w-muted mt-3">
                     {{ t $.Lang "profile.addons.maxReached" }}
                 </div>
+            {{ else }}
+                <a href="{{ langPath $.Lang "/discover" }}?setup-addons=1" class="btn btn-ghost btn-sm mt-3" data-umami-event="addon-add-from-list">
+                    {{ t $.Lang "profile.addons.addFromList" }}
+                </a>
             {{ end }}
             {{ if .Data.ErrKey }}
                 <div class="text-sm text-error mt-3">

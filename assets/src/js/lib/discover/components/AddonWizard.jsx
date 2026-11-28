@@ -131,10 +131,28 @@ function dedup(addons) {
     return result;
 }
 
-export function AddonWizard({ onComplete, onSkip }) {
+function baseUrl(u) {
+    return (u || '').replace(/\/manifest\.json$/, '').replace(/\/+$/, '');
+}
+
+// installedUrls / installedNames describe addons the user already has. When
+// present the wizard is being used to add MORE addons: both sources start
+// checked, and addons the user already has are shown as installed (checked,
+// locked) instead of being offered again.
+export function AddonWizard({ onComplete, onSkip, installedUrls = [], installedNames = [] }) {
     const dialogRef = useRef(null);
     const [step, setStep] = useState(1);
-    const [sources, setSources] = useState({ official: false, community: false });
+    const hasInstalled = installedUrls.length > 0;
+    const [sources, setSources] = useState({ official: hasInstalled, community: hasInstalled });
+    const installedBases = useMemo(() => new Set(installedUrls.map(baseUrl)), [installedUrls]);
+    const installedNameSet = useMemo(
+        () => new Set(installedNames.map(normalizeName).filter(Boolean)),
+        [installedNames],
+    );
+    const isInstalled = useCallback(
+        (a) => installedBases.has(baseUrl(a.transportUrl)) || installedNameSet.has(normalizeName(a.manifest.name)),
+        [installedBases, installedNameSet],
+    );
     const [addons, setAddons] = useState([]);
     const [selected, setSelected] = useState(new Set());
     const [loading, setLoading] = useState(false);
@@ -349,6 +367,7 @@ export function AddonWizard({ onComplete, onSkip }) {
                     <Step2
                         addons={filteredAddons}
                         selected={selected}
+                        isInstalled={isInstalled}
                         loading={loading}
                         saving={saving}
                         error={error}
@@ -431,7 +450,7 @@ function SourceCard({ label, desc, checked, onChange }) {
     );
 }
 
-function Step2({ addons, selected, loading, saving, error, search, onSearchChange, onToggle, showAdult, adultCount, onAdultToggle, torrentOnly, onTorrentOnlyToggle, onInstall, onBack, onSkip }) {
+function Step2({ addons, selected, isInstalled, loading, saving, error, search, onSearchChange, onToggle, showAdult, adultCount, onAdultToggle, torrentOnly, onTorrentOnlyToggle, onInstall, onBack, onSkip }) {
     const selectedCount = selected.size;
 
     return (
@@ -509,6 +528,7 @@ function Step2({ addons, selected, loading, saving, error, search, onSearchChang
                         <AddonRow
                             key={addon.transportUrl}
                             addon={addon}
+                            installed={isInstalled(addon)}
                             checked={selected.has(addon.transportUrl)}
                             onToggle={() => onToggle(addon.transportUrl)}
                         />
@@ -544,18 +564,20 @@ function Disclaimer() {
     );
 }
 
-function AddonRow({ addon, checked, onToggle }) {
+function AddonRow({ addon, checked, installed, onToggle }) {
     const [imgError, setImgError] = useState(false);
     const m = addon.manifest;
     const types = (m.types || []).slice(0, 4);
     const sourceLabel = addon.source === 'official' ? t('discover.official') : t('discover.community');
+    const on = checked || installed;
 
     return (
-        <label class={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${checked ? 'border-w-cyan/30 bg-w-cyan/5' : 'border-w-line hover:border-w-cyan/20'}`}>
+        <label class={`flex items-center gap-3 p-2.5 rounded-lg border transition-all ${installed ? 'cursor-default opacity-70 ' : 'cursor-pointer '}${on ? 'border-w-cyan/30 bg-w-cyan/5' : 'border-w-line hover:border-w-cyan/20'}`}>
             <input
                 type="checkbox"
                 class="checkbox checkbox-sm rounded-sm border-w-line hover:border-w-cyan/40 checked:border-w-cyan/50 checked:bg-w-cyan/20 [--chkfg:theme(colors.w-cyan)] flex-shrink-0"
-                checked={checked}
+                checked={on}
+                disabled={installed}
                 onChange={onToggle}
             />
             {m.logo && !imgError ? (
@@ -576,6 +598,11 @@ function AddonRow({ addon, checked, onToggle }) {
                     <span class={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${addon.source === 'official' ? 'bg-w-cyan/10 text-w-cyan' : 'bg-w-purple/10 text-w-purpleL'}`}>
                         {sourceLabel}
                     </span>
+                    {installed && (
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 bg-w-surface text-w-sub">
+                            {t('discover.addonInstalled')}
+                        </span>
+                    )}
                     {addon.votes > 0 && (
                         <span class="text-[10px] text-w-muted flex-shrink-0" title={t('discover.communityVotes')}>
                             👍 {addon.votes >= 1000 ? `${(addon.votes / 1000).toFixed(1)}k` : addon.votes}

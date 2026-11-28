@@ -286,6 +286,11 @@ func GetRecentlyWatched(ctx context.Context, db *pg.DB, userID uuid.UUID, limit 
 		return nil, nil
 	}
 
+	list = filterDismissed(ctx, db, list, userID)
+	if len(list) == 0 {
+		return nil, nil
+	}
+
 	// Sort by updated_at DESC (DISTINCT ON requires ORDER BY resource_id first).
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].UpdatedAt.After(list[j].UpdatedAt)
@@ -534,4 +539,41 @@ func SetWatchedForEpisode(ctx context.Context, db *pg.DB, userID uuid.UUID, vide
 		return errors.Wrap(err, "failed to sync watch_history for episode")
 	}
 	return nil
+}
+
+// DismissContinueWatching hides a resource from the user's Continue Watching
+// ribbon until they watch it again. Watch progress is left untouched.
+func DismissContinueWatching(ctx context.Context, db *pg.DB, userID uuid.UUID, resourceID string) error {
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO continue_watching_dismissed (user_id, resource_id, dismissed_at)
+		 VALUES (?, ?, now())
+		 ON CONFLICT (user_id, resource_id) DO UPDATE SET dismissed_at = now()`,
+		userID, resourceID)
+	return errors.Wrap(err, "failed to dismiss continue watching entry")
+}
+
+// filterDismissed drops entries the user removed with the x button, unless
+// they have been watched since. A lookup failure keeps the entries: showing
+// a removed card is better than hiding the whole ribbon.
+func filterDismissed(ctx context.Context, db *pg.DB, list []*WatchHistory, userID uuid.UUID) []*WatchHistory {
+	var rows []struct {
+		ResourceID  string    `pg:"resource_id"`
+		DismissedAt time.Time `pg:"dismissed_at"`
+	}
+	if _, err := db.QueryContext(ctx, &rows,
+		`SELECT resource_id, dismissed_at FROM continue_watching_dismissed WHERE user_id = ?`, userID); err != nil || len(rows) == 0 {
+		return list
+	}
+	dismissed := make(map[string]time.Time, len(rows))
+	for _, r := range rows {
+		dismissed[r.ResourceID] = r.DismissedAt
+	}
+	out := list[:0]
+	for _, wh := range list {
+		if at, ok := dismissed[wh.ResourceID]; ok && !wh.UpdatedAt.After(at) {
+			continue
+		}
+		out = append(out, wh)
+	}
+	return out
 }
