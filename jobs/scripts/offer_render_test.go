@@ -10,6 +10,7 @@ import (
 	"github.com/webtor-io/web-ui/services/i18n"
 	"github.com/webtor-io/web-ui/services/offer"
 	"github.com/webtor-io/web-ui/services/payments"
+	"github.com/webtor-io/web-ui/services/uploads"
 )
 
 type catalogSource struct{ c *payments.Catalog }
@@ -64,6 +65,7 @@ func offerFuncsWith(t *testing.T, c *payments.Catalog, checkout offer.Checkout) 
 		"downloadPitch": oh.DownloadPitch,
 		"speedUp":       oh.SpeedUp,
 		"trialURL":      oh.TrialURL,
+		"uploadOwned":   uploads.Owned,
 	}
 }
 
@@ -181,6 +183,41 @@ func TestDownloadCommands(t *testing.T) {
 	assertRender(t, "commands", renderModal(t, tpl, "en", &ctx{Lang: "en", Data: &FileDownload{URL: "u"}}),
 		[]string{"`wget -c -O \"${file}\" -t 20 \"${url}\"`",
 			"`curl -f -o \"${file}\" -C - --retry 20 \"${url}\"`"}, nil)
+}
+
+// The download card's events tell the viewer's own upload from a torrent
+// (prop own): copying a link to one's own file is the share the counts are
+// for. Every copy button and the download link carry it.
+func TestDownloadEventsTellOwnUpload(t *testing.T) {
+	type ctx struct {
+		Lang string
+		Data *FileDownload
+	}
+	tpl, err := template.New("download_file.html").Funcs(offerFuncs(t, nil, false)).
+		ParseFiles("../../templates/views/action/download_file.html")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	upload, err := uploads.NewID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name, id, want, banned string
+	}{
+		{"own upload", upload, `data-umami-event-own="true"`, `data-umami-event-own="false"`},
+		{"torrent", "0123456789abcdef0123456789abcdef01234567", `data-umami-event-own="false"`, `data-umami-event-own="true"`},
+	} {
+		out := renderModal(t, tpl, "en", &ctx{Lang: "en", Data: &FileDownload{URL: "u", ResourceID: c.id}})
+		events := strings.Count(out, `data-umami-event="download-copy"`) + strings.Count(out, `data-umami-event="download-start"`)
+		if events != 4 {
+			t.Fatalf("%s: %d download events, want 4 (wget, curl, URL, download)", c.name, events)
+		}
+		if n := strings.Count(out, c.want); n != events {
+			t.Errorf("%s: %d of %d events carry %s:\n%s", c.name, n, events, c.want, out)
+		}
+		assertRender(t, c.name, out, nil, []string{c.banned})
+	}
 }
 
 // The modal's title says which of the two it is: the plan's cap on a file

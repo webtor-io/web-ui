@@ -5,6 +5,10 @@
         var wgetCmd = `wget -c -O "${file}" -t 20 "${url}"`;
         var curlCmd = `curl -f -o "${file}" -C - --retry 20 "${url}"`;
     </script>
+    {{- /* own on the download events: a copied link to one's own upload is
+         how a file gets shared, a copied torrent link mostly feeds a download
+         manager. Counted apart. */}}
+    {{- $own := uploadOwned .Data.ResourceID }}
     {{- /* The nudge sells the promo plan (services/offer) to a free viewer.
          The title names the limit, the line under it prices this file's wait,
          the button promises the outcome ("download up to 10× faster") and the
@@ -79,21 +83,21 @@
          ✕ (style.css). */}}
     <div class="pt-3 px-5 flex sm:flex-wrap gap-1.5 sm:gap-2 items-center">
         <div class="flex gap-1.5 sm:mr-auto">
-            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" data-umami-event="download-copy" data-umami-event-kind="wget" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyWget" }}" data-umami-event="download-copy" data-umami-event-kind="wget" data-umami-event-own="{{ $own }}" onclick="navigator.clipboard.writeText(wgetCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 wget
             </button>
-            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" data-umami-event="download-copy" data-umami-event-kind="curl" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyCurl" }}" data-umami-event="download-copy" data-umami-event-kind="curl" data-umami-event-own="{{ $own }}" onclick="navigator.clipboard.writeText(curlCmd); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
                 curl
             </button>
-            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" data-umami-event="download-copy" data-umami-event-kind="url" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
+            <button type="button" class="btn btn-xs btn-ghost border border-w-line text-w-sub hover:border-w-cyan/50 hover:text-w-cyan gap-1.5 closeable-close" title="{{ t $.Lang "action.download.copyUrl" }}" data-umami-event="download-copy" data-umami-event-kind="url" data-umami-event-own="{{ $own }}" onclick="navigator.clipboard.writeText(url); toast.success('{{ t $.Lang "action.download.copied" }}')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 hidden sm:block">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -107,7 +111,7 @@
              turn into a download. A `download` link is not held back by the
              tracker (lib/umami.js treats it as external). */}}
         <a class="btn btn-sm btn-soft-cyan gap-1.5 closeable-close flex-1 sm:flex-none" data-transfer-download download href="{{ .Data.URL }}"
-           data-umami-event="download-start" data-umami-event-kind="{{ if .Data.IsArchive }}dir{{ else }}file{{ end }}" data-umami-event-cached="{{ .Data.Cached }}" data-umami-event-tier="{{ .Data.TierName }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
+           data-umami-event="download-start" data-umami-event-kind="{{ if .Data.IsArchive }}dir{{ else }}file{{ end }}" data-umami-event-cached="{{ .Data.Cached }}" data-umami-event-tier="{{ .Data.TierName }}" data-umami-event-own="{{ $own }}" onclick="toast.info('{{ t $.Lang "action.download.downloadStarting" }}')">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
             </svg>
