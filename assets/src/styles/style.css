@@ -1314,7 +1314,7 @@ html {
     &.statusupdate {
       span.task-status {
         @apply pl-1;
-        color: #64748b;
+        color: #7b8ca3; /* w-muted */
         &::before { content: '('; }
         &::after { content: ')'; }
       }
@@ -2287,7 +2287,13 @@ input:-webkit-autofill:focus {
   color: #fd79a8 !important;
 }
 [data-theme="night"] .badge.text-w-muted {
-  color: #64748b !important;
+  color: #7b8ca3 !important; /* w-muted */
+}
+/* DaisyUI fades .footer-title to 60%: over w-muted the footer's headings
+   read 2.2:1. The token is already the quiet grey; the fade only took the
+   headings under AA. */
+.footer-title {
+  opacity: 1;
 }
 [data-theme="night"] .badge.text-w-cyan {
   color: #00cec9 !important;

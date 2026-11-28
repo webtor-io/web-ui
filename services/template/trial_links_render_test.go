@@ -294,9 +294,9 @@ var trialNoteRe = regexp.MustCompile(`<span class="([^"]*)"[^>]*>\{\{ tn \$\.Lan
 
 // The trial's terms ("7 days free · cancel anytime") are the honest half of
 // the offer, at 11 px under its button: w-sub, as the status's box has them
-// (.tx-pn). w-muted is 3.3-3.7:1 on the cards and modals they sit on, under
-// AA's 4.5:1 for text that small -- the grace popup, the first offer a free
-// stream gets, the lowest of them (review 2026-10-03).
+// (.tx-pn). w-muted, #64748b then, was 3.3-3.7:1 on the cards and modals
+// they sit on, under AA's 4.5:1 for text that small -- the grace popup, the
+// first offer a free stream gets, the lowest of them (review 2026-10-03).
 func TestTrialNotesAreLegible(t *testing.T) {
 	n := 0
 	err := filepath.WalkDir("../../templates", func(path string, d fs.DirEntry, err error) error {
