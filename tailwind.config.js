@@ -35,7 +35,11 @@ module.exports = {
           cyan:    '#00cec9',
           text:    '#f1f5f9',
           sub:     '#94a3b8',
-          muted:   '#64748b',
+          // The quietest text that still reads: 4.6:1 on w-card, the
+          // lightest surface it sits on (modals, poster cards), 5.6:1 on the
+          // page -- AA for 12px. #64748b was 3.3-4.1:1. Under sub (6.2:1 on
+          // w-card), so muted < sub < text holds.
+          muted:   '#7b8ca3',
           line:    'rgba(255,255,255,0.07)',
         }
       },

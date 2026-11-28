@@ -1117,6 +1117,9 @@ func (s *ActionScript) renderActionTemplate(j *job.Job, c *web.Context, data any
 type FileDownload struct {
 	URL      string
 	TierName string
+	// ResourceID tells the viewer's own upload (uploadOwned) from a torrent
+	// in the card's events.
+	ResourceID string
 	// RateMbps is the viewer's download cap (0 = unlimited or unknown) and
 	// SizeBytes what this link downloads (0 = unknown); together they price
 	// the download in time against the promo plan (offer.DownloadPitch).
@@ -1209,6 +1212,7 @@ func (s *ActionScript) download(ctx context.Context, j *job.Job, c *web.Context,
 	str, err := tpl.ToString(c.WithData(&FileDownload{
 		URL:        de.URL,
 		TierName:   tierName,
+		ResourceID: resourceID,
 		RateMbps:   rate,
 		SizeBytes:  size,
 		Cached:     exportMeta(de).Cache,

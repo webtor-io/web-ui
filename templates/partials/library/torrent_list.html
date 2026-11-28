@@ -5,7 +5,7 @@
     {{/* An upload whose files storage removed (handlers/library annotateGone):
          its name and icon dimmed, and no link -- its page would only say the
          files are gone. The line saying so is not dimmed: text-w-muted under
-         opacity-60 read 2.2:1, and alone it reads as every row's, 3.9:1. */}}
+         opacity-60 read 2.2:1, and alone it reads as every row's, 5.4:1. */}}
     {{ if .Gone }}<div class="flex items-center gap-4 p-4">{{ else }}
     <a href="{{ langPath $.Ctx.Lang (printf "/%s" .ResourceID) }}" data-async-target="main"
        class="flex items-center gap-4 p-4 hover:bg-base-300/30 transition-colors group">{{ end }}

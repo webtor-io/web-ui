@@ -73,7 +73,7 @@ Two measurements were added to follow it:
   form, not on document: iOS Safari sends no click for a tap on an element without a
   click listener of its own (or an ancestor's below `<body>`) or `cursor: pointer`.
 - `download-start` (Umami, the "start download" link of `action/download_file`, props
-  `kind` file|dir, `cached`, `tier`) over `webui_download_ready_total{kind,cached}`
+  `kind` file|dir, `cached`, `tier`, `own`) over `webui_download_ready_total{kind,cached}`
   (Prometheus, counted where the job emits that card): how many finished downloads the
   viewer actually starts. The card needs a second click and used to render off-screen.
   Read the ratio as a trend per `kind` and `cached`, before and after a change, not as a
@@ -83,6 +83,10 @@ Two measurements were added to follow it:
   since 2026-10-29), and blocked trackers are missing from the
   numerator. Deduplicate the clicks on (session, url, kind, 10-minute bucket) and divide
   by `sum by (kind, cached) (increase(webui_download_ready_total[1d]))`.
+  Both events carry `own` (since 2026-11-28): `true` for the viewer's own upload
+  (`uploadOwned` of the card's resource, `docs/uploads.md`), `false` for a torrent.
+  `download-copy` with `own=true` is a link to one's own file copied: the share it is
+  counted for.
 
 ## Where the result appears — `lib/stickyStatus.js` reveal
 
